@@ -31,8 +31,8 @@ const Login = () => {
   };
 
   return (
-    <div className="w-full max-w-md p-10 mx-auto bg-gray-100 shadow-xl rounded-lg border border-gray-200 space-y-6">
-      <h2 className="text-2xl font-semibold text-center text-gray-800">Hello, have a wonderful day!</h2>
+    <div className="w-full max-w-sm md:max-w-md p-6 sm:p-10 mx-auto bg-gray-100 shadow-xl rounded-lg border border-gray-200 space-y-6">
+      <h2 className="text-xl sm:text-2xl font-semibold text-center text-gray-800">Hello, have a wonderful day!</h2>
       {errorMessage && <p className="text-center text-red-500">{errorMessage}</p>}
       
       <form onSubmit={handleLogin} className="space-y-6">
