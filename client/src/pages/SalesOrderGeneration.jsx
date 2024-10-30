@@ -1,12 +1,13 @@
 // client/src/pages/SalesOrderGeneration.jsx
 import { useState, useEffect } from 'react';
 import { nanoid } from 'nanoid';
-import { CalendarIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
+import axios from 'axios';
+import { CalendarIcon, DocumentTextIcon, PrinterIcon } from '@heroicons/react/24/outline';
 
-const SalesOrderGeneration = () => {
+const SalesOrderGeneration = ({ isCollapsed }) => {
     const [step, setStep] = useState(1);
     const [salesOrderId, setSalesOrderId] = useState('');
-    const [productId, setProductId] = useState('');
+    const [productIds, setProductIds] = useState(['']);
     const [stockStatus, setStockStatus] = useState('');
     const [quantity, setQuantity] = useState('');
     const [description, setDescription] = useState('');
@@ -18,11 +19,47 @@ const SalesOrderGeneration = () => {
     const [phoneNumber, setPhoneNumber] = useState('');
     const [otp, setOtp] = useState('');
     const [employee, setEmployee] = useState('');
+    const [advanceDetails, setAdvanceDetails] = useState(null);
     const [employees] = useState(['John Doe', 'Jane Smith', 'Alex Brown']); // Dummy employee list
 
     useEffect(() => {
         setSalesOrderId(nanoid());
     }, []);
+
+    // Function to fetch stock status from the backend
+    const fetchStockStatus = async (productId) => {
+        try {
+            const response = await axios.get(`/api/stock-status/${productId}`);
+            const { status } = response.data; // Assume the API returns { status: "in_stock" or "out_of_stock" }
+            setStockStatus((prevStatus) => ({
+                ...prevStatus,
+                [productId]: status,
+            }));
+        } catch (error) {
+            console.error('Error fetching stock status:', error);
+        }
+    };
+
+    const handleProductIdChange = (index, value) => {
+        // Update the specific product ID in the array
+        const updatedProductIds = [...productIds];
+        updatedProductIds[index] = value;
+        setProductIds(updatedProductIds);
+
+        // If this is the last input and it has a value, add a new empty field
+        if (index === productIds.length - 1 && value) {
+            setProductIds([...updatedProductIds, '']);
+        }
+    };
+
+    const handleScan = (index, e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            if (index === productIds.length - 1 && productIds[index]) {
+                setProductIds([...productIds, '']);
+            }
+        }
+    };
 
     const nextStep = (e) => {
         e.preventDefault();
@@ -34,12 +71,19 @@ const SalesOrderGeneration = () => {
         setStep((prevStep) => Math.max(prevStep - 1, 1));
     };
 
-    const handlePatientDetailsFetch = () => {
-        setPatientDetails({
-            name: 'Patient Name',
-            age: 45,
-            condition: 'Sample Condition',
-        });
+    // Function to fetch patient and advance payment details from backend
+    const handlePatientDetailsFetch = async () => {
+        try {
+            const response = await axios.get(`/api/patient-details/${patientId}`);
+            setPatientDetails({
+                name: response.data.name,
+                age: response.data.age,
+                condition: response.data.condition,
+            });
+            setAdvanceDetails(response.data.advanceAmount); // Assuming advanceAmount is returned by the backend
+        } catch (error) {
+            console.error('Error fetching patient details:', error);
+        }
     };
 
     const handlePrint = () => {
@@ -47,13 +91,13 @@ const SalesOrderGeneration = () => {
     };
 
     return (
-        <div className="p-8 max-w-5xl mx-auto space-y-10">
+        <div className={`transition-all duration-300 ${isCollapsed ? 'ml-2' : 'ml-2'} mt-16 p-4 max-w-5xl`}>
             <h1 className="text-2xl font-semibold text-gray-700 mb-8">Sales Order Generation</h1>
 
             {/* Progress Tracker */}
             <div className="flex justify-around items-center mb-8">
                 {Array.from({ length: 7 }, (_, i) => (
-                    <div key={i} className={`flex-1 h-2 rounded-xl ${step > i + 1 ? 'bg-[#05668d]' : 'bg-gray-300'} transition-all duration-300`} />
+                    <div key={i} className={`flex-1 h-2 mx-1 rounded-xl ${step > i + 1 ? 'bg-[#5db76d]' : 'bg-gray-300'} transition-all duration-300`} />
                 ))}
             </div>
 
@@ -70,47 +114,45 @@ const SalesOrderGeneration = () => {
                             readOnly
                             className="border border-gray-300 px-4 py-3 rounded-lg bg-gray-200 text-gray-700 w-full"
                         />
+
                         <label className="block text-gray-700 font-medium mb-1">Product ID or Barcode</label>
-                        <input
-                            type="text"
-                            placeholder="Enter Product ID or Scan Barcode"
-                            value={productId}
-                            onChange={(e) => setProductId(e.target.value)}
-                            className="border border-gray-300 px-4 py-3 rounded-lg w-full"
-                        />
+                        {productIds.map((productId, index) => (
+                            <input
+                                key={index}
+                                type="text"
+                                placeholder="Enter Product ID or Scan Barcode"
+                                value={productId}
+                                onChange={(e) => handleProductIdChange(index, e.target.value)}
+                                onKeyDown={(e) => handleScan(index, e)}
+                                className="border border-gray-300 px-4 py-3 rounded-lg w-full mb-2"
+                            />
+                        ))}
                     </div>
                 )}
 
-                {/* Step 2: Stock Status */}
+                {/* Step 2: Stock Status based on fetched data */}
                 {step === 2 && (
                     <div className="bg-gray-50 p-6 rounded-md shadow-inner space-y-4">
                         <h2 className="text-lg font-semibold text-gray-700">Stock Status</h2>
-                        <div className="flex space-x-4">
-                            <button
-                                type="button"
-                                onClick={() => setStockStatus('in_stock')}
-                                className={`px-4 py-2 rounded-lg w-full font-medium transition-colors duration-200 ${stockStatus === 'in_stock' ? 'bg-[#05668d] text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                                    }`}
-                            >
-                                In Stock
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setStockStatus('out_of_stock')}
-                                className={`px-4 py-2 rounded-lg w-full font-medium transition-colors duration-200 ${stockStatus === 'out_of_stock' ? 'bg-[#05668d] text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                                    }`}
-                            >
-                                Out of Stock
-                            </button>
-                        </div>
+                        {productIds.map((productId, index) => (
+                            productId && (
+                                <div key={index} className="flex items-center justify-between">
+                                    <span className="text-gray-700 font-medium">
+                                        Product ID: {productId}
+                                    </span>
+                                    <span className={`px-2 py-1 rounded-lg ${stockStatus[productId] === 'in_stock' ? 'bg-green-500 text-white' : 'bg-red-600 text-white'}`}>
+                                        {stockStatus[productId] === 'in_stock' ? 'In Stock' : 'Out of Stock'}
+                                    </span>
+                                </div>
+                            )
+                        ))}
                     </div>
                 )}
 
-                {/* Step 3: Quantity and Description if in stock or message if out of stock */}
+                {/* Step 3: Quantity and Description */}
                 {step === 3 && (
                     <div className="bg-gray-50 p-6 rounded-md shadow-inner space-y-4">
                         <h2 className="text-lg font-semibold text-gray-700">Product Details</h2>
-
                         {stockStatus === 'in_stock' ? (
                             <>
                                 <label className="block text-gray-700 font-medium mb-1">Quantity</label>
@@ -137,10 +179,12 @@ const SalesOrderGeneration = () => {
                     </div>
                 )}
 
-                {/* Step 4: Patient ID and Amount */}
+                {/* Step 4: Patient ID, Advance Payment, and Amount */}
                 {step === 4 && (
                     <div className="bg-gray-50 p-6 rounded-md shadow-inner space-y-4">
                         <h2 className="text-lg font-semibold text-gray-700">Patient & Payment Information</h2>
+
+                        {/* Patient ID Input */}
                         <label className="block text-gray-700 font-medium mb-1">Enter Patient ID</label>
                         <input
                             type="text"
@@ -149,18 +193,29 @@ const SalesOrderGeneration = () => {
                             onChange={(e) => setPatientId(e.target.value)}
                             className="border border-gray-300 w-full px-4 py-3 rounded-lg"
                         />
+
+                        {/* Fetch Patient Details Button */}
                         <button
                             type="button"
                             onClick={handlePatientDetailsFetch}
-                            className="mt-2 bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition"
+                            className="mt-2 bg-[#5db76d] bg-opacity-80 hover:bg-[#5db76d] text-white px-4 py-2 rounded-lg transition"
                         >
                             Fetch Patient Details
                         </button>
+
+                        {/* Displaying Fetched Patient Details */}
                         {patientDetails && (
                             <div className="mt-4 bg-gray-100 p-4 rounded border border-gray-200">
                                 <p><strong>Name:</strong> {patientDetails.name}</p>
                                 <p><strong>Age:</strong> {patientDetails.age}</p>
                                 <p><strong>Condition:</strong> {patientDetails.condition}</p>
+                            </div>
+                        )}
+
+                        {/* Displaying Fetched Advance Payment Details */}
+                        {advanceDetails !== null && (
+                            <div className="mt-4 bg-gray-100 p-4 rounded border border-gray-200">
+                                <p><strong>Advance Paid:</strong> ${advanceDetails}</p>
                             </div>
                         )}
                     </div>
@@ -185,7 +240,7 @@ const SalesOrderGeneration = () => {
                                     <button
                                         type="button"
                                         onClick={() => setRedeemOption('redeem')}
-                                        className={`px-4 py-2 rounded-lg w-full font-medium transition-colors duration-200 ${redeemOption === 'redeem' ? 'bg-[#05668d] text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                        className={`px-4 py-2 rounded-lg w-full font-medium transition-colors duration-200 ${redeemOption === 'redeem' ? 'bg-[#5db76d] bg-opacity-80 hover:bg-[#5db76d] text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                                             }`}
                                     >
                                         Redeem Points
@@ -193,7 +248,7 @@ const SalesOrderGeneration = () => {
                                     <button
                                         type="button"
                                         onClick={() => setRedeemOption('add')}
-                                        className={`px-4 py-2 rounded-lg w-full font-medium transition-colors duration-200 ${redeemOption === 'add' ? 'bg-[#05668d] text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                        className={`px-4 py-2 rounded-lg w-full font-medium transition-colors duration-200 ${redeemOption === 'add' ? 'bg-[#5db76d] bg-opacity-80 hover:bg-[#5db76d] text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                                             }`}
                                     >
                                         Add Points
@@ -238,30 +293,32 @@ const SalesOrderGeneration = () => {
                 {/* Step 7: Order Preview */}
                 {step === 7 && (
                     <div className="bg-white p-8 rounded space-y-4 text-gray-800">
-                        <h2 className="text-xl font-semibold">Order Summary</h2>
+                        <div className='flex justify-between'>
+                            <h2 className="text-xl font-semibold">Order Summary</h2>
+                            <button onClick={handlePrint} className="  bg-[#5db76d] bg-opacity-80 hover:bg-[#5db76d] text-white rounded-lg px-5 py-2 transition">
+                                <PrinterIcon className='w-5 h-5' />
+                            </button>
+                        </div>
                         <p><strong>Sales Order ID:</strong> {salesOrderId}</p>
-                        <p><strong>Product ID:</strong> {productId}</p>
+                        <p><strong>Product ID:</strong> {productIds}</p>
                         <p><strong>Stock Status:</strong> {stockStatus === 'in_stock' ? 'In Stock' : 'Out of Stock'}</p>
                         <p><strong>Quantity:</strong> {quantity}</p>
                         <p><strong>Description:</strong> {description}</p>
                         <p><strong>Patient ID:</strong> {patientId}</p>
                         <p><strong>Privilege Card:</strong> {privilegeCard ? 'Yes' : 'No'}</p>
                         <p><strong>Employee:</strong> {employee}</p>
-                        <button onClick={handlePrint} className="mt-4 bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition">
-                            Print Bill
-                        </button>
                     </div>
                 )}
 
                 {/* Navigation Buttons */}
-                <div className="flex justify-between mt-6">
+                <div className="flex justify-center mt-6 ">
                     {step > 1 && (
-                        <button onClick={prevStep} className="hover:bg-[#028090] hover:text-white px-4 py-2 rounded-lg bg-gray-300 text-black">
+                        <button onClick={prevStep} className="bg-[#5db76d] bg-opacity-80 hover:bg-[#5db76d] text-white mx-2 px-4 py-2 rounded-lg  ">
                             Previous
                         </button>
                     )}
                     {step < 7 && (
-                        <button onClick={nextStep} className="hover:bg-[#028090] hover:text-white px-4 py-2 rounded-lg bg-gray-300 text-black">
+                        <button onClick={nextStep} className="bg-[#5db76d] bg-opacity-80 hover:bg-[#5db76d] text-white mx-2 px-4 py-2 rounded-lg">
                             Next
                         </button>
                     )}

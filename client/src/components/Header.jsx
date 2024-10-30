@@ -2,68 +2,85 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
-import { Bars3BottomRightIcon, Bars3Icon } from '@heroicons/react/24/outline';
+import logo from '../assets/sreenethraenglishisolated.png';
+import { Cog8ToothIcon, UserIcon } from '@heroicons/react/24/outline';
 
 const Header = () => {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { logout, currentUser } = useAuth();
 
   const handleLogout = async () => {
     await logout();
     navigate('/login');
   };
 
-  const handleProfile = () => {
-    navigate('/profile');
-  };
-
   const handleSettings = () => {
     navigate('/settings');
   };
 
-  const toggleSidebar = () => {
-    setIsSidebarOpen(!isSidebarOpen);
+  const handleCreatePrivilegeCard = () => {
+    navigate('/privilege-generation');
+  };
+
+  const toggleProfileDropdown = () => {
+    setIsProfileOpen(!isProfileOpen);
   };
 
   return (
-    <>
-      <header className="w-full fixed top-0 left-0 flex items-center justify-center p-4 bg-[#05668d] text-white shadow-md z-10 h-20">
-        <h1 className="text-2xl font-semibold">Sreenethra</h1>
-        <button onClick={toggleSidebar} className="absolute right-4 text-white focus:outline-none">
-          {isSidebarOpen ? <Bars3BottomRightIcon className="h-6 w-6" /> : <Bars3Icon className="h-6 w-6" />}
+    <header className="w-full fixed top-0 left-0 flex items-center justify-between px-4 bg-white text-white border-b z-10 h-12">
+      {/* Left Section: Logo */}
+      <div className="flex items-center">
+        <img src={logo} alt="Logo" className="h-8 w-auto" />
+      </div>
+
+      {/* Right Section: Buttons */}
+      <div className="flex items-center space-x-4">
+        <button 
+          onClick={handleCreatePrivilegeCard} 
+          className="bg-[#5db76d] bg-opacity-80 hover:bg-[#5db76d] rounded-lg p-2 text-xs transition"
+        >
+          + Privilege Card
         </button>
-      </header>
-
-      {/* Sidebar */}
-      <div
-        className={`fixed top-0 right-0 h-full w-36 bg-[#05668d] rounded-l-xl text-white shadow-lg transform ${
-          isSidebarOpen ? 'translate-x-0' : 'translate-x-full'
-        } transition-transform duration-300 z-20`}
-      >
-        <div className="p-6 space-y-4">
-          <button onClick={handleProfile} className="w-full text-center text-lg py-2 hover:bg-[#028090] hover:text-black rounded-xl">
-            Profile
-          </button>
-          
-          <button onClick={handleSettings} className="w-full text-center text-lg py-2 hover:bg-[#028090] hover:text-black rounded-xl">
-            Settings
+        <button 
+          onClick={handleSettings} 
+          className="text-white hover:text-[#028090] transition"
+        >
+          <Cog8ToothIcon className='h-5 w-5 text-gray-500' />
+        </button>
+        <div className="relative">
+          <button 
+            onClick={toggleProfileDropdown} 
+            className="text-white hover:text-[#028090] transition"
+          >
+            <UserIcon className='w-6 h-6 rounded-full text-gray-600 border' />
           </button>
 
-          <button onClick={handleLogout} className="w-full text-center text-lg py-2 hover:bg-[#028090] hover:text-black rounded-xl">
-            Logout
-          </button>
+          {/* Profile Dropdown */}
+          {isProfileOpen && (
+            <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg z-20 p-4 text-black">
+              <p className="font-semibold">{currentUser?.name || 'User'} </p>
+              <p className="text-sm text-gray-600">{currentUser?.email || 'User@gmail.com'}</p>
+              <p className="text-sm text-gray-600">Employee ID: {currentUser?.employeeId}</p>
+              <button 
+                onClick={handleLogout} 
+                className="mt-4 w-full text-white py-1 rounded-lg bg-[#5db76d] bg-opacity-80 hover:bg-[#5db76d] transition"
+              >
+                Logout
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Overlay to close the sidebar when clicking outside */}
-      {isSidebarOpen && (
+      {/* Overlay to close the dropdown when clicking outside */}
+      {isProfileOpen && (
         <div
-          className="fixed inset-0 bg-black opacity-50 z-10"
-          onClick={toggleSidebar}
+          className="fixed inset-0 bg-transparent z-10"
+          onClick={() => setIsProfileOpen(false)}
         ></div>
       )}
-    </>
+    </header>
   );
 };
 

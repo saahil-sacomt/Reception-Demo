@@ -7,7 +7,7 @@ const Input = ({ label, type, value, onChange, autoComplete }) => (
       value={value}
       onChange={onChange}
       autoComplete={autoComplete} // Add autocomplete attribute
-      className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+      className="appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
     />
   </div>
 );

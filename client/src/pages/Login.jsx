@@ -2,8 +2,8 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { signIn } from '../services/authService';
-import Input from '../components/Input';
-import Button from '../components/Button';
+import topLogo from '../assets/sreenethraenglishisolated.png';
+import bottomLogo from '../assets/Retrato Black PNG.png';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -14,66 +14,83 @@ const Login = () => {
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    setErrorMessage(''); // Reset error message
+    setErrorMessage('');
 
     const { data, error } = await signIn(email, password);
     if (error) {
       setErrorMessage('Invalid credentials, please try again.');
     } else {
-      navigate('/home'); // Directly navigate to the homepage on successful login
+      sessionStorage.setItem('showSplash', 'true'); // Set flag for splash screen
+      navigate('/home'); // Navigate to home
     }
   };
 
-  // Function to toggle password visibility with auto-hide after 3 seconds
   const togglePasswordVisibility = () => {
     setShowPassword(true);
-    setTimeout(() => setShowPassword(false), 2000); // Hide password after 3 seconds
+    setTimeout(() => setShowPassword(false), 2000);
   };
 
   return (
-    <div className="w-full max-w-sm md:max-w-md p-6 sm:p-10 mx-auto bg-gray-100 shadow-xl rounded-lg border border-gray-200 space-y-6">
-      <h2 className="text-xl sm:text-2xl font-semibold text-center text-gray-800">Hello, have a wonderful day!</h2>
-      {errorMessage && <p className="text-center text-red-500">{errorMessage}</p>}
-      
-      <form onSubmit={handleLogin} className="space-y-6">
-        <Input
-          label="Email"
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          autoComplete="email"
-          placeholder="Enter your email"
-        />
-        <div className="relative">
-          <Input
-            label="Password"
-            type={showPassword ? "text" : "password"} // Toggle input type based on showPassword state
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoComplete="current-password"
-            placeholder="Enter your password"
-          />
-          <button
-            type="button"
-            onClick={togglePasswordVisibility}
-            className="absolute inset-y-0 right-0 top-6 pr-3 flex items-center text-gray-600"
-          >
-            {showPassword ? '👀' : '👁️'}
-          </button>
+    <div className="flex h-screen">
+      <div className="hidden md:flex w-1/2 bg-cover bg-center relative">
+        <img src={topLogo} alt="Top Logo" className="absolute top-6 left-6 h-10" />
+        <div className="flex items-center justify-center bg-green-50 w-full">
+        <h2 className="text-3xl  text-center text-gray-800 mb-6 font-">Sign in to Continue</h2>
+          <div className="text-center text-white p-8"></div>
         </div>
-        <Button
-          text="Login"
-          type="submit"
-          className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-150"
-        />
-      </form>
+      </div>
 
-      <p className="text-center text-gray-600">
-        Don’t have an account?{' '}
-        <Link to="/signup" className="text-indigo-600 font-medium hover:underline">
-          Sign up here
-        </Link>
-      </p>
+      {/* Right Section with Login Form */}
+      <div className="flex w-full md:w-1/2 items-center justify-center p-6 bg-white">
+        <div className="w-full max-w-xs">
+          
+          {errorMessage && <p className="text-center text-red-500 mb-4">{errorMessage}</p>}
+          
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div className="">
+              <label className="block font-normal text-sm text-gray-700 mb-1">
+                Email ID 
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Enter your email"
+                autoComplete="email"
+                className="w-full border border-gray-300 px-4 py-2 rounded-lg focus:outline-none focus:border-indigo-700"
+              />
+            </div>
+            <div className="relative">
+              <label className="block font-normal text-sm text-gray-700 mb-1">
+                Password
+              </label>
+              <input
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter your password"
+                autoComplete="current-password"
+                className="w-full border border-gray-300 px-4 py-2 rounded-lg focus:outline-none focus:border-indigo-700"
+              />
+              <span
+                onClick={togglePasswordVisibility}
+                className="absolute inset-y-0 right-0 top-8 pr-3 flex items-center text-gray-600 cursor-pointer"
+              >
+                {showPassword ? '👀' : '👁️'}
+              </span>
+            </div>
+            
+            <button
+              type="submit"
+              className="w-full bg-[#5db76d] bg-opacity-80 hover:bg-[#5db76d] text-white py-2 px-4 rounded-lg transition duration-150"
+            >
+              Sign in
+            </button>
+          </form>
+        </div>
+        {/* Bottom-right logo */}
+        <img src={bottomLogo} alt="Bottom Logo" className="absolute bottom-4 right-4 h-10" />
+      </div>
     </div>
   );
 };

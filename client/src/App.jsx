@@ -1,8 +1,8 @@
 // client/src/App.jsx
+import { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
-import AuthLayout from './components/AuthLayout';
 import RequireAuth from './components/RequireAuth';
 import { AuthProvider } from './context/AuthContext';
 import Login from './pages/Login';
@@ -11,29 +11,43 @@ import Home from './pages/Home';
 import OrderGenerationPage from './pages/OrderGenerationPage';
 import WorkOrderGeneration from './pages/WorkOrderGeneration';
 import SalesOrderGeneration from './pages/SalesOrderGeneration';
+import PrivilegeGeneration from './pages/PrivilegeGeneration';
 
 const App = () => {
   const location = useLocation();
-  const hideHeader = location.pathname === '/login' || location.pathname === '/signup';
+  const hideHeaderAndSidebar = location.pathname === '/login' || location.pathname === '/signup';
+
+  // Lift `isCollapsed` state to App component
+  const [isCollapsed, setIsCollapsed] = useState(false);
+
+  const toggleSidebar = () => {
+    setIsCollapsed((prev) => !prev);
+  };
 
   return (
     <AuthProvider>
-      {!hideHeader && <Header />}
+      {/* Conditionally render the Header and Sidebar based on the path */}
+      {!hideHeaderAndSidebar && <Header />}
       <div className="flex">
-        {/* Sidebar is hidden on login and signup pages */}
-        {!hideHeader && <Sidebar />}
-        <div className={`flex-grow ${hideHeader ? '' : 'pt-16 ml-16'} bg-gray-100 min-h-screen`}>
+        {!hideHeaderAndSidebar && (
+          <Sidebar isCollapsed={isCollapsed} toggleSidebar={toggleSidebar} />
+        )}
+        <div className={`flex-grow transition-all duration-300 ${hideHeaderAndSidebar ? '' : isCollapsed ? 'ml-16' : 'ml-48'} min-h-screen`}>
           <Routes>
-            <Route element={<AuthLayout />}>
-              <Route path="/login" element={<Login />} />
-              <Route path="/signup" element={<Signup />} />
-            </Route>
+            {/* Public Routes */}
+            <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Signup />} />
+
+            {/* Protected Routes */}
             <Route element={<RequireAuth />}>
-              <Route path="/home" element={<Home />} />
-              <Route path="/order-generation" element={<OrderGenerationPage />} />
-              <Route path="/work-order" element={<WorkOrderGeneration />} />
-              <Route path="/sales-order" element={<SalesOrderGeneration />} />
+              <Route path="/home" element={<Home isCollapsed={isCollapsed} />} />
+              <Route path="/order-generation" element={<OrderGenerationPage isCollapsed={isCollapsed} />} />
+              <Route path="/work-order" element={<WorkOrderGeneration isCollapsed={isCollapsed} />} />
+              <Route path="/sales-order" element={<SalesOrderGeneration isCollapsed={isCollapsed} />} />
+              <Route path="/privilege-generation" element={<PrivilegeGeneration isCollapsed={isCollapsed} />} />
             </Route>
+
+            {/* Default Route */}
             <Route path="/" element={<Navigate to="/home" replace />} />
           </Routes>
         </div>
