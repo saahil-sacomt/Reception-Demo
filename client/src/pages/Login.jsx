@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signIn } from '../services/authService';
-import topLogo from '../assets/sreenethraenglishisolated.png';
+import topLogo from '../assets/thumbnail_sreenethra logo mala eng.png';
 import bottomLogo from '../assets/Retrato Black PNG.png';
 
 const Login = () => {
@@ -34,9 +34,9 @@ const Login = () => {
     <div className="flex flex-col md:flex-row h-screen bg-gray-50 md:bg-white">
       {/* Left Section with Logo and Message */}
       <div className="hidden md:flex w-1/2 bg-cover bg-center relative items-center justify-center bg-green-50">
-        <img src={topLogo} alt="Top Logo" className="absolute top-6 left-6 h-10" />
+        
         <div className="text-center text-gray-800">
-          <h2 className="text-3xl text-center text-gray-800 mb-6 font-semibold">Sign in to Continue</h2>
+        <img src={topLogo} alt="Top Logo" className="h-48" />
         </div>
       </div>
 
