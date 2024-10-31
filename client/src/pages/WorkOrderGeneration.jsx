@@ -6,7 +6,7 @@ import { CalendarIcon, PrinterIcon } from '@heroicons/react/24/outline';
 const WorkOrderGeneration = ({ isCollapsed }) => {
   const [step, setStep] = useState(1);
   const [workOrderId, setWorkOrderId] = useState('');
-  const [productIds, setProductIds] = useState(['']); // Array to store multiple product IDs
+  const [productIds, setProductIds] = useState(['']);
   const [quantity, setQuantity] = useState('');
   const [description, setDescription] = useState('');
   const [advanceDetails, setAdvanceDetails] = useState('');
@@ -15,7 +15,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   const [patientDetails, setPatientDetails] = useState(null);
   const [employee, setEmployee] = useState('');
   const [employees] = useState(['John Doe', 'Jane Smith', 'Alex Brown']);
-  const [allowPrint, setAllowPrint] = useState(false); // State to control print trigger
+  const [allowPrint, setAllowPrint] = useState(false);
 
   // Refs for each input field to control focus
   const quantityRef = useRef(null);
@@ -23,6 +23,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   const advanceDetailsRef = useRef(null);
   const dueDateRef = useRef(null);
   const mrNumberRef = useRef(null);
+  const fetchButtonRef = useRef(null); // Ref for the fetch button
   const employeeRef = useRef(null);
 
   useEffect(() => {
@@ -30,7 +31,6 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   }, []);
 
   useEffect(() => {
-    // Focus on the first field of the current step when step changes
     focusFirstFieldOfStep();
   }, [step]);
 
@@ -96,7 +96,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         } else if (step === 6 && allowPrint) {
           handlePrint();
         } else if (step === 6) {
-          setAllowPrint(true); // Set to allow print on next Shift + Enter
+          setAllowPrint(true);
         }
       }
     };
@@ -208,13 +208,14 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
               placeholder="Enter MR Number of Patient"
               value={mrNumber}
               onChange={(e) => setMrNumber(e.target.value)}
-              onKeyDown={(e) => handleEnterKey(e, employeeRef)}
+              onKeyDown={(e) => handleEnterKey(e, fetchButtonRef)} // Move focus to fetch button
               ref={mrNumberRef}
               className="border border-gray-300 w-full px-4 py-3 rounded-lg"
             />
             <button
               type="button"
               onClick={handleMRNumberSearch}
+              ref={fetchButtonRef} // Assigning ref to the fetch button
               className="mt-2 text-white px-4 py-2 rounded-lg bg-[#5db76d] bg-opacity-80 hover:bg-[#5db76d] transition"
             >
               Fetch Patient Details

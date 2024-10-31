@@ -27,6 +27,7 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
     const quantityRef = useRef(null);
     const descriptionRef = useRef(null);
     const patientIdRef = useRef(null);
+    const fetchButtonRef = useRef(null); // New ref for the fetch button
     const privilegePhoneRef = useRef(null);
     const otpRef = useRef(null);
     const employeeRef = useRef(null);
@@ -212,13 +213,14 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
                             placeholder="Enter Patient ID"
                             value={patientId}
                             onChange={(e) => setPatientId(e.target.value)}
-                            onKeyDown={(e) => handleEnterKey(e, privilegePhoneRef)}
+                            onKeyDown={(e) => handleEnterKey(e, fetchButtonRef)} // Move focus to fetch button
                             ref={patientIdRef}
                             className="border border-gray-300 w-full px-4 py-3 rounded-lg"
                         />
                         <button
                             type="button"
                             onClick={handleMRNumberSearch}
+                            ref={fetchButtonRef} // Assigning ref to the fetch button
                             className="mt-2 bg-[#5db76d] hover:bg-green-600 text-white px-4 py-2 rounded-lg transition"
                         >
                             Fetch Patient Details
