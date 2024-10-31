@@ -5,7 +5,7 @@ const OrderGenerationPage = ({ isCollapsed }) => {
   const navigate = useNavigate();
 
   return (
-    <div className={`transition-all duration-300 ${isCollapsed ? 'ml-0' : 'ml-14'} my-10 p-10 min-h-screen flex flex-col space-y-10`}>
+    <div className={`transition-all duration-300 ${isCollapsed ? 'ml-0' : 'ml-14'} my-10 p-10 min-h-screen flex flex-col  space-y-10`}>
       <div className="flex space-x-10">
         <div
           className="max-w-xs bg-white shadow-lg rounded-xl overflow-hidden cursor-pointer hover:shadow-xl transition duration-200"

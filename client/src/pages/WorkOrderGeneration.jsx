@@ -23,8 +23,9 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   const advanceDetailsRef = useRef(null);
   const dueDateRef = useRef(null);
   const mrNumberRef = useRef(null);
-  const fetchButtonRef = useRef(null); // Ref for the fetch button
+  const fetchButtonRef = useRef(null);
   const employeeRef = useRef(null);
+  const nextButtonRef = useRef(null);
 
   useEffect(() => {
     setWorkOrderId(nanoid());
@@ -40,22 +41,35 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     if (step === 3) dueDateRef.current?.focus();
     if (step === 4) mrNumberRef.current?.focus();
     if (step === 5) employeeRef.current?.focus();
+    if (step === 6 && allowPrint) handlePrint();
   };
 
   const handleEnterKey = (e, nextFieldRef) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === 'Enter') {
       e.preventDefault();
-      nextFieldRef?.current?.focus();
+      if (nextFieldRef) {
+        nextFieldRef.current?.focus();
+      } else {
+        nextButtonRef.current?.focus();
+      }
     }
   };
 
-  const handleProductIdEnter = (e, index) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+  const handleProductIdEnter = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      nextStep();
+    }
+  };
+
+  const handleProductIdShiftEnter = (e, index) => {
+    if (e.key === 'Enter' && e.shiftKey) {
       e.preventDefault();
       if (index === productIds.length - 1 && productIds[index]) {
         setProductIds([...productIds, '']);
-      } else {
-        document.getElementById(`productId-${index + 1}`)?.focus();
+        setTimeout(() => {
+          document.getElementById(`productId-${index + 1}`)?.focus();
+        }, 0);
       }
     }
   };
@@ -67,7 +81,13 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   };
 
   const nextStep = () => {
-    setStep((prevStep) => Math.min(prevStep + 1, 6));
+    if (step < 6) {
+      setStep((prevStep) => prevStep + 1);
+    } else if (step === 6 && allowPrint) {
+      handlePrint();
+    } else if (step === 6) {
+      setAllowPrint(true);
+    }
   };
 
   const prevStep = () => {
@@ -80,22 +100,20 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       age: 35,
       condition: 'Condition Description',
     });
+    nextButtonRef.current?.focus();
   };
 
   const handlePrint = () => {
     window.print();
   };
 
-  // Updated global Shift + Enter handler for consistent step navigation
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.key === 'Enter' && e.shiftKey) {
+      if (e.key === 'Enter' && step === 6) {
         e.preventDefault();
-        if (step < 6) {
-          nextStep();
-        } else if (step === 6 && allowPrint) {
+        if (allowPrint) {
           handlePrint();
-        } else if (step === 6) {
+        } else {
           setAllowPrint(true);
         }
       }
@@ -109,7 +127,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       <h1 className="text-2xl font-semibold text-gray-700 text-center mb-8">Work Order Generation</h1>
 
       {/* Progress Tracker */}
-      <div className="flex justify-around items-center mb-8">
+      <div className="flex items-center mb-8 w-2/3 mx-auto">
         {Array.from({ length: 6 }, (_, i) => (
           <div key={i} className={`flex-1 h-2 rounded-xl mx-1 ${step > i + 1 ? 'bg-[#5db76d]' : 'bg-gray-300'} transition-all duration-300`} />
         ))}
@@ -137,7 +155,10 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                   placeholder="Enter Product ID or Scan Barcode"
                   value={id}
                   onChange={(e) => handleProductIdChange(index, e.target.value)}
-                  onKeyDown={(e) => handleProductIdEnter(e, index)}
+                  onKeyDown={(e) => {
+                    handleProductIdShiftEnter(e, index);
+                    if (!e.shiftKey) handleProductIdEnter(e);
+                  }}
                   className="border border-gray-300 px-4 py-3 rounded-lg w-full text-center"
                 />
               ))}
@@ -173,7 +194,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
               placeholder="Enter money paid in advance"
               value={advanceDetails}
               onChange={(e) => setAdvanceDetails(e.target.value)}
-              onKeyDown={(e) => handleEnterKey(e, dueDateRef)}
+              onKeyDown={(e) => handleEnterKey(e, nextButtonRef)}
               ref={advanceDetailsRef}
               className="border border-gray-300 w-full px-4 py-3 rounded-lg text-center"
             />
@@ -191,7 +212,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                 type="date"
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
-                onKeyDown={(e) => handleEnterKey(e, mrNumberRef)}
+                onKeyDown={(e) => handleEnterKey(e, nextButtonRef)}
                 ref={dueDateRef}
                 className="border border-gray-300 w-full px-10 py-3 rounded-lg text-center"
               />
@@ -208,14 +229,24 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
               placeholder="Enter MR Number of Patient"
               value={mrNumber}
               onChange={(e) => setMrNumber(e.target.value)}
-              onKeyDown={(e) => handleEnterKey(e, fetchButtonRef)} // Move focus to fetch button
+              onKeyDown={(e) => handleEnterKey(e, fetchButtonRef)}
               ref={mrNumberRef}
               className="border border-gray-300 w-full px-4 py-3 rounded-lg"
             />
             <button
               type="button"
-              onClick={handleMRNumberSearch}
-              ref={fetchButtonRef} // Assigning ref to the fetch button
+              onClick={() => {
+                handleMRNumberSearch();
+                nextButtonRef.current?.focus();
+              }}
+              ref={fetchButtonRef}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleMRNumberSearch();
+                  nextButtonRef.current?.focus();
+                }
+              }}
               className="mt-2 text-white px-4 py-2 rounded-lg bg-[#5db76d] bg-opacity-80 hover:bg-[#5db76d] transition"
             >
               Fetch Patient Details
@@ -238,6 +269,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
               value={employee}
               onChange={(e) => setEmployee(e.target.value)}
               ref={employeeRef}
+              onKeyDown={(e) => handleEnterKey(e, nextButtonRef)}
               className="border border-gray-300 w-full px-4 py-3 rounded-lg"
             >
               <option value="" disabled>Work Order Created By</option>
@@ -275,7 +307,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
             </button>
           )}
           {step < 6 && (
-            <button onClick={nextStep} className="bg-[#5db76d] hover:bg-green-600 text-white mx-2 px-4 py-2 rounded-lg">
+            <button ref={nextButtonRef} onClick={nextStep} className="bg-[#5db76d] hover:bg-green-600 text-white mx-2 px-4 py-2 rounded-lg">
               Next
             </button>
           )}
