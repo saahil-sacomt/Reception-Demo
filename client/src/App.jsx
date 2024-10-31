@@ -1,5 +1,5 @@
 // client/src/App.jsx
-import { useState } from 'react';
+import { useState,useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
@@ -23,6 +23,34 @@ const App = () => {
   const toggleSidebar = () => {
     setIsCollapsed((prev) => !prev);
   };
+
+  useEffect(() => {
+    // Define OTPLESS callback
+    window.otpless = (userinfo) => {
+      const emailMap = userinfo.identities.find(
+        (item) => item.identityType === 'EMAIL'
+      );
+      const mobileMap = userinfo.identities.find(
+        (item) => item.identityType === 'MOBILE'
+      );
+
+      const token = userinfo.token;
+      const email = emailMap?.identityValue;
+      const mobile = mobileMap?.identityValue;
+      const name = emailMap?.name || mobileMap?.name;
+
+      console.log('User Info:', userinfo);
+      console.log('Token:', token, 'Email:', email, 'Mobile:', mobile, 'Name:', name);
+
+      // Implement your custom logic for successful login
+    };
+
+    // Initialize OTPLESS SDK with the callback
+    if (window.OTPless) {
+      window.OTPlessSignin = new OTPless(window.otpless);
+    }
+  }, []);
+
 
   return (
     <AuthProvider>

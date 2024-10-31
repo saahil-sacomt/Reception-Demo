@@ -1,33 +1,79 @@
 // client/src/pages/PrivilegeGeneration.jsx
-import { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
-const PrivilegeGeneration = ({ isCollapsed }) => {
-  const [userData, setUserData] = useState(null);
+const PrivilegeGeneration = () => {
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [otp, setOtp] = useState('');
+  const [isOtpRequested, setIsOtpRequested] = useState(false);
 
-  useEffect(() => {
-    // OTPLESS callback function to handle user data
-    window.otpless = (otplessUser) => {
-      setUserData(otplessUser);  // Save user data on successful login
-      console.log("User authenticated:", otplessUser);  // For debugging
-    };
-  }, []);
+  const requestOtp = () => {
+    try {
+      // Initialize OTP request via OTPLESS SDK for phone verification
+      window.OTPlessSignin.initiate({
+        channel: 'PHONE',
+        phone: phoneNumber,
+        countryCode: '+91', // Update this as per the user's location
+      });
+      setIsOtpRequested(true);
+    } catch (error) {
+      console.error('Error initiating OTP request:', error);
+    }
+  };
+
+  const verifyOtp = () => {
+    try {
+      // Verify the entered OTP via OTPLESS SDK
+      window.OTPlessSignin.verify({
+        channel: 'PHONE',
+        phone: phoneNumber,
+        otp: otp,
+        countryCode: '+91', // Update this based on the user’s location
+      });
+    } catch (error) {
+      console.error('Error verifying OTP:', error);
+    }
+  };
 
   return (
-    <div className="container mt-20 mx-auto p-6 bg-white shadow-lg rounded-lg max-w-md">
+    <div className="container mx-auto mt-20 p-6 bg-white shadow-lg rounded-lg max-w-md">
       <h2 className="text-2xl font-bold text-center mb-4">Privilege Generation</h2>
 
-      {/* OTPLESS Login UI */}
-      <div id="otpless-login-page"></div>
-
-      {/* Display user data after authentication */}
-      {userData ? (
-        <div className="mt-6 text-center">
-          <h3 className="text-lg font-medium">User Authenticated</h3>
-          <p><strong>Name:</strong> {userData.identities[0].name}</p>
-          <p><strong>Email:</strong> {userData.identities[0].identityValue}</p>
+      {!isOtpRequested ? (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Enter your Phone Number
+          </label>
+          <input
+            type="text"
+            value={phoneNumber}
+            onChange={(e) => setPhoneNumber(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500"
+            placeholder="Enter phone number"
+          />
+          <button
+            onClick={requestOtp}
+            className="mt-4 w-full bg-indigo-600 text-white py-2 rounded-lg"
+          >
+            Request OTP
+          </button>
         </div>
       ) : (
-        <p className="text-center text-gray-500 mt-4">Please log in using OTPLESS.</p>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Enter OTP</label>
+          <input
+            type="text"
+            value={otp}
+            onChange={(e) => setOtp(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500"
+            placeholder="Enter the OTP"
+          />
+          <button
+            onClick={verifyOtp}
+            className="mt-4 w-full bg-green-600 text-white py-2 rounded-lg"
+          >
+            Verify OTP
+          </button>
+        </div>
       )}
     </div>
   );
