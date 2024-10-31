@@ -9,7 +9,7 @@ const PrivilegeGeneration = () => {
     // Request OTP via OTPLESS SDK
     window.OTPlessSignin.initiate({
       channel: 'PHONE',
-      phone: phoneNumber,
+      phone: 8660797857,
       countryCode: '+91',  // Update with user's country code
     });
     setIsOtpRequested(true);
@@ -19,7 +19,7 @@ const PrivilegeGeneration = () => {
     // Verify OTP entered by the user
     window.OTPlessSignin.verify({
       channel: 'PHONE',
-      phone: phoneNumber,
+      phone: 8660797857,
       otp: otp,
       countryCode: '+91',
     });
