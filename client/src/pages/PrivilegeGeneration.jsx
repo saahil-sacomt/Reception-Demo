@@ -1,4 +1,3 @@
-// client/src/pages/PrivilegeGeneration.jsx
 import React, { useState } from 'react';
 
 const PrivilegeGeneration = () => {
@@ -7,31 +6,23 @@ const PrivilegeGeneration = () => {
   const [isOtpRequested, setIsOtpRequested] = useState(false);
 
   const requestOtp = () => {
-    try {
-      // Initialize OTP request via OTPLESS SDK for phone verification
-      window.OTPlessSignin.initiate({
-        channel: 'PHONE',
-        phone: phoneNumber,
-        countryCode: '+91', // Update this as per the user's location
-      });
-      setIsOtpRequested(true);
-    } catch (error) {
-      console.error('Error initiating OTP request:', error);
-    }
+    // Request OTP via OTPLESS SDK
+    window.OTPlessSignin.initiate({
+      channel: 'PHONE',
+      phone: phoneNumber,
+      countryCode: '+91',  // Update with user's country code
+    });
+    setIsOtpRequested(true);
   };
 
   const verifyOtp = () => {
-    try {
-      // Verify the entered OTP via OTPLESS SDK
-      window.OTPlessSignin.verify({
-        channel: 'PHONE',
-        phone: phoneNumber,
-        otp: otp,
-        countryCode: '+91', // Update this based on the user’s location
-      });
-    } catch (error) {
-      console.error('Error verifying OTP:', error);
-    }
+    // Verify OTP entered by the user
+    window.OTPlessSignin.verify({
+      channel: 'PHONE',
+      phone: phoneNumber,
+      otp: otp,
+      countryCode: '+91',
+    });
   };
 
   return (

@@ -25,29 +25,15 @@ const App = () => {
   };
 
   useEffect(() => {
-    // Load OTPLESS SDK after component mounts
-    const loadOtplessSdk = () => {
-      const script = document.createElement('script');
-      script.id = 'otpless-sdk';
-      script.src = 'https://otpless.com/v3/headless.js';
-      script.async = true;
-      script.setAttribute('data-appid', 'YOUR_APP_ID'); // Replace with actual App ID
+    window.otpless = (userinfo) => {
+      console.log('User Info:', userinfo);
+      const email = userinfo.identities.find(item => item.identityType === 'EMAIL')?.identityValue;
+      const mobile = userinfo.identities.find(item => item.identityType === 'MOBILE')?.identityValue;
 
-      // Initialize OTPLESS with callback on successful load
-      script.onload = () => {
-        if (window.OTPless) {
-          window.otpless = (userinfo) => {
-            console.log('User Info:', userinfo);
-
-            // Add custom authentication logic here
-          };
-          window.OTPlessSignin = new window.OTPless(window.otpless);
-        }
-      };
-      document.body.appendChild(script);
+      // Store user info or process it further here
     };
 
-    loadOtplessSdk();
+    window.OTPlessSignin = new OTPless(window.otpless);
   }, []);
 
 
