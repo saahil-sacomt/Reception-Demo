@@ -5,10 +5,9 @@ import bottomLogo from '../assets/Retrato Black PNG.png';
 
 const SplashScreen = ({ onAnimationEnd }) => {
     useEffect(() => {
-        // Trigger the end of animation after 2 seconds (or the duration of the animation)
         const timer = setTimeout(() => {
             onAnimationEnd();
-        }, 3000); // Match the duration to the animation in CSS
+        }, 4000);
 
         return () => clearTimeout(timer);
     }, [onAnimationEnd]);
