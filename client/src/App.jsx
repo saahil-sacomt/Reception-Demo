@@ -1,5 +1,5 @@
 // client/src/App.jsx
-import { useState,useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
@@ -17,8 +17,9 @@ const App = () => {
   const location = useLocation();
   const hideHeaderAndSidebar = location.pathname === '/login' || location.pathname === '/signup';
 
-  // Lift `isCollapsed` state to App component
+  // Lift `isCollapsed` and `selectedTab` state to App component
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [selectedTab, setSelectedTab] = useState('Dashboard');
 
   const toggleSidebar = () => {
     setIsCollapsed((prev) => !prev);
@@ -36,14 +37,19 @@ const App = () => {
     window.OTPlessSignin = new OTPless(window.otpless);
   }, []);
 
-
   return (
     <AuthProvider>
       {/* Conditionally render the Header and Sidebar based on the path */}
-      {!hideHeaderAndSidebar && <Header />}
+      {!hideHeaderAndSidebar && (
+        <Header selectedTab={selectedTab} setSelectedTab={setSelectedTab} />
+      )}
       <div className="flex">
         {!hideHeaderAndSidebar && (
-          <Sidebar isCollapsed={isCollapsed} toggleSidebar={toggleSidebar} />
+          <Sidebar
+            isCollapsed={isCollapsed}
+            toggleSidebar={toggleSidebar}
+            selectedTab={selectedTab}
+          />
         )}
         <div className={`flex-grow transition-all duration-300 ${hideHeaderAndSidebar ? '' : isCollapsed ? 'ml-16' : 'ml-48'} min-h-screen`}>
           <Routes>

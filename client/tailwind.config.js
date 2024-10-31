@@ -8,13 +8,13 @@ export default {
         extend: {
             keyframes: {
                 disintegrate: {
-                    '0%': { transform: 'scale(1.5)', opacity: 1 },
-                    '50%': { transform: 'scale(1) translateX(0)', opacity: 0.6 },
-                    '100%': { transform: 'scale(0.5) translateX(0)', opacity: 0 }, // Modify for a scatter effect
+                    '0%': { transform: 'scale(1)', opacity: 0 },
+                    '50%': { transform: 'scale(1) translateX(0)', opacity: 1 },
+                    '100%': { transform: 'scale(1) translateX(0)', opacity: 0.2 }, // Modify for a scatter effect
                 },
             },
             animation: {
-                disintegrate: 'disintegrate 1.5s ease-in forwards',
+                disintegrate: 'disintegrate 3s ease-in forwards',
             },
         },
     },

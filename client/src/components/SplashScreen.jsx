@@ -8,7 +8,7 @@ const SplashScreen = ({ onAnimationEnd }) => {
         // Trigger the end of animation after 2 seconds (or the duration of the animation)
         const timer = setTimeout(() => {
             onAnimationEnd();
-        }, 1500); // Match the duration to the animation in CSS
+        }, 3000); // Match the duration to the animation in CSS
 
         return () => clearTimeout(timer);
     }, [onAnimationEnd]);
