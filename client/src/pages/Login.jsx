@@ -36,7 +36,7 @@ const Login = () => {
       <div className="hidden md:flex w-1/2 bg-cover bg-center relative items-center justify-center bg-green-50">
         
         <div className="text-center text-gray-800">
-        <img src={topLogo} alt="Top Logo" className="h-48" />
+        <img src={topLogo} alt="Top Logo" className="h-56" />
         </div>
       </div>
 
