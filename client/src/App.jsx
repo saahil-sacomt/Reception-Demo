@@ -25,30 +25,29 @@ const App = () => {
   };
 
   useEffect(() => {
-    // Define OTPLESS callback
-    window.otpless = (userinfo) => {
-      const emailMap = userinfo.identities.find(
-        (item) => item.identityType === 'EMAIL'
-      );
-      const mobileMap = userinfo.identities.find(
-        (item) => item.identityType === 'MOBILE'
-      );
+    // Load OTPLESS SDK after component mounts
+    const loadOtplessSdk = () => {
+      const script = document.createElement('script');
+      script.id = 'otpless-sdk';
+      script.src = 'https://otpless.com/v3/headless.js';
+      script.async = true;
+      script.setAttribute('data-appid', 'YOUR_APP_ID'); // Replace with actual App ID
 
-      const token = userinfo.token;
-      const email = emailMap?.identityValue;
-      const mobile = mobileMap?.identityValue;
-      const name = emailMap?.name || mobileMap?.name;
+      // Initialize OTPLESS with callback on successful load
+      script.onload = () => {
+        if (window.OTPless) {
+          window.otpless = (userinfo) => {
+            console.log('User Info:', userinfo);
 
-      console.log('User Info:', userinfo);
-      console.log('Token:', token, 'Email:', email, 'Mobile:', mobile, 'Name:', name);
-
-      // Implement your custom logic for successful login
+            // Add custom authentication logic here
+          };
+          window.OTPlessSignin = new window.OTPless(window.otpless);
+        }
+      };
+      document.body.appendChild(script);
     };
 
-    // Initialize OTPLESS SDK with the callback
-    if (window.OTPless) {
-      window.OTPlessSignin = new OTPless(window.otpless);
-    }
+    loadOtplessSdk();
   }, []);
 
 
