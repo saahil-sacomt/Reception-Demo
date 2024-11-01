@@ -247,7 +247,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                   nextButtonRef.current?.focus();
                 }
               }}
-              className="mt-2 text-white px-4 py-2 rounded-lg bg-[#5db76d] bg-opacity-80 hover:bg-[#5db76d] transition"
+              className="mt-2 text-white px-4 py-2 rounded-lg bg-green-500  hover:bg-green-600 transition"
             >
               Fetch Patient Details
             </button>
@@ -285,7 +285,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
           <div className="bg-white p-8 rounded space-y-4 text-gray-800">
             <div className='flex justify-between'>
               <h2 className="text-xl font-semibold">Order Summary</h2>
-              <button onClick={handlePrint} className="bg-[#5db76d] hover:bg-green-600 text-white rounded-lg px-5 py-2 transition">
+              <button onClick={handlePrint} className="bg-green-500 hover:bg-green-600 text-white rounded-lg px-5 py-2 transition">
                 <PrinterIcon className='w-5 h-5' />
               </button>
             </div>
@@ -302,12 +302,12 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         {/* Navigation Buttons */}
         <div className="flex justify-center mt-6">
           {step > 1 && (
-            <button onClick={prevStep} className="bg-[#5db76d] hover:bg-green-600 text-white mx-2 px-4 py-2 rounded-lg">
+            <button onClick={prevStep} className="bg-green-500 hover:bg-green-600 text-white mx-2 px-4 py-2 rounded-lg">
               Previous
             </button>
           )}
           {step < 6 && (
-            <button ref={nextButtonRef} onClick={nextStep} className="bg-[#5db76d] hover:bg-green-600 text-white mx-2 px-4 py-2 rounded-lg">
+            <button ref={nextButtonRef} onClick={nextStep} className="bg-green-500 hover:bg-green-600 text-white mx-2 px-4 py-2 rounded-lg">
               Next
             </button>
           )}

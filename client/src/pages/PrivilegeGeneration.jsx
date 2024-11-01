@@ -1,10 +1,10 @@
 // client/src/pages/PrivilegeGeneration.jsx
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { generateCardWithBarcode } from '../utils/cardGenerator';
 import { sendCardViaWhatsApp } from '../utils/watiApi';
 
 const PrivilegeGeneration = () => {
-    const [name, setName] = useState('');  // New state for customer name
+    const [name, setName] = useState('');
     const [phoneNumber, setPhoneNumber] = useState('');
     const [otp, setOtp] = useState('');
     const [isOtpRequested, setIsOtpRequested] = useState(false);
@@ -14,11 +14,17 @@ const PrivilegeGeneration = () => {
 
     const mockOtp = "1234";
 
+    // References for navigating between fields
+    const phoneNumberRef = useRef(null);
+    const otpRef = useRef(null);
+    const nameRef = useRef(null);
+
     const requestOtp = () => {
         if (phoneNumber.length === 10) {
             setIsOtpRequested(true);
             setErrorMessage('');
             alert(`Mock OTP for testing purposes: ${mockOtp}`);
+            otpRef.current?.focus();  // Move focus to OTP input
         } else {
             setErrorMessage("Please enter a valid 10-digit phone number.");
         }
@@ -28,6 +34,7 @@ const PrivilegeGeneration = () => {
         if (otp === mockOtp) {
             setIsOtpVerified(true);
             setErrorMessage('');
+            setTimeout(() => nameRef.current?.focus(), 0); // Ensure focus on the name input after rendering
         } else {
             setErrorMessage("Incorrect OTP. Please try again.");
         }
@@ -36,7 +43,7 @@ const PrivilegeGeneration = () => {
     const generateAndSendCard = async () => {
         try {
             const mrNumber = `MR${Date.now()}`;
-            const cardDataUrl = await generateCardWithBarcode(mrNumber, 'Mr. '+name);  // Pass name to card generation function
+            const cardDataUrl = await generateCardWithBarcode(mrNumber, 'Mr. ' + name);
 
             setCardPreview(cardDataUrl);
 
@@ -56,7 +63,6 @@ const PrivilegeGeneration = () => {
                 <div className="text-center">
                     <p className="text-green-600 font-bold">OTP Verified Successfully!</p>
 
-                    {/* New input for customer's name */}
                     <label className="block text-sm font-medium text-gray-700 mb-1 mt-4">
                         Customer Name
                     </label>
@@ -64,13 +70,16 @@ const PrivilegeGeneration = () => {
                         type="text"
                         value={name}
                         onChange={(e) => setName(e.target.value)}
+                        ref={nameRef}
+                        autoFocus // Ensure name input is auto-focused after OTP verification
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500"
                         placeholder="Enter customer's name"
+                        onKeyDown={(e) => e.key === 'Enter' && generateAndSendCard()}
                     />
 
                     <button
                         onClick={generateAndSendCard}
-                        className="mt-4 w-full bg-[#5db76d] hover:bg-green-600 text-white py-2 rounded-lg"
+                        className="mt-4 w-full bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg"
                     >
                         Generate and Send Privilege Card
                     </button>
@@ -93,12 +102,14 @@ const PrivilegeGeneration = () => {
                                 type="text"
                                 value={phoneNumber}
                                 onChange={(e) => setPhoneNumber(e.target.value)}
+                                ref={phoneNumberRef}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500"
                                 placeholder="Enter phone number"
+                                onKeyDown={(e) => e.key === 'Enter' && requestOtp()}
                             />
                             <button
                                 onClick={requestOtp}
-                                className="mt-4 w-full bg-[#5db76d] hover:bg-green-600 text-white py-2 rounded-lg"
+                                className="mt-4 w-full bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg"
                             >
                                 Request OTP
                             </button>
@@ -110,12 +121,14 @@ const PrivilegeGeneration = () => {
                                 type="text"
                                 value={otp}
                                 onChange={(e) => setOtp(e.target.value)}
+                                ref={otpRef}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500"
                                 placeholder="Enter the OTP"
+                                onKeyDown={(e) => e.key === 'Enter' && verifyOtp()}
                             />
                             <button
                                 onClick={verifyOtp}
-                                className="mt-4 w-full bg-[#5db76d] hover:bg-green-600 text-white py-2 rounded-lg"
+                                className="mt-4 w-full bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg"
                             >
                                 Verify OTP
                             </button>

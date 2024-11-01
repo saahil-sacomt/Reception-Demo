@@ -251,7 +251,7 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
                                     nextButtonRef.current?.focus();
                                 }
                             }}
-                            className="mt-2 bg-[#5db76d] hover:bg-green-600 text-white px-4 py-2 rounded-lg transition"
+                            className="mt-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition"
                         >
                             Fetch Patient Details
                         </button>
@@ -289,7 +289,7 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
                                     <button
                                         type="button"
                                         onClick={() => setRedeemOption('redeem')}
-                                        className={`px-4 py-2 rounded-lg w-full font-medium transition-colors duration-200 ${redeemOption === 'redeem' ? 'bg-[#5db76d] hover:bg-green-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                        className={`px-4 py-2 rounded-lg w-full font-medium transition-colors duration-200 ${redeemOption === 'redeem' ? 'bg-green-500 hover:bg-green-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                                             }`}
                                     >
                                         Redeem Points
@@ -297,7 +297,7 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
                                     <button
                                         type="button"
                                         onClick={() => setRedeemOption('add')}
-                                        className={`px-4 py-2 rounded-lg w-full font-medium transition-colors duration-200 ${redeemOption === 'add' ? 'bg-[#5db76d] hover:bg-green-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                        className={`px-4 py-2 rounded-lg w-full font-medium transition-colors duration-200 ${redeemOption === 'add' ? 'bg-green-500 hover:bg-green-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                                             }`}
                                     >
                                         Add Points
@@ -350,7 +350,7 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
                     <div className="bg-white p-8 rounded space-y-4 text-gray-800">
                         <div className='flex justify-between'>
                             <h2 className="text-xl font-semibold">Order Summary</h2>
-                            <button onClick={handlePrint} className="bg-[#5db76d] hover:bg-green-600 text-white rounded-lg px-5 py-2 transition">
+                            <button onClick={handlePrint} className="bg-green-500 hover:bg-green-600 text-white rounded-lg px-5 py-2 transition">
                                 <PrinterIcon className='w-5 h-5' />
                             </button>
                         </div>
@@ -368,12 +368,12 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
                 {/* Navigation Buttons */}
                 <div className="flex justify-center mt-6">
                     {step > 1 && (
-                        <button onClick={prevStep} className="bg-[#5db76d] hover:bg-green-600 text-white mx-2 px-4 py-2 rounded-lg">
+                        <button onClick={prevStep} className="bg-green-500 hover:bg-green-600 text-white mx-2 px-4 py-2 rounded-lg">
                             Previous
                         </button>
                     )}
                     {step < 7 && (
-                        <button ref={nextButtonRef} onClick={nextStep} className="bg-[#5db76d] hover:bg-green-600 text-white mx-2 px-4 py-2 rounded-lg">
+                        <button ref={nextButtonRef} onClick={nextStep} className="bg-green-500 hover:bg-green-600 text-white mx-2 px-4 py-2 rounded-lg">
                             Next
                         </button>
                     )}
