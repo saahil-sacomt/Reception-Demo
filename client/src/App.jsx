@@ -25,17 +25,7 @@ const App = () => {
     setIsCollapsed((prev) => !prev);
   };
 
-  useEffect(() => {
-    window.otpless = (userinfo) => {
-      console.log('User Info:', userinfo);
-      const email = userinfo.identities.find(item => item.identityType === 'EMAIL')?.identityValue;
-      const mobile = userinfo.identities.find(item => item.identityType === 'MOBILE')?.identityValue;
 
-      // Store user info or process it further here
-    };
-
-    window.OTPlessSignin = new OTPless(window.otpless);
-  }, []);
 
   return (
     <AuthProvider>

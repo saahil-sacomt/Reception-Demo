@@ -1,8 +1,7 @@
-// server/routes/privilegeRoutes.js
 const express = require('express');
-const { createPrivilegeCard } = require('../controllers/privilegeController');
 const router = express.Router();
+const { sendPrivilegeCard } = require('../controllers/privilegeCardController');
 
-router.post('/create', createPrivilegeCard);
+router.post('/send-card', sendPrivilegeCard);
 
 module.exports = router;
