@@ -4,6 +4,7 @@ import { generateCardWithBarcode } from '../utils/cardGenerator';
 import { sendCardViaWhatsApp } from '../utils/watiApi';
 
 const PrivilegeGeneration = () => {
+    const [name, setName] = useState('');  // New state for customer name
     const [phoneNumber, setPhoneNumber] = useState('');
     const [otp, setOtp] = useState('');
     const [isOtpRequested, setIsOtpRequested] = useState(false);
@@ -35,11 +36,10 @@ const PrivilegeGeneration = () => {
     const generateAndSendCard = async () => {
         try {
             const mrNumber = `MR${Date.now()}`;
-            const cardDataUrl = await generateCardWithBarcode(mrNumber);
+            const cardDataUrl = await generateCardWithBarcode(mrNumber, 'Mr. '+name);  // Pass name to card generation function
 
-            setCardPreview(cardDataUrl); // Show card preview in the UI
+            setCardPreview(cardDataUrl);
 
-            // Send card image to WhatsApp
             await sendCardViaWhatsApp(phoneNumber, cardDataUrl);
             alert("Privilege card sent successfully via WhatsApp!");
         } catch (error) {
@@ -55,6 +55,19 @@ const PrivilegeGeneration = () => {
             {isOtpVerified ? (
                 <div className="text-center">
                     <p className="text-green-600 font-bold">OTP Verified Successfully!</p>
+
+                    {/* New input for customer's name */}
+                    <label className="block text-sm font-medium text-gray-700 mb-1 mt-4">
+                        Customer Name
+                    </label>
+                    <input
+                        type="text"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500"
+                        placeholder="Enter customer's name"
+                    />
+
                     <button
                         onClick={generateAndSendCard}
                         className="mt-4 w-full bg-[#5db76d] hover:bg-green-600 text-white py-2 rounded-lg"

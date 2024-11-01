@@ -70,7 +70,7 @@ const Header = ({ selectedTab, setSelectedTab, isCollapsed, toggleSidebar }) => 
         <div className="relative">
           <button
             onClick={toggleCreateDropdown}
-            className="flex flex-row bg-[#5db76d] hover:bg-green-600 px-4 py-2 rounded-lg text-sm text-white"
+            className="flex flex-row bg-green-500 hover:bg-green-600 px-4 py-2 rounded-lg text-sm text-white"
           >
             <PlusIcon className="w-5 h-5 mr-2" /> Create
           </button>
