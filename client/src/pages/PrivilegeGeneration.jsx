@@ -7,18 +7,19 @@ const PrivilegeGeneration = () => {
     const [name, setName] = useState('');
     const [phoneNumber, setPhoneNumber] = useState('');
     const [otp, setOtp] = useState('');
+    const [topUpAmount, setTopUpAmount] = useState(''); // Keep as a string for better handling of blank state
     const [isOtpRequested, setIsOtpRequested] = useState(false);
     const [isOtpVerified, setIsOtpVerified] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
     const [cardPreview, setCardPreview] = useState(null);
-    const [isLoading, setIsLoading] = useState(false); // New state for loading indication
+    const [isLoading, setIsLoading] = useState(false);
 
     const mockOtp = "1234";
 
-    // References for navigating between fields
     const phoneNumberRef = useRef(null);
     const otpRef = useRef(null);
     const nameRef = useRef(null);
+    const topUpAmountRef = useRef(null);
 
     const requestOtp = () => {
         if (phoneNumber.length === 10) {
@@ -41,33 +42,51 @@ const PrivilegeGeneration = () => {
         }
     };
 
+    const handleTopUpChange = (value) => {
+        // Only update if input is a positive integer
+        if (!isNaN(value) && Number(value) >= 0) {
+            setTopUpAmount(value);
+            if (value && Number(value) < 500) {
+                setErrorMessage("Top-Up Amount must be at least 500.");
+            } else {
+                setErrorMessage('');
+            }
+        }
+    };
+
     const generateAndSendCard = async () => {
-        setIsLoading(true); // Set loading to true at the start
+        if (topUpAmount === '' || Number(topUpAmount) < 500) {
+            setErrorMessage("Top-Up Amount must be at least 500.");
+            return;
+        }
+
+        setIsLoading(true);
         try {
             const mrNumber = `MR${Date.now()}`;
             const cardDataUrl = await generateCardWithBarcode(mrNumber, 'Mr. ' + name);
 
             setCardPreview(cardDataUrl);
 
-            await sendCardViaWhatsApp(phoneNumber, cardDataUrl);
+            await sendCardViaWhatsApp(phoneNumber, cardDataUrl, topUpAmount);
             alert("Privilege card sent successfully via WhatsApp!");
         } catch (error) {
             console.error("Error generating/sending card:", error);
             setErrorMessage("Failed to generate/send card. Please try again.");
         } finally {
-            setIsLoading(false); // Reset loading state after process is complete
+            setIsLoading(false);
         }
     };
 
     return (
-        <div className="container mx-auto mt-20 p-6 py-20 bg-green-50 shadow-inner rounded-lg max-w-xl">
-            <h2 className="text-2xl font-bold text-center mb-4">Privilege Generation</h2>
+        <div className="container mx-auto my-20 px-6 py-6 bg-green-50 shadow-inner rounded-lg max-w-xl ">
+            <h2 className="text-2xl font-semibold text-center mb-4 ">Privilege Generation</h2>
             
             {isOtpVerified ? (
-                <div className="text-center">
-                    <p className="text-green-600 font-bold">OTP Verified Successfully!</p>
+                <div className="">
+                    <p className="text-green-600 font-bold text-center">OTP Verified Successfully!</p>
 
-                    <label className="block text-sm font-medium text-gray-700 mb-1 mt-4">
+                    {/* Customer Name Input */}
+                    <label className="block text-base font-medium text-gray-700 mb-1 mt-4">
                         Customer Name
                     </label>
                     <input
@@ -78,13 +97,30 @@ const PrivilegeGeneration = () => {
                         autoFocus
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500"
                         placeholder="Enter customer's name"
+                        onKeyDown={(e) => e.key === 'Enter' && topUpAmountRef.current?.focus()}
+                    />
+
+                    {/* Top-Up Amount Input */}
+                    <label className="block text-base font-medium text-gray-700 mb-1 mt-4">
+                        Top-Up Amount <span className="text-xs text-gray-500">(Minimum: 500)</span>
+                    </label>
+                    <input
+                        type="number"
+                        value={topUpAmount}
+                        onChange={(e) => handleTopUpChange(e.target.value)}
+                        ref={topUpAmountRef}
+                        className="appearance-none w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500"
+                        placeholder="Enter top-up amount"
                         onKeyDown={(e) => e.key === 'Enter' && generateAndSendCard()}
                     />
+                    {errorMessage && (
+                        <p className="text-red-600 text-xs mt-1 text-center">{errorMessage}</p>
+                    )}
 
                     <button
                         onClick={generateAndSendCard}
-                        disabled={isLoading} // Disable button during loading
-                        className={`mt-4 w-full py-2 rounded-lg transition ${isLoading ? 'bg-yellow-400' : 'bg-green-500 hover:bg-green-600'} text-white `}
+                        disabled={isLoading}
+                        className={`mt-4 w-full py-2 rounded-lg transition ${isLoading ? 'bg-yellow-400' : 'bg-green-500 hover:bg-green-600'} text-white`}
                     >
                         {isLoading ? (
                             <span className="flex items-center justify-center">
@@ -110,7 +146,7 @@ const PrivilegeGeneration = () => {
                 <div>
                     {!isOtpRequested ? (
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                            <label className="block text-base font-semibold text-gray-700 mb-2">
                                 Enter your Phone Number
                             </label>
                             <input
@@ -131,7 +167,7 @@ const PrivilegeGeneration = () => {
                         </div>
                     ) : (
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Enter OTP</label>
+                            <label className="block text-base font-semibold text-gray-700 mb-2">Enter OTP</label>
                             <input
                                 type="text"
                                 value={otp}
