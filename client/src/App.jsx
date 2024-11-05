@@ -12,6 +12,7 @@ import OrderGenerationPage from './pages/OrderGenerationPage';
 import WorkOrderGeneration from './pages/WorkOrderGeneration';
 import SalesOrderGeneration from './pages/SalesOrderGeneration';
 import PrivilegeGeneration from './pages/PrivilegeGeneration';
+import SettingsPage from './pages/SettingsPage';
 
 const App = () => {
   const location = useLocation();
@@ -54,6 +55,7 @@ const App = () => {
               <Route path="/work-order" element={<WorkOrderGeneration isCollapsed={isCollapsed} />} />
               <Route path="/sales-order" element={<SalesOrderGeneration isCollapsed={isCollapsed} />} />
               <Route path="/privilege-generation" element={<PrivilegeGeneration isCollapsed={isCollapsed} />} />
+              <Route path="/settings" element={<SettingsPage isCollapsed={isCollapsed} />} />
             </Route>
 
             {/* Default Route */}

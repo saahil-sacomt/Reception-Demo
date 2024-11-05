@@ -5,7 +5,6 @@ import { HomeIcon, DocumentTextIcon, ArrowLeftIcon, ArrowRightIcon, CloudIcon, R
 const Sidebar = ({ isCollapsed, toggleSidebar, selectedTab }) => {
   const dashboardLinks = [
     { to: '/home', icon: HomeIcon, label: 'Home' },
-    { to: '/order-generation', icon: DocumentTextIcon, label: 'Order Generation' },
     { to: '/appointment', icon: RectangleStackIcon, label: 'Appointments' },
   ];
 
