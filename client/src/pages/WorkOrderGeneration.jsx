@@ -175,7 +175,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
               readOnly
               className="border border-gray-300 px-4 py-3 rounded-lg bg-gray-200 text-gray-700 w-full text-center"
             />
-            <label className="block text-gray-700 font-medium mb-4">Product Details (ID, Price, Quantity)</label>
+            <label className="block text-gray-700 font-medium mb-4">Product Details</label>
             <div className="space-y-6">
               {productEntries.map((product, index) => (
                 <div key={index} className="flex space-x-2 items-center">
@@ -372,10 +372,11 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                 <PrinterIcon className="w-5 h-5" />
               </button>
             </div>
-            <div className="text-center mb-6">
+            <div className="mb-6">
               <p><strong>Work Order ID:</strong> {workOrderId}</p>
+              <p><strong>Description:</strong> {description}</p>
               <p><strong>Due Date:</strong> {dueDate}</p>
-              <p><strong>Employee:</strong> {employee}</p>
+              <p><strong>Billed by Employee Name:</strong> {employee}</p>
             </div>
             <table className="w-full border border-gray-300 rounded-md">
               <thead>
@@ -405,19 +406,18 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
               <p><strong>Advance Paid:</strong> {parseFloat(advanceDetails) || 0}</p>
               <p><strong>Balance Due:</strong> {(calculateTotal() - (parseFloat(advanceDetails) || 0)).toFixed(2)}</p>
             </div>
-            <label className="block text-gray-700 font-medium mt-6 mb-1">Payment Method</label>
+            <label className="block font-bold mt-6 mb-1">Payment Method</label>
             <select
               value={paymentMethod}
               onChange={(e) => setPaymentMethod(e.target.value)}
               ref={paymentMethodRef}
               onKeyDown={(e) => handleEnterKey(e, printButtonRef)}
-              className="border border-gray-300 w-full px-4 py-3 rounded-lg text-center"
+              className="border border-gray-300 w-1/2 px-4 py-3 rounded-lg text-center"
             >
               <option value="" disabled>Select Payment Method</option>
               <option value="cash">Cash</option>
-              <option value="credit">Credit</option>
-              <option value="debit">Debit</option>
-              <option value="online">Online</option>
+              <option value="credit">Card</option>
+              <option value="online">UPI (Paytm/PhonePe/GPay)</option>
             </select>
           </div>
         )}

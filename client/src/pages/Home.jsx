@@ -3,9 +3,11 @@ import { useState, useEffect } from 'react';
 import SplashScreen from '../components/SplashScreen';
 import walletImage from '../assets/pngwing.com.png';
 import { CreditCardIcon } from '@heroicons/react/24/outline';
+import { useNavigate } from 'react-router-dom';
 
 const Home = ({ isCollapsed }) => {
   const [showSplash, setShowSplash] = useState(sessionStorage.getItem('showSplash') === 'true');
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (showSplash) {
@@ -26,8 +28,8 @@ const Home = ({ isCollapsed }) => {
       {showSplash ? (
         <SplashScreen />
       ) : (
-        <div className="space-y-2">
-          {/* Combined Welcome and Metrics Section */}
+        <div className="space-y-10">
+          {/* Welcome and Metrics Section */}
           <div className="bg-white p-6 flex flex-col md:flex-row justify-between items-center">
             {/* Welcome Message */}
             <div className="mb-4 md:mb-0">
@@ -54,7 +56,7 @@ const Home = ({ isCollapsed }) => {
 
           {/* Purchase Section */}
           <div className="bg-green-50 py-10 px-5 mx-6 rounded-lg shadow flex items-center space-x-20">
-            <img src={walletImage} alt="Wallet Icon" className="w-96 h-auto p-10 m-0 shadow-xl rounded-xl" />
+            <img src={walletImage} alt="Wallet Icon" className="w-96 h-auto p-10 m-0 shadow-xl rounded-full bg-white" />
             <div className="text-left space-y-2">
               <h3 className="text-3xl text-gray-800">Generate a New Privilege Card</h3>
               <p className="text-sm text-gray-600 pb-4">
@@ -66,6 +68,24 @@ const Home = ({ isCollapsed }) => {
               >
                 <CreditCardIcon className='w-6 h-6 mr-1' /> Privilege Card
               </button>
+            </div>
+          </div>
+
+          {/* Order Generation Section */}
+          <div className="flex flex-col md:flex-row md:space-x-10 pb-10  ml-6">
+            {/* Work Order Container */}
+            <div className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 w-1/3" onClick={() => navigate('/work-order')}>
+              <img src="/work-order.png" alt="Work Order" className="w-full h-48 object-contain bg-white rounded-full shadow-xl" />
+              <h2 className="text-2xl text-gray-800 mt-4">Work Order Generation</h2>
+            </div>
+
+            {/* Sales Order Container */}
+            <div className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 w-1/3" onClick={() => navigate('/sales-order')}>
+              <img src="/sales-order.png" alt="Sales Order" className="w-full h-48 object-contain bg-white rounded-full shadow-xl" />
+              <h2 className="text-2xl text-gray-800 mt-4">Sales Order Generation</h2>
+            </div>
+            <div className=''>
+              <p></p>
             </div>
           </div>
         </div>

@@ -98,8 +98,7 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
                 if (!product.price) errors[`productPrice-${index}`] = 'Price is required';
                 if (!product.quantity) errors[`productQuantity-${index}`] = 'Quantity is required';
             });
-        } else if (step === 2) {
-            if (!description) errors.description = 'Description is required';
+        
         } else if (step === 3) {
             if (!patientId) errors.patientId = 'Patient ID is required';
         } else if (step === 4) {
@@ -168,8 +167,8 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
             <form className="space-y-8 bg-white p-6 rounded-lg max-w-2xl mx-auto" onSubmit={(e) => e.preventDefault()}>
                 {/* Step 1: Sales Order ID and Product Details */}
                 {step === 1 && (
-                    <div className="w-full bg-gray-50 p-6 rounded-md shadow-inner space-y-4 text-center">
-                        <h2 className="text-lg font-semibold text-gray-700">Product Information</h2>
+                    <div className="w-full bg-gray-50 p-6 rounded-md shadow-inner space-y-6">
+                        <h2 className="text-lg font-semibold text-gray-700 text-center">Product Information</h2>
                         <label className="block text-gray-700 font-medium mb-1">Generated Sales Order ID</label>
                         <input
                             type="text"
@@ -177,7 +176,7 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
                             readOnly
                             className="border border-gray-300 px-4 py-3 rounded-lg bg-gray-200 text-gray-700 w-full text-center"
                         />
-                        <label className="block text-gray-700 font-medium mb-1">Product Details (ID, Price, Quantity)</label>
+                        <label className="block text-gray-700 font-medium mb-1">Product Details</label>
                         {productEntries.map((product, index) => (
                             <div key={index} className="flex space-x-2 items-center">
                                 <div className="relative w-1/2">
@@ -223,14 +222,16 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
                                     )}
                                 </div>
                             </div>
+                            
                         ))}
                         <button
                             type="button"
                             onClick={() => setProductEntries([...productEntries, { id: '', price: '', quantity: '' }])}
-                            className="mt-4 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition"
+                            className=" bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition"
                         >
                             Add Product
                         </button>
+                        
                     </div>
                 )}
 
@@ -259,9 +260,7 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
                             ref={descriptionRef}
                             className="border border-gray-300 w-full px-4 py-3 rounded-lg text-center"
                         />
-                        {validationErrors.description && (
-                            <p className="text-red-500 text-xs mt-1">{validationErrors.description}</p>
-                        )}
+                    
                     </div>
                 )}
 
@@ -399,11 +398,11 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
                                 <PrinterIcon className='w-5 h-5' />
                             </button>
                         </div>
-                        <div className="text-center mb-6">
+                        <div className=" mb-6">
                             <p><strong>Sales Order ID:</strong> {salesOrderId}</p>
                             <p><strong>Description:</strong> {description}</p>
                             <p><strong>Patient ID:</strong> {patientId}</p>
-                            <p><strong>Employee:</strong> {employee}</p>
+                            <p><strong>Billed by Employee Name:</strong> {employee}</p>
                         </div>
                         <table className="w-full border border-gray-300 rounded-md">
                             <thead>
@@ -433,18 +432,18 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
                             <p><strong>Advance Paid:</strong> {parseFloat(advanceDetails) || 0}</p>
                             <p><strong>Balance Due:</strong> {(calculateTotal() - (parseFloat(advanceDetails) || 0)).toFixed(2)}</p>
                         </div>
-                        <label className="block text-gray-700 font-medium mt-6 mb-1">Payment Method</label>
+                        <label className="block font-bold mt-6 mb-1">Payment Method</label>
                         <select
                             value={paymentMethod}
                             onChange={(e) => setPaymentMethod(e.target.value)}
                             ref={paymentMethodRef}
                             onKeyDown={(e) => handleEnterKey(e, printButtonRef)}
-                            className="border border-gray-300 w-full px-4 py-3 rounded-lg text-center"
+                            className="border border-gray-300 w-1/2 px-4 py-3 rounded-lg text-center"
                         >
                             <option value="" disabled>Select Payment Method</option>
                             <option value="cash">Cash</option>
                             <option value="credit">Card</option>
-                            <option value="online">Online</option>
+                            <option value="online">UPI (Paytm/PhonePe/GPay)</option>
                         </select>
                         {validationErrors.paymentMethod && (
                             <p className="text-red-500 text-xs mt-1">{validationErrors.paymentMethod}</p>
