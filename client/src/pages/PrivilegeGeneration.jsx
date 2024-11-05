@@ -11,6 +11,7 @@ const PrivilegeGeneration = () => {
     const [isOtpVerified, setIsOtpVerified] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
     const [cardPreview, setCardPreview] = useState(null);
+    const [isLoading, setIsLoading] = useState(false); // New state for loading indication
 
     const mockOtp = "1234";
 
@@ -24,7 +25,7 @@ const PrivilegeGeneration = () => {
             setIsOtpRequested(true);
             setErrorMessage('');
             alert(`Mock OTP for testing purposes: ${mockOtp}`);
-            otpRef.current?.focus();  // Move focus to OTP input
+            otpRef.current?.focus();
         } else {
             setErrorMessage("Please enter a valid 10-digit phone number.");
         }
@@ -34,13 +35,14 @@ const PrivilegeGeneration = () => {
         if (otp === mockOtp) {
             setIsOtpVerified(true);
             setErrorMessage('');
-            setTimeout(() => nameRef.current?.focus(), 0); // Ensure focus on the name input after rendering
+            setTimeout(() => nameRef.current?.focus(), 0);
         } else {
             setErrorMessage("Incorrect OTP. Please try again.");
         }
     };
 
     const generateAndSendCard = async () => {
+        setIsLoading(true); // Set loading to true at the start
         try {
             const mrNumber = `MR${Date.now()}`;
             const cardDataUrl = await generateCardWithBarcode(mrNumber, 'Mr. ' + name);
@@ -52,6 +54,8 @@ const PrivilegeGeneration = () => {
         } catch (error) {
             console.error("Error generating/sending card:", error);
             setErrorMessage("Failed to generate/send card. Please try again.");
+        } finally {
+            setIsLoading(false); // Reset loading state after process is complete
         }
     };
 
@@ -71,7 +75,7 @@ const PrivilegeGeneration = () => {
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         ref={nameRef}
-                        autoFocus // Ensure name input is auto-focused after OTP verification
+                        autoFocus
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500"
                         placeholder="Enter customer's name"
                         onKeyDown={(e) => e.key === 'Enter' && generateAndSendCard()}
@@ -79,9 +83,20 @@ const PrivilegeGeneration = () => {
 
                     <button
                         onClick={generateAndSendCard}
-                        className="mt-4 w-full bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg"
+                        disabled={isLoading} // Disable button during loading
+                        className={`mt-4 w-full py-2 rounded-lg transition ${isLoading ? 'bg-yellow-400' : 'bg-green-500 hover:bg-green-600'} text-white `}
                     >
-                        Generate and Send Privilege Card
+                        {isLoading ? (
+                            <span className="flex items-center justify-center">
+                                <svg className="animate-spin h-5 w-5 mr-2 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path d="M4 12a8 8 0 018-8" stroke="currentColor" strokeWidth="4"></path>
+                                </svg>
+                                Sending...
+                            </span>
+                        ) : (
+                            "Generate and Send Privilege Card"
+                        )}
                     </button>
                     
                     {cardPreview && (
@@ -142,4 +157,3 @@ const PrivilegeGeneration = () => {
 };
 
 export default PrivilegeGeneration;
- 
