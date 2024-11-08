@@ -4,6 +4,10 @@ import { nanoid } from 'nanoid';
 import axios from 'axios';
 import { PrinterIcon } from '@heroicons/react/24/outline';
 
+const branchCode = 'NTA';
+const initialSalesOrderCount = 1824;
+
+
 const SalesOrderGeneration = ({ isCollapsed }) => {
     const [step, setStep] = useState(1);
     const [salesOrderId, setSalesOrderId] = useState('');
@@ -34,9 +38,23 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
     const paymentMethodRef = useRef(null);
     const printButtonRef = useRef(null);
 
+    const getFinancialYear = () => {
+        const currentYear = new Date().getFullYear();
+        const nextYear = (currentYear + 1) % 100;
+        return `${currentYear % 100}-${nextYear}`;
+      };
+      
+      const generateSalesOrderId = (count) => {
+        const financialYear = getFinancialYear();
+        return `SO(${branchCode})-${count}-${financialYear}`;
+      };
+      
+
     useEffect(() => {
-        setSalesOrderId(nanoid());
-    }, []);
+        const newSalesOrderId = generateSalesOrderId(initialSalesOrderCount);
+        setSalesOrderId(newSalesOrderId);
+      }, []);
+      
 
     useEffect(() => {
         focusFirstFieldOfStep();

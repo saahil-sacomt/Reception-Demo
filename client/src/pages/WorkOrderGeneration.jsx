@@ -3,6 +3,10 @@ import { useState, useEffect, useRef } from 'react';
 import { nanoid } from 'nanoid';
 import { CalendarIcon, PrinterIcon } from '@heroicons/react/24/outline';
 
+
+const branchCode = 'NTA';
+const initialWorkOrderCount = 1824;
+
 const WorkOrderGeneration = ({ isCollapsed }) => {
   const [step, setStep] = useState(1);
   const [workOrderId, setWorkOrderId] = useState('');
@@ -30,10 +34,23 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   const printButtonRef = useRef(null);
   const nextButtonRef = useRef(null);
 
-  useEffect(() => {
-    setWorkOrderId(nanoid());
-  }, []);
+  const getFinancialYear = () => {
+    const currentYear = new Date().getFullYear();
+    const nextYear = (currentYear + 1) % 100;
+    return `${currentYear % 100}-${nextYear}`;
+  };
+  
+  const generateWorkOrderId = (count) => {
+    const financialYear = getFinancialYear();
+    return `WO(${branchCode})-${count}-${financialYear}`;
+  };
+  
 
+  useEffect(() => {
+    const newWorkOrderId = generateWorkOrderId(initialWorkOrderCount);
+    setWorkOrderId(newWorkOrderId);
+  }, []);
+  
   useEffect(() => {
     focusFirstFieldOfStep();
   }, [step]);
