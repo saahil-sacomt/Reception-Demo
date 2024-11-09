@@ -1,7 +1,9 @@
-const express = require('express');
+// server/routes/privilegeRoutes.js
+import express from 'express';
+import { createPrivilegeCard } from '../controllers/privilegeController.js';
+
 const router = express.Router();
-const { sendPrivilegeCard } = require('../controllers/privilegeCardController');
 
-router.post('/send-card', sendPrivilegeCard);
+router.post('/create', createPrivilegeCard);
 
-module.exports = router;
+export default router;

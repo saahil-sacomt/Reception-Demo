@@ -1,8 +1,9 @@
 // server/routes/billingRoutes.js
-const express = require('express');
-const { createBillingRecord } = require('../controllers/billingController');
+import express from 'express';
+import { createBillingRecord } from '../controllers/billingController.js';
+
 const router = express.Router();
 
 router.post('/create', createBillingRecord);
 
-module.exports = router;
+export default router;

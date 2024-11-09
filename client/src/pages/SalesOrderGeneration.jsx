@@ -1,31 +1,54 @@
 // client/src/pages/SalesOrderGeneration.jsx
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { nanoid } from 'nanoid';
 import axios from 'axios';
 import { PrinterIcon } from '@heroicons/react/24/outline';
+import { fetchPrivilegeCardByPhone } from '../supabaseClient';
+// Import Supabase client
+import supabase from '../supabaseClient';
+import { calculateAmounts, calculateLoyaltyPoints } from '../utils/calculatepoints';
+import { useNavigate, useLocation } from 'react-router-dom';
+
 
 const branchCode = 'NTA';
 const initialSalesOrderCount = 1824;
+const mockOtp = "1234";
+
 
 
 const SalesOrderGeneration = ({ isCollapsed }) => {
     const [step, setStep] = useState(1);
     const [salesOrderId, setSalesOrderId] = useState('');
     const [productEntries, setProductEntries] = useState([{ id: '', price: '', quantity: '' }]);
-    const [stockStatus, setStockStatus] = useState({});
+    const [stockStatus, setStockStatus] = useState({}); // Remove
+    const [redeemOption, setRedeemOption] = useState('add'); // Remove
+    const [isLoading, setIsLoading] = useState(false); // Remove
+    const [isOtpModalOpen, setIsOtpModalOpen] = useState(false); // Remove
+
     const [description, setDescription] = useState('');
     const [patientId, setPatientId] = useState('');
     const [patientDetails, setPatientDetails] = useState(null);
     const [privilegeCard, setPrivilegeCard] = useState(true);
-    const [redeemOption, setRedeemOption] = useState('add');
+
     const [phoneNumber, setPhoneNumber] = useState('');
     const [otp, setOtp] = useState('');
+    const [isOtpVerified, setIsOtpVerified] = useState(false);
     const [employee, setEmployee] = useState('');
     const [employees] = useState(['John Doe', 'Jane Smith', 'Alex Brown']);
     const [allowPrint, setAllowPrint] = useState(false);
     const [advanceDetails, setAdvanceDetails] = useState(1000); // Default value for testing
     const [paymentMethod, setPaymentMethod] = useState('');
     const [validationErrors, setValidationErrors] = useState({});
+    const [errorMessage, setErrorMessage] = useState('');
+
+    const [isOtpSent, setIsOtpSent] = useState(false);
+    const [privilegeCardDetails, setPrivilegeCardDetails] = useState(null);
+    const [redeemPoints, setRedeemPoints] = useState(false);
+    const [loyaltyPoints, setLoyaltyPoints] = useState(0);
+    const [discountAmount, setDiscountAmount] = useState(0);
+
+
+
 
     // Refs for input fields to control focus
     const descriptionRef = useRef(null);
@@ -38,23 +61,120 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
     const paymentMethodRef = useRef(null);
     const printButtonRef = useRef(null);
 
+    const navigate = useNavigate();
+    const location = useLocation();
+
+
+    const handleFetchPrivilegeCard = async () => {
+        setIsLoading(true);
+        try {
+            const card = await fetchPrivilegeCardByPhone(phoneNumber);
+            setPrivilegeCardDetails(card);
+            if (card) {
+                setLoyaltyPoints(card.loyalty_points || 0);
+            }
+        } catch (error) {
+            console.error('Error fetching privilege card:', error);
+            setErrorMessage('Failed to fetch privilege card details.');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+
+    // Function to send OTP
+    const handleSendOtp = () => {
+        if (phoneNumber.length === 10) {
+            setIsOtpSent(true);
+            setErrorMessage('');
+            setIsOtpModalOpen(true); // Open the OTP modal
+            alert(`Mock OTP for testing purposes: ${mockOtp}`); // For testing, you can remove this in production
+        } else {
+            setErrorMessage("Please enter a valid 10-digit phone number.");
+        }
+    };
+
+    const handleVerifyOtp = async () => {
+        if (otp === mockOtp) {
+            setIsOtpVerified(true);
+            setErrorMessage('');
+            await handleFetchPrivilegeCard();
+            setIsOtpModalOpen(false);
+        } else {
+            setErrorMessage("Incorrect OTP. Please try again.");
+        }
+    };
+
+
+    const handleNewPrivilegeCard = () => {
+        navigate('/privilege-generation', {
+            state: {
+                from: 'sales-order',
+                step,
+                formData: {
+                    productEntries,
+                    description,
+                    patientId,
+                    patientDetails,
+                    phoneNumber,
+                    otp,
+                    isOtpVerified,
+                    employee,
+                    paymentMethod,
+                    advanceDetails,
+                    privilegeCard,
+                    redeemPoints,
+                    loyaltyPoints,
+                    discountAmount
+                }
+            }
+        });
+    };
+
+    useEffect(() => {
+        const locationState = location.state;
+        if (locationState?.from === 'privilege-generation') {
+            setStep(locationState.step);
+
+            const data = locationState.formData;
+            if (data) {
+                setProductEntries(data.productEntries);
+                setDescription(data.description);
+                setPatientId(data.patientId);
+                setPatientDetails(data.patientDetails);
+                setPhoneNumber(data.phoneNumber);
+                setOtp(data.otp);
+                setIsOtpVerified(data.isOtpVerified);
+                setEmployee(data.employee);
+                setPaymentMethod(data.paymentMethod);
+                setAdvanceDetails(data.advanceDetails);
+                setPrivilegeCard(data.privilegeCard);
+                setRedeemPoints(data.redeemPoints);
+                setLoyaltyPoints(data.loyaltyPoints);
+                setDiscountAmount(data.discountAmount);
+            }
+        }
+    }, [location]);
+
+
+
     const getFinancialYear = () => {
         const currentYear = new Date().getFullYear();
         const nextYear = (currentYear + 1) % 100;
         return `${currentYear % 100}-${nextYear}`;
-      };
-      
-      const generateSalesOrderId = (count) => {
+    };
+
+    const generateSalesOrderId = (count) => {
         const financialYear = getFinancialYear();
         return `SO(${branchCode})-${count}-${financialYear}`;
-      };
-      
+    };
+
 
     useEffect(() => {
         const newSalesOrderId = generateSalesOrderId(initialSalesOrderCount);
         setSalesOrderId(newSalesOrderId);
-      }, []);
-      
+    }, []);
+
 
     useEffect(() => {
         focusFirstFieldOfStep();
@@ -98,45 +218,76 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
         }
     };
 
-    const calculateTotal = () => {
-        return productEntries.reduce((total, product) => {
+    const calculateTotal = useMemo(() => {
+        const total = productEntries.reduce((acc, product) => {
             const price = parseFloat(product.price) || 0;
             const quantity = parseInt(product.quantity) || 0;
-            return total + price * quantity;
+            return acc + price * quantity;
         }, 0);
-    };
 
-    const nextStep = () => {
+        // Subtract the advance amount from the total
+        const remainingBalance = total - (parseFloat(advanceDetails) || 0);
+
+        // Calculate the discount based on loyalty points
+        const discount = redeemPoints ? Math.min(loyaltyPoints, remainingBalance) : 0;
+
+        // Final amount after discount
+        return Math.max(remainingBalance - discount, 0); // Ensure it doesn't go below zero
+    }, [productEntries, advanceDetails, redeemPoints, loyaltyPoints]);
+
+    useEffect(() => {
+        // Calculate discount amount whenever inputs change
+        const total = productEntries.reduce((acc, product) => {
+            const price = parseFloat(product.price) || 0;
+            const quantity = parseInt(product.quantity) || 0;
+            return acc + price * quantity;
+        }, 0);
+
+        const remainingBalance = total - (parseFloat(advanceDetails) || 0);
+        const discount = redeemPoints ? Math.min(loyaltyPoints, remainingBalance) : 0;
+
+        setDiscountAmount(discount);
+    }, [productEntries, advanceDetails, redeemPoints, loyaltyPoints]);
+
+
+    const nextStep = async () => {
         const errors = {};
 
-        // Step 1 Validation for productEntries
+        // Validate each step before proceeding
         if (step === 1) {
             productEntries.forEach((product, index) => {
                 if (!product.id) errors[`productId-${index}`] = 'Product ID is required';
                 if (!product.price) errors[`productPrice-${index}`] = 'Price is required';
                 if (!product.quantity) errors[`productQuantity-${index}`] = 'Quantity is required';
             });
-        
-        } else if (step === 3) {
-            if (!patientId) errors.patientId = 'Patient ID is required';
-        } else if (step === 4) {
+        } else if (step === 3 && !patientId) {
+            errors.patientId = 'Patient ID is required';
+        } else if (step === 4 && privilegeCard) {
             if (!phoneNumber) errors.phoneNumber = 'Phone number is required';
             if (!otp) errors.otp = 'OTP is required';
-        } else if (step === 5) {
-            if (!employee) errors.employee = 'Employee selection is required';
-        } else if (step === 6) {
-            if (!paymentMethod) errors.paymentMethod = 'Payment method is required';
+            if (!isOtpVerified) errors.otp = 'Please verify the OTP';
+        } else if (step === 5 && !employee) {
+            errors.employee = 'Employee selection is required';
+        } else if (step === 6 && !paymentMethod) {
+            errors.paymentMethod = 'Payment method is required';
         }
 
         setValidationErrors(errors);
 
-        // If no errors, proceed to the next step
         if (Object.keys(errors).length === 0) {
-            if (step < 6) setStep((prevStep) => prevStep + 1);
-            else if (step === 6 && allowPrint) handlePrint();
-            else if (step === 6) setAllowPrint(true);
+            if (step < 6) {
+                setStep((prevStep) => prevStep + 1);
+            } else if (step === 6) {
+                if (allowPrint) {
+                    handlePrint();
+                    await updateLoyaltyPoints();
+                } else {
+                    setAllowPrint(true);
+                }
+            }
         }
     };
+
 
     const prevStep = () => setStep((prevStep) => Math.max(prevStep - 1, 1));
 
@@ -170,6 +321,90 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
         document.addEventListener('keydown', handleKeyDown);
         return () => document.removeEventListener('keydown', handleKeyDown);
     }, [step, allowPrint]);
+
+    const updateLoyaltyPoints = async () => {
+        try {
+            const totalAmount = productEntries.reduce((acc, product) => {
+                const price = parseFloat(product.price) || 0;
+                const quantity = parseInt(product.quantity) || 0;
+                return acc + price * quantity;
+            }, 0);
+
+            const remainingBalance = totalAmount - (parseFloat(advanceDetails) || 0);
+            const pointsToRedeem = redeemPoints ? Math.min(loyaltyPoints, remainingBalance) : 0;
+
+            // Deduct redeemed points
+            let updatedPoints = loyaltyPoints - pointsToRedeem;
+
+            // Calculate additional points to be added (10% of the total amount or max 500 points)
+            const pointsToAdd = Math.min(Math.floor(totalAmount * 0.1), 500);
+            updatedPoints += pointsToAdd;
+
+            // Update the database with the new points
+            const { error } = await supabase
+                .from('privilegecards')
+                .update({ loyalty_points: updatedPoints })
+                .eq('phone_number', phoneNumber);
+
+            if (error) {
+                console.error('Error updating loyalty points:', error);
+                setErrorMessage('Failed to update loyalty points.');
+            } else {
+                setLoyaltyPoints(updatedPoints);
+                alert("Loyalty points updated successfully!");
+            }
+        } catch (error) {
+            console.error('Error updating loyalty points:', error);
+            setErrorMessage('Failed to update loyalty points.');
+        }
+    };
+
+
+    
+
+const handleOrderCompletion = async () => {
+    try {
+        // Step 1: Calculate amounts
+        const { totalAmount, remainingBalance, discount, finalAmount } = calculateAmounts(
+            productEntries,
+            advanceDetails,
+            redeemPoints,
+            loyaltyPoints
+        );
+
+        // Step 2: Calculate loyalty points
+        const { updatedPoints, pointsToRedeem } = calculateLoyaltyPoints(
+            totalAmount,
+            loyaltyPoints,
+            redeemPoints,
+            remainingBalance
+        );
+
+        // Step 3: Update database with new loyalty points balance
+        const { error } = await supabase
+            .from('privilegecards')
+            .update({ loyalty_points: updatedPoints })
+            .eq('phone_number', phoneNumber);
+
+        if (error) {
+            console.error('Error updating loyalty points:', error);
+            setErrorMessage('Failed to update loyalty points.');
+        } else {
+            setLoyaltyPoints(updatedPoints);
+            alert("Order submitted and loyalty points updated successfully!");
+        }
+
+        handlePrint();
+
+    } catch (error) {
+        console.error('Error in order submission:', error);
+        setErrorMessage('Failed to complete the order.');
+    }
+};
+
+    
+
+
 
     return (
         <div className={`transition-all duration-300 ${isCollapsed ? 'mx-20' : 'mx-20 px-20'} justify-center mt-16 p-4 mx-auto`}>
@@ -240,7 +475,7 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
                                     )}
                                 </div>
                             </div>
-                            
+
                         ))}
                         <button
                             type="button"
@@ -249,7 +484,7 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
                         >
                             Add Product
                         </button>
-                        
+
                     </div>
                 )}
 
@@ -278,7 +513,7 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
                             ref={descriptionRef}
                             className="border border-gray-300 w-full px-4 py-3 rounded-lg text-center"
                         />
-                    
+
                     </div>
                 )}
 
@@ -325,11 +560,12 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
                     </div>
                 )}
 
-                {/* Step 4: Privilege Card & OTP */}
                 {step === 4 && (
                     <div className="bg-gray-50 p-6 rounded-md shadow-inner space-y-4">
                         <h2 className="text-lg font-semibold text-gray-700">Privilege Card</h2>
-                        <label className="flex items-center">
+
+                        {/* Checkbox to toggle privilege card usage */}
+                        <label className="flex items-center mb-4">
                             <input
                                 type="checkbox"
                                 checked={privilegeCard}
@@ -338,52 +574,104 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
                             />
                             Do you have a Privilege Card?
                         </label>
+
                         {privilegeCard && (
-                            <div className="space-y-4">
-                                <div className="flex space-x-4">
-                                    <button
-                                        type="button"
-                                        onClick={() => setRedeemOption('redeem')}
-                                        className={`px-4 py-2 rounded-lg w-full font-medium transition-colors duration-200 ${redeemOption === 'redeem' ? 'bg-green-500 hover:bg-green-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
-                                    >
-                                        Redeem Points
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setRedeemOption('add')}
-                                        className={`px-4 py-2 rounded-lg w-full font-medium transition-colors duration-200 ${redeemOption === 'add' ? 'bg-green-500 hover:bg-green-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
-                                    >
-                                        Add Points
-                                    </button>
-                                </div>
+                            <>
+                                {/* Phone Number Input */}
                                 <input
                                     type="text"
                                     placeholder="Enter Phone Number"
                                     value={phoneNumber}
                                     onChange={(e) => setPhoneNumber(e.target.value)}
-                                    onKeyDown={(e) => handleEnterKey(e, otpRef)}
+                                    className="border border-gray-300 w-full px-4 py-3 rounded-lg text-center mb-2"
                                     ref={privilegePhoneRef}
-                                    className="border border-gray-300 w-full px-4 py-3 rounded-lg text-center"
                                 />
                                 {validationErrors.phoneNumber && (
                                     <p className="text-red-500 text-xs mt-1">{validationErrors.phoneNumber}</p>
                                 )}
-                                <input
-                                    type="text"
-                                    placeholder="Enter OTP"
-                                    value={otp}
-                                    onChange={(e) => setOtp(e.target.value)}
-                                    onKeyDown={(e) => handleEnterKey(e, nextButtonRef)}
-                                    ref={otpRef}
-                                    className="border border-gray-300 w-full px-4 py-3 rounded-lg text-center"
-                                />
-                                {validationErrors.otp && (
-                                    <p className="text-red-500 text-xs mt-1">{validationErrors.otp}</p>
+
+                                {/* Send OTP Button */}
+                                {!isOtpSent && (
+                                    <button
+                                        onClick={handleSendOtp}
+                                        className="mt-4 bg-blue-500 hover:bg-blue-600 text-white py-2 rounded-lg w-full"
+                                    >
+                                        Send OTP
+                                    </button>
                                 )}
-                            </div>
+
+                                {isOtpSent && (
+                                    <>
+                                        {/* OTP Input */}
+                                        <input
+                                            type="text"
+                                            placeholder="Enter OTP"
+                                            value={otp}
+                                            onChange={(e) => setOtp(e.target.value)}
+                                            className="border border-gray-300 w-full px-4 py-3 rounded-lg text-center mb-2"
+                                            ref={otpRef}
+                                        />
+                                        {validationErrors.otp && (
+                                            <p className="text-red-500 text-xs mt-1">{validationErrors.otp}</p>
+                                        )}
+
+                                        {/* Verify OTP Button */}
+                                        <button
+                                            onClick={handleVerifyOtp}
+                                            className="bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg w-full"
+                                        >
+                                            Verify OTP
+                                        </button>
+
+                                        {errorMessage && (
+                                            <p className="text-red-600 text-center mt-2">{errorMessage}</p>
+                                        )}
+                                    </>
+                                )}
+
+                                {/* Show privilege card details if found */}
+                                {isOtpVerified && privilegeCardDetails && (
+                                    <div className="mt-6 bg-gray-100 p-4 rounded border">
+                                        <p><strong>Customer Name:</strong> {privilegeCardDetails.customer_name}</p>
+                                        <p><strong>MR Number:</strong> {privilegeCardDetails.mr_number}</p>
+                                        <p><strong>Loyalty Points:</strong> {loyaltyPoints}</p>
+
+                                        {/* Redeem Points Section */}
+                                        <label className="flex items-center mt-4">
+                                            <input
+                                                type="checkbox"
+                                                checked={redeemPoints}
+                                                onChange={() => setRedeemPoints(!redeemPoints)}
+                                                className="mr-2"
+                                            />
+                                            Redeem Loyalty Points?
+                                        </label>
+
+                                        {redeemPoints && (
+                                            <p className="text-green-700 mt-2">
+                                                You will get a discount of ₹{loyaltyPoints} on your total bill.
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* Prompt to create a new privilege card if not found */}
+                                {isOtpVerified && !privilegeCardDetails && (
+                                    <div className="mt-6 bg-yellow-100 p-4 rounded">
+                                        <p className="text-center">No Privilege Card found for this number.</p>
+                                        <button
+                                            onClick={handleNewPrivilegeCard}
+                                            className="mt-4 bg-blue-500 hover:bg-blue-600 text-white py-2 rounded-lg w-full"
+                                        >
+                                            Create New Privilege Card
+                                        </button>
+                                    </div>
+                                )}
+                            </>
                         )}
                     </div>
                 )}
+
 
                 {/* Step 5: Employee Selection */}
                 {step === 5 && (
@@ -446,9 +734,14 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
                             </tbody>
                         </table>
                         <div className="mt-6">
-                            <p><strong>Total Amount:</strong> {calculateTotal().toFixed(2)}</p>
-                            <p><strong>Advance Paid:</strong> {parseFloat(advanceDetails) || 0}</p>
-                            <p><strong>Balance Due:</strong> {(calculateTotal() - (parseFloat(advanceDetails) || 0)).toFixed(2)}</p>
+                            <div className="mt-6">
+                                <p><strong>Total Amount:</strong> ₹{productEntries.reduce((acc, product) => acc + (parseFloat(product.price) || 0) * (parseInt(product.quantity) || 0), 0).toFixed(2)}</p>
+                                <p><strong>Advance Paid:</strong> ₹{parseFloat(advanceDetails) || 0}</p>
+                                <p><strong>Discount Applied (Loyalty Points):</strong> ₹{discountAmount}</p>
+                                <p><strong>Balance Due:</strong> ₹{calculateTotal.toFixed(2)}</p>
+                            </div>
+
+
                         </div>
                         <label className="block font-bold mt-6 mb-1">Payment Method</label>
                         <select
@@ -466,7 +759,14 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
                         {validationErrors.paymentMethod && (
                             <p className="text-red-500 text-xs mt-1">{validationErrors.paymentMethod}</p>
                         )}
+                        {/* New Submit Button */}
+                        <button
+                            onClick={handleOrderCompletion}
+                            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 mt-4 rounded-lg transition w-full">
+                            Submit Order & Update Loyalty Points
+                        </button>
                     </div>
+
                 )}
 
 

@@ -2,10 +2,16 @@
 import { useState, useEffect, useRef } from 'react';
 import { nanoid } from 'nanoid';
 import { CalendarIcon, PrinterIcon } from '@heroicons/react/24/outline';
+import axios from 'axios';
 
 
 const branchCode = 'NTA';
-const initialWorkOrderCount = 1824;
+
+const getFinancialYear = () => {
+  const currentYear = new Date().getFullYear();
+  const nextYear = (currentYear + 1) % 100;
+  return `${currentYear % 100}-${nextYear}`;
+};
 
 const WorkOrderGeneration = ({ isCollapsed }) => {
   const [step, setStep] = useState(1);
@@ -21,6 +27,8 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   const [allowPrint, setAllowPrint] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState('');
   const [validationErrors, setValidationErrors] = useState({});
+  const [isB2B, setIsB2B] = useState(false);
+  const [initialCount, setInitialCount] = useState(0);
 
 
   // References for managing field focus
@@ -34,23 +42,37 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   const printButtonRef = useRef(null);
   const nextButtonRef = useRef(null);
 
-  const getFinancialYear = () => {
-    const currentYear = new Date().getFullYear();
-    const nextYear = (currentYear + 1) % 100;
-    return `${currentYear % 100}-${nextYear}`;
+  const getTodayDate = () => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0'); // Months are zero-based
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   };
-  
-  const generateWorkOrderId = (count) => {
-    const financialYear = getFinancialYear();
-    return `WO(${branchCode})-${count}-${financialYear}`;
-  };
-  
+
+
+
 
   useEffect(() => {
-    const newWorkOrderId = generateWorkOrderId(initialWorkOrderCount);
-    setWorkOrderId(newWorkOrderId);
+    const fetchInitialCount = async () => {
+      try {
+        const response = await axios.get('http://localhost:5000/api/initial-count');
+        setInitialCount(response.data.initialCount);
+      } catch (error) {
+        console.error('Error fetching initial count:', error);
+      }
+    };
+
+    fetchInitialCount();
   }, []);
-  
+
+
+  // Generate work order ID based on financial year and initial count
+  useEffect(() => {
+    const financialYear = getFinancialYear();
+    setWorkOrderId(`WO(${branchCode})-${initialCount}-${financialYear}`);
+  }, [initialCount]);
+
   useEffect(() => {
     focusFirstFieldOfStep();
   }, [step]);
@@ -104,12 +126,62 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     setTimeout(() => document.getElementById(`productId-${productEntries.length}`)?.focus(), 0);
   };
 
-  const calculateTotal = () => {
-    return productEntries.reduce((total, product) => {
+  const calculateTotal = (entries) => {
+    // Ensure entries is an array before calling reduce
+    if (!Array.isArray(entries)) return 0;
+
+    return entries.reduce((total, product) => {
       const price = parseFloat(product.price) || 0;
       const quantity = parseInt(product.quantity) || 0;
-      return total + price * quantity;
+      return total + (price * quantity);
     }, 0);
+  };
+
+
+  const determineTaxRate = (entries) => {
+    const hasSunglasses = entries.some(product => product.category === 'sunglasses');
+    return hasSunglasses ? 18 : 12; // Tax rate logic
+  };
+
+  const saveWorkOrder = async () => {
+    const totalAmount = calculateTotal(productEntries);
+    const taxRate = determineTaxRate(productEntries);
+
+    // Prepare the payload with all form data
+    const payload = {
+      workOrderId,
+      productEntries,
+      description,
+      advanceDetails,
+      dueDate,
+      mrNumber,
+      patientDetails,
+      employee,
+      paymentMethod,
+      total_amount: totalAmount,
+      tax_rate: taxRate,
+      is_b2b: isB2B,
+    };
+
+    try {
+      const response = await axios.post('http://localhost:5000/api/work-orders', payload);
+
+      if (response.status === 201) {
+        alert('Work Order saved successfully!');
+        // Increment the initial count after saving the work order
+        setInitialCount((prevCount) => {
+          const newCount = prevCount + 1;
+          const financialYear = getFinancialYear();
+          setWorkOrderId(`WO(${branchCode})-${newCount}-${financialYear}`);
+          return newCount;
+        });
+      } else {
+        alert('Failed to save work order. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error saving work order:', error);
+      alert('An error occurred while saving the work order.');
+    }
   };
 
   const nextStep = () => {
@@ -144,7 +216,10 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     setValidationErrors({});
     if (step < 6) setStep((prevStep) => prevStep + 1);
     else if (step === 6 && allowPrint) handlePrint();
-    else if (step === 6) setAllowPrint(true);
+    else if (step === 6) {
+      saveWorkOrder();
+      setAllowPrint(true);
+    }
   };
 
 
@@ -168,6 +243,8 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [step, allowPrint]);
+
+
 
   return (
     <div className={`transition-all duration-300 ${isCollapsed ? 'mx-20' : 'mx-20 px-20'} justify-center mt-16 p-4 mx-auto`}>
@@ -194,7 +271,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
             />
             <label className="block text-gray-700 font-medium mb-4">Product Details</label>
             <div className="space-y-6">
-              {productEntries.map((product, index) => (
+              {productEntries && Array.isArray(productEntries) && productEntries.map((product, index) => (
                 <div key={index} className="flex space-x-2 items-center">
                   {/* Product ID Input */}
                   <div className="relative w-1/2">
@@ -253,15 +330,15 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
               ))}
 
               <button
-              type="button"
-              onClick={addNewProductEntry}
-              className=" bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition"
-            >
-              Add Product
-            </button>
+                type="button"
+                onClick={addNewProductEntry}
+                className=" bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition"
+              >
+                Add Product
+              </button>
 
             </div>
-            
+
           </div>
         )}
 
@@ -308,6 +385,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                 onChange={(e) => setDueDate(e.target.value)}
                 onKeyDown={(e) => handleEnterKey(e, nextButtonRef)}
                 ref={dueDateRef}
+                min={getTodayDate()}  // Set minimum date to today
                 className="border border-gray-300 w-full px-10 py-3 rounded-lg text-center appearance-none"
               />
               {validationErrors.dueDate && (
@@ -331,8 +409,8 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
               className="border border-gray-300 w-full px-4 py-3 rounded-lg"
             />
             {validationErrors.mrNumber && (
-                <p className="text-red-500 text-xs mt-1">{validationErrors.mrNumber}</p>
-              )}
+              <p className="text-red-500 text-xs mt-1">{validationErrors.mrNumber}</p>
+            )}
             <button
               type="button"
               onClick={() => {
@@ -354,25 +432,54 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
           </div>
         )}
 
-        {/* Step 5: Employee Selection */}
+        {/* Step 5: Employee Selection & B2B Toggle */}
         {step === 5 && (
-          <div className="bg-gray-50 p-6 rounded-md shadow-inner space-y-4">
+          <div className="bg-gray-50 p-6 rounded-md shadow-inner space-y-6">
             <h2 className="text-lg font-semibold text-gray-700">Order Created by Employee Details</h2>
+            {/* Employee Dropdown */}
             <select
               value={employee}
               onChange={(e) => setEmployee(e.target.value)}
               ref={employeeRef}
               onKeyDown={(e) => handleEnterKey(e, nextButtonRef)}
-              className="border border-gray-300 w-full px-4 py-3 rounded-lg"
+              className="border border-gray-300 w-full px-4 py-3 rounded-lg focus:outline-none focus:border-green-500"
             >
-              <option value="" disabled>Work Order Created By</option>
+              <option value="" disabled>Select Employee</option>
               {employees.map((emp) => (
                 <option key={emp} value={emp}>{emp}</option>
               ))}
             </select>
             {validationErrors.employee && (
-                <p className="text-red-500 text-xs mt-1">{validationErrors.employee}</p>
-              )}
+              <p className="text-red-500 text-xs mt-1">{validationErrors.employee}</p>
+            )}
+
+            <div className="flex items-center space-x-4 mt-6">
+  <label className="flex items-center cursor-pointer space-x-4">
+    <span className="font-semibold text-gray-700">Is this a B2B order?</span>
+    <div className="relative">
+      <input
+        type="checkbox"
+        id="b2b-toggle"
+        checked={isB2B}
+        onChange={(e) => setIsB2B(e.target.checked)}
+        className="sr-only"
+      />
+      <div
+        className={`w-11 h-6 rounded-full transition-colors duration-300 ${
+          isB2B ? 'bg-green-500' : 'bg-gray-300'
+        }`}
+      ></div>
+      <div
+        className={`absolute w-5 h-5 bg-white rounded-full top-0.5 left-0.5 transform transition-transform duration-300 ${
+          isB2B ? 'translate-x-5' : 'translate-x-0'
+        }`}
+      ></div>
+    </div>
+  </label>
+</div>
+
+
+
           </div>
         )}
 
@@ -419,9 +526,11 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
               </tbody>
             </table>
             <div className="mt-6">
-              <p><strong>Total Amount:</strong> {calculateTotal().toFixed(2)}</p>
-              <p><strong>Advance Paid:</strong> {parseFloat(advanceDetails) || 0}</p>
-              <p><strong>Balance Due:</strong> {(calculateTotal() - (parseFloat(advanceDetails) || 0)).toFixed(2)}</p>
+              <div className="mt-6">
+                <p><strong>Total Amount:</strong> {calculateTotal(productEntries).toFixed(2)}</p>
+                <p><strong>Advance Paid:</strong> {parseFloat(advanceDetails) || 0}</p>
+                <p><strong>Balance Due:</strong> {(calculateTotal(productEntries) - (parseFloat(advanceDetails) || 0)).toFixed(2)}</p>
+              </div>
             </div>
             <label className="block font-bold mt-6 mb-1">Payment Method</label>
             <select
@@ -436,6 +545,13 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
               <option value="credit">Card</option>
               <option value="online">UPI (Paytm/PhonePe/GPay)</option>
             </select>
+
+            <button
+              onClick={saveWorkOrder}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition w-full mt-6"
+            >
+              Save Work Order
+            </button>
           </div>
         )}
 

@@ -1,6 +1,7 @@
 // server/routes/authRoutes.js
-const express = require('express');
-const { login, register } = require('../controllers/authController');
+import express from 'express';
+import { login, register } from '../controllers/authController.js';
+
 const router = express.Router();
 
 // Register new users (Admin-only functionality)
@@ -9,4 +10,4 @@ router.post('/register', register);
 // Login for both employees and admins
 router.post('/login', login);
 
-module.exports = router;
+export default router;

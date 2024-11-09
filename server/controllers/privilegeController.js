@@ -1,7 +1,7 @@
 // server/controllers/privilegeController.js
-const supabase = require('../supabaseClient');
+import supabase from '../services/supabaseClient.js';
 
-exports.createPrivilegeCard = async (req, res) => {
+export const createPrivilegeCard = async (req, res) => {
   const { customerId, points } = req.body;
   const { data, error } = await supabase
     .from('privilege_cards')

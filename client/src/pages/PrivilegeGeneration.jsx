@@ -1,7 +1,9 @@
 // client/src/pages/PrivilegeGeneration.jsx
 import React, { useState, useRef } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { generateCardWithBarcode } from '../utils/cardGenerator';
 import { sendCardViaWhatsApp } from '../utils/watiApi';
+import supabase from '../supabaseClient';
 
 const PrivilegeGeneration = () => {
     const [name, setName] = useState('');
@@ -20,6 +22,10 @@ const PrivilegeGeneration = () => {
     const otpRef = useRef(null);
     const nameRef = useRef(null);
     const topUpAmountRef = useRef(null);
+
+    // React Router Hooks
+    const navigate = useNavigate();
+    const location = useLocation();
 
     const requestOtp = () => {
         if (phoneNumber.length === 10) {
@@ -54,7 +60,8 @@ const PrivilegeGeneration = () => {
         }
     };
 
-    const generateAndSendCard = async () => {
+    const generateAndSaveCard = async () => {
+        // Validation for top-up amount
         if (topUpAmount === '' || Number(topUpAmount) < 500) {
             setErrorMessage("Top-Up Amount must be at least 500.");
             return;
@@ -62,25 +69,60 @@ const PrivilegeGeneration = () => {
 
         setIsLoading(true);
         try {
-            const mrNumber = `MR${Date.now()}`;
-            const cardDataUrl = await generateCardWithBarcode(mrNumber, 'Mr. ' + name);
+            console.log("Attempting to generate and save card...");
 
+            // Step 1: Generate a unique MR number
+            const mrNumber = `MR${Date.now()}`;
+            console.log("Generated MR Number:", mrNumber);
+
+            // Step 2: Generate the barcode card
+            const cardDataUrl = await generateCardWithBarcode(mrNumber, 'Mr. ' + name);
             setCardPreview(cardDataUrl);
 
+            // Step 3: Insert data into Supabase
+            const { data, error } = await supabase.from('privilegecards').insert([{
+                mr_number: mrNumber,
+                customer_name: name,
+                phone_number: phoneNumber,
+                top_up_amount: Number(topUpAmount),
+                loyalty_points: Number(topUpAmount),
+            }]);
+
+            // Handle any Supabase errors
+            if (error) {
+                console.error("Supabase insert error:", error.message);
+                setErrorMessage("Error inserting data: " + error.message);
+                return;
+            }
+
+            console.log("Data inserted successfully into Supabase:", data);
+
+            // Step 4: Send the card via WhatsApp
             await sendCardViaWhatsApp(phoneNumber, cardDataUrl, topUpAmount);
             alert("Privilege card sent successfully via WhatsApp!");
-        } catch (error) {
-            console.error("Error generating/sending card:", error);
+            // Navigate back to Sales Order with previous state
+        if (location.state?.from === 'sales-order') {
+            navigate('/sales-order', {
+                state: {
+                    from: 'privilege-generation',
+                    step: location.state.step,
+                    formData: location.state.formData
+                }
+            });
+        }
+    } catch (err) {
+            console.error("Error generating/saving card:", err);
             setErrorMessage("Failed to generate/send card. Please try again.");
         } finally {
             setIsLoading(false);
         }
     };
 
+
     return (
         <div className="container mx-auto my-20 px-6 py-6 bg-green-50 shadow-inner rounded-lg max-w-xl ">
             <h2 className="text-2xl font-semibold text-center mb-4 ">Privilege Generation</h2>
-            
+
             {isOtpVerified ? (
                 <div className="">
                     <p className="text-green-600 font-bold text-center">OTP Verified Successfully!</p>
@@ -111,17 +153,19 @@ const PrivilegeGeneration = () => {
                         ref={topUpAmountRef}
                         className="appearance-none w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500"
                         placeholder="Enter top-up amount"
-                        onKeyDown={(e) => e.key === 'Enter' && generateAndSendCard()}
+                        onKeyDown={(e) => e.key === 'Enter' && generateAndSaveCard()}
                     />
+
                     {errorMessage && (
                         <p className="text-red-600 text-xs mt-1 text-center">{errorMessage}</p>
                     )}
 
                     <button
-                        onClick={generateAndSendCard}
+                        onClick={generateAndSaveCard}
                         disabled={isLoading}
                         className={`mt-4 w-full py-2 rounded-lg transition ${isLoading ? 'bg-yellow-400' : 'bg-green-500 hover:bg-green-600'} text-white`}
                     >
+
                         {isLoading ? (
                             <span className="flex items-center justify-center">
                                 <svg className="animate-spin h-5 w-5 mr-2 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -134,7 +178,7 @@ const PrivilegeGeneration = () => {
                             "Generate and Send Privilege Card"
                         )}
                     </button>
-                    
+
                     {cardPreview && (
                         <div className="mt-6">
                             <h3 className="text-lg font-semibold mb-2">Card Preview:</h3>

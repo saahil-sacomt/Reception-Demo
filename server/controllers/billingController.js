@@ -1,7 +1,7 @@
 // server/controllers/billingController.js
-const supabase = require('../supabaseClient');
+import supabase from '../services/supabaseClient.js';
 
-exports.createBillingRecord = async (req, res) => {
+export const createBillingRecord = async (req, res) => {
   const { customerId, totalAmount, paymentMethod } = req.body;
   const { data, error } = await supabase
     .from('billing')
