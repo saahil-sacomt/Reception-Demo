@@ -1,5 +1,5 @@
 // utils.js
-export const calculateAmounts = (productEntries, advanceDetails, redeemPoints, loyaltyPoints) => {
+const calculateAmounts = (productEntries, advanceDetails, redeemPoints, loyaltyPoints) => {
     const totalAmount = productEntries.reduce((acc, product) => {
         const price = parseFloat(product.price) || 0;
         const quantity = parseInt(product.quantity) || 0;
@@ -13,7 +13,7 @@ export const calculateAmounts = (productEntries, advanceDetails, redeemPoints, l
     return { totalAmount, remainingBalance, discount, finalAmount };
 };
 
-export const calculateLoyaltyPoints = (totalAmount, loyaltyPoints, redeemPoints, remainingBalance) => {
+const calculateLoyaltyPoints = (totalAmount, loyaltyPoints, redeemPoints, remainingBalance) => {
     let pointsToRedeem = 0;
     if (redeemPoints) {
         pointsToRedeem = Math.min(loyaltyPoints, remainingBalance);

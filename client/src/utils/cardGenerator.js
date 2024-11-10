@@ -5,13 +5,13 @@ import cardTemplate from '../assets/Sreenetra Final Proposal-2_page-0001.jpg';
 import logo from '../assets/SreenethraLogoWhite.png';
 
 // Generate barcode as a high-resolution image
-async function generateBarcode(mrNumber) {
+async function generateBarcode(pcNumber) {
     const barcodeCanvas = createCanvas(300, 100); // Larger canvas for higher resolution
-    JsBarcode(barcodeCanvas, mrNumber, { format: 'CODE128', width: 2, height: 50 });
+    JsBarcode(barcodeCanvas, pcNumber, { format: 'CODE128', width: 2, height: 50 });
     return barcodeCanvas.toDataURL(); // Return Data URL for embedding in the main canvas
 }
 
-export async function generateCardWithBarcode(mrNumber, name) { // Added `name` as a parameter
+export async function generateCardWithBarcode(pcNumber, name) { // Added `name` as a parameter
     // Load card template and logo images
     const cardImage = await loadImage(cardTemplate);
     const logoImage = await loadImage(logo);
@@ -35,7 +35,7 @@ export async function generateCardWithBarcode(mrNumber, name) { // Added `name` 
     ctx.fillText(name, canvas.width / 2, canvas.height / 2); // Centered text
 
     // Generate and load the barcode image, then draw it on bottom-right
-    const barcodeDataUrl = await generateBarcode(mrNumber);
+    const barcodeDataUrl = await generateBarcode(pcNumber);
     const barcodeImage = await loadImage(barcodeDataUrl);
     const barcodeWidth = 2500;
     const barcodeHeight = 1000;

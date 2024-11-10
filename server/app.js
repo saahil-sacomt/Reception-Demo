@@ -6,7 +6,6 @@ import cors from 'cors';
 import authRoutes from './routes/authRoutes.js';
 import privilegeRoutes from './routes/privilegeRoutes.js';
 import billingRoutes from './routes/billingRoutes.js';
-import workOrderRoutes from './routes/workOrderRoutes.js';
 
 dotenv.config();
 
@@ -17,7 +16,6 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/privileges', privilegeRoutes);
 app.use('/api/billing', billingRoutes);
-app.use('/api', workOrderRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
