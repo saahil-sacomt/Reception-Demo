@@ -4,7 +4,7 @@ import { PrinterIcon } from "@heroicons/react/24/outline";
 import { fetchPrivilegeCardByPhone } from "../supabaseClient";
 import supabase from "../supabaseClient";
 import { useNavigate, useLocation } from "react-router-dom";
-import { formatInTimeZone } from "date-fns-tz";
+import { convertUTCToIST, getCurrentUTCDateTime, formatDateToIST } from "../utils/dateUtils";
 
 const branchCode = "NTA";
 const mockOtp = "1234";
@@ -52,10 +52,7 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
   const [pointsToAdd, setPointsToAdd] = useState(0);
   const [redeemOption, setRedeemOption] = useState(null); // 'full', 'custom', or null
 
-  // Function to format dates to IST
-  const formatToIST = (dateString) => {
-    return formatInTimeZone(dateString, "Asia/Kolkata", "dd-MM-yyyy hh:mm a");
-  };
+
 
   // Function to fetch product details based on ID
   const fetchProductDetails = (productId) => {
@@ -595,7 +592,7 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
 
   const handleOrderCompletion = async () => {
     try {
-      const currentISTDateTime = formatToIST(new Date());
+      const currentUTCDateTime = getCurrentUTCDateTime();
 
       if (privilegeCard && privilegeCardDetails) {
         // Step 2: Calculate loyalty points
@@ -648,7 +645,8 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
               privilegeCard && privilegeCardDetails ? redeemPointsAmount : 0,
             loyalty_points_added:
               privilegeCard && privilegeCardDetails ? pointsToAdd : 0,
-            created_at: currentISTDateTime,
+            created_at: currentUTCDateTime, // Store in UTC
+      updated_at: currentUTCDateTime,
           },
         ]);
 
@@ -710,7 +708,7 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
               </p>
               <p>
                 <strong>Created At:</strong>{" "}
-                {formatToIST(selectedWorkOrder.created_at)}
+                {convertUTCToIST(selectedWorkOrder.created_at)}
               </p>
 
               {/* Display Product Entries */}
@@ -856,7 +854,7 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
                           </p>
                           <p>
                             <strong>Created At:</strong>{" "}
-                            {formatToIST(workOrder.created_at)}
+                            {convertUTCToIST(workOrder.created_at)}
                           </p>
                         </div>
                         <button

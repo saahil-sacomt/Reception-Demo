@@ -4,9 +4,9 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { generateCardWithBarcode } from '../utils/cardGenerator';
 import { sendCardViaWhatsApp } from '../utils/watiApi';
 import supabase from '../supabaseClient';
-import { formatInTimeZone } from "date-fns-tz";
+import { convertUTCToIST, getCurrentUTCDateTime, formatDateToIST } from "../utils/dateUtils";
 
-const PrivilegeGeneration = () => {
+const PrivilegeGeneration = ({ isCollapsed }) => {
   const [name, setName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [otp, setOtp] = useState('');
@@ -161,6 +161,8 @@ const PrivilegeGeneration = () => {
       const cardDataUrl = await generateCardWithBarcode(pcNumber, name);
       setCardPreview(cardDataUrl);
 
+      const currentUTCDateTime = getCurrentUTCDateTime(); 
+
       // Insert data into Supabase
       const { data, error } = await supabase.from('privilegecards').insert([{
         pc_number: pcNumber,
@@ -169,6 +171,7 @@ const PrivilegeGeneration = () => {
         top_up_amount: Number(topUpAmount),
         loyalty_points: Number(topUpAmount),
         card_tier: cardTier,
+        created_at: currentUTCDateTime,
       }]);
 
       if (error) {
@@ -212,7 +215,8 @@ const PrivilegeGeneration = () => {
   };
 
   return (
-    <div className="container mx-auto my-20 px-6 py-6 bg-green-50 shadow-inner rounded-lg max-w-xl ">
+    <div className={`transition-all duration-300 ${isCollapsed ? "mx-20" : "mx-20 px-20"
+        } justify-center mt-20 p-20 rounded-xl mx-auto max-w-2xl bg-green-50 shadow-inner`}>
       <h2 className="text-2xl font-semibold text-center mb-4 ">Privilege Generation</h2>
 
       {isOtpVerified ? (

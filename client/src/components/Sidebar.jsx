@@ -1,6 +1,6 @@
 // client/src/components/Sidebar.jsx
 import { NavLink } from 'react-router-dom';
-import { HomeIcon, DocumentTextIcon, ArrowLeftIcon, ArrowRightIcon, CloudIcon, RectangleStackIcon } from '@heroicons/react/24/outline';
+import { HomeIcon, DocumentTextIcon, ArrowLeftIcon, ArrowRightIcon, CloudIcon, RectangleStackIcon, ReceiptRefundIcon, ReceiptPercentIcon, ClipboardDocumentListIcon } from '@heroicons/react/24/outline';
 
 const Sidebar = ({ isCollapsed, toggleSidebar, selectedTab }) => {
   const dashboardLinks = [
@@ -9,10 +9,8 @@ const Sidebar = ({ isCollapsed, toggleSidebar, selectedTab }) => {
   ];
 
   const documentLinks = [
-    { to: '/documents/sent', icon: DocumentTextIcon, label: 'Sent' },
-    { to: '/documents/received', icon: CloudIcon, label: 'Received' },
-    { to: '/documents/drafts', icon: DocumentTextIcon, label: 'Drafts' },
-    { to: '/documents/completed', icon: CloudIcon, label: 'Completed' },
+    { to: '/reportgenerator', icon: ClipboardDocumentListIcon, label: 'Reports' },
+    
   ];
 
   const linksToRender = selectedTab === 'Dashboard' ? dashboardLinks : documentLinks;

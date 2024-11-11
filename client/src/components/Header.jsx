@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import logo from '../assets/sreenethraenglishisolated.png';
-import { BriefcaseIcon, Cog8ToothIcon, CreditCardIcon, PlusIcon, PresentationChartLineIcon, UserIcon } from '@heroicons/react/24/outline';
+import { BriefcaseIcon, ClipboardDocumentListIcon, Cog8ToothIcon, CreditCardIcon, FolderPlusIcon, PlusIcon, PresentationChartLineIcon, UserIcon } from '@heroicons/react/24/outline';
 
 const Header = ({ selectedTab, setSelectedTab, isCollapsed, toggleSidebar }) => {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -95,6 +95,12 @@ const Header = ({ selectedTab, setSelectedTab, isCollapsed, toggleSidebar }) => 
                 className="flex flex-row items-center block w-full text-left px-4 py-2 text-sm hover:bg-green-50 hover:text-green-600 rounded-lg"
               >
                 <CreditCardIcon className='h-5 w-5 mr-2'/> Privilege Card
+              </button>
+              <button
+                onClick={() => handleCreateNavigate('/reportgenerator')}
+                className="flex flex-row items-center block w-full text-left px-4 py-2 text-sm hover:bg-green-50 hover:text-green-600 rounded-lg"
+              >
+                <ClipboardDocumentListIcon className='h-5 w-5 mr-2'/> Reports
               </button>
             </div>
           )}

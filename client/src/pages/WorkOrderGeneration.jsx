@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from "react";
 import { CalendarIcon, PrinterIcon } from "@heroicons/react/24/outline";
 import supabase from '../supabaseClient';
-import { formatInTimeZone } from "date-fns-tz";
+import { convertUTCToIST } from '../utils/dateUtils';
 
 const branchCode = "NTA";
 
@@ -28,10 +28,6 @@ const getFinancialYear = () => {
   return `${financialYearStart}-${financialYearEnd}`;
 };
 
-// Function to format dates to IST
-const formatToIST = (date) => {
-  return formatInTimeZone(date, "Asia/Kolkata", "dd-MM-yyyy hh:mm a");
-};
 
 const WorkOrderGeneration = ({ isCollapsed }) => {
   const [step, setStep] = useState(1);
@@ -52,6 +48,11 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   const [validationErrors, setValidationErrors] = useState({});
   const [isB2B, setIsB2B] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Function to format dates to IST
+const formatToIST = (date) => {
+  return convertUTCToIST(date, "dd-MM-yyyy hh:mm a");
+};
 
   // Dummy dataset for products
   const productDatabase = [
@@ -221,7 +222,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     const { subtotal, cgst, sgst, totalWithGST } = calculateTotalWithGST(productEntries);
 
     // Get current date and time in IST format
-    const currentISTDateTime = formatToIST(new Date());
+    const currentUTCDateTime = new Date().toISOString();
 
     const payload = {
       work_order_id: newWorkOrderId,
@@ -239,7 +240,8 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       total_amount: totalWithGST,
       hsn_code: HSN_CODE,
       is_b2b: isB2B,
-      created_at: currentISTDateTime,
+      created_at: currentUTCDateTime, // Store in UTC
+      updated_at: currentUTCDateTime,
     };
 
     console.log('Payload being sent:', payload);
@@ -261,8 +263,9 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         product_name: product.name,
         product_id: product.id,
         price: parseFloat(product.price) || 0,
+        hsn_code: HSN_CODE,
         quantity: parseInt(product.quantity) || 0,
-        created_at: currentISTDateTime,
+        created_at: currentUTCDateTime,
       }));
 
       const { data: productsInsertData, error: productsInsertError } = await supabase
