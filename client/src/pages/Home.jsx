@@ -86,7 +86,7 @@ const Home = ({ isCollapsed }) => {
         <img
           src="/work-order.png"
           alt="Work Order"
-          className="w-40 h-40 object-contain bg-white rounded-full shadow-xl"
+          className="w-40 h-40 object-contain bg-white rounded-xl shadow-xl"
         />
         <h2 className="text-xl text-gray-800 mt-4">Work Order Generation</h2>
       </div>
@@ -99,7 +99,7 @@ const Home = ({ isCollapsed }) => {
         <img
           src="/sales-order.png"
           alt="Sales Order"
-          className="w-40 h-40 object-contain bg-white rounded-full shadow-xl"
+          className="w-40 h-40 object-contain bg-white rounded-xl shadow-xl"
         />
         <h2 className="text-xl text-gray-800 mt-4">Sales Order Generation</h2>
       </div>
