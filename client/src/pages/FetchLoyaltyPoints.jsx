@@ -120,7 +120,7 @@ const FetchLoyaltyPoints = ({ isCollapsed }) => {
 
         {/* User Data Display */}
         {userData && (
-          <div className="mt-6 bg-gray-50 p-4 rounded-lg shadow-inner">
+          <div className="mt-6 bg-green-50 p-4 rounded-lg shadow-inner">
             <h3 className="text-xl font-semibold text-gray-700 mb-4 text-center">
               Privilege Card Details
             </h3>
@@ -136,9 +136,6 @@ const FetchLoyaltyPoints = ({ isCollapsed }) => {
                   <span className="font-semibold">PC Number:</span> {userData.pc_number}
                 </p>
               )}
-              <p>
-                <span className="font-semibold">Top-Up Amount:</span> ₹{parseFloat(userData.top_up_amount).toFixed(2)}
-              </p>
               <p>
                 <span className="font-semibold">Loyalty Points:</span> {userData.loyalty_points}
               </p>
