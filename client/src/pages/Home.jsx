@@ -39,7 +39,7 @@ const Home = ({ isCollapsed }) => {
     </div>
 
     {/* Metrics Section */}
-    <div className="bg-green-100 rounded-lg shadow flex overflow-hidden">
+    <div className="bg-green-50 rounded-lg shadow flex overflow-hidden">
       {['Action Required', 'Pending Work Orders', 'Sales Today', 'Failed'].map((label, index) => (
         <div
           key={index}
@@ -56,11 +56,11 @@ const Home = ({ isCollapsed }) => {
   {/* Purchase and Order Generation Sections (Horizontal Row) */}
   <div className="flex flex-col lg:flex-row items-start lg:space-x-6 mx-6">
     {/* Purchase Section */}
-    <div className="flex flex-col lg:flex-row items-center bg-green-100 py-8 px-6 rounded-lg shadow w-full lg:w-2/3">
+    <div className="flex flex-col lg:flex-row items-center bg-green-50 py-8 px-6 rounded-lg shadow w-full lg:w-1/2">
       <img
         src={walletImage}
         alt="Wallet Icon"
-        className="w-72 h-auto p-6 shadow-xl rounded-xl bg-white"
+        className="w-48 h-auto p-6 shadow-xl rounded-full bg-white"
       />
       <div className="text-left space-y-2 ml-6">
         <h3 className="text-2xl text-gray-800">Generate a New Privilege Card</h3>
@@ -77,29 +77,29 @@ const Home = ({ isCollapsed }) => {
     </div>
 
     {/* Order Generation Section */}
-    <div className="flex flex-col lg:flex-row lg:space-x-6 mt-10 lg:mt-0 w-fit lg:w-1/2">
+    <div className="flex flex-col lg:flex-row lg:space-x-6 mt-10 lg:mt-0 w-full lg:w-1/2">
       {/* Work Order Container */}
       <div
-        className="flex flex-col items-center bg-green-100 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 w-full"
+        className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 w-full"
         onClick={() => navigate('/work-order')}
       >
         <img
           src="/work-order.png"
           alt="Work Order"
-          className="w-40 h-40 object-contain bg-white rounded-xl shadow-xl"
+          className="w-40 h-40 object-contain bg-white rounded-full shadow-xl"
         />
         <h2 className="text-xl text-gray-800 mt-4">Work Order Generation</h2>
       </div>
 
       {/* Sales Order Container */}
       <div
-        className="flex flex-col items-center bg-green-100 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 w-full mt-6 lg:mt-0"
+        className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 w-full mt-6 lg:mt-0"
         onClick={() => navigate('/sales-order')}
       >
         <img
           src="/sales-order.png"
           alt="Sales Order"
-          className="w-40 h-40 object-contain bg-white rounded-xl shadow-xl"
+          className="w-40 h-40 object-contain bg-white rounded-full shadow-xl"
         />
         <h2 className="text-xl text-gray-800 mt-4">Sales Order Generation</h2>
       </div>
