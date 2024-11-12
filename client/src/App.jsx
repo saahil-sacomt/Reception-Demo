@@ -8,6 +8,7 @@ import { AuthProvider } from './context/AuthContext';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Home from './pages/Home';
+import FetchLoyaltyPoints from './pages/FetchLoyaltyPoints';
 import OrderGenerationPage from './pages/OrderGenerationPage';
 import WorkOrderGeneration from './pages/WorkOrderGeneration';
 import SalesOrderGeneration from './pages/SalesOrderGeneration';
@@ -58,6 +59,7 @@ const App = () => {
               <Route path="/privilege-generation" element={<PrivilegeGeneration isCollapsed={isCollapsed} />} />
               <Route path="/settings" element={<SettingsPage isCollapsed={isCollapsed} />} />
               <Route path="/reportgenerator" element={<ReportGenerator isCollapsed={isCollapsed} />} />
+              <Route path="/loyaltypoints" element={<FetchLoyaltyPoints isCollapsed={isCollapsed} />} />
             </Route>
 
             {/* Default Route */}

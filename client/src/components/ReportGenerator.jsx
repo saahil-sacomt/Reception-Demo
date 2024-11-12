@@ -165,8 +165,8 @@ const ReportGenerator = ({ isCollapsed }) => {
               'Product ID': productId,
               'Product Name': details.product_name,
               'Total Quantity Sold': details.total_quantity,
-              'Total Revenue ()': details.total_revenue.toFixed(2),
-              'Average Price ()': details.count ? (details.total_price / details.count).toFixed(2) : '0.00',
+              'Total Revenue': details.total_revenue.toFixed(2),
+              'Average Price': details.count ? (details.total_price / details.count).toFixed(2) : '0.00',
             }))
             .sort((a, b) => b['Total Revenue ()'] - a['Total Revenue ()']); // Optional: Sort by revenue
           break;
@@ -204,7 +204,7 @@ const ReportGenerator = ({ isCollapsed }) => {
     doc.setFontSize(18);
     doc.text('Sreenethra Eye Care', 105, 20, { align: 'center' });
     doc.setFontSize(12);
-    doc.text('GSTIN: 32BGVPH3530C1ZQ', 105, 30, { align: 'center' });
+    doc.text('GSTIN: 32AAUCS7002H1ZV', 105, 30, { align: 'center' });
     doc.text(`Report Type: ${reportDetails.type}`, 14, 40);
     doc.text(
       isDaily
@@ -222,10 +222,10 @@ const ReportGenerator = ({ isCollapsed }) => {
           'Sales Order ID',
           'MR Number',
           'Is B2B',
-          'Subtotal ()',
-          'CGST ()',
-          'SGST ()',
-          'Total Amount ()',
+          'Subtotal',
+          'CGST',
+          'SGST',
+          'Total Amount',
           'Employee',
           'Payment Method',
           'Loyalty Points Redeemed',
@@ -237,14 +237,14 @@ const ReportGenerator = ({ isCollapsed }) => {
         tableColumn = [
           'Work Order ID',
           'Description',
-          'Advance Details ()',
+          'Advance Details',
           'Due Date',
           'MR Number',
           'Employee',
           'Payment Method',
-          'Total Amount ()',
-          'CGST ()',
-          'SGST ()',
+          'Total Amount',
+          'CGST',
+          'SGST',
           'Is B2B',
           'HSN Code',
           'Created At',
@@ -256,7 +256,7 @@ const ReportGenerator = ({ isCollapsed }) => {
           'PC Number',
           'Customer Name',
           'Phone Number',
-          'Top-Up Amount ()',
+          'Top-Up Amount',
           'Loyalty Points',
           'Card Tier',
           'Created At',
@@ -268,7 +268,7 @@ const ReportGenerator = ({ isCollapsed }) => {
           'Work Order ID',
           'Product Name',
           'Product ID',
-          'Price ()',
+          'Price',
           'Quantity',
           'HSN Code',
           'Created At',
@@ -403,11 +403,11 @@ const ReportGenerator = ({ isCollapsed }) => {
 
         summaryTable = [
           ['Total Sales Orders', totalSalesOrders],
-          ['Total Advance Payments ()', totalAdvancePayments.toFixed(2)],
-          ['Total Subtotal ()', totalSubtotal.toFixed(2)],
-          ['Total CGST ()', totalCGST.toFixed(2)],
-          ['Total SGST ()', totalSGST.toFixed(2)],
-          ['Total Amount ()', totalAmount.toFixed(2)],
+          ['Total Advance Payments ', totalAdvancePayments.toFixed(2)],
+          ['Total Subtotal', totalSubtotal.toFixed(2)],
+          ['Total CGST', totalCGST.toFixed(2)],
+          ['Total SGST', totalSGST.toFixed(2)],
+          ['Total Amount', totalAmount.toFixed(2)],
           ['Total Loyalty Points Redeemed', totalLoyaltyPoints],
           ['Total B2B Orders', totalB2B],
         ];
@@ -465,11 +465,11 @@ const ReportGenerator = ({ isCollapsed }) => {
 
         summaryTable = [
           ['Total Work Orders', totalWorkOrders],
-          ['Total Advance Details ()', totalAdvance.toFixed(2)],
-          ['Total Subtotal ()', totalworkSubtotal.toFixed(2)],
-          ['Total CGST ()', totalworkCGST.toFixed(2)],
-          ['Total SGST ()', totalworkSGST.toFixed(2)],
-          ['Total Amount ()', totalWorkAmount.toFixed(2)],
+          ['Total Advance Details', totalAdvance.toFixed(2)],
+          ['Total Subtotal', totalworkSubtotal.toFixed(2)],
+          ['Total CGST', totalworkCGST.toFixed(2)],
+          ['Total SGST', totalworkSGST.toFixed(2)],
+          ['Total Amount', totalWorkAmount.toFixed(2)],
           ['Total B2B Orders', totalWorkB2B],
           ['Product Entries Summary', formattedProductEntriesSummary || 'N/A'],
           ['Patient Details Summary', formattedPatientDetailsSummary || 'N/A'],
@@ -494,7 +494,7 @@ const ReportGenerator = ({ isCollapsed }) => {
 
         summaryTable = [
           ['Total Privilege Cards', totalPrivilegeCards],
-          ['Total Top-Up Amount ()', totalTopUp.toFixed(2)],
+          ['Total Top-Up Amount', totalTopUp.toFixed(2)],
           ['Total Loyalty Points', totalLoyaltyPointsPrivilege],
           ['Card Tier Distribution', distributionText],
         ];
@@ -520,8 +520,8 @@ const ReportGenerator = ({ isCollapsed }) => {
         summaryTable = [
           ['Total Products', totalProducts],
           ['Total Quantity', totalQuantity],
-          ['Total Revenue()', totalRevenue.toFixed(2)],
-          ['Average Price per Product()', averagePrice.toFixed(2)],
+          ['Total Revenue', totalRevenue.toFixed(2)],
+          ['Average Price per Product', averagePrice.toFixed(2)],
           ['HSN Code Distribution', formattedHsnCodeDistribution || 'N/A'],
         ];
         break;
@@ -560,8 +560,8 @@ const ReportGenerator = ({ isCollapsed }) => {
           item['Product ID'],
           item['Product Name'],
           item['Total Quantity Sold'],
-          item['Total Revenue ()'],
-          item['Average Price ()'],
+          item['Total Revenue'],
+          item['Average Price'],
         ]),
         styles: { fontSize: 8, cellPadding: 1 },
         headStyles: { fillColor: [0, 200, 0], halign: 'center' },
