@@ -28,7 +28,6 @@ const getFinancialYear = () => {
   return `${financialYearStart}-${financialYearEnd}`;
 };
 
-
 const WorkOrderGeneration = ({ isCollapsed }) => {
   const [step, setStep] = useState(1);
   const [workOrderId, setWorkOrderId] = useState("");
@@ -37,7 +36,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   ]);
 
   const [description, setDescription] = useState("");
-  const [advanceDetails, setAdvanceDetails] = useState("");
+  const [advanceDetails, setAdvanceDetails] = useState(""); // Separate state for Advance Details
   const [dueDate, setDueDate] = useState("");
   const [mrNumber, setMrNumber] = useState("");
   const [patientDetails, setPatientDetails] = useState(null);
@@ -47,12 +46,13 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   const [paymentMethod, setPaymentMethod] = useState("");
   const [validationErrors, setValidationErrors] = useState({});
   const [isB2B, setIsB2B] = useState(false);
+  const [gstNumber, setGstNumber] = useState(""); // New state for GST Number
   const [isSaving, setIsSaving] = useState(false);
 
   // Function to format dates to IST
-const formatToIST = (date) => {
-  return convertUTCToIST(date, "dd-MM-yyyy hh:mm a");
-};
+  const formatToIST = (date) => {
+    return convertUTCToIST(date, "dd-MM-yyyy hh:mm a");
+  };
 
   // Dummy dataset for products
   const productDatabase = [
@@ -71,12 +71,13 @@ const formatToIST = (date) => {
   const resetForm = () => {
     setProductEntries([{ id: "", name: "", price: "", quantity: "" }]);
     setDescription("");
-    setAdvanceDetails("");
+    setAdvanceDetails(""); // Reset Advance Details
     setDueDate("");
     setMrNumber("");
     setPatientDetails(null);
     setEmployee("");
     setPaymentMethod("");
+    setGstNumber(""); // Reset GST Number
     setValidationErrors({});
     setIsB2B(false);
     setAllowPrint(false);
@@ -104,12 +105,13 @@ const formatToIST = (date) => {
 
   // References for managing field focus
   const descriptionRef = useRef(null);
-  const advanceDetailsRef = useRef(null);
   const dueDateRef = useRef(null);
   const mrNumberRef = useRef(null);
   const fetchButtonRef = useRef(null);
   const employeeRef = useRef(null);
   const paymentMethodRef = useRef(null);
+  const gstNumberRef = useRef(null); // New ref for GST Number
+  const advanceDetailsRef = useRef(null); // Defined ref for Advance Details
   const printButtonRef = useRef(null);
   const saveButtonRef = useRef(null);
   const newWorkOrderButtonRef = useRef(null);
@@ -125,14 +127,17 @@ const formatToIST = (date) => {
 
   useEffect(() => {
     focusFirstFieldOfStep();
-  }, [step]);
+  }, [step, isB2B]);
 
   const focusFirstFieldOfStep = () => {
     if (step === 1) document.getElementById(`productId-0`)?.focus();
     if (step === 2) descriptionRef.current?.focus();
     if (step === 3) dueDateRef.current?.focus();
     if (step === 4) mrNumberRef.current?.focus();
-    if (step === 5) employeeRef.current?.focus();
+    if (step === 5) {
+      if (isB2B) gstNumberRef.current?.focus();
+      else employeeRef.current?.focus();
+    }
     if (step === 6) paymentMethodRef.current?.focus();
   };
 
@@ -166,12 +171,12 @@ const formatToIST = (date) => {
   const addNewProductEntry = () => {
     setProductEntries([
       ...productEntries,
-      { name: "", id: "", price: "", quantity: "" },
+      { id: "", name: "", price: "", quantity: "" },
     ]);
     setTimeout(
       () =>
         document
-          .getElementById(`productName-${productEntries.length}`)
+          .getElementById(`productId-${productEntries.length}`)
           ?.focus(),
       0
     );
@@ -205,9 +210,27 @@ const formatToIST = (date) => {
   };
 
   const saveWorkOrder = async () => {
-    if (isSaving || !paymentMethod) {
-      alert('Please select a payment method before saving.');
+    if (isSaving) {
+      alert('Please wait while the work order is being saved.');
+      return;
+    }
+
+    // Validate Advance Details in Step 6
+    if (isB2B && !gstNumber) {
+      setValidationErrors({ gstNumber: "GST Number is required for B2B orders" });
+      gstNumberRef.current?.focus();
+      return;
+    }
+
+    if (!paymentMethod) {
+      setValidationErrors({ paymentMethod: "Payment method is required" });
       paymentMethodRef.current?.focus();
+      return;
+    }
+
+    if (!advanceDetails) {
+      setValidationErrors({ advanceDetails: "Advance details are required" });
+      advanceDetailsRef.current?.focus();
       return;
     }
 
@@ -228,7 +251,7 @@ const formatToIST = (date) => {
       work_order_id: newWorkOrderId,
       product_entries: productEntries,
       description,
-      advance_details: advanceDetails,
+      advance_details: parseFloat(advanceDetails) || 0, // Advance Details as separate field
       due_date: dueDate,
       mr_number: mrNumber,
       patient_details: patientDetails,
@@ -240,6 +263,7 @@ const formatToIST = (date) => {
       total_amount: totalWithGST,
       hsn_code: HSN_CODE,
       is_b2b: isB2B,
+      gst_number: isB2B ? gstNumber : null, // Include GST Number if B2B
       created_at: currentUTCDateTime, // Store in UTC
       updated_at: currentUTCDateTime,
     };
@@ -301,24 +325,51 @@ const formatToIST = (date) => {
           errors[`productQuantity-${index}`] = "Quantity is required";
       });
     } else if (step === 2) {
-      if (!advanceDetails)
-        errors.advanceDetails = "Advance details are required";
+      if (!description)
+        errors.description = "Description is required";
     } else if (step === 3) {
       if (!dueDate) errors.dueDate = "Due date is required";
     } else if (step === 4) {
       if (!mrNumber) errors.mrNumber = "MR Number is required";
     } else if (step === 5) {
-      if (!employee) errors.employee = "Employee selection is required";
+      if (isB2B && !gstNumber) {
+        errors.gstNumber = "GST Number is required for B2B orders";
+      }
+      if (!employee) { // Employee selection is now always required
+        errors.employee = "Employee selection is required";
+      }
     } else if (step === 6) {
       if (!paymentMethod) {
-        setValidationErrors({ paymentMethod: "Payment method is required" });
-        paymentMethodRef.current?.focus();
+        errors.paymentMethod = "Payment method is required";
+      }
+      if (!advanceDetails) {
+        errors.advanceDetails = "Advance details are required";
       }
     }
 
     // If there are errors, do not proceed to the next step
     if (Object.keys(errors).length > 0) {
       setValidationErrors(errors);
+      // Focus on the first error field
+      const firstErrorKey = Object.keys(errors)[0];
+      if (firstErrorKey.startsWith('productId')) {
+        const index = firstErrorKey.split('-')[1];
+        document.getElementById(`productId-${index}`)?.focus();
+      } else if (firstErrorKey === 'description') {
+        descriptionRef.current?.focus();
+      } else if (firstErrorKey === 'dueDate') {
+        dueDateRef.current?.focus();
+      } else if (firstErrorKey === 'mrNumber') {
+        mrNumberRef.current?.focus();
+      } else if (firstErrorKey === 'gstNumber') {
+        gstNumberRef.current?.focus();
+      } else if (firstErrorKey === 'employee') {
+        employeeRef.current?.focus();
+      } else if (firstErrorKey === 'paymentMethod') {
+        paymentMethodRef.current?.focus();
+      } else if (firstErrorKey === 'advanceDetails') {
+        advanceDetailsRef.current?.focus();
+      }
       return;
     }
 
@@ -353,19 +404,55 @@ const formatToIST = (date) => {
     }, 100);
   };
 
-  // Unified handler for Enter key in Step 6
-  const handleStep6EnterKey = (e) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      if (document.activeElement === paymentMethodRef.current) {
-        saveButtonRef.current?.focus();
-      } else if (document.activeElement === saveButtonRef.current && !isSaving) {
-        saveWorkOrder();
-        setTimeout(() => printButtonRef.current?.focus(), 100);
-      } else if (document.activeElement === printButtonRef.current && allowPrint) {
-        handlePrint();
-      }
+  // Customized Invoice Print Functionality
+  const handleCustomPrint = () => {
+    const printContent = document.getElementById('invoice-summary');
+    if (!printContent) {
+      console.error('Invoice summary content not found.');
+      alert('Failed to find invoice content for printing.');
+      return;
     }
+
+    const WindowPrt = window.open('', '_blank', 'width=800,height=600');
+    if (!WindowPrt) {
+      console.error('Pop-up blocked. Please allow pop-ups for this website.');
+      alert('Pop-up blocked. Please allow pop-ups for this website to print the invoice.');
+      return;
+    }
+
+    WindowPrt.document.write(`
+      <html>
+        <head>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; color: #000; }
+            .invoice-header { text-align: center; margin-bottom: 20px; }
+            .invoice-header h1 { margin: 0; font-size: 24px; }
+            .invoice-header p { margin: 5px 0; font-size: 14px; }
+            .invoice-details, .financial-summary { margin-bottom: 20px; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+            th { background-color: #f2f2f2; }
+            .totals { float: right; width: 50%; }
+            .totals p { margin: 5px 0; font-size: 14px; }
+            @media print {
+              body { margin: 0; }
+              .no-print { display: none; }
+            }
+          </style>
+        </head>
+        <body>
+          ${printContent.innerHTML}
+          <script>
+            window.onload = function() {
+              window.print();
+              window.close();
+            }
+          </script>
+        </body>
+      </html>
+    `);
+
+    WindowPrt.document.close();
   };
 
   const generateNewWorkOrderId = async () => {
@@ -415,8 +502,6 @@ const formatToIST = (date) => {
   useEffect(() => {
     handleGenerateWorkOrder();
   }, []);
-
-
 
   return (
     <div
@@ -560,11 +645,11 @@ const formatToIST = (date) => {
           </div>
         )}
 
-        {/* Step 2: Description and Advance Details */}
+        {/* Step 2: Description Only */}
         {step === 2 && (
           <div className="w-full bg-gray-50 p-6 rounded-md shadow-inner space-y-4 text-center">
             <h2 className="text-lg font-semibold text-gray-700">
-              Product Details
+              Product Description
             </h2>
             <label className="block text-gray-700 font-medium mb-1">
               Description
@@ -573,25 +658,13 @@ const formatToIST = (date) => {
               placeholder="Enter Description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              onKeyDown={(e) => handleEnterKey(e, advanceDetailsRef)}
-              ref={descriptionRef}
-              className="border border-gray-300 w-full px-4 py-3 rounded-lg text-center"
-            />
-            <label className="block text-gray-700 font-medium mb-1">
-              Advance Details
-            </label>
-            <input
-              type="text"
-              placeholder="Enter amount paid in advance"
-              value={advanceDetails}
-              onChange={(e) => setAdvanceDetails(e.target.value)}
               onKeyDown={(e) => handleEnterKey(e, nextButtonRef)}
-              ref={advanceDetailsRef}
-              className="border border-gray-300 w-full px-4 py-3 rounded-lg text-center appearance-none"
+              ref={descriptionRef}
+              className="border border-gray-300 w-full px-4 py-3 rounded-lg text-left"
             />
-            {validationErrors.advanceDetails && (
+            {validationErrors.description && (
               <p className="text-red-500 text-xs mt-1">
-                {validationErrors.advanceDetails}
+                {validationErrors.description}
               </p>
             )}
           </div>
@@ -669,13 +742,13 @@ const formatToIST = (date) => {
           </div>
         )}
 
-        {/* Step 5: Employee Selection & B2B Toggle */}
+        {/* Step 5: Employee Selection, B2B Toggle, and GST Number if B2B */}
         {step === 5 && (
           <div className="bg-gray-50 p-6 rounded-md shadow-inner space-y-6">
             <h2 className="text-lg font-semibold text-gray-700">
               Order Created by Employee Details
             </h2>
-            {/* Employee Dropdown */}
+            {/* Employee Dropdown - Always Visible */}
             <select
               value={employee}
               onChange={(e) => setEmployee(e.target.value)}
@@ -708,7 +781,11 @@ const formatToIST = (date) => {
                     type="checkbox"
                     id="b2b-toggle"
                     checked={isB2B}
-                    onChange={(e) => setIsB2B(e.target.checked)}
+                    onChange={(e) => {
+                      setIsB2B(e.target.checked);
+                      // Reset GST Number when toggling off B2B
+                      if (!e.target.checked) setGstNumber("");
+                    }}
                     className="sr-only"
                   />
                   <div
@@ -722,147 +799,223 @@ const formatToIST = (date) => {
                 </div>
               </label>
             </div>
+
+            {/* GST Number Input for B2B Orders */}
+            {isB2B && (
+              <div className="relative w-full mt-4">
+                <label className="block text-gray-700 font-medium mb-1">
+                  GST Number
+                </label>
+                <input
+                  type="text"
+                  placeholder="Enter GST Number"
+                  value={gstNumber}
+                  onChange={(e) => setGstNumber(e.target.value)}
+                  onKeyDown={(e) => handleEnterKey(e, nextButtonRef)}
+                  ref={gstNumberRef}
+                  className="border border-gray-300 w-full px-4 py-3 rounded-lg"
+                />
+                {validationErrors.gstNumber && (
+                  <p className="text-red-500 text-xs mt-1">
+                    {validationErrors.gstNumber}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         )}
 
-        {/* Step 6: Order Preview in Bill Format with Payment Method */}
+        {/* Step 6: Order Preview in Bill Format with Payment Method and Advance Details */}
         {step === 6 && (
-          <div className="bg-white p-8 rounded space-y-4 text-gray-800">
-            <div className="flex justify-between">
-              <h2 className="text-xl font-semibold">Invoice Summary</h2>
-              {/* Print Button */}
+          <>
+            {/* Invoice Summary */}
+            <div id="invoice-summary" className="bg-white p-8 rounded-lg shadow-md text-gray-800">
+              {/* Invoice Header */}
+              <div className="invoice-header text-center mb-6">
+                <h1 className="text-3xl font-bold">Screenetra Eye Care</h1>
+                <p className="text-sm text-gray-600">GST Number: 27AAACM1234R1Z5</p>
+                <h2 className="text-2xl font-semibold">Invoice Summary</h2>
+              </div>
+
+              {/* Invoice Details */}
+              <div className="invoice-details grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div>
+                  <p>
+                    <span className="font-semibold">Work Order ID:</span> <span className="font-normal">{workOrderId}</span>
+                  </p>
+                  <p>
+                    <span className="font-semibold">Description:</span> <span className="font-normal">{description}</span>
+                  </p>
+                  <p>
+                    <span className="font-semibold">Due Date:</span> <span className="font-normal">{dueDate}</span>
+                  </p>
+                  <p>
+                    <span className="font-semibold">Customer MR Number:</span> <span className="font-normal">{mrNumber}</span>
+                  </p>
+                </div>
+                <div>
+                  <p>
+                    <span className="font-semibold">Billed by Employee:</span> <span className="font-normal">{employee || 'N/A'}</span>
+                  </p>
+                  {isB2B && (
+                    <p>
+                      <span className="font-semibold">B2B GST Number:</span> <span className="font-normal">{gstNumber}</span>
+                    </p>
+                  )}
+                  <p>
+                    <span className="font-semibold">HSN Code:</span> <span className="font-normal">{HSN_CODE}</span>
+                  </p>
+                </div>
+              </div>
+
+              {/* Product Table */}
+              <table className="w-full border border-gray-300 rounded-md mb-6">
+                <thead>
+                  <tr className="bg-gray-100">
+                    <th className="py-2 px-4 border-b">Product ID</th>
+                    <th className="py-2 px-4 border-b">Product Name</th>
+                    <th className="py-2 px-4 border-b">Price</th>
+                    <th className="py-2 px-4 border-b">Quantity</th>
+                    <th className="py-2 px-4 border-b">Subtotal</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {productEntries.map((product, index) => {
+                    const subtotal =
+                      (parseFloat(product.price) || 0) *
+                      (parseInt(product.quantity) || 0);
+                    return (
+                      <tr key={index} className="text-center">
+                        <td className="py-2 px-4 border-b">{product.id}</td>
+                        <td className="py-2 px-4 border-b">{product.name}</td>
+                        <td className="py-2 px-4 border-b">₹ {parseFloat(product.price).toFixed(2)}</td>
+                        <td className="py-2 px-4 border-b">{product.quantity}</td>
+                        <td className="py-2 px-4 border-b">₹ {subtotal.toFixed(2)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+
+              {/* Financial Summary */}
+              <div className="financial-summary grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Left Column */}
+                <div className="space-y-2">
+                  <p>
+                    <span className="font-semibold">Subtotal:</span> <span className="font-normal">₹ {calculateTotalWithGST(productEntries).subtotal.toFixed(2)}</span>
+                  </p>
+                  <p>
+                    <span className="font-semibold">CGST (6%):</span> <span className="font-normal">₹ {calculateTotalWithGST(productEntries).cgst.toFixed(2)}</span>
+                  </p>
+                  <p>
+                    <span className="font-semibold">SGST (6%):</span> <span className="font-normal">₹ {calculateTotalWithGST(productEntries).sgst.toFixed(2)}</span>
+                  </p>
+                </div>
+
+                {/* Right Column */}
+                <div className="space-y-2">
+                  <p>
+                    <span className="font-semibold">Total Amount (incl. GST):</span> <span className="font-normal">₹ {calculateTotalWithGST(productEntries).totalWithGST.toFixed(2)}</span>
+                  </p>
+                  <p>
+                    <span className="font-semibold">Advance Paid:</span> <span className="font-normal">₹ {parseFloat(advanceDetails).toFixed(2)}</span>
+                  </p>
+                  <p>
+                    <span className="font-semibold">Balance Due:</span> <span className="font-normal">₹ {(calculateTotalWithGST(productEntries).totalWithGST - parseFloat(advanceDetails)).toFixed(2)}</span>
+                  </p>
+                </div>
+              </div>
+            
+
+            {/* Payment Method and Advance Details on the Same Line */}
+            <div className="flex flex-col md:flex-row items-center justify-between my-6 space-x-4">
+              {/* Payment Method */}
+              <div className="w-full md:w-1/2 mb-4 md:mb-0">
+                <label htmlFor="paymentMethod" className="block font-semibold mb-1">
+                  Payment Method:
+                </label>
+                <select
+                  id="paymentMethod"
+                  value={paymentMethod}
+                  onChange={(e) => setPaymentMethod(e.target.value)}
+                  ref={paymentMethodRef}
+                  onKeyDown={(e) => handleEnterKey(e, saveButtonRef)}
+                  className="border border-gray-300 w-full px-4 py-3 rounded-lg"
+                >
+                  <option value="" disabled>Select Payment Method</option>
+                  <option value="cash">Cash</option>
+                  <option value="credit">Card</option>
+                  <option value="online">UPI (Paytm/PhonePe/GPay)</option>
+                </select>
+              </div>
+              {validationErrors.paymentMethod && (
+                <p className="text-red-500 text-xs ml-1">
+                  {validationErrors.paymentMethod}
+                </p>
+              )}
+
+              {/* Advance Details */}
+              <div className="w-full md:w-1/2 mb-4 md:mb-0">
+                <label htmlFor="advanceDetails" className="block font-semibold mb-1">
+                  Advance Details:
+                </label>
+                <input
+                  type="text"
+                  id="advanceDetails"
+                  placeholder="Enter amount paid in advance"
+                  value={advanceDetails}
+                  onChange={(e) => setAdvanceDetails(e.target.value)}
+                  onKeyDown={(e) => handleEnterKey(e, saveButtonRef)}
+                  ref={advanceDetailsRef}
+                  className="border border-gray-300 w-full px-4 py-3 rounded-lg"
+                />
+              </div>
+              {validationErrors.advanceDetails && (
+                <p className="text-red-500 text-xs ml-1">
+                  {validationErrors.advanceDetails}
+                </p>
+              )}
+            </div>
+
+            {/* Save Work Order and Print Buttons on the Same Line */}
+            <div className="flex justify-center text-center space-x-4 mt-6">
               <button
                 onClick={() => {
-                  if (allowPrint) handlePrint();
+                  if (!isSaving) saveWorkOrder();
+                }}
+                ref={saveButtonRef}
+                className="flex items-center bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition w-fit"
+              >
+                {isSaving ? "Saving..." : "Save Work Order"}
+              </button>
+
+              <button
+                onClick={() => {
+                  if (allowPrint) handleCustomPrint();
                 }}
                 ref={printButtonRef}
-                className="bg-green-500 hover:bg-green-600 text-white rounded-lg px-5 py-2 transition mt-4"
+                className={`flex items-center bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-lg transition w-fit ml-2 ${allowPrint ? "" : "opacity-50 cursor-not-allowed"
+                  }`}
+                disabled={!allowPrint}
               >
-                <PrinterIcon className="w-5 h-5" />
+                <PrinterIcon className="w-5 h-5 mr-2" />
+                Print
+              </button>
+
+              <button
+                onClick={async () => {
+                  await handleGenerateWorkOrder();
+                  resetForm();
+                  setStep(1);
+                }}
+                ref={newWorkOrderButtonRef}
+                className="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-lg flex items-center justify-center w-fit"
+              >
+                Create New Sales Order
               </button>
             </div>
-            <div className="mb-6">
-              <p>
-                <strong>Work Order ID:</strong> {workOrderId}
-              </p>
-              <p>
-                <strong>Description:</strong> {description}
-              </p>
-              <p>
-                <strong>Due Date:</strong> {dueDate}
-              </p>
-              <p>
-                <strong>Billed by Employee Name:</strong> {employee}
-              </p>
-              <p>
-                <strong>HSN Code:</strong> {HSN_CODE}
-              </p>
             </div>
-            <table className="w-full border border-gray-300 rounded-md">
-              <thead>
-                <tr className="bg-gray-100">
-                  <th className="py-2 px-4 border-b">Product ID</th>
-                  <th className="py-2 px-4 border-b">Product Name</th>
-                  <th className="py-2 px-4 border-b">Price</th>
-                  <th className="py-2 px-4 border-b">Quantity</th>
-                  <th className="py-2 px-4 border-b">Subtotal</th>
-                </tr>
-              </thead>
-              <tbody>
-                {productEntries.map((product, index) => {
-                  const subtotal =
-                    (parseFloat(product.price) || 0) *
-                    (parseInt(product.quantity) || 0);
-                  return (
-                    <tr key={index} className="text-center">
-                      <td className="py-2 px-4 border-b">{product.id}</td>
-                      <td className="py-2 px-4 border-b">{product.name}</td>
-                      <td className="py-2 px-4 border-b">{product.price}</td>
-                      <td className="py-2 px-4 border-b">{product.quantity}</td>
-                      <td className="py-2 px-4 border-b">
-                        {subtotal.toFixed(2)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            <div className="mt-6">
-              <div className="mt-6">
-                <p>
-                  <strong>Subtotal:</strong> ₹
-                  {calculateTotalWithGST(productEntries).subtotal.toFixed(2)}
-                </p>
-                <p>
-                  <strong>CGST (6%):</strong> ₹
-                  {calculateTotalWithGST(productEntries).cgst.toFixed(2)}
-                </p>
-                <p>
-                  <strong>SGST (6%):</strong> ₹
-                  {calculateTotalWithGST(productEntries).sgst.toFixed(2)}
-                </p>
-                <p>
-                  <strong>Total Amount (incl. GST):</strong> ₹
-                  {calculateTotalWithGST(productEntries).totalWithGST.toFixed(
-                    2
-                  )}
-                </p>
-                <p>
-                  <strong>Advance Paid:</strong> ₹
-                  {parseFloat(advanceDetails) || 0}
-                </p>
-                <p>
-                  <strong>Balance Due:</strong> ₹
-                  {(
-                    calculateTotalWithGST(productEntries).totalWithGST -
-                    (parseFloat(advanceDetails) || 0)
-                  ).toFixed(2)}
-                </p>
-              </div>
-            </div>
-            {/* Payment Method Dropdown */}
-            <label className="block font-bold mt-6 mb-1">Payment Method</label>
-            <select
-              value={paymentMethod}
-              onChange={(e) => setPaymentMethod(e.target.value)}
-              ref={paymentMethodRef}
-              onKeyDown={handleStep6EnterKey}
-              className="border border-gray-300 w-1/2 px-4 py-3 rounded-lg text-center"
-            >
-              <option value="" disabled>Select Payment Method</option>
-              <option value="cash">Cash</option>
-              <option value="credit">Card</option>
-              <option value="online">UPI (Paytm/PhonePe/GPay)</option>
-            </select>
-            {validationErrors.paymentMethod && (
-              <p className="text-red-500 text-xs mt-1">{validationErrors.paymentMethod}</p>
-            )}
-
-            {/* Save Work Order Button */}
-            <button
-              onClick={() => {
-                if (!isSaving) saveWorkOrder();
-              }}
-              ref={saveButtonRef}
-              onKeyDown={handleStep6EnterKey}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition w-full mt-6"
-            >
-              Save Work Order
-            </button>
-
-            {/* Create New Work Order Button - Mouse Only */}
-            <button
-              onClick={async () => {
-                await handleGenerateWorkOrder();
-                resetForm();
-                setStep(1);
-              }}
-              ref={newWorkOrderButtonRef}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition w-full mt-6"
-            >
-              Create New Work Order
-            </button>
-          </div>
+          </>
         )}
 
         {/* Navigation Buttons */}

@@ -25,6 +25,7 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.27.0",
+    "react-to-print": "^3.0.2",
     "supabase": "^1.219.2",
     "uuid": "^11.0.2"
   },

@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signIn } from '../services/authService';
-import topLogo from '../assets/thumbnail_sreenethra logo mala eng.png';
+import topLogo from '../assets/sreenethraenglishisolated.png';
 import bottomLogo from '../assets/Retrato Black PNG.png';
 
 const Login = () => {
@@ -36,7 +36,7 @@ const Login = () => {
       <div className="hidden md:flex w-1/2 bg-cover bg-center relative items-center justify-center bg-green-50">
         
         <div className="text-center text-gray-800">
-        <img src={topLogo} alt="Top Logo" className="h-56" />
+        <img src={topLogo} alt="Top Logo" className="h-24" />
         </div>
       </div>
 
