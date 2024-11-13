@@ -42,7 +42,7 @@ const Header = ({ selectedTab, setSelectedTab, isCollapsed, toggleSidebar }) => 
   };
 
   return (
-    <header className="w-full fixed top-0 left-0 flex items-center justify-between px-4 bg-white border-b z-10 h-16">
+    <header className="app-content print:hidden w-full fixed top-0 left-0 flex items-center justify-between px-4 bg-white border-b z-10 h-16">
       {/* Left Section: Logo and Tab Buttons */}
       <div className="flex items-center">
         <img

@@ -16,7 +16,7 @@ const Sidebar = ({ isCollapsed, toggleSidebar, selectedTab }) => {
   const linksToRender = selectedTab === 'Dashboard' ? dashboardLinks : documentLinks;
 
   return (
-    <div className={`h-screen fixed mt-16 left-0 ${isCollapsed ? 'w-12' : 'w-60'} bg-white border-r transition-width duration-300 z-10`}>
+    <div className={`app-content print:hidden h-screen fixed mt-16 left-0 ${isCollapsed ? 'w-12' : 'w-60'} bg-white border-r transition-width duration-300 z-10`}>
       <div className="flex items-center justify-between p-4">
         <h1 className={`text-base font-semibold pt-3 ${isCollapsed ? 'hidden' : ''}`}>{selectedTab}</h1>
         <button onClick={toggleSidebar} className="focus:outline-none pt-3">

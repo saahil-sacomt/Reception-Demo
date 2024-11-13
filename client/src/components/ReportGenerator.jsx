@@ -1,20 +1,51 @@
 // client/src/components/ReportGenerator.jsx
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { convertUTCToIST } from '../utils/dateUtils';
+import logo from '../assets/sreenethraenglishisolated.png';
 
 const ReportGenerator = ({ isCollapsed }) => {
   // State Variables
   const [reportType, setReportType] = useState('sales_orders'); // 'sales_orders', 'work_orders', 'privilegecards', 'products'
-  const [reportPeriod, setReportPeriod] = useState('daily'); // 'daily', 'monthly'
+  const [reportPeriod, setReportPeriod] = useState('daily'); // 'daily', 'monthly', 'range'
   const [date, setDate] = useState(''); // For daily reports
   const [monthYear, setMonthYear] = useState(''); // For monthly reports (format: YYYY-MM)
+  const [fromDate, setFromDate] = useState(''); // Start date for range reports
+  const [toDate, setToDate] = useState(''); // End date for range reports
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+
+  const [logoDataUrl, setLogoDataUrl] = useState('');
+
+  useEffect(() => {
+    const convertImageToDataUrl = (image) => {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.src = image;
+        img.crossOrigin = 'Anonymous';
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0);
+          const dataURL = canvas.toDataURL('image/png');
+          resolve(dataURL);
+        };
+        img.onerror = (err) => {
+          reject(err);
+        };
+      });
+    };
+
+    convertImageToDataUrl(logo)
+      .then((dataUrl) => setLogoDataUrl(dataUrl))
+      .catch((err) => console.error('Failed to load logo image:', err));
+  }, []);
 
   // Utility function to get the last day of a month
   const getLastDayOfMonth = (year, month) => {
@@ -71,7 +102,7 @@ const ReportGenerator = ({ isCollapsed }) => {
           date: convertUTCToIST(startDate.toISOString(), "dd-MM-yyyy"),
           identifier: date,
         };
-      } else {
+      } else if (reportPeriod === 'monthly') {
         if (!monthYear) {
           setError('Please select a month and year for the monthly report.');
           setLoading(false);
@@ -91,6 +122,32 @@ const ReportGenerator = ({ isCollapsed }) => {
           month,
           year,
           identifier: `${month}-${year}`,
+        };
+      } else if (reportPeriod === 'range') {
+        if (!fromDate || !toDate) {
+          setError('Please select both start and end dates for the report.');
+          setLoading(false);
+          return;
+        }
+        const start = new Date(fromDate);
+        const end = new Date(toDate);
+        if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+          setError('Invalid dates selected.');
+          setLoading(false);
+          return;
+        }
+        if (start > end) {
+          setError('Start date cannot be after end date.');
+          setLoading(false);
+          return;
+        }
+        startDate = new Date(`${fromDate}T00:00:00Z`);
+        endDate = new Date(`${toDate}T23:59:59Z`);
+        reportDetails = {
+          type: 'Date Range',
+          fromDate: convertUTCToIST(startDate.toISOString(), "dd-MM-yyyy"),
+          toDate: convertUTCToIST(endDate.toISOString(), "dd-MM-yyyy"),
+          identifier: `${fromDate}_to_${toDate}`,
         };
       }
 
@@ -168,7 +225,7 @@ const ReportGenerator = ({ isCollapsed }) => {
               'Total Revenue': details.total_revenue.toFixed(2),
               'Average Price': details.count ? (details.total_price / details.count).toFixed(2) : '0.00',
             }))
-            .sort((a, b) => b['Total Revenue ()'] - a['Total Revenue ()']); // Optional: Sort by revenue
+            .sort((a, b) => b['Total Revenue'] - a['Total Revenue']); // Optional: Sort by revenue
           break;
         }
         default:
@@ -199,20 +256,34 @@ const ReportGenerator = ({ isCollapsed }) => {
   const generatePDF = (data, reportDetails, reportType, formattedProductIdSummary) => {
     const doc = new jsPDF();
     const isDaily = reportDetails.type === 'Daily';
+    const isRange = reportDetails.type === 'Date Range';
 
-    // Header
+    // Add Logo Image (Centered)
+    if (logoDataUrl) {
+      const imgProps = doc.getImageProperties(logoDataUrl);
+      const pdfWidth = doc.internal.pageSize.getWidth();
+      const imgWidth = 50; // Adjust the width as needed
+      const imgHeight = (imgProps.height * imgWidth) / imgProps.width; // Maintain aspect ratio
+      const xPos = (pdfWidth - imgWidth) / 2; // Center horizontally
+      const yPos = 10; // Position from top
+      doc.addImage(logoDataUrl, 'PNG', xPos, yPos, imgWidth, imgHeight);
+    }
+
+    // Header (Removed Company Name)
     doc.setFontSize(18);
-    doc.text('Sreenethra Eye Care', 105, 20, { align: 'center' });
+    // Removed: doc.text('Sreenethra Eye Care', 105, 20, { align: 'center' });
     doc.setFontSize(12);
     doc.text('GSTIN: 32AAUCS7002H1ZV', 105, 30, { align: 'center' });
     doc.text(`Report Type: ${reportDetails.type}`, 14, 40);
-    doc.text(
-      isDaily
-        ? `Date: ${reportDetails.date}`
-        : `Month: ${reportDetails.month}/${reportDetails.year}`,
-      14,
-      47
-    );
+
+    if (isDaily) {
+      doc.text(`Date: ${reportDetails.date}`, 14, 47);
+    } else if (reportDetails.type === 'Monthly') {
+      doc.text(`Month: ${reportDetails.month}/${reportDetails.year}`, 14, 47);
+    } else if (isRange) {
+      doc.text(`From Date: ${reportDetails.fromDate}`, 14, 47);
+      doc.text(`To Date: ${reportDetails.toDate}`, 14, 54);
+    }
 
     // Determine table columns based on report type
     let tableColumn = [];
@@ -222,7 +293,7 @@ const ReportGenerator = ({ isCollapsed }) => {
           'Sales Order ID',
           'MR Number',
           'Is B2B',
-          'Subtotal',
+          'Sale Value', // Changed from 'Subtotal' to 'Sale Value'
           'CGST',
           'SGST',
           'Total Amount',
@@ -287,7 +358,7 @@ const ReportGenerator = ({ isCollapsed }) => {
             record.sales_order_id || 'N/A',
             record.mr_number || 'N/A',
             record.is_b2b ? 'Yes' : 'No',
-            record.subtotal ? Number(record.subtotal).toFixed(2) : '0.00',
+            record.subtotal ? Number(record.subtotal).toFixed(2) : '0.00', // Assuming 'subtotal' is now 'Sale Value'
             record.cgst ? Number(record.cgst).toFixed(2) : '0.00',
             record.sgst ? Number(record.sgst).toFixed(2) : '0.00',
             record.total_amount ? Number(record.total_amount).toFixed(2) : '0.00',
@@ -380,7 +451,7 @@ const ReportGenerator = ({ isCollapsed }) => {
     });
 
     // Calculate and Add Summary
-    const summaryStartY = doc.lastAutoTable.finalY + 10;
+    let summaryStartY = doc.lastAutoTable.finalY + 10;
     doc.setFontSize(12);
     doc.text('Summary', 14, summaryStartY);
     doc.setFontSize(10);
@@ -390,8 +461,8 @@ const ReportGenerator = ({ isCollapsed }) => {
     switch (reportType) {
       case 'sales_orders': {
         const totalSalesOrders = data.length;
-        const totalAdvancePayments = data.reduce((acc, curr) => acc + (curr.advance_details || 0), 0); // Ensure 'advance_details' exists
-        const totalSubtotal = data.reduce((acc, curr) => acc + (curr.subtotal || 0), 0);
+        const totalAdvancePayments = data.reduce((acc, curr) => acc + (curr.advance_details || 0), 0);
+        const totalSaleValue = data.reduce((acc, curr) => acc + (curr.subtotal || 0), 0); // Changed from 'totalSubtotal'
         const totalCGST = data.reduce((acc, curr) => acc + (curr.cgst || 0), 0);
         const totalSGST = data.reduce((acc, curr) => acc + (curr.sgst || 0), 0);
         const totalAmount = data.reduce((acc, curr) => acc + (curr.total_amount || 0), 0);
@@ -403,8 +474,8 @@ const ReportGenerator = ({ isCollapsed }) => {
 
         summaryTable = [
           ['Total Sales Orders', totalSalesOrders],
-          ['Total Advance Payments ', totalAdvancePayments.toFixed(2)],
-          ['Total Subtotal', totalSubtotal.toFixed(2)],
+          ['Total Advance Payments', totalAdvancePayments.toFixed(2)],
+          ['Total Sale Value', totalSaleValue.toFixed(2)], // Changed label
           ['Total CGST', totalCGST.toFixed(2)],
           ['Total SGST', totalSGST.toFixed(2)],
           ['Total Amount', totalAmount.toFixed(2)],
@@ -417,7 +488,7 @@ const ReportGenerator = ({ isCollapsed }) => {
         const totalWorkOrders = data.length;
         const totalAdvance = data.reduce((acc, curr) => acc + (curr.advance_details || 0), 0);
         const totalWorkAmount = data.reduce((acc, curr) => acc + (curr.total_amount || 0), 0);
-        const totalworkSubtotal = data.reduce((acc, curr) => acc + (curr.subtotal || 0), 0); // Assuming 'subtotal' exists
+        const totalSaleValue = data.reduce((acc, curr) => acc + (curr.subtotal || 0), 0); // Changed from 'totalworkSubtotal'
         const totalworkCGST = data.reduce((acc, curr) => acc + (curr.cgst || 0), 0);
         const totalworkSGST = data.reduce((acc, curr) => acc + (curr.sgst || 0), 0);
         const totalWorkB2B = data.reduce((acc, curr) => acc + (curr.is_b2b ? 1 : 0), 0);
@@ -466,7 +537,7 @@ const ReportGenerator = ({ isCollapsed }) => {
         summaryTable = [
           ['Total Work Orders', totalWorkOrders],
           ['Total Advance Details', totalAdvance.toFixed(2)],
-          ['Total Subtotal', totalworkSubtotal.toFixed(2)],
+          ['Total Sale Value', totalSaleValue.toFixed(2)], // Changed label
           ['Total CGST', totalworkCGST.toFixed(2)],
           ['Total SGST', totalworkSGST.toFixed(2)],
           ['Total Amount', totalWorkAmount.toFixed(2)],
@@ -532,7 +603,7 @@ const ReportGenerator = ({ isCollapsed }) => {
 
     // Generate the summary table
     doc.autoTable({
-      startY: summaryStartY + 5,
+      startY: summaryStartY + (isRange ? 14 : 5), // Adjust Y position for range reports
       head: [['Metric', 'Value']],
       body: summaryTable,
       styles: { fontSize: 8 },
@@ -555,7 +626,7 @@ const ReportGenerator = ({ isCollapsed }) => {
       // Generate the detailed summary table
       doc.autoTable({
         startY: detailedSummaryStartY + 5,
-        head: [['Product ID', 'Product Name', 'Total Quantity Sold', 'Total Revenue ()', 'Average Price ()']],
+        head: [['Product ID', 'Product Name', 'Total Quantity Sold', 'Total Revenue', 'Average Price']],
         body: formattedProductIdSummary.map((item) => [
           item['Product ID'],
           item['Product Name'],
@@ -578,12 +649,16 @@ const ReportGenerator = ({ isCollapsed }) => {
     }
 
     // Save the PDF
-    doc.save(`${reportDetails.type}-${reportType}-report-${reportDetails.identifier}.pdf`);
+    let fileName = `${reportDetails.type}-${reportType}-report-${reportDetails.identifier}.pdf`;
+    doc.save(fileName);
   };
 
   return (
-    <div className={`transition-all duration-300 ${isCollapsed ? "mx-20" : "mx-20 px-20"
-        } justify-center mt-20 p-10 rounded-xl mx-auto max-w-2xl bg-green-50 shadow-inner`}>
+    <div
+      className={`transition-all duration-300 ${
+        isCollapsed ? "mx-20" : "mx-20 px-20"
+      } justify-center mt-20 p-10 rounded-xl mx-auto max-w-2xl bg-green-50 shadow-inner`}
+    >
       <h2 className="text-2xl font-semibold text-center mb-6">Generate Reports</h2>
 
       <div className="mb-6 flex flex-col md:flex-row md:space-x-4">
@@ -612,11 +687,14 @@ const ReportGenerator = ({ isCollapsed }) => {
               // Reset date inputs when report period changes
               setDate('');
               setMonthYear('');
+              setFromDate('');
+              setToDate('');
             }}
             className="w-full p-2 border rounded"
           >
             <option value="daily">Daily</option>
             <option value="monthly">Monthly</option>
+            <option value="range">Date Range</option>
           </select>
         </div>
       </div>
@@ -633,7 +711,7 @@ const ReportGenerator = ({ isCollapsed }) => {
             required
           />
         </div>
-      ) : (
+      ) : reportPeriod === 'monthly' ? (
         <div className="mb-6">
           <label className="block mb-2 font-medium">Select Month and Year</label>
           <input
@@ -644,7 +722,32 @@ const ReportGenerator = ({ isCollapsed }) => {
             required
           />
         </div>
-      )}
+      ) : reportPeriod === 'range' ? (
+        <div className="mb-6 flex flex-col md:flex-row md:space-x-4">
+          {/* From Date */}
+          <div className="flex-1">
+            <label className="block mb-2 font-medium">From Date</label>
+            <input
+              type="date"
+              value={fromDate}
+              onChange={(e) => setFromDate(e.target.value)}
+              className="w-full p-2 border rounded"
+              required
+            />
+          </div>
+          {/* To Date */}
+          <div className="flex-1">
+            <label className="block mb-2 font-medium">To Date</label>
+            <input
+              type="date"
+              value={toDate}
+              onChange={(e) => setToDate(e.target.value)}
+              className="w-full p-2 border rounded"
+              required
+            />
+          </div>
+        </div>
+      ) : null}
 
       {/* Error and Success Messages */}
       {error && <p className="text-red-500 mb-4">{error}</p>}

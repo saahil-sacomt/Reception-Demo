@@ -4,6 +4,12 @@ export default {
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
+  safelist: [
+    {
+      pattern: /print:(block|hidden|absolute|inset-0|w-full)/,
+    },
+  ],
+  
   theme: {
     extend: {
       keyframes: {

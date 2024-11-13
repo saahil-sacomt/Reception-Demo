@@ -1,12 +1,11 @@
 // client/src/pages/SalesOrderGeneration.jsx
 import { useState, useEffect, useRef, useMemo } from "react";
-import { PrinterIcon } from "@heroicons/react/24/outline";
+import { PrinterIcon, TrashIcon } from "@heroicons/react/24/outline";
 import { fetchPrivilegeCardByPhone } from "../supabaseClient";
 import supabase from "../supabaseClient";
 import { useNavigate, useLocation } from "react-router-dom";
 import { convertUTCToIST, getCurrentUTCDateTime, formatDateToIST } from "../utils/dateUtils";
 
-const branchCode = "NTA";
 const mockOtp = "1234";
 
 // Dummy dataset for products
@@ -16,6 +15,13 @@ const productDatabase = [
   { id: "P003", name: "Contact Lenses", price: "700" },
   { id: "P004", name: "Blue Light Glasses", price: "450" },
   { id: "P005", name: "Safety Goggles", price: "600" },
+];
+
+// Dummy branches
+const branchOptions = [
+  { name: 'Neyyattinkara', code: 'NTA' },
+  { name: 'Old City', code: 'OCT' },
+  { name: 'Downtown', code: 'DWN' },
 ];
 
 // Function to fetch product details based on ID
@@ -44,64 +50,45 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
   const [paymentMethod, setPaymentMethod] = useState("");
   const [validationErrors, setValidationErrors] = useState({});
   const [errorMessage, setErrorMessage] = useState("");
+  const [privilegeCardNumber, setPrivilegeCardNumber] = useState("");
+  const privilegeCardRef = useRef(null);
 
   const [isOtpSent, setIsOtpSent] = useState(false);
   const [privilegeCardDetails, setPrivilegeCardDetails] = useState(null);
   const [redeemPoints, setRedeemPoints] = useState(false);
-  const [redeemPointsAmount, setRedeemPointsAmount] = useState(0); // New state for custom redemption amount
+  const [redeemPointsAmount, setRedeemPointsAmount] = useState(""); // New state for custom redemption amount
   const [loyaltyPoints, setLoyaltyPoints] = useState(0);
   const [mrNumber, setMrNumber] = useState("");
   const [workOrders, setWorkOrders] = useState([]);
   const [selectedWorkOrder, setSelectedWorkOrder] = useState(null);
   const [showWorkOrderModal, setShowWorkOrderModal] = useState(false);
   const [pointsToAdd, setPointsToAdd] = useState(0);
-  const [redeemOption, setRedeemOption] = useState(null); // 'full', 'custom', or null
+  const [redeemOption, setRedeemOption] = useState(null); // 'barcode', 'phone', 'full', 'custom', or null
+  const [searchQuery, setSearchQuery] = useState("");
+  const [branchCode, setBranchCode] = useState("");
+  const [isGeneratingId, setIsGeneratingId] = useState(false); // To handle loading state
 
   // Refs for input fields to control focus
   const descriptionRef = useRef(null);
   const mrNumberRef = useRef(null);
-  const fetchButtonRef = useRef(null);
   const privilegePhoneRef = useRef(null);
   const otpRef = useRef(null);
   const employeeRef = useRef(null);
   const nextButtonRef = useRef(null);
   const paymentMethodRef = useRef(null);
-  const printButtonRef = useRef(null);
   const redeemPointsAmountRef = useRef(null);
   const proceedButtonRef = useRef(null);
+  const saveOrderRef = useRef(null);
+  const printButtonRef = useRef(null);
   const newWorkOrderButtonRef = useRef(null);
-  const saveOrderRef = useRef(null); // Added ref for Submit Order button
+  // Refs for inputs and buttons
+const branchRef = useRef(null);
+const workOrderInputRef = useRef(null);
+const firstWorkOrderButtonRef = useRef(null);
+const fetchButtonRef = useRef(null);
 
   const navigate = useNavigate();
   const location = useLocation();
-
-  // Fetch and set the Sales Order ID
-  useEffect(() => {
-    const fetchAndSetSalesOrderId = async () => {
-      const newSalesOrderId = await generateSalesOrderId();
-      if (newSalesOrderId) {
-        setSalesOrderId(newSalesOrderId);
-      } else {
-        console.error("Failed to generate Sales Order ID");
-      }
-    };
-
-    fetchAndSetSalesOrderId();
-  }, []);
-
-  const handleGenerateSalesOrder = async () => {
-    const newId = await generateSalesOrderId();
-    if (newId) {
-      setSalesOrderId(newId);
-    } else {
-      console.error("Failed to generate Work Order ID");
-    }
-  };
-
-  useEffect(() => {
-    handleGenerateSalesOrder();
-  }, []);
-
 
 
   // Utility function to get the current financial year
@@ -127,15 +114,32 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
   };
 
   // Generate Sales Order ID
-  const generateSalesOrderId = async () => {
+  // Function to generate Sales Order ID based on the last entry in the database
+  const generateSalesOrderId = async (selectedBranchCode) => {
     try {
       const financialYear = getFinancialYear();
 
-      // Fetch the last sales order ID from the database
+      // Define date range for the financial year
+      const today = new Date();
+      const currentYear = today.getFullYear();
+      const currentMonth = today.getMonth() + 1;
+
+      const financialYearStart = currentMonth >= 4
+        ? new Date(currentYear, 3, 1) // April 1st of this year
+        : new Date(currentYear - 1, 3, 1); // April 1st of last year
+
+      const financialYearEnd = currentMonth >= 4
+        ? new Date(currentYear + 1, 2, 31) // March 31st of next year
+        : new Date(currentYear, 2, 31); // March 31st of this year
+
+      // Fetch the last sales order ID for the selected branch
       const { data: lastSalesOrders, error } = await supabase
-        .from('sales_orders')
-        .select('sales_order_id, created_at')
-        .order('created_at', { ascending: false })
+        .from("sales_orders")
+        .select("sales_order_id")
+        .ilike("sales_order_id", `SO(${selectedBranchCode})%`)
+        .gte("created_at", financialYearStart.toISOString())
+        .lte("created_at", financialYearEnd.toISOString())
+        .order("created_at", { ascending: false })
         .limit(1);
 
       if (error) {
@@ -143,24 +147,44 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
       }
 
       let lastCount = 0;
-
       if (lastSalesOrders && lastSalesOrders.length > 0) {
-        const lastSalesOrderId = lastSalesOrders[0].sales_order_id;
-        // Extract the count from the last sales order ID
-        const parts = lastSalesOrderId.split('-');
-        const countPart = parts[1];
-        lastCount = parseInt(countPart, 10);
+        const lastOrderId = lastSalesOrders[0].sales_order_id;
+        const parts = lastOrderId.split("-");
+        lastCount = parseInt(parts[1], 10);
       }
 
+      // Increment the count for the new Sales Order ID
       const newCount = lastCount + 1;
-      const newSalesOrderId = `SO(${branchCode})-${newCount}-${financialYear}`;
+      const newSalesOrderId = `SO(${selectedBranchCode})-${newCount}-${financialYear}`;
 
-      return newSalesOrderId; // Return the new ID
+      return newSalesOrderId;
     } catch (error) {
-      console.error('Error generating Sales Order ID:', error);
+      console.error("Error generating Sales Order ID:", error);
       return null;
     }
   };
+
+
+  // Handle branch selection and generate Sales Order ID
+  // Handle branch selection and generate Sales Order ID
+const handleBranchSelection = async (selectedBranch) => {
+  setBranchCode(selectedBranch);
+  if (selectedBranch) {
+    setIsGeneratingId(true);
+    const newSalesOrderId = await generateSalesOrderId(selectedBranch);
+    if (newSalesOrderId) {
+      setSalesOrderId(newSalesOrderId);
+      setErrorMessage("");
+    } else {
+      setErrorMessage("Failed to generate Sales Order ID.");
+    }
+    setIsGeneratingId(false);
+
+    // Focus on the Work Order ID input after branch selection
+    setTimeout(() => workOrderInputRef.current?.focus(), 0);
+  }
+};
+
 
   // Calculate amounts using useMemo
   const {
@@ -231,7 +255,8 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
     // If customer has privilege card, allow discount
     let discount = 0;
     if (privilegeCard && privilegeCardDetails && redeemPointsAmount > 0) {
-      discount = Math.min(redeemPointsAmount, loyaltyPoints, remainingBalance);
+      const redeemAmount = parseFloat(redeemPointsAmount) || 0;
+      discount = Math.min(redeemAmount, loyaltyPoints, remainingBalance);
     }
 
     const finalAmount = Math.max(remainingBalance - discount, 0);
@@ -257,7 +282,7 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
   ) => {
     let pointsToRedeem = 0;
     if (privilegeCard && privilegeCardDetails) {
-      pointsToRedeem = Math.min(redeemPointsAmount, loyaltyPoints);
+      pointsToRedeem = Math.min(parseFloat(redeemPointsAmount) || 0, loyaltyPoints);
     }
 
     let updatedPoints = loyaltyPoints - pointsToRedeem;
@@ -287,13 +312,36 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
     privilegeCardDetails,
   ]);
 
-  // Fetch privilege card details
-  const handleFetchPrivilegeCard = async () => {
+  // Function to remove a product entry
+  const removeProductEntry = (index) => {
+    const updatedEntries = productEntries.filter((_, i) => i !== index);
+    setProductEntries(updatedEntries);
+  };
+
+  // Function to fetch privilege card by pc_number
+  const handleFetchPrivilegeCardByNumber = async () => {
     try {
-      const card = await fetchPrivilegeCardByPhone(phoneNumber);
-      setPrivilegeCardDetails(card);
-      if (card) {
-        setLoyaltyPoints(card.loyalty_points || 0);
+      // Validate pc_number format if necessary
+      if (!privilegeCardNumber.trim()) {
+        setErrorMessage("Privilege Card Number is required.");
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("privilegecards")
+        .select("*")
+        .eq("pc_number", privilegeCardNumber)
+        .single();
+
+      if (error || !data) {
+        console.error("Error fetching privilege card:", error);
+        setErrorMessage("Privilege Card not found.");
+      } else {
+        setPrivilegeCardDetails(data);
+        setLoyaltyPoints(data.loyalty_points || 0);
+        setIsOtpVerified(true); // Skip OTP verification when using barcode
+        setErrorMessage("");
+        setTimeout(() => nextButtonRef.current?.focus(), 0);
       }
     } catch (error) {
       console.error("Error fetching privilege card:", error);
@@ -301,37 +349,56 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
     }
   };
 
-  // Fetch work orders
-  async function handleFetchWorkOrders() {
+  // Fetch privilege card details via phone number
+  const handleFetchPrivilegeCard = async () => {
     try {
-      const { data, error } = await supabase
-        .from("work_orders")
-        .select("*")
-        .eq("mr_number", mrNumber)
-        .order("created_at", { ascending: false });
-
-      if (error) {
-        console.error("Error fetching work orders:", error);
-        setErrorMessage("Failed to fetch work orders.");
+      const card = await fetchPrivilegeCardByPhone(phoneNumber);
+      if (card) {
+        setPrivilegeCardDetails(card);
+        setLoyaltyPoints(card.loyalty_points || 0);
+        setErrorMessage("");
       } else {
-        setWorkOrders(data);
-        if (data.length > 0) {
-          // Focus on the first work order button
-          setTimeout(() => {
-            document.getElementById(`workOrderButton-0`)?.focus();
-          }, 0);
-        } else {
-          // If no work orders, focus on the "Proceed to Step 1" button
-          setTimeout(() => {
-            proceedButtonRef.current?.focus();
-          }, 0);
-        }
+        setErrorMessage("No Privilege Card associated with this phone number.");
       }
     } catch (error) {
+      console.error("Error fetching privilege card:", error);
+      setErrorMessage("Failed to fetch privilege card details.");
+    }
+  };
+
+  // Handle fetching work orders
+async function handleFetchWorkOrders() {
+  try {
+    let query = supabase.from("work_orders").select("*");
+
+    if (searchQuery.startsWith("WO(")) {
+      query = query.eq("work_order_id", searchQuery);
+    } else {
+      query = query.eq("mr_number", searchQuery);
+    }
+
+    const { data, error } = await query.order("created_at", { ascending: false });
+
+    if (error) {
       console.error("Error fetching work orders:", error);
       setErrorMessage("Failed to fetch work orders.");
+    } else {
+      setWorkOrders(data);
+
+      // Focus on the first work order button if found, otherwise on the proceed button
+      setTimeout(() => {
+        if (data.length > 0) {
+          firstWorkOrderButtonRef.current?.focus();
+        } else {
+          proceedButtonRef.current?.focus();
+        }
+      }, 0);
     }
+  } catch (error) {
+    console.error("Error fetching work orders:", error);
+    setErrorMessage("Failed to fetch work orders.");
   }
+}
 
   function handleSelectWorkOrder(workOrder) {
     setSelectedWorkOrder(workOrder);
@@ -356,7 +423,7 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
 
   // Function to send OTP
   const handleSendOtp = () => {
-    if (phoneNumber.length === 10) {
+    if (phoneNumber.length === 10 && /^\d+$/.test(phoneNumber)) {
       setIsOtpSent(true);
       setErrorMessage("");
       alert(`Mock OTP for testing purposes: ${mockOtp}`); // For testing, remove in production
@@ -375,7 +442,11 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
       setIsOtpVerified(true);
       setErrorMessage("");
       await handleFetchPrivilegeCard();
-      setTimeout(() => nextButtonRef.current?.focus(), 0); // Focus on the next button
+      setTimeout(() => {
+        if (!errorMessage) {
+          nextButtonRef.current?.focus();
+        }
+      }, 0); // Focus on the next button if no errors
     } else {
       setErrorMessage("Incorrect OTP. Please try again.");
     }
@@ -402,6 +473,7 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
           redeemPointsAmount,
           loyaltyPoints,
           discountAmount,
+          privilegeCardNumber,
         },
       },
     });
@@ -428,21 +500,27 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
         setRedeemPoints(data.redeemPoints);
         setRedeemPointsAmount(data.redeemPointsAmount);
         setLoyaltyPoints(data.loyaltyPoints);
-        // setDiscountAmount(data.discountAmount);
+        setPrivilegeCardNumber(data.privilegeCardNumber || "");
       }
     }
   }, [location]);
 
   useEffect(() => {
     focusFirstFieldOfStep();
-  }, [step, privilegeCard]);
+  }, [step, privilegeCard, redeemOption]);
 
   const focusFirstFieldOfStep = () => {
     if (step === 0) mrNumberRef.current?.focus();
     if (step === 1) document.getElementById(`productId-0`)?.focus();
     if (step === 2) descriptionRef.current?.focus();
     if (step === 3) mrNumberRef.current?.focus();
-    if (step === 4 && privilegeCard) privilegePhoneRef.current?.focus();
+    if (step === 4 && privilegeCard) {
+      if (redeemOption === "barcode") {
+        privilegeCardRef.current?.focus();
+      } else if (redeemOption === "phone") {
+        privilegePhoneRef.current?.focus();
+      }
+    }
     if (step === 5) employeeRef.current?.focus();
     if (step === 6) paymentMethodRef.current?.focus();
   };
@@ -524,7 +602,8 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
 
     // Validate each step before proceeding
     if (step === 0) {
-      if (!mrNumber) errors.mrNumber = "MR number is required";
+      if (!searchQuery.trim()) errors.searchQuery = "Work Order ID or MR Number is required";
+      if (!branchCode.trim()) errors.branchCode = "Branch selection is required";
     } else if (step === 1) {
       productEntries.forEach((product, index) => {
         if (!product.id)
@@ -539,12 +618,14 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
     } else if (step === 3 && !mrNumber) {
       errors.mrNumber = "MR number is required";
     } else if (step === 4 && privilegeCard) {
-      if (!phoneNumber) errors.phoneNumber = "Phone number is required";
-      if (!otp) errors.otp = "OTP is required";
-      if (!isOtpVerified) errors.otp = "Please verify the OTP";
+      if (redeemOption === "phone") {
+        if (!phoneNumber.trim()) errors.phoneNumber = "Phone number is required";
+        if (!otp.trim()) errors.otp = "OTP is required";
+        if (!isOtpVerified) errors.otp = "Please verify the OTP";
+      }
       if (
         redeemPoints &&
-        (redeemPointsAmount > loyaltyPoints || redeemPointsAmount < 0)
+        (parseFloat(redeemPointsAmount) > loyaltyPoints || parseFloat(redeemPointsAmount) < 0)
       ) {
         errors.redeemPointsAmount = "Invalid redemption amount";
       }
@@ -624,7 +705,7 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
         const { error: updateError } = await supabase
           .from("privilegecards")
           .update({ loyalty_points: updatedPoints })
-          .eq("phone_number", phoneNumber);
+          .eq("pc_number", privilegeCardNumber); // Ensure correct field
 
         if (updateError) {
           console.error("Error updating loyalty points:", updateError);
@@ -670,28 +751,65 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
         setErrorMessage("Failed to insert sales order.");
       } else {
         alert("Sales order created successfully!");
-        // Generate new Sales Order ID for the next order
-        const newSalesOrderId = await generateSalesOrderId();
+        // Generate new Sales Order ID for the next order with the current branchCode
+        const newSalesOrderId = await generateSalesOrderId(branchCode);
         if (newSalesOrderId) {
           setSalesOrderId(newSalesOrderId);
+          // **Remove or Comment Out the resetForm() Call**
+          // resetForm(); // This resets the form immediately, preventing bill printing
         } else {
           console.error("Failed to generate Sales Order ID");
           setErrorMessage("Failed to generate Sales Order ID.");
         }
+
+        // **Enable Printing After Successful Save**
+        setAllowPrint(true);
       }
 
-      // **Removed handlePrint();**
+      // **Ensure the Printable Area Remains Accessible**
+      // Do not reset the form here to allow printing
     } catch (error) {
       console.error("Error in order submission:", error);
       setErrorMessage("Failed to complete the order.");
     }
   };
 
+  // Function to reset the form
+  const resetForm = () => {
+    setProductEntries([{ id: "", name: "", price: "", quantity: "" }]);
+    setDescription("");
+    setPatientDetails(null);
+    setPrivilegeCard(true);
+    setPhoneNumber("");
+    setOtp("");
+    setIsOtpVerified(false);
+    setEmployee("");
+    setAllowPrint(false);
+    setAdvanceDetails(0);
+    setPaymentMethod("");
+    setValidationErrors({});
+    setErrorMessage("");
+    setIsOtpSent(false);
+    setPrivilegeCardDetails(null);
+    setRedeemPoints(false);
+    setRedeemPointsAmount("");
+    setLoyaltyPoints(0);
+    setMrNumber("");
+    setWorkOrders([]);
+    setSelectedWorkOrder(null);
+    setShowWorkOrderModal(false);
+    setPointsToAdd(0);
+    setRedeemOption(null);
+    setPrivilegeCardNumber("");
+    // **Optionally retain the branchCode to allow multiple orders for the same branch**
+    // If you wish to reset the branchCode as well, uncomment the next line
+    // setBranchCode("");
+  };
+
   return (
     <div
-      className={`transition-all duration-300 ${
-        isCollapsed ? "mx-20" : "mx-20 px-20"
-      } justify-center mt-16 p-4 mx-auto`}
+      className={`transition-all duration-300 ${isCollapsed ? "mx-20" : "mx-20 px-20"
+        } justify-center mt-16 p-4 mx-auto`}
     >
       {showWorkOrderModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
@@ -701,8 +819,7 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
             </h2>
             <div className="space-y-2">
               <p>
-                <strong>Work Order ID:</strong>{" "}
-                {selectedWorkOrder.work_order_id}
+                <strong>Work Order ID:</strong> {selectedWorkOrder.work_order_id}
               </p>
               <p>
                 <strong>MR Number:</strong> {selectedWorkOrder.mr_number}
@@ -793,15 +910,14 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
         {Array.from({ length: 7 }, (_, i) => (
           <div
             key={i}
-            className={`flex-1 h-2 rounded-xl mx-1 ${
-              step > i ? "bg-[#5db76d]" : "bg-gray-300"
-            } transition-all duration-300`}
+            className={`flex-1 h-2 rounded-xl mx-1 ${step > i ? "bg-[#5db76d]" : "bg-gray-300"
+              } transition-all duration-300`}
           />
         ))}
       </div>
 
       <form
-        className="space-y-8 bg-white p-6 rounded-lg max-w-2xl mx-auto"
+        className="space-y-8 bg-white p-6 rounded-lg max-w-3xl mx-auto"
         onSubmit={(e) => e.preventDefault()}
       >
         {/* Step 0: Fetch Work Orders */}
@@ -810,36 +926,72 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
             <h2 className="text-lg font-semibold text-gray-700">
               Fetch Work Orders
             </h2>
+
+            {/* Branch Selection */}
+            <div>
+              <label className="block text-gray-700 font-medium mb-1">
+                Select Branch
+              </label>
+              <select
+                value={branchCode}
+                ref={branchRef}
+                onChange={(e) => handleBranchSelection(e.target.value)}
+                className="border border-gray-300 w-1/3 px-4 py-3 rounded-lg"
+                required
+              >
+                <option value="" disabled>-- Select Branch --</option>
+                {branchOptions.map((branch) => (
+                  <option key={branch.code} value={branch.code}>
+                    {branch.name}
+                  </option>
+                ))}
+              </select>
+
+              {validationErrors.branchCode && (
+                <p className="text-red-500 text-xs mt-1">
+                  {validationErrors.branchCode}
+                </p>
+              )}
+            </div>
+
+            {/* Show loading indicator while generating Sales Order ID */}
+            {isGeneratingId && (
+              <p className="text-blue-500 text-sm">Generating Sales Order ID...</p>
+            )}
+
+            {/* Enter Work Order ID or MR Number */}
             <label className="block text-gray-700 font-medium mb-1">
-              Enter MR Number
+              Enter Work Order ID or MR Number
             </label>
             <input
-              id="mrNumberInput"
               type="text"
-              placeholder="Enter MR Number"
-              value={mrNumber}
-              onChange={(e) => setMrNumber(e.target.value)}
+              placeholder="Work Order ID or MR Number"
+              value={searchQuery}
+              ref={workOrderInputRef}
+              onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   e.preventDefault();
                   handleFetchWorkOrders();
                 }
               }}
-              ref={mrNumberRef}
+              
               className="border border-gray-300 w-full px-4 py-3 rounded-lg"
+              disabled={!branchCode || isGeneratingId} // Disable until branch is selected and ID is generated
             />
 
-            {validationErrors.mrNumber && (
+            {validationErrors.searchQuery && (
               <p className="text-red-500 text-xs mt-1">
-                {validationErrors.mrNumber}
+                {validationErrors.searchQuery}
               </p>
             )}
             <button
               type="button"
               onClick={handleFetchWorkOrders}
-              onKeyDown={(e) => handleEnterKey(e, nextButtonRef)}
               ref={fetchButtonRef}
-              className="mt-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition"
+              className={`mt-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition ${!branchCode || isGeneratingId ? "opacity-50 cursor-not-allowed" : ""
+                }`}
+              disabled={!branchCode || isGeneratingId} // Disable until branch is selected and ID is generated
             >
               Fetch Work Orders
             </button>
@@ -858,12 +1010,10 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
                       <div className="flex justify-between items-center">
                         <div>
                           <p>
-                            <strong>Work Order ID:</strong>{" "}
-                            {workOrder.work_order_id}
+                            <strong>Work Order ID:</strong> {workOrder.work_order_id}
                           </p>
                           <p>
-                            <strong>Description:</strong>{" "}
-                            {workOrder.description}
+                            <strong>Description:</strong> {workOrder.description}
                           </p>
                           <p>
                             <strong>Advance Paid:</strong> ₹
@@ -876,6 +1026,7 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
                         </div>
                         <button
                           type="button"
+                          ref={index === 0 ? firstWorkOrderButtonRef : null}
                           onClick={() => handleSelectWorkOrder(workOrder)}
                           id={`workOrderButton-${index}`}
                           className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition"
@@ -889,7 +1040,7 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
               </div>
             ) : (
               <div className="mt-4">
-                <p>No work orders found for this MR number.</p>
+                <p>No work orders found for this search.</p>
                 <button
                   type="button"
                   onClick={() => setStep(1)}
@@ -1004,6 +1155,14 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
                     </p>
                   )}
                 </div>
+                {/* Delete Button */}
+                <button
+                  type="button"
+                  onClick={() => removeProductEntry(index)}
+                  className="text-red-500 hover:text-red-700 transition"
+                >
+                  <TrashIcon className="w-5 h-5" />
+                </button>
               </div>
             ))}
             <button
@@ -1036,7 +1195,7 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
               onChange={(e) => setDescription(e.target.value)}
               onKeyDown={(e) => handleEnterKey(e, nextButtonRef)}
               ref={descriptionRef}
-              className="border border-gray-300 w-full px-4 py-3 rounded-lg text-center"
+              className="border border-gray-300 w-full px-4 py-3 rounded-lg text-left"
             />
             {validationErrors.description && (
               <p className="text-red-500 text-xs mt-1">
@@ -1060,7 +1219,7 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
               placeholder="Enter MR Number"
               value={mrNumber}
               onChange={(e) => setMrNumber(e.target.value)}
-              onKeyDown={(e) => handleEnterKey(e, fetchButtonRef)}
+              onKeyDown={(e) => handleEnterKey(e, nextButtonRef)}
               ref={mrNumberRef}
               className="border border-gray-300 w-full px-4 py-3 rounded-lg"
             />
@@ -1108,9 +1267,18 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
                 type="button"
                 onClick={() => {
                   setPrivilegeCard(true);
-                  setTimeout(() => privilegePhoneRef.current?.focus(), 0); // Focus on phone input
+                  setRedeemOption(null); // Reset redeem option
+                  setErrorMessage(""); // Clear previous errors
+                  setTimeout(() => {
+                    if (redeemOption === "barcode") {
+                      privilegeCardRef.current?.focus();
+                    } else {
+                      privilegePhoneRef.current?.focus();
+                    }
+                  }, 0);
                 }}
-                className={`px-4 py-2 rounded-lg ${privilegeCard ? 'bg-green-500 text-white' : 'bg-gray-200'}`}
+                className={`px-4 py-2 rounded-lg ${privilegeCard ? "bg-green-500 text-white" : "bg-gray-200"
+                  }`}
               >
                 Yes
               </button>
@@ -1118,9 +1286,12 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
                 type="button"
                 onClick={() => {
                   setPrivilegeCard(false);
-                  nextStep(); // Proceed to next step if "No" is selected
+                  setRedeemOption(null); // Reset redeem option
+                  setErrorMessage(""); // Clear previous errors
+                  nextStep();
                 }}
-                className={`px-4 py-2 rounded-lg ${!privilegeCard ? 'bg-green-500 text-white' : 'bg-gray-200'}`}
+                className={`px-4 py-2 rounded-lg ${!privilegeCard ? "bg-green-500 text-white" : "bg-gray-200"
+                  }`}
               >
                 No
               </button>
@@ -1128,67 +1299,125 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
 
             {privilegeCard && (
               <>
-                {/* Phone Number Input */}
-                <input
-                  type="text"
-                  placeholder="Enter Phone Number"
-                  value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
-                  className="border border-gray-300 w-full px-4 py-3 rounded-lg text-center mb-2"
-                  ref={privilegePhoneRef}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleSendOtp();
-                    }
-                  }}
-                />
-
-                {validationErrors.phoneNumber && (
-                  <p className="text-red-500 text-xs mt-1">{validationErrors.phoneNumber}</p>
-                )}
-
-                {/* Send OTP Button */}
-                {!isOtpSent && (
+                <p className="font-semibold mb-2">
+                  How would you like to fetch your Privilege Card?
+                </p>
+                <div className="flex space-x-4 mb-4">
                   <button
-                    onClick={handleSendOtp}
-                    className="mt-4 bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg w-full"
+                    type="button"
+                    onClick={() => setRedeemOption("barcode")}
+                    className={`px-4 py-2 rounded-lg ${redeemOption === "barcode"
+                        ? "bg-green-500 text-white"
+                        : "bg-gray-200"
+                      }`}
                   >
-                    Send OTP
+                    Scan Barcode
                   </button>
-                )}
+                  <button
+                    type="button"
+                    onClick={() => setRedeemOption("phone")}
+                    className={`px-4 py-2 rounded-lg ${redeemOption === "phone"
+                        ? "bg-green-500 text-white"
+                        : "bg-gray-200"
+                      }`}
+                  >
+                    Use Phone Number
+                  </button>
+                </div>
 
-                {isOtpSent && (
+                {/* Barcode Scan Option */}
+                {redeemOption === "barcode" && (
                   <>
-                    {/* OTP Input */}
                     <input
                       type="text"
-                      placeholder="Enter OTP"
-                      value={otp}
-                      onChange={(e) => setOtp(e.target.value)}
+                      placeholder="Enter Privilege Card Number (pc_number)"
+                      value={privilegeCardNumber}
+                      onChange={(e) => setPrivilegeCardNumber(e.target.value)}
                       className="border border-gray-300 w-full px-4 py-3 rounded-lg text-center mb-2"
-                      ref={otpRef}
+                      ref={privilegeCardRef}
                       onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
+                        if (e.key === "Enter") {
                           e.preventDefault();
-                          handleVerifyOtp();
+                          handleFetchPrivilegeCardByNumber();
                         }
                       }}
                     />
-                    {validationErrors.otp && (
-                      <p className="text-red-500 text-xs mt-1">{validationErrors.otp}</p>
-                    )}
-
-                    {/* Verify OTP Button */}
                     <button
-                      onClick={handleVerifyOtp}
+                      onClick={handleFetchPrivilegeCardByNumber}
                       className="bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg w-full"
                     >
-                      Verify OTP
+                      Fetch Privilege Card
                     </button>
+                  </>
+                )}
 
-                    {errorMessage && (
-                      <p className="text-red-600 text-center mt-2">{errorMessage}</p>
+                {/* Phone Number and OTP Option */}
+                {redeemOption === "phone" && (
+                  <>
+                    {/* Phone Number Input */}
+                    <input
+                      type="text"
+                      placeholder="Enter Phone Number"
+                      value={phoneNumber}
+                      onChange={(e) => setPhoneNumber(e.target.value)}
+                      className="border border-gray-300 w-full px-4 py-3 rounded-lg text-center mb-2"
+                      ref={privilegePhoneRef}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleSendOtp();
+                        }
+                      }}
+                    />
+
+                    {/* Send OTP Button */}
+                    {!isOtpSent && (
+                      <button
+                        onClick={handleSendOtp}
+                        className="mt-4 bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg w-full"
+                      >
+                        Send OTP
+                      </button>
+                    )}
+
+                    {isOtpSent && (
+                      <>
+                        {/* OTP Input */}
+                        <input
+                          type="text"
+                          placeholder="Enter OTP"
+                          value={otp}
+                          onChange={(e) => setOtp(e.target.value)}
+                          className="border border-gray-300 w-full px-4 py-3 rounded-lg text-center mb-2"
+                          ref={otpRef}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              handleVerifyOtp();
+                            }
+                          }}
+                        />
+                        {validationErrors.otp && (
+                          <p className="text-red-500 text-xs mt-1">
+                            {validationErrors.otp}
+                          </p>
+                        )}
+
+                        {/* Verify OTP Button */}
+                        <button
+                          onClick={handleVerifyOtp}
+                          className="bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg w-full"
+                        >
+                          Verify OTP
+                        </button>
+
+                        {/* Display Error Messages */}
+                        {errorMessage && (
+                          <p className="text-red-600 text-center mt-2">
+                            {errorMessage}
+                          </p>
+                        )}
+                      </>
                     )}
                   </>
                 )}
@@ -1196,9 +1425,15 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
                 {/* Show privilege card details if found */}
                 {isOtpVerified && privilegeCardDetails && (
                   <div className="mt-6 bg-gray-100 p-4 rounded border">
-                    <p><strong>Customer Name:</strong> {privilegeCardDetails.customer_name}</p>
-                    <p><strong>PC Number:</strong> {privilegeCardDetails.pc_number}</p>
-                    <p><strong>Loyalty Points:</strong> {loyaltyPoints}</p>
+                    <p>
+                      <strong>Customer Name:</strong> {privilegeCardDetails.customer_name}
+                    </p>
+                    <p>
+                      <strong>PC Number:</strong> {privilegeCardDetails.pc_number}
+                    </p>
+                    <p>
+                      <strong>Loyalty Points:</strong> {loyaltyPoints}
+                    </p>
 
                     {/* Redeem Points Section */}
                     <div className="mt-4">
@@ -1207,30 +1442,36 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
                         <button
                           type="button"
                           onClick={() => {
-                            setRedeemOption('full');
+                            setRedeemOption("full");
                             setRedeemPointsAmount(loyaltyPoints);
                             setRedeemPoints(true);
                           }}
-                          className={`px-4 py-2 mb-2 rounded-lg ${redeemOption === 'full' ? 'bg-green-500 text-white' : 'bg-gray-200'}`}
+                          className={`px-4 py-2 mb-2 rounded-lg ${redeemOption === "full"
+                              ? "bg-green-500 text-white"
+                              : "bg-gray-200"
+                            }`}
                         >
                           Redeem Full Points
                         </button>
                         <button
                           type="button"
                           onClick={() => {
-                            setRedeemOption('custom');
-                            setRedeemPointsAmount(0);
+                            setRedeemOption("custom");
+                            setRedeemPointsAmount("");
                             setRedeemPoints(true);
                             setTimeout(() => redeemPointsAmountRef.current?.focus(), 0); // Focus on custom amount input
                           }}
-                          className={`px-4 py-2 mb-2 rounded-lg ${redeemOption === 'custom' ? 'bg-green-500 text-white' : 'bg-gray-200'}`}
+                          className={`px-4 py-2 mb-2 rounded-lg ${redeemOption === "custom"
+                              ? "bg-green-500 text-white"
+                              : "bg-gray-200"
+                            }`}
                         >
                           Redeem Custom Amount
                         </button>
                       </div>
 
                       {/* When 'Redeem Full' is selected */}
-                      {redeemOption === 'full' && (
+                      {redeemOption === "full" && (
                         <div className="mt-2">
                           <input
                             type="number"
@@ -1238,32 +1479,41 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
                             readOnly
                             className="border border-gray-300 w-full px-4 py-3 rounded-lg text-center my-2 bg-gray-100"
                           />
-                          <p className="text-center">You are redeeming your full loyalty points.</p>
+                          <p className="text-center">
+                            You are redeeming your full loyalty points.
+                          </p>
                         </div>
                       )}
 
                       {/* When 'Redeem Custom' is selected */}
-                      {redeemOption === 'custom' && (
+                      {redeemOption === "custom" && (
                         <div className="mt-2">
                           <input
                             type="number"
                             placeholder={`Enter amount to redeem (Max: ₹${loyaltyPoints})`}
                             value={redeemPointsAmount}
-                            onChange={(e) => setRedeemPointsAmount(Math.min(Number(e.target.value), loyaltyPoints))}
+                            onChange={(e) =>
+                              setRedeemPointsAmount(
+                                e.target.value === ""
+                                  ? ""
+                                  : Math.min(Number(e.target.value), loyaltyPoints)
+                              )
+                            }
                             className="border border-gray-300 w-full px-4 py-3 rounded-lg text-center my-2"
                             onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
+                              if (e.key === "Enter") {
                                 e.preventDefault();
                                 nextButtonRef.current?.focus();
                               }
                             }}
                             ref={redeemPointsAmountRef}
                           />
-                          {(redeemPointsAmount > loyaltyPoints || redeemPointsAmount < 0) && (
-                            <p className="text-red-500 text-xs mt-1">
-                              Please enter a valid amount up to your available points.
-                            </p>
-                          )}
+                          {(parseFloat(redeemPointsAmount) > loyaltyPoints ||
+                            parseFloat(redeemPointsAmount) < 0) && (
+                              <p className="text-red-500 text-xs mt-1">
+                                Please enter a valid amount up to your available points.
+                              </p>
+                            )}
                         </div>
                       )}
                     </div>
@@ -1273,7 +1523,9 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
                 {/* Prompt to create a new privilege card if not found */}
                 {isOtpVerified && !privilegeCardDetails && (
                   <div className="mt-6 bg-green-50 p-4 rounded">
-                    <p className="text-center text-red-500">No Privilege Card found for this number.</p>
+                    <p className="text-center text-red-500">
+                      No Privilege Card found for this {redeemOption === "phone" ? "phone number." : "PC Number."}
+                    </p>
                     <button
                       onClick={handleNewPrivilegeCard}
                       className="mt-4 bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg w-full"
@@ -1319,157 +1571,165 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
 
         {/* Step 6: Order Preview with Payment Method */}
         {step === 6 && (
-          <div className="bg-white p-8 rounded-lg shadow-md text-gray-800">
-            {/* Invoice Header */}
-            <div className="text-center mb-8">
-              <h1 className="text-3xl font-bold">Screenetra Eye Care</h1>
-              <p className="text-sm text-gray-600">GST Number: 27AAACM1234R1Z5</p>
-              <h2 className="text-2xl font-semibold mt-2">Invoice Summary</h2>
-            </div>
-
-            {/* Invoice Details */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-              <div>
-                <p>
-                  <span className="font-semibold">Sales Order ID:</span> {salesOrderId}
-                </p>
-                <p>
-                  <span className="font-semibold">Description:</span> {description}
-                </p>
-                <p>
-                  <span className="font-semibold">Customer MR Number:</span> {mrNumber}
-                </p>
-                <p>
-                  <span className="font-semibold">Billed by:</span> {employee}
-                </p>
-              </div>
-              <div>
-                <p>
-                  <span className="font-semibold">HSN Code:</span> 12345678
-                </p>
-                <p>
-                  <span className="font-semibold">Discount (Loyalty Points):</span> ₹{discountAmount.toFixed(2)}
-                </p>
-                <p>
-                  <span className="font-semibold">Loyalty Points to be Added:</span> {pointsToAdd}
-                </p>
-              </div>
-            </div>
-
-            {/* Product Table */}
-            <div className="overflow-x-auto mb-6">
-              <table className="min-w-full border border-gray-300">
-                <thead className="bg-gray-100">
-                  <tr>
-                    <th className="py-2 px-4 border-b text-left">Product ID</th>
-                    <th className="py-2 px-4 border-b text-left">Product Name</th>
-                    <th className="py-2 px-4 border-b text-right">Price (₹)</th>
-                    <th className="py-2 px-4 border-b text-right">Quantity</th>
-                    <th className="py-2 px-4 border-b text-right">Subtotal (₹)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {productEntries.map((product, index) => {
-                    const subtotal =
-                      (parseFloat(product.price) || 0) *
-                      (parseInt(product.quantity) || 0);
-                    return (
-                      <tr key={index} className="hover:bg-gray-50">
-                        <td className="py-2 px-4 border-b">{product.id}</td>
-                        <td className="py-2 px-4 border-b">{product.name}</td>
-                        <td className="py-2 px-4 border-b text-right">₹ {parseFloat(product.price).toFixed(2)}</td>
-                        <td className="py-2 px-4 border-b text-right">{product.quantity}</td>
-                        <td className="py-2 px-4 border-b text-right">₹ {subtotal.toFixed(2)}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Financial Summary */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-              {/* Left Column */}
-              <div className="space-y-2">
-                <p>
-                  <span className="font-semibold">Subtotal:</span> ₹{subtotal.toFixed(2)}
-                </p>
-                <p>
-                  <span className="font-semibold">CGST (6%):</span> ₹{parseFloat(cgstAmount).toFixed(2)}
-                </p>
-                <p>
-                  <span className="font-semibold">SGST (6%):</span> ₹{parseFloat(sgstAmount).toFixed(2)}
-                </p>
+          <div>
+            {/* Printable Area */}
+            <div className="printable-area print:block print:absolute print:inset-0 print:w-full bg-white p-8 rounded-lg text-gray-800">
+              {/* Invoice Header */}
+              <div className="text-center mb-8">
+                <h1 className="text-3xl font-bold">Screenetra Eye Care</h1>
+                <p className="text-sm text-gray-600">GST Number: 27AAACM1234R1Z5</p>
+                <h2 className="text-2xl font-semibold mt-2">Invoice Summary</h2>
               </div>
 
-              {/* Right Column */}
-              <div className="space-y-2">
-                <p>
-                  <span className="font-semibold">Total Amount (incl. GST):</span> ₹{totalAmount.toFixed(2)}
-                </p>
-                <p>
-                  <span className="font-semibold">Advance Paid:</span> ₹{parseFloat(advanceDetails).toFixed(2)}
-                </p>
-                <p>
-                  <span className="font-semibold">Discount Applied:</span> ₹{discountAmount.toFixed(2)}
-                </p>
-                <p>
-                  <span className="font-semibold">Balance Due:</span> ₹{finalAmount.toFixed(2)}
-                </p>
-              </div>
-            </div>
-
-            {/* Loyalty Points Information */}
-            {privilegeCard && privilegeCardDetails && (
-              <div className="mb-6">
-                <p>
-                  <span className="font-semibold">Loyalty Points Redeemed:</span> ₹{redeemPointsAmount.toFixed(2)}
-                </p>
-                <p>
-                  <span className="font-semibold">Loyalty Points gained:</span> {pointsToAdd}
-                </p>
-              </div>
-            )}
-
-            {/* Payment Method and Advance Details */}
-            <div className="flex flex-col md:flex-row items-center justify-between mb-6">
-              <div className="w-full md:w-1/2 mb-4 md:mb-0">
-                <label className="block font-semibold mb-1">Payment Method:</label>
-                <select
-                  value={paymentMethod}
-                  onChange={(e) => setPaymentMethod(e.target.value)}
-                  ref={paymentMethodRef}
-                  onKeyDown={(e) => handleEnterKey(e, saveOrderRef)} // Focus on Save Order on Enter
-                  className="border border-gray-300 w-full px-4 py-2 rounded-lg"
-                >
-                  <option value="" disabled>
-                    Select Payment Method
-                  </option>
-                  <option value="cash">Cash</option>
-                  <option value="credit">Card</option>
-                  <option value="online">UPI (Paytm/PhonePe/GPay)</option>
-                </select>
-                {validationErrors.paymentMethod && (
-                  <p className="text-red-500 text-xs mt-1">
-                    {validationErrors.paymentMethod}
+              {/* Invoice Details */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div>
+                  <p>
+                    <span className="font-semibold">Sales Order ID:</span> {salesOrderId}
                   </p>
-                )}
+                  <p>
+                    <span className="font-semibold">Description:</span> {description}
+                  </p>
+                  <p>
+                    <span className="font-semibold">Customer MR Number:</span> {mrNumber}
+                  </p>
+                  <p>
+                    <span className="font-semibold">Customer Name:</span>{" "}
+                    {patientDetails?.name || privilegeCardDetails?.customer_name || "N/A"}
+                  </p>
+                  <p>
+                    <span className="font-semibold">Billed by:</span> {employee}
+                  </p>
+                </div>
+                <div>
+                  <p>
+                    <span className="font-semibold">HSN Code:</span> 12345678
+                  </p>
+                </div>
+              </div>
+
+              {/* Product Table */}
+              <div className="overflow-x-auto mb-6">
+                <table className="min-w-full border border-gray-300">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="py-2 px-4 border-b text-left">Product ID</th>
+                      <th className="py-2 px-4 border-b text-left">Product Name</th>
+                      <th className="py-2 px-4 border-b text-right">Price (₹)</th>
+                      <th className="py-2 px-4 border-b text-right">Quantity</th>
+                      <th className="py-2 px-4 border-b text-right">Subtotal (₹)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {productEntries.map((product, index) => {
+                      const subtotal =
+                        (parseFloat(product.price) || 0) *
+                        (parseInt(product.quantity) || 0);
+                      return (
+                        <tr key={index} className="hover:bg-gray-50">
+                          <td className="py-2 px-4 border-b">{product.id}</td>
+                          <td className="py-2 px-4 border-b">{product.name}</td>
+                          <td className="py-2 px-4 border-b text-right">₹ {parseFloat(product.price).toFixed(2)}</td>
+                          <td className="py-2 px-4 border-b text-right">{product.quantity}</td>
+                          <td className="py-2 px-4 border-b text-right">₹ {subtotal.toFixed(2)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Financial Summary */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                {/* Left Column */}
+                <div className="space-y-2">
+                  <p>
+                    <span className="font-semibold">Subtotal:</span> ₹{subtotal.toFixed(2)}
+                  </p>
+                  <p>
+                    <span className="font-semibold">CGST (6%):</span> ₹{parseFloat(cgstAmount).toFixed(2)}
+                  </p>
+                  <p>
+                    <span className="font-semibold">SGST (6%):</span> ₹{parseFloat(sgstAmount).toFixed(2)}
+                  </p>
+                </div>
+
+                {/* Right Column */}
+                <div className="space-y-2">
+                  <p>
+                    <span className="font-semibold">Total Amount (incl. GST):</span> ₹{totalAmount.toFixed(2)}
+                  </p>
+                  <p>
+                    <span className="font-semibold">Advance Paid:</span> ₹{parseFloat(advanceDetails).toFixed(2)}
+                  </p>
+                  <p>
+                    <span className="font-semibold">Discount Applied:</span> ₹{discountAmount.toFixed(2)}
+                  </p>
+                  <p>
+                    <span className="font-semibold">Balance Due:</span> ₹{finalAmount.toFixed(2)}
+                  </p>
+                </div>
+              </div>
+
+              {/* Loyalty Points Information */}
+              {privilegeCard && privilegeCardDetails && (
+                <div className="mb-6">
+                  <p>
+                    <span className="font-semibold">Loyalty Points Redeemed:</span> ₹{redeemPointsAmount.toFixed(2)}
+                  </p>
+                  <p>
+                    <span className="font-semibold">Loyalty Points Gained:</span> {pointsToAdd}
+                  </p>
+                </div>
+              )}
+
+              {/* Payment Method and Advance Details */}
+              <div className="flex flex-col md:flex-row items-center justify-between mb-6">
+                <div className="w-full md:w-1/2 mb-4 md:mb-0">
+                  <label className="block font-semibold mb-1">Payment Method:</label>
+                  <select
+                    value={paymentMethod}
+                    onChange={(e) => setPaymentMethod(e.target.value)}
+                    ref={paymentMethodRef}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        saveOrderRef.current?.focus();
+                      }
+                    }}
+                    className="border border-gray-300 w-full px-4 py-2 rounded-lg"
+                  >
+                    <option value="" disabled>
+                      Select Payment Method
+                    </option>
+                    <option value="cash">Cash</option>
+                    <option value="credit">Card</option>
+                    <option value="online">UPI (Paytm/PhonePe/GPay)</option>
+                  </select>
+                  {validationErrors.paymentMethod && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {validationErrors.paymentMethod}
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
 
-            {/* Action Buttons */}
-            <div className="flex flex-col md:flex-row justify-between">
+            {/* Action Buttons Outside Printable Area */}
+            <div className="flex flex-col md:flex-row justify-start mt-6 space-x-6 space-y-4 md:space-y-0">
               <button
                 onClick={handleOrderCompletion}
                 ref={saveOrderRef}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
+                onKeyDown={async (e) => {
+                  if (e.key === "Enter") {
                     e.preventDefault();
-                    handleOrderCompletion();
+                    await handleOrderCompletion();
                     printButtonRef.current?.focus(); // Move focus to Print button after saving
                   }
                 }}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg transition mb-4 md:mb-0 md:mr-2 w-full md:w-auto"
+                className={`bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg transition ${!paymentMethod ? "opacity-50 cursor-not-allowed" : ""
+                  } w-full md:w-auto`}
+                disabled={!paymentMethod}
               >
                 Submit Order {privilegeCard && privilegeCardDetails ? "& Update Loyalty Points" : ""}
               </button>
@@ -1477,26 +1737,47 @@ const SalesOrderGeneration = ({ isCollapsed }) => {
                 onClick={handlePrint}
                 ref={printButtonRef}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
+                  if (e.key === "Enter") {
                     e.preventDefault();
                     handlePrint();
+                    newWorkOrderButtonRef.current?.focus(); // Move focus to Create New after printing
                   }
                 }}
                 className="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-lg transition w-full md:w-auto"
+                disabled={!allowPrint} // Disable
               >
                 <PrinterIcon className="w-5 h-5 inline mr-2" />
                 Print
               </button>
               <button
                 onClick={async () => {
-                  await handleGenerateSalesOrder();
                   resetForm();
-                  setStep(1);
+                  // Generate new Sales Order ID for the next order with the current branchCode
+                  if (branchCode) {
+                    setIsGeneratingId(true);
+                    const newSalesOrderId = await generateSalesOrderId(branchCode);
+                    if (newSalesOrderId) {
+                      setSalesOrderId(newSalesOrderId);
+                      localStorage.setItem("salesOrderId", newSalesOrderId); // Store in localStorage
+                      setErrorMessage("");
+                    } else {
+                      setErrorMessage("Failed to generate Sales Order ID.");
+                    }
+                    setIsGeneratingId(false);
+                  }
+                  setStep(0); // Start from Step 0
                 }}
                 ref={newWorkOrderButtonRef}
-                className="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-lg flex items-center justify-center w-fit"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    // Only proceed if the order is saved (which it is after handleOrderCompletion)
+                    newWorkOrderButtonRef.current?.click();
+                  }
+                }}
+                className="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-lg flex items-center justify-center w-full md:w-auto"
               >
-                Create New Work Order
+                Create New Sales Order
               </button>
             </div>
           </div>

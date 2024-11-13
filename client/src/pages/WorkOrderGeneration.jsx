@@ -1,32 +1,8 @@
 // client/src/pages/WorkOrderGeneration.jsx
-import { useState, useEffect, useRef } from "react";
-import { CalendarIcon, PrinterIcon } from "@heroicons/react/24/outline";
+import React, { useState, useEffect, useRef } from "react";
+import { CalendarIcon, PrinterIcon, TrashIcon } from "@heroicons/react/24/outline"; // Ensure this import path is correct and the package is installed
 import supabase from '../supabaseClient';
 import { convertUTCToIST } from '../utils/dateUtils';
-
-const branchCode = "NTA";
-
-// Utility function to get the current financial year
-const getFinancialYear = () => {
-  const today = new Date();
-  const currentYear = today.getFullYear();
-  const currentMonth = today.getMonth() + 1; // Months are zero-based
-
-  let financialYearStart;
-  let financialYearEnd;
-
-  if (currentMonth >= 4) {
-    // If the month is April or after, the financial year starts this year
-    financialYearStart = currentYear % 100;
-    financialYearEnd = (currentYear + 1) % 100;
-  } else {
-    // If the month is before April, the financial year started last year
-    financialYearStart = (currentYear - 1) % 100;
-    financialYearEnd = currentYear % 100;
-  }
-
-  return `${financialYearStart}-${financialYearEnd}`;
-};
 
 const WorkOrderGeneration = ({ isCollapsed }) => {
   const [step, setStep] = useState(1);
@@ -34,9 +10,8 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   const [productEntries, setProductEntries] = useState([
     { id: "", name: "", price: "", quantity: "" },
   ]);
-
   const [description, setDescription] = useState("");
-  const [advanceDetails, setAdvanceDetails] = useState(""); // Separate state for Advance Details
+  const [advanceDetails, setAdvanceDetails] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [mrNumber, setMrNumber] = useState("");
   const [patientDetails, setPatientDetails] = useState(null);
@@ -46,13 +21,17 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   const [paymentMethod, setPaymentMethod] = useState("");
   const [validationErrors, setValidationErrors] = useState({});
   const [isB2B, setIsB2B] = useState(false);
-  const [gstNumber, setGstNumber] = useState(""); // New state for GST Number
+  const [gstNumber, setGstNumber] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [selectedBranch, setSelectedBranch] = useState(null);
 
-  // Function to format dates to IST
-  const formatToIST = (date) => {
-    return convertUTCToIST(date, "dd-MM-yyyy hh:mm a");
-  };
+  // Dummy branches
+  const branches = [
+    { name: 'Neyyattinkara', code: 'NTA' },
+    { name: 'Old City', code: 'OCT' },
+    { name: 'Downtown', code: 'DWN' },
+  ];
+
 
   // Dummy dataset for products
   const productDatabase = [
@@ -63,6 +42,26 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     { id: "P005", name: "Safety Goggles", price: "600" },
   ];
 
+  // Utility function to get the current financial year
+  const getFinancialYear = () => {
+    const today = new Date();
+    const currentYear = today.getFullYear();
+    const currentMonth = today.getMonth() + 1; // Months are zero-based
+
+    let financialYearStart;
+    let financialYearEnd;
+
+    if (currentMonth >= 4) {
+      financialYearStart = currentYear % 100;
+      financialYearEnd = (currentYear + 1) % 100;
+    } else {
+      financialYearStart = (currentYear - 1) % 100;
+      financialYearEnd = currentYear % 100;
+    }
+
+    return `${financialYearStart}-${financialYearEnd}`;
+  };
+
   // Function to fetch product details based on ID
   const fetchProductDetails = (productId) => {
     return productDatabase.find((product) => product.id === productId) || null;
@@ -71,16 +70,17 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   const resetForm = () => {
     setProductEntries([{ id: "", name: "", price: "", quantity: "" }]);
     setDescription("");
-    setAdvanceDetails(""); // Reset Advance Details
+    setAdvanceDetails("");
     setDueDate("");
     setMrNumber("");
     setPatientDetails(null);
     setEmployee("");
     setPaymentMethod("");
-    setGstNumber(""); // Reset GST Number
+    setGstNumber("");
     setValidationErrors({});
     setIsB2B(false);
     setAllowPrint(false);
+    setSelectedBranch(null);
   };
 
   // GST Rate
@@ -110,12 +110,13 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   const fetchButtonRef = useRef(null);
   const employeeRef = useRef(null);
   const paymentMethodRef = useRef(null);
-  const gstNumberRef = useRef(null); // New ref for GST Number
-  const advanceDetailsRef = useRef(null); // Defined ref for Advance Details
+  const gstNumberRef = useRef(null);
+  const advanceDetailsRef = useRef(null);
   const printButtonRef = useRef(null);
   const saveButtonRef = useRef(null);
   const newWorkOrderButtonRef = useRef(null);
   const nextButtonRef = useRef(null);
+  const step6Ref = useRef();
 
   const getTodayDate = () => {
     const today = new Date();
@@ -130,7 +131,13 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   }, [step, isB2B]);
 
   const focusFirstFieldOfStep = () => {
-    if (step === 1) document.getElementById(`productId-0`)?.focus();
+    if (step === 1) {
+      if (!selectedBranch) {
+        document.getElementById('branch-select')?.focus();
+      } else {
+        document.getElementById(`productId-0`)?.focus();
+      }
+    }
     if (step === 2) descriptionRef.current?.focus();
     if (step === 3) dueDateRef.current?.focus();
     if (step === 4) mrNumberRef.current?.focus();
@@ -141,11 +148,16 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     if (step === 6) paymentMethodRef.current?.focus();
   };
 
-  const handleEnterKey = (e, nextFieldRef) => {
+  const handleEnterKey = (e, nextFieldRef, action) => {
     if (e.key === "Enter") {
       e.preventDefault();
-      if (nextFieldRef) nextFieldRef.current?.focus();
-      else nextStep();
+      if (nextFieldRef) {
+        nextFieldRef.current?.focus();
+      } else if (action) {
+        action();
+      } else {
+        nextStep();
+      }
     }
   };
 
@@ -180,6 +192,11 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
           ?.focus(),
       0
     );
+  };
+
+  const removeProductEntry = (index) => {
+    const updatedEntries = productEntries.filter((_, i) => i !== index);
+    setProductEntries(updatedEntries);
   };
 
   const handleProductEntryShiftEnter = (e, index, field) => {
@@ -251,7 +268,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       work_order_id: newWorkOrderId,
       product_entries: productEntries,
       description,
-      advance_details: parseFloat(advanceDetails) || 0, // Advance Details as separate field
+      advance_details: parseFloat(advanceDetails) || 0,
       due_date: dueDate,
       mr_number: mrNumber,
       patient_details: patientDetails,
@@ -263,8 +280,8 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       total_amount: totalWithGST,
       hsn_code: HSN_CODE,
       is_b2b: isB2B,
-      gst_number: isB2B ? gstNumber : null, // Include GST Number if B2B
-      created_at: currentUTCDateTime, // Store in UTC
+      gst_number: isB2B ? gstNumber : null,
+      created_at: currentUTCDateTime,
       updated_at: currentUTCDateTime,
     };
 
@@ -303,6 +320,9 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
 
       alert('Work Order and Products saved successfully!');
       setAllowPrint(true);
+      setTimeout(() => {
+        printButtonRef.current?.focus();
+      }, 100);
     } catch (error) {
       console.error('Error saving work order:', error);
       alert('Failed to save work order. Please try again.');
@@ -315,6 +335,9 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     let errors = {};
 
     if (step === 1) {
+      if (!selectedBranch) {
+        errors.branch = "Branch selection is required";
+      }
       // Validate product entries: Each entry must have id, price, and quantity
       productEntries.forEach((product, index) => {
         if (!product.id)
@@ -335,7 +358,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       if (isB2B && !gstNumber) {
         errors.gstNumber = "GST Number is required for B2B orders";
       }
-      if (!employee) { // Employee selection is now always required
+      if (!employee) {
         errors.employee = "Employee selection is required";
       }
     } else if (step === 6) {
@@ -352,7 +375,9 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       setValidationErrors(errors);
       // Focus on the first error field
       const firstErrorKey = Object.keys(errors)[0];
-      if (firstErrorKey.startsWith('productId')) {
+      if (firstErrorKey === 'branch') {
+        document.getElementById('branch-select')?.focus();
+      } else if (firstErrorKey.startsWith('productId')) {
         const index = firstErrorKey.split('-')[1];
         document.getElementById(`productId-${index}`)?.focus();
       } else if (firstErrorKey === 'description') {
@@ -376,93 +401,29 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     // Clear errors and proceed to the next step
     setValidationErrors({});
     if (step < 6) setStep((prevStep) => prevStep + 1);
-    else if (step === 6 && allowPrint) handlePrint();
-    else if (step === 6) {
-      saveWorkOrder();
-      setAllowPrint(true);
-    }
   };
 
   const prevStep = () => setStep((prevStep) => Math.max(prevStep - 1, 1));
 
   const handleMRNumberSearch = () => {
+    // Simulate fetching patient details
     setPatientDetails({
-      name: "Patient Name",
+      name: "John Doe",
       age: 35,
-      condition: "Condition Description",
+      condition: "Myopia",
     });
     nextButtonRef.current?.focus();
-  };
-
-  const handlePrint = () => {
-    window.print();
-    // Prevent accidental form reset
-    setTimeout(() => {
-      if (newWorkOrderButtonRef.current) {
-        newWorkOrderButtonRef.current.focus();
-      }
-    }, 100);
-  };
-
-  // Customized Invoice Print Functionality
-  const handleCustomPrint = () => {
-    const printContent = document.getElementById('invoice-summary');
-    if (!printContent) {
-      console.error('Invoice summary content not found.');
-      alert('Failed to find invoice content for printing.');
-      return;
-    }
-
-    const WindowPrt = window.open('', '_blank', 'width=800,height=600');
-    if (!WindowPrt) {
-      console.error('Pop-up blocked. Please allow pop-ups for this website.');
-      alert('Pop-up blocked. Please allow pop-ups for this website to print the invoice.');
-      return;
-    }
-
-    WindowPrt.document.write(`
-      <html>
-        <head>
-          <style>
-            body { font-family: Arial, sans-serif; padding: 20px; color: #000; }
-            .invoice-header { text-align: center; margin-bottom: 20px; }
-            .invoice-header h1 { margin: 0; font-size: 24px; }
-            .invoice-header p { margin: 5px 0; font-size: 14px; }
-            .invoice-details, .financial-summary { margin-bottom: 20px; }
-            table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-            th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
-            th { background-color: #f2f2f2; }
-            .totals { float: right; width: 50%; }
-            .totals p { margin: 5px 0; font-size: 14px; }
-            @media print {
-              body { margin: 0; }
-              .no-print { display: none; }
-            }
-          </style>
-        </head>
-        <body>
-          ${printContent.innerHTML}
-          <script>
-            window.onload = function() {
-              window.print();
-              window.close();
-            }
-          </script>
-        </body>
-      </html>
-    `);
-
-    WindowPrt.document.close();
   };
 
   const generateNewWorkOrderId = async () => {
     try {
       const financialYear = getFinancialYear();
 
-      // Fetch the last work order ID from the database
+      // Fetch the last work order ID from the database for the selected branch
       const { data: lastWorkOrders, error } = await supabase
         .from('work_orders')
         .select('work_order_id, created_at')
+        .ilike('work_order_id', `%(${selectedBranch.code})%`)
         .order('created_at', { ascending: false })
         .limit(1);
 
@@ -481,7 +442,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       }
 
       const newCount = lastCount + 1;
-      const newWorkOrderId = `WO(${branchCode})-${newCount}-${financialYear}`;
+      const newWorkOrderId = `WO(${selectedBranch.code})-${newCount}-${financialYear}`;
 
       return newWorkOrderId; // Return the new ID
     } catch (error) {
@@ -491,6 +452,10 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   };
 
   const handleGenerateWorkOrder = async () => {
+    if (!selectedBranch) {
+      alert('Please select a branch.');
+      return;
+    }
     const newId = await generateNewWorkOrderId();
     if (newId) {
       setWorkOrderId(newId);
@@ -500,12 +465,15 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   };
 
   useEffect(() => {
-    handleGenerateWorkOrder();
-  }, []);
+    if (selectedBranch) {
+      handleGenerateWorkOrder();
+    }
+  }, [selectedBranch]);
+
 
   return (
     <div
-      className={`transition-all duration-300 ${isCollapsed ? "mx-20" : "mx-20 px-20"
+      className={` transition-all duration-300 ${isCollapsed ? "mx-20" : "mx-20 px-20"
         } justify-center mt-16 p-4 mx-auto`}
     >
       <h1 className="text-2xl font-semibold text-gray-700 text-center mb-8">
@@ -523,25 +491,59 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         ))}
       </div>
 
+
       <form
-        className="space-y-8 bg-white p-6 rounded-lg max-w-2xl mx-auto"
+        className="space-y-8 bg-white p-6 rounded-lg max-w-3xl mx-auto"
         onSubmit={(e) => e.preventDefault()}
       >
-        {/* Step 1: Work Order ID and Product Entries with ID, Price, and Quantity */}
+        {/* Step 1: Branch Selection, Work Order ID, and Product Entries */}
         {step === 1 && (
-          <div className="w-full bg-gray-50 p-6 rounded-md shadow-inner space-y-4">
+          <div className="w-fit bg-gray-50 p-6 rounded-md shadow-inner space-y-4">
             <h2 className="text-lg font-semibold text-gray-700 text-center">
-              Product Information
+              Branch and Product Information
             </h2>
-            <label className="block text-gray-700 font-medium mb-1">
-              Generated Work Order ID
-            </label>
-            <input
-              type="text"
-              value={workOrderId}
-              readOnly
-              className="border border-gray-300 px-4 py-3 rounded-lg bg-gray-200 text-gray-700 w-full text-center"
-            />
+            {/* Branch Selection */}
+            <div className="relative">
+              <label className="block text-gray-700 font-medium mb-1">
+                Select Branch
+              </label>
+              <select
+                id="branch-select"
+                value={selectedBranch ? selectedBranch.code : ""}
+                onChange={(e) => {
+                  const branch = branches.find(b => b.code === e.target.value);
+                  setSelectedBranch(branch || null);
+                }}
+                className="border border-gray-300 w-1/2 px-4 py-3 rounded-lg focus:outline-none focus:border-green-500"
+              >
+                <option value="" disabled>Select Branch</option>
+                {branches.map((branch) => (
+                  <option key={branch.code} value={branch.code}>
+                    {branch.name}
+                  </option>
+                ))}
+              </select>
+              {validationErrors.branch && (
+                <p className="text-red-500 text-xs mt-1">
+                  {validationErrors.branch}
+                </p>
+              )}
+            </div>
+
+            {/* Generated Work Order ID */}
+            <div>
+              <label className="block text-gray-700 font-medium mb-1">
+                Generated Work Order ID
+              </label>
+              <input
+                type="text"
+                value={workOrderId}
+                readOnly
+                className="border border-gray-300 px-4 py-3 rounded-lg bg-gray-200 text-gray-700 w-full text-center"
+              />
+            </div>
+
+            {/* Product Details */}
             <label className="block text-gray-700 font-medium mb-4">
               Product Details
             </label>
@@ -551,7 +553,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                 productEntries.map((product, index) => (
                   <div key={index} className="flex space-x-2 items-center">
                     {/* Product ID Input */}
-                    <div className="relative w-1/4">
+                    <div className="relative w-2/4">
                       <input
                         type="text"
                         id={`productId-${index}`}
@@ -561,7 +563,6 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                         onKeyDown={(e) => handleProductEntryShiftEnter(e, index, "id")}
                         className="border border-gray-300 px-4 py-3 rounded-lg w-full"
                       />
-
                       {validationErrors[`productId-${index}`] && (
                         <p className="text-red-500 text-xs absolute -bottom-5 left-0">
                           {validationErrors[`productId-${index}`]}
@@ -624,20 +625,28 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                         onKeyDown={(e) => handleProductEntryShiftEnter(e, index, "quantity")}
                         className="border border-gray-300 px-4 py-3 rounded-lg w-full text-center appearance-none"
                       />
-
                       {validationErrors[`productQuantity-${index}`] && (
                         <p className="text-red-500 text-xs absolute -bottom-5 left-0">
                           {validationErrors[`productQuantity-${index}`]}
                         </p>
                       )}
                     </div>
+
+                    {/* Delete Product Entry Button */}
+                    <button
+                      type="button"
+                      onClick={() => removeProductEntry(index)}
+                      className="text-red-500 hover:text-red-700 transition"
+                    >
+                      <TrashIcon className="w-5 h-5" />
+                    </button>
                   </div>
                 ))}
 
               <button
                 type="button"
                 onClick={addNewProductEntry}
-                className=" bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition"
+                className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition"
               >
                 Add Product
               </button>
@@ -825,199 +834,223 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
           </div>
         )}
 
-        {/* Step 6: Order Preview in Bill Format with Payment Method and Advance Details */}
+        {/* Step 6: Payment Method, Advance Details, Save and Print */}
         {step === 6 && (
           <>
-            {/* Invoice Summary */}
-            <div id="invoice-summary" className="bg-white p-8 rounded-lg shadow-md text-gray-800">
-              {/* Invoice Header */}
-              <div className="invoice-header text-center mb-6">
-                <h1 className="text-3xl font-bold">Screenetra Eye Care</h1>
-                <p className="text-sm text-gray-600">GST Number: 27AAACM1234R1Z5</p>
-                <h2 className="text-2xl font-semibold">Invoice Summary</h2>
-              </div>
-
-              {/* Invoice Details */}
-              <div className="invoice-details grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                <div>
-                  <p>
-                    <span className="font-semibold">Work Order ID:</span> <span className="font-normal">{workOrderId}</span>
-                  </p>
-                  <p>
-                    <span className="font-semibold">Description:</span> <span className="font-normal">{description}</span>
-                  </p>
-                  <p>
-                    <span className="font-semibold">Due Date:</span> <span className="font-normal">{dueDate}</span>
-                  </p>
-                  <p>
-                    <span className="font-semibold">Customer MR Number:</span> <span className="font-normal">{mrNumber}</span>
-                  </p>
+            {/* Wrap the content you want to print with step6Ref */}
+            <div ref={step6Ref}>
+              {/* Invoice Summary */}
+              <div className="printable-area print:block print:absolute print:inset-0 print:w-full bg-white p-8 rounded-lg text-gray-800">
+                {/* Invoice Header */}
+                <div className="invoice-header text-center mb-6">
+                  <h1 className="text-3xl font-bold">Screenetra Eye Care</h1>
+                  <p className="text-sm text-gray-600">GST Number: 32AAUCS7002H1ZV</p>
+                  <h2 className="text-2xl font-semibold">Invoice Summary</h2>
                 </div>
-                <div>
-                  <p>
-                    <span className="font-semibold">Billed by Employee:</span> <span className="font-normal">{employee || 'N/A'}</span>
-                  </p>
-                  {isB2B && (
+
+                {/* Invoice Details */}
+                <div className="invoice-details grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                  <div>
                     <p>
-                      <span className="font-semibold">B2B GST Number:</span> <span className="font-normal">{gstNumber}</span>
+                      <span className="font-semibold">Work Order ID:</span> <span className="font-normal">{workOrderId}</span>
                     </p>
-                  )}
-                  <p>
-                    <span className="font-semibold">HSN Code:</span> <span className="font-normal">{HSN_CODE}</span>
-                  </p>
+                    <p>
+                      <span className="font-semibold">Description:</span> <span className="font-normal">{description}</span>
+                    </p>
+                    <p>
+                      <span className="font-semibold">Due Date:</span> <span className="font-normal">{dueDate}</span>
+                    </p>
+                    <p>
+                      <span className="font-semibold">Customer MR Number:</span> <span className="font-normal">{mrNumber}</span>
+                    </p>
+                    {patientDetails && (
+                      <p>
+                        <span className="font-semibold">Customer Name:</span> <span className="font-normal">{patientDetails.name}</span>
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <p>
+                      <span className="font-semibold">Billed by Employee:</span> <span className="font-normal">{employee || 'N/A'}</span>
+                    </p>
+                    {isB2B && (
+                      <p>
+                        <span className="font-semibold">B2B GST Number:</span> <span className="font-normal">{gstNumber}</span>
+                      </p>
+                    )}
+                    <p>
+                      <span className="font-semibold">HSN Code:</span> <span className="font-normal">{HSN_CODE}</span>
+                    </p>
+                  </div>
+                </div>
+
+                {/* Product Table */}
+                <table className="w-full border border-gray-300 rounded-md mb-6">
+                  <thead>
+                    <tr className="bg-gray-100">
+                      <th className="py-2 px-4 border-b">Product ID</th>
+                      <th className="py-2 px-4 border-b">Product Name</th>
+                      <th className="py-2 px-4 border-b">Price</th>
+                      <th className="py-2 px-4 border-b">Quantity</th>
+                      <th className="py-2 px-4 border-b">Subtotal</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {productEntries.map((product, index) => {
+                      const subtotal =
+                        (parseFloat(product.price) || 0) *
+                        (parseInt(product.quantity) || 0);
+                      return (
+                        <tr key={index} className="text-center">
+                          <td className="py-2 px-4 border-b">{product.id}</td>
+                          <td className="py-2 px-4 border-b">{product.name}</td>
+                          <td className="py-2 px-4 border-b">₹ {parseFloat(product.price).toFixed(2)}</td>
+                          <td className="py-2 px-4 border-b">{product.quantity}</td>
+                          <td className="py-2 px-4 border-b">₹ {subtotal.toFixed(2)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+
+                {/* Financial Summary */}
+                <div className="financial-summary grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Left Column */}
+                  <div className="space-y-2">
+                    <p>
+                      <span className="font-semibold">Subtotal:</span> <span className="font-normal">₹ {calculateTotalWithGST(productEntries).subtotal.toFixed(2)}</span>
+                    </p>
+                    <p>
+                      <span className="font-semibold">CGST (6%):</span> <span className="font-normal">₹ {calculateTotalWithGST(productEntries).cgst.toFixed(2)}</span>
+                    </p>
+                    <p>
+                      <span className="font-semibold">SGST (6%):</span> <span className="font-normal">₹ {calculateTotalWithGST(productEntries).sgst.toFixed(2)}</span>
+                    </p>
+                  </div>
+
+                  {/* Right Column */}
+                  <div className="space-y-2">
+                    <p>
+                      <span className="font-semibold">Total Amount (incl. GST):</span> <span className="font-normal">₹ {calculateTotalWithGST(productEntries).totalWithGST.toFixed(2)}</span>
+                    </p>
+                    <p>
+                      <span className="font-semibold">Advance Paid:</span> <span className="font-normal">₹ {parseFloat(advanceDetails).toFixed(2)}</span>
+                    </p>
+                    <p>
+                      <span className="font-semibold">Balance Due:</span> <span className="font-normal">₹ {(calculateTotalWithGST(productEntries).totalWithGST - parseFloat(advanceDetails)).toFixed(2)}</span>
+                    </p>
+                  </div>
+                </div>
+
+                {/* Payment Method and Advance Details on the Same Line */}
+                <div className="flex flex-col md:flex-row items-center justify-between my-6 space-x-4">
+                  {/* Payment Method */}
+                  <div className="w-full md:w-1/2 mb-4 md:mb-0">
+                    <label htmlFor="paymentMethod" className="block font-semibold mb-1">
+                      Payment Method:
+                    </label>
+                    <select
+                      id="paymentMethod"
+                      value={paymentMethod}
+                      onChange={(e) => setPaymentMethod(e.target.value)}
+                      ref={paymentMethodRef}
+                      onKeyDown={(e) => handleEnterKey(e, advanceDetailsRef)}
+                      className="border border-gray-300 w-full px-4 py-3 rounded-lg"
+                    >
+                      <option value="" disabled>Select Payment Method</option>
+                      <option value="cash">Cash</option>
+                      <option value="credit">Card</option>
+                      <option value="online">UPI (Paytm/PhonePe/GPay)</option>
+                    </select>
+                    {validationErrors.paymentMethod && (
+                      <p className="text-red-500 text-xs ml-1">
+                        {validationErrors.paymentMethod}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Advance Details */}
+                  <div className="w-full md:w-1/2 mb-4 md:mb-0">
+                    <label htmlFor="advanceDetails" className="block font-semibold mb-1">
+                      Advance Details:
+                    </label>
+                    <input
+                      type="text"
+                      id="advanceDetails"
+                      placeholder="Enter amount paid in advance"
+                      value={advanceDetails}
+                      onChange={(e) => setAdvanceDetails(e.target.value)}
+                      onKeyDown={(e) => handleEnterKey(e, saveButtonRef)}
+                      ref={advanceDetailsRef}
+                      className="border border-gray-300 w-full px-4 py-3 rounded-lg"
+                    />
+                    {validationErrors.advanceDetails && (
+                      <p className="text-red-500 text-xs ml-1">
+                        {validationErrors.advanceDetails}
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
 
-              {/* Product Table */}
-              <table className="w-full border border-gray-300 rounded-md mb-6">
-                <thead>
-                  <tr className="bg-gray-100">
-                    <th className="py-2 px-4 border-b">Product ID</th>
-                    <th className="py-2 px-4 border-b">Product Name</th>
-                    <th className="py-2 px-4 border-b">Price</th>
-                    <th className="py-2 px-4 border-b">Quantity</th>
-                    <th className="py-2 px-4 border-b">Subtotal</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {productEntries.map((product, index) => {
-                    const subtotal =
-                      (parseFloat(product.price) || 0) *
-                      (parseInt(product.quantity) || 0);
-                    return (
-                      <tr key={index} className="text-center">
-                        <td className="py-2 px-4 border-b">{product.id}</td>
-                        <td className="py-2 px-4 border-b">{product.name}</td>
-                        <td className="py-2 px-4 border-b">₹ {parseFloat(product.price).toFixed(2)}</td>
-                        <td className="py-2 px-4 border-b">{product.quantity}</td>
-                        <td className="py-2 px-4 border-b">₹ {subtotal.toFixed(2)}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-
-              {/* Financial Summary */}
-              <div className="financial-summary grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Left Column */}
-                <div className="space-y-2">
-                  <p>
-                    <span className="font-semibold">Subtotal:</span> <span className="font-normal">₹ {calculateTotalWithGST(productEntries).subtotal.toFixed(2)}</span>
-                  </p>
-                  <p>
-                    <span className="font-semibold">CGST (6%):</span> <span className="font-normal">₹ {calculateTotalWithGST(productEntries).cgst.toFixed(2)}</span>
-                  </p>
-                  <p>
-                    <span className="font-semibold">SGST (6%):</span> <span className="font-normal">₹ {calculateTotalWithGST(productEntries).sgst.toFixed(2)}</span>
-                  </p>
-                </div>
-
-                {/* Right Column */}
-                <div className="space-y-2">
-                  <p>
-                    <span className="font-semibold">Total Amount (incl. GST):</span> <span className="font-normal">₹ {calculateTotalWithGST(productEntries).totalWithGST.toFixed(2)}</span>
-                  </p>
-                  <p>
-                    <span className="font-semibold">Advance Paid:</span> <span className="font-normal">₹ {parseFloat(advanceDetails).toFixed(2)}</span>
-                  </p>
-                  <p>
-                    <span className="font-semibold">Balance Due:</span> <span className="font-normal">₹ {(calculateTotalWithGST(productEntries).totalWithGST - parseFloat(advanceDetails)).toFixed(2)}</span>
-                  </p>
-                </div>
-              </div>
-            
-
-            {/* Payment Method and Advance Details on the Same Line */}
-            <div className="flex flex-col md:flex-row items-center justify-between my-6 space-x-4">
-              {/* Payment Method */}
-              <div className="w-full md:w-1/2 mb-4 md:mb-0">
-                <label htmlFor="paymentMethod" className="block font-semibold mb-1">
-                  Payment Method:
-                </label>
-                <select
-                  id="paymentMethod"
-                  value={paymentMethod}
-                  onChange={(e) => setPaymentMethod(e.target.value)}
-                  ref={paymentMethodRef}
-                  onKeyDown={(e) => handleEnterKey(e, saveButtonRef)}
-                  className="border border-gray-300 w-full px-4 py-3 rounded-lg"
+              {/* Save Work Order and Print Buttons on the Same Line */}
+              <div className="flex justify-center text-center space-x-4 mt-6">
+                <button
+                  onClick={() => {
+                    if (!isSaving) saveWorkOrder();
+                  }}
+                  ref={saveButtonRef}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      if (!isSaving) {
+                        saveWorkOrder();
+                      }
+                      setTimeout(() => {
+                        printButtonRef.current?.focus();
+                      }, 100);
+                    }
+                  }}
+                  className="flex items-center bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition w-fit"
                 >
-                  <option value="" disabled>Select Payment Method</option>
-                  <option value="cash">Cash</option>
-                  <option value="credit">Card</option>
-                  <option value="online">UPI (Paytm/PhonePe/GPay)</option>
-                </select>
+                  {isSaving ? "Saving..." : "Save Work Order"}
+                </button>
+
+                {allowPrint && (
+                  <button
+                    onClick={() => window.print()}
+                    ref={printButtonRef}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        printButtonRef.current?.click();
+                        setTimeout(() => {
+                          newWorkOrderButtonRef.current?.focus();
+                        }, 100);
+                      }
+                    }}
+                    className="flex items-center bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-lg transition w-fit ml-2"
+                  >
+                    <PrinterIcon className="w-5 h-5 mr-2" />
+                    Print
+                  </button>
+                )}
+
+                <button
+                  onClick={async () => {
+                    await handleGenerateWorkOrder();
+                    resetForm();
+                    setStep(1);
+                  }}
+                  ref={newWorkOrderButtonRef}
+                  className="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-lg flex items-center justify-center w-fit"
+                >
+                  Create New Work Order
+                </button>
               </div>
-              {validationErrors.paymentMethod && (
-                <p className="text-red-500 text-xs ml-1">
-                  {validationErrors.paymentMethod}
-                </p>
-              )}
-
-              {/* Advance Details */}
-              <div className="w-full md:w-1/2 mb-4 md:mb-0">
-                <label htmlFor="advanceDetails" className="block font-semibold mb-1">
-                  Advance Details:
-                </label>
-                <input
-                  type="text"
-                  id="advanceDetails"
-                  placeholder="Enter amount paid in advance"
-                  value={advanceDetails}
-                  onChange={(e) => setAdvanceDetails(e.target.value)}
-                  onKeyDown={(e) => handleEnterKey(e, saveButtonRef)}
-                  ref={advanceDetailsRef}
-                  className="border border-gray-300 w-full px-4 py-3 rounded-lg"
-                />
-              </div>
-              {validationErrors.advanceDetails && (
-                <p className="text-red-500 text-xs ml-1">
-                  {validationErrors.advanceDetails}
-                </p>
-              )}
-            </div>
-
-            {/* Save Work Order and Print Buttons on the Same Line */}
-            <div className="flex justify-center text-center space-x-4 mt-6">
-              <button
-                onClick={() => {
-                  if (!isSaving) saveWorkOrder();
-                }}
-                ref={saveButtonRef}
-                className="flex items-center bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition w-fit"
-              >
-                {isSaving ? "Saving..." : "Save Work Order"}
-              </button>
-
-              <button
-                onClick={() => {
-                  if (allowPrint) handleCustomPrint();
-                }}
-                ref={printButtonRef}
-                className={`flex items-center bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-lg transition w-fit ml-2 ${allowPrint ? "" : "opacity-50 cursor-not-allowed"
-                  }`}
-                disabled={!allowPrint}
-              >
-                <PrinterIcon className="w-5 h-5 mr-2" />
-                Print
-              </button>
-
-              <button
-                onClick={async () => {
-                  await handleGenerateWorkOrder();
-                  resetForm();
-                  setStep(1);
-                }}
-                ref={newWorkOrderButtonRef}
-                className="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-lg flex items-center justify-center w-fit"
-              >
-                Create New Sales Order
-              </button>
-            </div>
             </div>
           </>
         )}
-
         {/* Navigation Buttons */}
         <div className="flex justify-center mt-6">
           {step > 1 && (
