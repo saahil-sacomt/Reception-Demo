@@ -14,11 +14,12 @@ import WorkOrderGeneration from './pages/WorkOrderGeneration';
 import SalesOrderGeneration from './pages/SalesOrderGeneration';
 import PrivilegeGeneration from './pages/PrivilegeGeneration';
 import SettingsPage from './pages/SettingsPage';
-import ReportGenerator from './components/ReportGenerator'
+import ReportGenerator from './components/ReportGenerator';
+import Unauthorized from './pages/Unauthorized';
 
 const App = () => {
   const location = useLocation();
-  const hideHeaderAndSidebar = location.pathname === '/login' || location.pathname === '/signup';
+  const hideHeaderAndSidebar = location.pathname === '/login';
 
   // Lift `isCollapsed` and `selectedTab` state to App component
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -48,18 +49,26 @@ const App = () => {
           <Routes>
             {/* Public Routes */}
             <Route path="/login" element={<Login />} />
-            <Route path="/signup" element={<Signup />} />
+            
+            <Route path="/unauthorized" element={<Unauthorized />} />
 
             {/* Protected Routes */}
-            <Route element={<RequireAuth />}>
+            <Route element={<RequireAuth allowedRoles={['super_admin', 'admin', 'employee']}/>}>
               <Route path="/home" element={<Home isCollapsed={isCollapsed} />} />
+            
               <Route path="/order-generation" element={<OrderGenerationPage isCollapsed={isCollapsed} />} />
               <Route path="/work-order" element={<WorkOrderGeneration isCollapsed={isCollapsed} />} />
               <Route path="/sales-order" element={<SalesOrderGeneration isCollapsed={isCollapsed} />} />
               <Route path="/privilege-generation" element={<PrivilegeGeneration isCollapsed={isCollapsed} />} />
-              <Route path="/settings" element={<SettingsPage isCollapsed={isCollapsed} />} />
-              <Route path="/reportgenerator" element={<ReportGenerator isCollapsed={isCollapsed} />} />
+              
+              
               <Route path="/loyaltypoints" element={<FetchLoyaltyPoints isCollapsed={isCollapsed} />} />
+            </Route> 
+            <Route element={<RequireAuth allowedRoles={['super_admin', 'admin']}/>}>
+            <Route path="/reportgenerator" element={<ReportGenerator isCollapsed={isCollapsed} />} />
+            <Route path="/settings" element={<SettingsPage isCollapsed={isCollapsed} />} />
+            <Route path="/signup" element={<Signup isCollapsed={isCollapsed} />} />
+
             </Route>
 
             {/* Default Route */}

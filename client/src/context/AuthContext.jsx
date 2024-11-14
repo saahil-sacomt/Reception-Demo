@@ -1,43 +1,69 @@
 // client/src/context/AuthContext.jsx
 import { createContext, useContext, useEffect, useState } from 'react';
-// client/src/context/AuthContext.jsx
-import supabase, { fetchCustomerDetails } from '../supabaseClient';
+import supabase from '../supabaseClient';
 
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
+  const [name, setName] = useState(null);
+  const [role, setRole] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  const fetchUserDetails = async (userId) => {
+    try {
+      const { data, error } = await supabase
+        .from('employees')
+        .select('role, name')
+        .eq('auth_user_id', userId)
+        .single();
+
+      if (error) {
+        console.error("Error fetching role:", error);
+        return { role: null, name: null };
+      }
+
+      return { role: data.role || null, name: data.name || null };
+    } catch (err) {
+      console.error("Unexpected error fetching role:", err);
+      return { role: null, name: null };
+    }
+  };
+
+  const loadUserSession = async () => {
+    setLoading(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      const userId = session.user.id;
+      setUser(session.user);
+      const userDetails = await fetchUserDetails(userId);
+      setRole(userDetails.role);
+      setName(userDetails.name);
+      console.log("User role set to:", userDetails.role);
+      console.log("User name set to:", userDetails.name);
+    }
+    setLoading(false);
+  };
+
   useEffect(() => {
-    // Automatically update the user state whenever the auth state changes
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN') {
-        setUser(session?.user);
+        loadUserSession();
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
+        setRole(null);
+        setName(null);
       }
-      setLoading(false);
     });
 
-    // Load initial session on component mount
-    const loadSession = async () => {
-      const { data: { session }, error } = await supabase.auth.getSession();
-      if (error) {
-        console.error("Error loading session:", error);
-      }
-      setUser(session?.user || null);
-      setLoading(false);
-    };
+    loadUserSession();
 
-    loadSession();
-
-    // Clean up subscription on unmount
     return () => {
       authListener.subscription.unsubscribe();
     };
   }, []);
+
 
   const login = (session) => {
     setUser(session.user);
@@ -49,10 +75,12 @@ export const AuthProvider = ({ children }) => {
       console.error("Error during logout:", error);
     }
     setUser(null);
+    setRole(null);
+    setName(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, role, name, login, logout, loading }}>
       {children}
     </AuthContext.Provider>
   );

@@ -4,10 +4,12 @@ import SplashScreen from '../components/SplashScreen';
 import walletImage from '../assets/pngwing.com.png';
 import { CreditCardIcon } from '@heroicons/react/24/outline';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext.jsx';
 
 const Home = ({ isCollapsed }) => {
   const [showSplash, setShowSplash] = useState(sessionStorage.getItem('showSplash') === 'true');
   const navigate = useNavigate();
+  const { user, name, loading } = useAuth();
 
   useEffect(() => {
     if (showSplash) {
@@ -34,7 +36,7 @@ const Home = ({ isCollapsed }) => {
   <div className="bg-white p-6 flex flex-col md:flex-row justify-between items-center">
     {/* Welcome Message */}
     <div className="mb-4 md:mb-0">
-      <h2 className="font-normal text-[25px] text-gray-800">Welcome, Parvon Santhan</h2>
+      <h2 className="font-normal text-[25px] text-gray-800">{name ? `Welcome, ${name}` : 'Welcome, User'}</h2>
       <p className="text-sm text-gray-600">Send, track & manage your documents & Privilege cards.</p>
     </div>
 

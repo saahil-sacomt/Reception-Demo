@@ -2,30 +2,44 @@
 import supabase from '../supabaseClient';
 
 export const signUp = async (name, email, password, role, address, phoneNumber, emergencyContact) => {
-  // Sign up the user with Supabase Auth
-  const { data: authData, error: authError } = await supabase.auth.signUp({
-    email,
-    password,
-  });
-  
-  if (authError) return { data: null, error: authError };
+  try {
+    // Step 1: Sign up the user using Supabase Auth
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email,
+      password,
+    });
 
-  // Add additional employee details to the 'employees' table
-  const { data: employeeData, error: employeeError } = await supabase
-    .from('employees')
-    .insert([
-      {
-        auth_user_id: authData.user.id,
+    if (authError || !authData?.user) {
+      return { data: null, error: authError || new Error('Failed to create user') };
+    }
+
+    const userId = authData.user.id;
+
+    // Step 2: Insert additional details into the 'employees' table
+    const { data: employeeData, error: employeeError } = await supabase
+      .from('employees')
+      .insert([{
+        auth_user_id: userId,
         name,
         email,
         role,
         address,
-        phone_number: phoneNumber,             // Ensure this matches your database column name
-        emergency_contact: emergencyContact, // Ensure this matches your database column name
-      },
-    ]);
+        phone_number: phoneNumber,
+        emergency_contact: emergencyContact,
+        emp_id: `emp${Math.floor(1000 + Math.random() * 9000)}`, // Generate emp_id
+      }]);
 
-  return { data: employeeData, error: employeeError };
+    // If the employee insertion fails, delete the user from Auth
+    if (employeeError) {
+      await supabase.auth.admin.deleteUser(userId);
+      return { data: null, error: employeeError };
+    }
+
+    return { data: employeeData, error: null };
+  } catch (err) {
+    console.error("Error during sign-up:", err);
+    return { data: null, error: err };
+  }
 };
 
 export const signIn = async (email, password) => {

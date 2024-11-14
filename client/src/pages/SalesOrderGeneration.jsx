@@ -1577,7 +1577,7 @@ async function handleFetchWorkOrders() {
               {/* Invoice Header */}
               <div className="text-center mb-8">
                 <h1 className="text-3xl font-bold">Screenetra Eye Care</h1>
-                <p className="text-sm text-gray-600">GST Number: 27AAACM1234R1Z5</p>
+                <p className="text-sm text-gray-600">GST Number: 32AAUCS7002H1ZV</p>
                 <h2 className="text-2xl font-semibold mt-2">Invoice Summary</h2>
               </div>
 

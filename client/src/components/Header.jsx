@@ -3,13 +3,13 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import logo from '../assets/sreenethraenglishisolated.png';
-import { BriefcaseIcon, ClipboardDocumentListIcon, Cog8ToothIcon, CreditCardIcon, FolderPlusIcon, PercentBadgeIcon, PlusIcon, PresentationChartLineIcon, UserIcon } from '@heroicons/react/24/outline';
+import { BriefcaseIcon, ClipboardDocumentListIcon, Cog8ToothIcon, CreditCardIcon, FolderPlusIcon, PercentBadgeIcon, PlusIcon, PresentationChartLineIcon, UserIcon, UserPlusIcon } from '@heroicons/react/24/outline';
 
 const Header = ({ selectedTab, setSelectedTab, isCollapsed, toggleSidebar }) => {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false); // State for Create dropdown
   const navigate = useNavigate();
-  const { logout, currentUser } = useAuth();
+  const { logout, user, role ,name } = useAuth();
 
   const handleLogout = async () => {
     await logout();
@@ -26,18 +26,18 @@ const Header = ({ selectedTab, setSelectedTab, isCollapsed, toggleSidebar }) => 
 
   const handleCreateNavigate = (path) => {
     navigate(path);
-    setIsCreateOpen(false); // Close the dropdown after navigation
+    setIsCreateOpen(false);
   };
 
   const handleTabClick = (tabName) => {
     setSelectedTab(tabName);
     if (isCollapsed) toggleSidebar(); // Expand sidebar if it's collapsed
-    
+
     // Default navigation based on the selected tab
     if (tabName === 'Dashboard') {
       navigate('/home'); // Default route for Dashboard tab
     } else if (tabName === 'Documents') {
-      navigate('/documents/sent'); // Default route for Documents tab
+      navigate('/reportgenerator'); // Default route for Documents tab
     }
   };
 
@@ -57,12 +57,14 @@ const Header = ({ selectedTab, setSelectedTab, isCollapsed, toggleSidebar }) => 
         >
           Dashboard
         </button>
-        <button
-          onClick={() => handleTabClick('Documents')}
-          className={`px-4 py-2 ml-1 text-sm hover:bg-green-50 hover:text-green-600 rounded-lg ${selectedTab === 'Documents' ? 'bg-green-50 text-green-600' : 'text-gray-700'}`}
-        >
-          Documents
-        </button>
+        {role !== 'employee' && (
+          <button
+            onClick={() => handleTabClick('Documents')}
+            className={`px-4 py-2 ml-1 text-sm hover:bg-green-50 hover:text-green-600 rounded-lg ${selectedTab === 'Documents' ? 'bg-green-50 text-green-600' : 'text-gray-700'}`}
+          >
+            Documents
+          </button>
+        )}
       </div>
 
       {/* Right Section: Create Button, Profile, and Settings */}
@@ -82,40 +84,53 @@ const Header = ({ selectedTab, setSelectedTab, isCollapsed, toggleSidebar }) => 
                 onClick={() => handleCreateNavigate('/work-order')}
                 className="flex flex-row items-center block w-full text-left px-4 py-2 text-sm hover:bg-green-50 hover:text-green-600 rounded-lg"
               >
-                <BriefcaseIcon className='h-5 w-5 mr-2'/> Work Order
+                <BriefcaseIcon className='h-5 w-5 mr-2' /> Work Order
               </button>
               <button
                 onClick={() => handleCreateNavigate('/sales-order')}
                 className="flex flex-row items-center block w-full text-left px-4 py-2 text-sm hover:bg-green-50 hover:text-green-600 rounded-lg"
               >
-                <PresentationChartLineIcon className='h-5 w-5 mr-2'/> Sales Order
+                <PresentationChartLineIcon className='h-5 w-5 mr-2' /> Sales Order
               </button>
               <button
                 onClick={() => handleCreateNavigate('/privilege-generation')}
                 className="flex flex-row items-center block w-full text-left px-4 py-2 text-sm hover:bg-green-50 hover:text-green-600 rounded-lg"
               >
-                <CreditCardIcon className='h-5 w-5 mr-2'/> Privilege Card
+                <CreditCardIcon className='h-5 w-5 mr-2' /> Privilege Card
               </button>
-              <button
-                onClick={() => handleCreateNavigate('/reportgenerator')}
-                className="flex flex-row items-center block w-full text-left px-4 py-2 text-sm hover:bg-green-50 hover:text-green-600 rounded-lg"
-              >
-                <ClipboardDocumentListIcon className='h-5 w-5 mr-2'/> Reports
-              </button>
+              {role !== 'employee' && (
+                <button
+                  onClick={() => handleCreateNavigate('/reportgenerator')}
+                  className="flex flex-row items-center block w-full text-left px-4 py-2 text-sm hover:bg-green-50 hover:text-green-600 rounded-lg"
+                >
+                  <ClipboardDocumentListIcon className='h-5 w-5 mr-2' /> Reports
+                </button>
+              )}
               <button
                 onClick={() => handleCreateNavigate('/loyaltypoints')}
                 className="flex flex-row items-center block w-full text-left px-4 py-2 text-sm hover:bg-green-50 hover:text-green-600 rounded-lg"
               >
-                <PercentBadgeIcon className='h-5 w-5 mr-2'/> Privilege card details
+                <PercentBadgeIcon className='h-5 w-5 mr-2' /> Privilege card details
               </button>
+              {role !== 'employee' && (
+                <button
+                  onClick={() => handleCreateNavigate('/signup')}
+                  className="flex flex-row items-center block w-full text-left px-4 py-2 text-sm hover:bg-green-50 hover:text-green-600 rounded-lg"
+                >
+                  <UserPlusIcon className='h-5 w-5 mr-2' /> Add New User
+                </button>
+              )}
             </div>
           )}
         </div>
 
-        <button onClick={() => navigate('/settings')} className="text-gray-500 hover:text-green-500">
-          <Cog8ToothIcon className="h-6 w-6" />
-        </button>
-        
+        {role !== 'employee' && (
+
+          <button onClick={() => navigate('/settings')} className="text-gray-500 hover:text-green-500">
+            <Cog8ToothIcon className="h-6 w-6" />
+          </button>
+        )}
+
         <div className="relative top-0.5">
           <button onClick={toggleProfileDropdown} className="text-gray-500 hover:text-green-500">
             <UserIcon className="w-6 h-6" />
@@ -124,8 +139,8 @@ const Header = ({ selectedTab, setSelectedTab, isCollapsed, toggleSidebar }) => 
           {/* Profile Dropdown */}
           {isProfileOpen && (
             <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg z-20 p-4 text-black">
-              <p className="font-semibold">{currentUser?.name || 'User'}</p>
-              <p className="text-sm text-gray-600">{currentUser?.email || 'user@gmail.com'}</p>
+              <p className="font-semibold">{name || 'User'}</p>
+              <p className="text-sm text-gray-600">{user?.email || 'user@gmail.com'}</p>
               <button onClick={handleLogout} className="mt-4 w-full bg-[#5db76d] hover:bg-green-600 text-white py-1 rounded-lg">
                 Logout
               </button>
