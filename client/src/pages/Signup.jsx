@@ -79,16 +79,7 @@ const Signup = () => {
       if (error) {
         setErrorMessage(`Signup failed: ${error.message}`);
       } else {
-        setIsSuccess(true); // Set success state to true
-        // Optionally, reset form fields
-        setName('');
-        setEmail('');
-        setPassword('');
-        setConfirmPassword('');
-        setRole('employee');
-        setAddress('');
-        setPhoneNumber('');
-        setEmergencyContact('');
+        navigate('/login');
       }
     } catch (err) {
       console.error(err);
@@ -98,19 +89,7 @@ const Signup = () => {
 
   const togglePasswordVisibility = () => setShowPassword(!showPassword);
 
-  const resetForm = () => {
-    setIsSuccess(false);
-    setErrorMessage('');
-    setName('');
-    setEmail('');
-    setPassword('');
-    setConfirmPassword('');
-    setRole('employee');
-    setAddress('');
-    setPhoneNumber('');
-    setEmergencyContact('');
-    setShowPassword(false);
-  };
+  
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-white p-4 sm:p-6 lg:p-8">

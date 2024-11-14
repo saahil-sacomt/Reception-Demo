@@ -7,62 +7,68 @@ import 'jspdf-autotable';
 import { convertUTCToIST } from '../utils/dateUtils';
 import logo from '../assets/sreenethraenglishisolated.png';
 
-// Helper function to get dynamic column styles based on report type
-const getColumnStyles = (reportType, availableWidth) => {
+// Utility function to capitalize the first letter
+const capitalizeFirstLetter = (string) => {
+  return string.charAt(0).toUpperCase() + string.slice(1);
+};
+
+// Define this outside the component for better reusability
+const getColumnStyles = (reportType) => {
+  const maxColumnWidth = 22;
   switch (reportType) {
     case 'sales_orders':
       return {
-        0: { halign: 'left', cellWidth: 20 },  // Sales Order ID
-        1: { halign: 'left', cellWidth: 20 },  // MR Number
-        2: { halign: 'center', cellWidth: 10 }, // Is B2B
-        3: { halign: 'right', cellWidth: 15 }, // Sale Value
-        4: { halign: 'right', cellWidth: 10 }, // CGST
-        5: { halign: 'right', cellWidth: 10 }, // SGST
-        6: { halign: 'right', cellWidth: 15 }, // Total Amount
-        7: { halign: 'left', cellWidth: 20 },  // Employee (wrap)
-        8: { halign: 'left', cellWidth: 25 },  // Payment Method (wrap)
-        9: { halign: 'right', cellWidth: 15 }, // Loyalty Points Redeemed
-        10: { halign: 'right', cellWidth: 15 }, // Loyalty Points Added
-        11: { halign: 'center', cellWidth: 20 }, // Created At
-        12: { halign: 'center', cellWidth: 20 }, // Updated At
+        0: { halign: 'center', cellWidth: 35 },  // Sales Order ID
+        1: { halign: 'center', cellWidth: maxColumnWidth },  // MR Number
+        2: { halign: 'center', cellWidth: 15 },  // Is B2B
+        3: { halign: 'center', cellWidth: maxColumnWidth },  // Sale Value
+        4: { halign: 'center', cellWidth: 15 },  // CGST
+        5: { halign: 'center', cellWidth: 15 },  // SGST
+        6: { halign: 'center', cellWidth: maxColumnWidth },  // Total Amount
+        7: { halign: 'center', cellWidth: maxColumnWidth },  // Employee
+        8: { halign: 'center', cellWidth: maxColumnWidth },  // Payment Method
+        9: { halign: 'center', cellWidth: maxColumnWidth },  // Loyalty Points Redeemed
+        10: { halign: 'center', cellWidth: maxColumnWidth }, // Loyalty Points Added
+        11: { halign: 'center', cellWidth: maxColumnWidth }, // Created At
+        12: { halign: 'center', cellWidth: maxColumnWidth }, // Updated At
       };
     case 'work_orders':
       return {
-        0: { halign: 'left', cellWidth: 30 }, // Work Order ID
-        1: { halign: 'right', cellWidth: 15 }, // Advance Details
-        2: { halign: 'center', cellWidth: 20 }, // Due Date
-        3: { halign: 'left', cellWidth: 15 }, // MR Number
-        4: { halign: 'left', cellWidth: 20 }, // Employee (wrap)
-        5: { halign: 'left', cellWidth: 25 }, // Payment Method (wrap)
-        6: { halign: 'right', cellWidth: 15 }, // Total Amount
-        7: { halign: 'right', cellWidth: 10 }, // CGST
-        8: { halign: 'right', cellWidth: 10 }, // SGST
-        9: { halign: 'center', cellWidth: 10 }, // Is B2B
-        10: { halign: 'left', cellWidth: 25 }, // HSN Code
-        11: { halign: 'center', cellWidth: 20 }, // Created At
-        12: { halign: 'center', cellWidth: 20 }, // Updated At
+        0: { halign: 'center', cellWidth: 35 },  // Work Order ID
+        1: { halign: 'center', cellWidth: maxColumnWidth },  // Advance Details
+        2: { halign: 'center', cellWidth: maxColumnWidth },  // Due Date
+        3: { halign: 'center', cellWidth: maxColumnWidth },  // MR Number
+        4: { halign: 'center', cellWidth: maxColumnWidth },  // Employee
+        5: { halign: 'center', cellWidth: maxColumnWidth },  // Payment Method
+        6: { halign: 'center', cellWidth: maxColumnWidth },  // Total Amount
+        7: { halign: 'center', cellWidth: 15 },  // CGST
+        8: { halign: 'center', cellWidth: 15 },  // SGST
+        9: { halign: 'center', cellWidth: 15 },  // Is B2B
+        10: { halign: 'center', cellWidth: maxColumnWidth }, // HSN Code
+        11: { halign: 'center', cellWidth: maxColumnWidth }, // Created At
+        12: { halign: 'center', cellWidth: maxColumnWidth }, // Updated At
       };
     case 'privilegecards':
       return {
-        0: { halign: 'left', cellWidth: 20 }, // PC Number
-        1: { halign: 'left', cellWidth: 25 }, // Customer Name
-        2: { halign: 'left', cellWidth: 20 }, // Phone Number
-        3: { halign: 'right', cellWidth: 15 }, // Top-Up Amount
-        4: { halign: 'right', cellWidth: 15 }, // Loyalty Points
-        5: { halign: 'left', cellWidth: 15 }, // Card Tier
-        6: { halign: 'center', cellWidth: 20 }, // Created At
+        0: { halign: 'center', cellWidth: 'wrap' }, // PC Number
+        1: { halign: 'center', cellWidth: 'wrap' }, // Customer Name
+        2: { halign: 'center', cellWidth: 'wrap' }, // Phone Number
+        3: { halign: 'center', cellWidth: 'wrap' }, // Top-Up Amount
+        4: { halign: 'center', cellWidth: 'wrap' }, // Loyalty Points
+        5: { halign: 'center', cellWidth: 'wrap' }, // Card Tier
+        6: { halign: 'center', cellWidth: 'wrap' }, // Created At
       };
     case 'products':
       return {
-        0: { halign: 'left', cellWidth: 10 }, // ID
-        1: { halign: 'left', cellWidth: 15 }, // Work Order ID
-        2: { halign: 'left', cellWidth: 40 }, // Product Name (wrap)
-        3: { halign: 'left', cellWidth: 20 }, // Product ID
-        4: { halign: 'right', cellWidth: 15 }, // Price
-        5: { halign: 'right', cellWidth: 10 }, // Quantity
-        6: { halign: 'left', cellWidth: 15 }, // HSN Code
-        7: { halign: 'center', cellWidth: 20 }, // Created At
-        8: { halign: 'center', cellWidth: 20 }, // Updated At
+        0: { halign: 'center', cellWidth: 'wrap' }, // ID
+        1: { halign: 'center', cellWidth: 'wrap' }, // Work Order ID
+        2: { halign: 'center', cellWidth: 'wrap' }, // Product Name
+        3: { halign: 'center', cellWidth: 'wrap' }, // Product ID
+        4: { halign: 'center', cellWidth: 'wrap' }, // Price
+        5: { halign: 'center', cellWidth: 'wrap' }, // Quantity
+        6: { halign: 'center', cellWidth: 'wrap' }, // HSN Code
+        7: { halign: 'center', cellWidth: 'wrap' }, // Created At
+        8: { halign: 'center', cellWidth: 'wrap' }, // Updated At
       };
     default:
       return {};
@@ -83,17 +89,23 @@ const addHeader = (doc, logoDataUrl, reportDetails) => {
 
   doc.setFontSize(10);
   doc.text('GSTIN: 32AAUCS7002H1ZV', doc.internal.pageSize.getWidth() / 2, 35, { align: 'center' });
-  doc.setFontSize(12);
-  doc.text(`Report Type: ${reportDetails.type}`, 14, 45);
   
+  // Add Report Title
+  doc.setFontSize(16);
+  const reportTitle = `${capitalizeFirstLetter(reportDetails.type)} Report - ${capitalizeFirstLetter(reportDetails.reportTypeLabel)}`;
+  doc.text(reportTitle, doc.internal.pageSize.getWidth() / 2, 50, { align: 'center' });
+
+  // Add Report Period
+  doc.setFontSize(12);
+  let periodText = '';
   if (reportDetails.type === 'Daily') {
-    doc.text(`Date: ${reportDetails.date}`, 14, 52);
+    periodText = `Date: ${reportDetails.date}`;
   } else if (reportDetails.type === 'Monthly') {
-    doc.text(`Month: ${reportDetails.month}/${reportDetails.year}`, 14, 52);
+    periodText = `Month: ${reportDetails.month}/${reportDetails.year}`;
   } else if (reportDetails.type === 'Date Range') {
-    doc.text(`From Date: ${reportDetails.fromDate}`, 14, 52);
-    doc.text(`To Date: ${reportDetails.toDate}`, 14, 59);
+    periodText = `From: ${reportDetails.fromDate} To: ${reportDetails.toDate}`;
   }
+  doc.text(periodText, doc.internal.pageSize.getWidth() / 2, 60, { align: 'center' });
 };
 
 const addFooter = (doc) => {
@@ -158,25 +170,9 @@ const ReportGenerator = ({ isCollapsed }) => {
       .catch((err) => console.error('Failed to load logo image:', err));
   }, []);
 
-  // Utility functions
+  // Utility function to get the last day of a month
   const getLastDayOfMonth = (year, month) => {
     return new Date(year, month, 0).getDate();
-  };
-
-  const capitalizeFirstLetter = (string) => {
-    return string.charAt(0).toUpperCase() + string.slice(1);
-  };
-
-  const formatJSONB = (jsonbData) => {
-    if (!jsonbData) return 'N/A';
-    try {
-      const parsedData = typeof jsonbData === 'string' ? JSON.parse(jsonbData) : jsonbData;
-      return Object.entries(parsedData)
-        .map(([key, value]) => `${capitalizeFirstLetter(key)}: ${JSON.stringify(value)}`)
-        .join('\n');
-    } catch (e) {
-      return 'Invalid JSON Data';
-    }
   };
 
   // Handle Report Generation
@@ -191,6 +187,7 @@ const ReportGenerator = ({ isCollapsed }) => {
 
       // Validate and Determine Date Range
       let startDate, endDate;
+      let reportTypeLabel = '';
 
       if (reportPeriod === 'daily') {
         if (!date) {
@@ -210,6 +207,7 @@ const ReportGenerator = ({ isCollapsed }) => {
           type: 'Daily',
           date: convertUTCToIST(startDate.toISOString(), "dd-MM-yyyy"),
           identifier: date,
+          reportTypeLabel: getReportTypeLabel(reportType),
         };
       } else if (reportPeriod === 'monthly') {
         if (!monthYear) {
@@ -231,6 +229,7 @@ const ReportGenerator = ({ isCollapsed }) => {
           month,
           year,
           identifier: `${month}-${year}`,
+          reportTypeLabel: getReportTypeLabel(reportType),
         };
       } else if (reportPeriod === 'range') {
         if (!fromDate || !toDate) {
@@ -257,6 +256,7 @@ const ReportGenerator = ({ isCollapsed }) => {
           fromDate: convertUTCToIST(startDate.toISOString(), "dd-MM-yyyy"),
           toDate: convertUTCToIST(endDate.toISOString(), "dd-MM-yyyy"),
           identifier: `${fromDate}_to_${toDate}`,
+          reportTypeLabel: getReportTypeLabel(reportType),
         };
       }
 
@@ -358,6 +358,22 @@ const ReportGenerator = ({ isCollapsed }) => {
       setError('Failed to generate report. Please try again.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Helper function to get report type label
+  const getReportTypeLabel = (reportType) => {
+    switch (reportType) {
+      case 'sales_orders':
+        return 'Sales Orders';
+      case 'work_orders':
+        return 'Work Orders';
+      case 'privilegecards':
+        return 'Privilege Cards';
+      case 'products':
+        return 'Products';
+      default:
+        return '';
     }
   };
 
@@ -522,19 +538,31 @@ const ReportGenerator = ({ isCollapsed }) => {
       }
     });
 
+    const maxColumnWidth = 30;
     // Generate the main table
     doc.autoTable({
       head: [tableColumn],
       body: tableRows,
       startY: 70, // Adjusted to utilize more vertical space
-      styles: { fontSize: 10, cellPadding: 1 }, // Increased fontSize and cellPadding
-      headStyles: { fillColor: [41, 128, 185], halign: 'center', textColor: 255 },
+      styles: { fontSize: 10, cellPadding: 2, halign: 'center' }, // Center align all entries
+      headStyles: {
+        fillColor: [0, 160, 0], // Changed to green
+        halign: 'center',
+        textColor: 255,
+        fontSize: 10, // Adequate font size to prevent wrapping
+      },
       alternateRowStyles: { fillColor: [245, 245, 245] },
       margin: { left: leftMargin, right: rightMargin },
       theme: 'striped',
       showHead: 'everyPage',
       pageBreak: 'auto',
-      columnStyles: getColumnStyles(reportType, availableWidth),
+      columnStyles: getColumnStyles(reportType),
+      didParseCell: function (data) {
+        if (data.section === 'head' && data.cell.raw.length > 15) {
+          const lines = doc.splitTextToSize(data.cell.raw, maxColumnWidth);
+          data.cell.text = lines;
+        }
+      },
     });
 
     // Calculate and Add Summary
@@ -695,13 +723,13 @@ const ReportGenerator = ({ isCollapsed }) => {
       startY: summaryStartY + 5,
       head: [['Metric', 'Value']],
       body: summaryTable,
-      styles: { fontSize: 10, cellPadding: 1.5, overflow: 'linebreak' }, // Increased fontSize and cellPadding
+      styles: { fontSize: 10, cellPadding: 1.5, halign: 'center' }, // Center align entries
       headStyles: { fillColor: [41, 128, 185], halign: 'center', textColor: 255 },
       margin: { left: 14, right: 14 },
       theme: 'striped',
       columnStyles: {
         0: { halign: 'left', cellWidth: 80 },
-        1: { halign: 'right', cellWidth: 30 },
+        1: { halign: 'center', cellWidth: 30 },
       },
     });
 
@@ -723,16 +751,16 @@ const ReportGenerator = ({ isCollapsed }) => {
           item['Total Revenue'],
           item['Average Price'],
         ]),
-        styles: { fontSize: 10, cellPadding: 1.5, overflow: 'linebreak' }, // Increased fontSize and cellPadding
+        styles: { fontSize: 10, cellPadding: 1.5, halign: 'center' }, // Center align entries
         headStyles: { fillColor: [41, 128, 185], halign: 'center', textColor: 255 },
         margin: { left: 14, right: 14 },
         theme: 'grid',
         columnStyles: {
-          0: { halign: 'left', cellWidth: 30 },
-          1: { halign: 'left', cellWidth: 50 },
-          2: { halign: 'right', cellWidth: 30 },
-          3: { halign: 'right', cellWidth: 40 },
-          4: { halign: 'right', cellWidth: 40 },
+          0: { halign: 'center', cellWidth: 30 },
+          1: { halign: 'center', cellWidth: 50 },
+          2: { halign: 'center', cellWidth: 30 },
+          3: { halign: 'center', cellWidth: 40 },
+          4: { halign: 'center', cellWidth: 40 },
         },
       });
     }
@@ -743,68 +771,6 @@ const ReportGenerator = ({ isCollapsed }) => {
     // Save the PDF
     let fileName = `${reportDetails.type}-${reportType}-report-${reportDetails.identifier}.pdf`;
     doc.save(fileName);
-  };
-
-  // Function to get dynamic column styles based on report type
-  const getColumnStyles = (reportType, availableWidth) => {
-    switch (reportType) {
-      case 'sales_orders':
-        return {
-          0: { halign: 'left', cellWidth: 20 },  // Sales Order ID
-          1: { halign: 'left', cellWidth: 20 },  // MR Number
-          2: { halign: 'center', cellWidth: 10 }, // Is B2B
-          3: { halign: 'right', cellWidth: 15 }, // Sale Value
-          4: { halign: 'right', cellWidth: 10 }, // CGST
-          5: { halign: 'right', cellWidth: 10 }, // SGST
-          6: { halign: 'right', cellWidth: 15 }, // Total Amount
-          7: { halign: 'left', cellWidth: 20 },  // Employee (increased to wrap)
-          8: { halign: 'left', cellWidth: 25 },  // Payment Method (increased to wrap)
-          9: { halign: 'right', cellWidth: 15 }, // Loyalty Points Redeemed
-          10: { halign: 'right', cellWidth: 15 }, // Loyalty Points Added
-          11: { halign: 'center', cellWidth: 20 }, // Created At
-          12: { halign: 'center', cellWidth: 20 }, // Updated At
-        };
-      case 'work_orders':
-        return {
-          0: { halign: 'left', cellWidth: 30 }, // Work Order ID
-          1: { halign: 'right', cellWidth: 15 }, // Advance Details
-          2: { halign: 'center', cellWidth: 20 }, // Due Date
-          3: { halign: 'left', cellWidth: 15 }, // MR Number
-          4: { halign: 'left', cellWidth: 20 }, // Employee (increased to wrap)
-          5: { halign: 'left', cellWidth: 25 }, // Payment Method (increased to wrap)
-          6: { halign: 'right', cellWidth: 15 }, // Total Amount
-          7: { halign: 'right', cellWidth: 10 }, // CGST
-          8: { halign: 'right', cellWidth: 10 }, // SGST
-          9: { halign: 'center', cellWidth: 10 }, // Is B2B
-          10: { halign: 'left', cellWidth: 25 }, // HSN Code
-          11: { halign: 'center', cellWidth: 20 }, // Created At
-          12: { halign: 'center', cellWidth: 20 }, // Updated At
-        };
-      case 'privilegecards':
-        return {
-          0: { halign: 'left', cellWidth: 20 }, // PC Number
-          1: { halign: 'left', cellWidth: 25 }, // Customer Name
-          2: { halign: 'left', cellWidth: 20 }, // Phone Number
-          3: { halign: 'right', cellWidth: 15 }, // Top-Up Amount
-          4: { halign: 'right', cellWidth: 15 }, // Loyalty Points
-          5: { halign: 'left', cellWidth: 15 }, // Card Tier
-          6: { halign: 'center', cellWidth: 20 }, // Created At
-        };
-      case 'products':
-        return {
-          0: { halign: 'left', cellWidth: 10 }, // ID
-          1: { halign: 'left', cellWidth: 15 }, // Work Order ID
-          2: { halign: 'left', cellWidth: 40 }, // Product Name (increased to wrap)
-          3: { halign: 'left', cellWidth: 20 }, // Product ID
-          4: { halign: 'right', cellWidth: 15 }, // Price
-          5: { halign: 'right', cellWidth: 10 }, // Quantity
-          6: { halign: 'left', cellWidth: 15 }, // HSN Code
-          7: { halign: 'center', cellWidth: 20 }, // Created At
-          8: { halign: 'center', cellWidth: 20 }, // Updated At
-        };
-      default:
-        return {};
-    }
   };
 
   const handleKeyDown = (event, nextRef) => {
@@ -980,7 +946,5 @@ const ReportGenerator = ({ isCollapsed }) => {
     </div>
   );
 };
-
-
 
 export default ReportGenerator;
