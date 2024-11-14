@@ -25,5 +25,7 @@ dist-ssr
 
 # .gitignore
 /node_modules
-/.env
+# Environment Variables
+.env
+
 
