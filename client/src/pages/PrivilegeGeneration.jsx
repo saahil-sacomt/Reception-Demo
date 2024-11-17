@@ -5,8 +5,11 @@ import { generateCardWithBarcode } from '../utils/cardGenerator';
 import { sendCardViaWhatsApp } from '../utils/watiApi';
 import supabase from '../supabaseClient';
 import { convertUTCToIST, getCurrentUTCDateTime, formatDateToIST } from "../utils/dateUtils";
+import { useAuth } from '../context/AuthContext';
+import { PencilIcon, XMarkIcon, CheckCircleIcon, ExclamationCircleIcon, InformationCircleIcon } from "@heroicons/react/24/outline"; // Enhanced Icons
 
 const PrivilegeGeneration = ({ isCollapsed }) => {
+  const { name: employeeName, branch } = useAuth(); // Fetch employee name and branch from AuthContext
   const [name, setName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [otp, setOtp] = useState('');
@@ -17,8 +20,6 @@ const PrivilegeGeneration = ({ isCollapsed }) => {
   const [cardPreview, setCardPreview] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [cardTier, setCardTier] = useState('gold');
-
-
 
   const mockOtp = "1234";
 
@@ -39,52 +40,52 @@ const PrivilegeGeneration = ({ isCollapsed }) => {
       .order('created_at', { ascending: false })
       .limit(1)
       .single();
-  
+
     if (error && error.code !== 'PGRST116') {
       throw new Error('Error fetching last PC number: ' + error.message);
     }
-  
+
     let lastPcNumber = lastRecord ? lastRecord.pc_number : null;
-  
+
     // If no PC number exists, start from 'aa0002' (skip 'aa0001')
     if (!lastPcNumber) {
       return 'aa0002';
     }
-  
+
     // Split last PC number into alphabet and numeric parts
     const alphaPart = lastPcNumber.slice(0, 2);
     const numericPart = parseInt(lastPcNumber.slice(2));
-  
+
     // Increment numeric part
     let newNumericPart = numericPart + 1;
-  
+
     let newAlphaPart = alphaPart;
-  
+
     if (newNumericPart > 9999) {
       // Reset numeric part and increment alpha part
       newNumericPart = 1;
       newAlphaPart = incrementAlphaPart(alphaPart);
     }
-  
+
     // Format numeric part to be 4 digits with leading zeros
     const numericPartStr = newNumericPart.toString().padStart(4, '0');
-  
+
     // Combine new alpha and numeric parts
     let newPcNumber = `${newAlphaPart}${numericPartStr}`;
-  
+
     // Skip 'aa0001' if it's generated
     if (newPcNumber === 'aa0001') {
       newPcNumber = 'aa0002';
     }
-  
+
     return newPcNumber;
   }
-  
+
   // Helper function to increment the alphabetic part
   function incrementAlphaPart(alpha) {
     const firstCharCode = alpha.charCodeAt(0);
     const secondCharCode = alpha.charCodeAt(1);
-  
+
     if (secondCharCode < 122) { // 'z' in ASCII is 122
       return alpha[0] + String.fromCharCode(secondCharCode + 1);
     } else if (firstCharCode < 122) {
@@ -95,7 +96,7 @@ const PrivilegeGeneration = ({ isCollapsed }) => {
   }
 
   const requestOtp = () => {
-    if (phoneNumber.length === 10) {
+    if (phoneNumber.length === 10 && /^\d+$/.test(phoneNumber)) {
       setIsOtpRequested(true);
       setErrorMessage('');
       alert(`Mock OTP for testing purposes: ${mockOtp}`);
@@ -172,6 +173,8 @@ const PrivilegeGeneration = ({ isCollapsed }) => {
         loyalty_points: Number(topUpAmount),
         card_tier: cardTier,
         created_at: currentUTCDateTime,
+        branch: branch, // Add branch from AuthContext
+        employee_name: employeeName, // Add employee name from AuthContext
       }]);
 
       if (error) {
@@ -270,17 +273,23 @@ const PrivilegeGeneration = ({ isCollapsed }) => {
           <button
             onClick={generateAndSaveCard}
             disabled={isLoading}
-            className={`mt-4 w-full py-2 rounded-lg transition ${isLoading ? 'bg-yellow-400' : 'bg-green-500 hover:bg-green-600'} text-white`}
+            className={`mt-4 w-full py-2 rounded-lg flex items-center justify-center transition ${
+              isLoading ? 'bg-yellow-400 cursor-not-allowed' : 'bg-green-500 hover:bg-green-600'
+            } text-white`}
           >
-
             {isLoading ? (
-              <span className="flex items-center justify-center">
-                <svg className="animate-spin h-5 w-5 mr-2 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <>
+                <svg
+                  className="animate-spin h-5 w-5 mr-3 border-t-2 border-b-2 border-white rounded-full"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
                   <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path d="M4 12a8 8 0 018-8" stroke="currentColor" strokeWidth="4"></path>
                 </svg>
                 Sending...
-              </span>
+              </>
             ) : (
               "Generate and Send Privilege Card"
             )}
@@ -311,7 +320,7 @@ const PrivilegeGeneration = ({ isCollapsed }) => {
               />
               <button
                 onClick={requestOtp}
-                className="mt-4 w-full bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg"
+                className="mt-4 w-full bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg flex items-center justify-center"
               >
                 Request OTP
               </button>
@@ -330,7 +339,7 @@ const PrivilegeGeneration = ({ isCollapsed }) => {
               />
               <button
                 onClick={verifyOtp}
-                className="mt-4 w-full bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg"
+                className="mt-4 w-full bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg flex items-center justify-center"
               >
                 Verify OTP
               </button>

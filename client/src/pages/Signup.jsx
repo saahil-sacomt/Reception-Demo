@@ -19,7 +19,21 @@ const Signup = () => {
   const [errorMessage, setErrorMessage] = useState('');
   const [isSuccess, setIsSuccess] = useState(false); // New state for success
   const [showPassword, setShowPassword] = useState(false);
+  const [selectedBranch, setSelectedBranch] = useState('');
   const navigate = useNavigate();
+
+
+  // client/src/data/branches.js
+
+const branches = [
+  { name: 'Neyyatinkara', code: 'NTA' },
+  { name: 'Trivandrum', code: 'TVR' },
+  { name: 'Kottarakara 1', code: 'KOT1' },
+  { name: 'Kottarakara 2', code: 'KOT2' },
+  { name: 'Kattakada', code: 'KAT' },
+  // Add more branches as needed
+];
+
 
   // Regular Expressions for Validation
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -28,43 +42,48 @@ const Signup = () => {
   const handleSignup = async (e) => {
     e.preventDefault();
     setErrorMessage('');
-
+  
     // Frontend Validations
     if (!name.trim()) {
       setErrorMessage('Full Name is required.');
       return;
     }
-
+  
     if (!emailRegex.test(email)) {
       setErrorMessage('Please enter a valid email address.');
       return;
     }
-
+  
     if (password.length < 6) {
       setErrorMessage('Password must be at least 6 characters long.');
       return;
     }
-
+  
     if (password !== confirmPassword) {
       setErrorMessage('Passwords do not match.');
       return;
     }
-
+  
     if (!address.trim()) {
       setErrorMessage('Address is required.');
       return;
     }
-
+  
     if (!phoneRegex.test(phoneNumber)) {
       setErrorMessage('Please enter a valid phone number.');
       return;
     }
-
+  
     if (!phoneRegex.test(emergencyContact)) {
       setErrorMessage('Please enter a valid emergency contact number.');
       return;
     }
-
+  
+    if (!selectedBranch) {
+      setErrorMessage('Please select a branch.');
+      return;
+    }
+  
     try {
       const { data, error } = await signUp(
         name,
@@ -73,12 +92,15 @@ const Signup = () => {
         role,
         address,
         phoneNumber,
-        emergencyContact
+        emergencyContact,
+        selectedBranch // Pass the selected branch code
       );
-
+  
       if (error) {
         setErrorMessage(`Signup failed: ${error.message}`);
       } else {
+        // setIsSuccess(true); // Show success message
+        // Optionally, navigate to login or another page
         navigate('/login');
       }
     } catch (err) {
@@ -86,13 +108,14 @@ const Signup = () => {
       setErrorMessage('An unexpected error occurred. Please try again.');
     }
   };
+  
 
   const togglePasswordVisibility = () => setShowPassword(!showPassword);
 
   
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-white p-4 sm:p-6 lg:p-8">
+    <div className="min-h-screen flex items-center justify-center bg-white p-20">
       <div className="max-w-3xl w-full bg-green-50 shadow-lg rounded-xl p-8">
         {/* Company Logo */}
         <div className="flex justify-center mb-6">
@@ -308,6 +331,30 @@ const Signup = () => {
                   <option value="employee">Employee</option>
                   <option value="admin">Admin</option>
                   <option value="super_admin">Super Admin</option>
+                </select>
+              </div>
+
+              {/* Branch Selection */}
+              <div>
+                <label htmlFor="branch" className="block text-sm font-medium text-gray-700">
+                  Select Branch <span className="text-red-500">*</span>
+                </label>
+                <select
+                  id="branch"
+                  name="branch"
+                  value={selectedBranch}
+                  onChange={(e) => setSelectedBranch(e.target.value)}
+                  className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+                  required
+                >
+                  <option value="" disabled>
+                    -- Select Branch --
+                  </option>
+                  {branches.map((branch) => (
+                    <option key={branch.code} value={branch.code}>
+                      {branch.name}
+                    </option>
+                  ))}
                 </select>
               </div>
 

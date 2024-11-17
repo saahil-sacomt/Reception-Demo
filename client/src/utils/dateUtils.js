@@ -7,9 +7,7 @@ import { formatInTimeZone, toZonedTime } from 'date-fns-tz';
  * @param {string} format - The desired date format.
  * @returns {string} - The formatted IST date string.
  */
-export const convertUTCToIST = (utcDate, format = "dd-MM-yyyy hh:mm a") => {
-  return formatInTimeZone(new Date(utcDate), "Asia/Kolkata", format);
-};
+
 
 /**
  * Converts an IST date string to UTC ISO string.
@@ -37,3 +35,16 @@ export const getCurrentUTCDateTime = () => {
 export const formatDateToIST = (date, format = "dd-MM-yyyy hh:mm a") => {
   return formatInTimeZone(new Date(date), "Asia/Kolkata", format);
 };
+
+
+// Utility functions assumed to be defined in ../utils/dateUtils.js
+// Example implementations:
+export const convertUTCToIST = (utcDate) => {
+  const date = new Date(utcDate);
+  // IST is UTC+5:30
+  const istDate = new Date(date.getTime() + 5.5 * 60 * 60 * 1000);
+  return istDate.toLocaleString("en-IN", { timeZone: "Asia/Kolkata" });
+};
+
+
+

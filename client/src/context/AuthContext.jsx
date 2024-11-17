@@ -9,25 +9,26 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [name, setName] = useState(null);
   const [role, setRole] = useState(null);
+  const [branch, setBranch] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const fetchUserDetails = async (userId) => {
     try {
       const { data, error } = await supabase
         .from('employees')
-        .select('role, name')
+        .select('role, name,branch')
         .eq('auth_user_id', userId)
         .single();
 
       if (error) {
         console.error("Error fetching role:", error);
-        return { role: null, name: null };
+        return { role: null, name: null, branch:null };
       }
 
-      return { role: data.role || null, name: data.name || null };
+      return { role: data.role || null, name: data.name || null, branch: data.branch || null };
     } catch (err) {
       console.error("Unexpected error fetching role:", err);
-      return { role: null, name: null };
+      return { role: null, name: null, branch:null };
     }
   };
 
@@ -40,8 +41,10 @@ export const AuthProvider = ({ children }) => {
       const userDetails = await fetchUserDetails(userId);
       setRole(userDetails.role);
       setName(userDetails.name);
-      console.log("User role set to:", userDetails.role);
-      console.log("User name set to:", userDetails.name);
+      setBranch(userDetails.branch);
+      // console.log("User role set to:", userDetails.role);
+      // console.log("User name set to:", userDetails.name);
+      // console.log("User name set to:", userDetails.branch);
     }
     setLoading(false);
   };
@@ -54,6 +57,7 @@ export const AuthProvider = ({ children }) => {
         setUser(null);
         setRole(null);
         setName(null);
+        setBranch(null);
       }
     });
 
@@ -77,10 +81,11 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
     setRole(null);
     setName(null);
+    setBranch(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, role, name, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, role, name,branch, login, logout, loading }}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,74 +1,77 @@
 // client/src/components/ReportGenerator.jsx
-
 import React, { useState, useEffect, useRef } from 'react';
-import { supabase } from '../supabaseClient';
+import supabase from '../supabaseClient';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { convertUTCToIST } from '../utils/dateUtils';
 import logo from '../assets/sreenethraenglishisolated.png';
+import { useAuth } from '../context/AuthContext';
+import { CheckCircleIcon, ExclamationCircleIcon } from "@heroicons/react/24/outline";
 
 // Utility function to capitalize the first letter
 const capitalizeFirstLetter = (string) => {
   return string.charAt(0).toUpperCase() + string.slice(1);
 };
 
-// Define this outside the component for better reusability
+// Define column styles outside the component for better reusability
 const getColumnStyles = (reportType) => {
-  const maxColumnWidth = 22;
   switch (reportType) {
     case 'sales_orders':
       return {
-        0: { halign: 'center', cellWidth: 35 },  // Sales Order ID
-        1: { halign: 'center', cellWidth: maxColumnWidth },  // MR Number
-        2: { halign: 'center', cellWidth: 15 },  // Is B2B
-        3: { halign: 'center', cellWidth: maxColumnWidth },  // Sale Value
-        4: { halign: 'center', cellWidth: 15 },  // CGST
-        5: { halign: 'center', cellWidth: 15 },  // SGST
-        6: { halign: 'center', cellWidth: maxColumnWidth },  // Total Amount
-        7: { halign: 'center', cellWidth: maxColumnWidth },  // Employee
-        8: { halign: 'center', cellWidth: maxColumnWidth },  // Payment Method
-        9: { halign: 'center', cellWidth: maxColumnWidth },  // Loyalty Points Redeemed
-        10: { halign: 'center', cellWidth: maxColumnWidth }, // Loyalty Points Added
-        11: { halign: 'center', cellWidth: maxColumnWidth }, // Created At
-        12: { halign: 'center', cellWidth: maxColumnWidth }, // Updated At
+        0: { halign: 'center', cellWidth: 20 }, // Sales Order ID
+        1: { halign: 'center', cellWidth: 15 }, // MR Number
+        2: { halign: 'center', cellWidth: 10 }, // Is B2B
+        3: { halign: 'center', cellWidth: 15 }, // Sale Value
+        4: { halign: 'center', cellWidth: 10 }, // CGST
+        5: { halign: 'center', cellWidth: 10 }, // SGST
+        6: { halign: 'center', cellWidth: 15 }, // Total Amount
+        7: { halign: 'center', cellWidth: 20 }, // Employee
+        8: { halign: 'center', cellWidth: 15 }, // Payment Method
+        9: { halign: 'center', cellWidth: 15 }, // Loyalty Points Redeemed
+        10: { halign: 'center', cellWidth: 15 }, // Loyalty Points Added
+        11: { halign: 'center', cellWidth: 20 }, // Created At
+        12: { halign: 'center', cellWidth: 20 }, // Updated At
       };
     case 'work_orders':
       return {
-        0: { halign: 'center', cellWidth: 35 },  // Work Order ID
-        1: { halign: 'center', cellWidth: maxColumnWidth },  // Advance Details
-        2: { halign: 'center', cellWidth: maxColumnWidth },  // Due Date
-        3: { halign: 'center', cellWidth: maxColumnWidth },  // MR Number
-        4: { halign: 'center', cellWidth: maxColumnWidth },  // Employee
-        5: { halign: 'center', cellWidth: maxColumnWidth },  // Payment Method
-        6: { halign: 'center', cellWidth: maxColumnWidth },  // Total Amount
-        7: { halign: 'center', cellWidth: 15 },  // CGST
-        8: { halign: 'center', cellWidth: 15 },  // SGST
-        9: { halign: 'center', cellWidth: 15 },  // Is B2B
-        10: { halign: 'center', cellWidth: maxColumnWidth }, // HSN Code
-        11: { halign: 'center', cellWidth: maxColumnWidth }, // Created At
-        12: { halign: 'center', cellWidth: maxColumnWidth }, // Updated At
+        0: { halign: 'center', cellWidth: 20 }, // Work Order ID
+        1: { halign: 'center', cellWidth: 15 }, // Advance Details
+        2: { halign: 'center', cellWidth: 15 }, // Due Date
+        3: { halign: 'center', cellWidth: 15 }, // MR Number
+        4: { halign: 'center', cellWidth: 20 }, // Employee
+        5: { halign: 'center', cellWidth: 15 }, // Payment Method
+        6: { halign: 'center', cellWidth: 15 }, // Total Amount
+        7: { halign: 'center', cellWidth: 10 }, // CGST
+        8: { halign: 'center', cellWidth: 10 }, // SGST
+        9: { halign: 'center', cellWidth: 10 }, // Is B2B
+        10: { halign: 'center', cellWidth: 15 }, // HSN Code
+        11: { halign: 'center', cellWidth: 20 }, // Created At
+        12: { halign: 'center', cellWidth: 20 }, // Updated At
+        13: { halign: 'center', cellWidth: 15 }, // Branch
       };
     case 'privilegecards':
       return {
-        0: { halign: 'center', cellWidth: 'wrap' }, // PC Number
-        1: { halign: 'center', cellWidth: 'wrap' }, // Customer Name
-        2: { halign: 'center', cellWidth: 'wrap' }, // Phone Number
-        3: { halign: 'center', cellWidth: 'wrap' }, // Top-Up Amount
-        4: { halign: 'center', cellWidth: 'wrap' }, // Loyalty Points
-        5: { halign: 'center', cellWidth: 'wrap' }, // Card Tier
-        6: { halign: 'center', cellWidth: 'wrap' }, // Created At
+        0: { halign: 'center', cellWidth: 20 }, // PC Number
+        1: { halign: 'center', cellWidth: 25 }, // Customer Name
+        2: { halign: 'center', cellWidth: 20 }, // Phone Number
+        3: { halign: 'center', cellWidth: 15 }, // Top-Up Amount
+        4: { halign: 'center', cellWidth: 15 }, // Loyalty Points
+        5: { halign: 'center', cellWidth: 15 }, // Card Tier
+        6: { halign: 'center', cellWidth: 20 }, // Created At
+        7: { halign: 'center', cellWidth: 15 }, // Branch
+        8: { halign: 'center', cellWidth: 15 }, // Employee
       };
-    case 'products':
+    case 'product_sales':
       return {
-        0: { halign: 'center', cellWidth: 'wrap' }, // ID
-        1: { halign: 'center', cellWidth: 'wrap' }, // Work Order ID
-        2: { halign: 'center', cellWidth: 'wrap' }, // Product Name
-        3: { halign: 'center', cellWidth: 'wrap' }, // Product ID
-        4: { halign: 'center', cellWidth: 'wrap' }, // Price
-        5: { halign: 'center', cellWidth: 'wrap' }, // Quantity
-        6: { halign: 'center', cellWidth: 'wrap' }, // HSN Code
-        7: { halign: 'center', cellWidth: 'wrap' }, // Created At
-        8: { halign: 'center', cellWidth: 'wrap' }, // Updated At
+        0: { halign: 'center', cellWidth: 15 }, // Product ID
+        1: { halign: 'center', cellWidth: 25 }, // Product Name
+        2: { halign: 'center', cellWidth: 10 }, // MRP
+        3: { halign: 'center', cellWidth: 10 }, // Rate
+        4: { halign: 'center', cellWidth: 15 }, // HSN Code
+        5: { halign: 'center', cellWidth: 15 }, // Total Quantity Sold
+        6: { halign: 'center', cellWidth: 15 }, // Total Revenue
+        7: { halign: 'center', cellWidth: 20 }, // Stock Created At
+        8: { halign: 'center', cellWidth: 20 }, // Stock Updated At
       };
     default:
       return {};
@@ -80,7 +83,7 @@ const addHeader = (doc, logoDataUrl, reportDetails) => {
   if (logoDataUrl) {
     const imgProps = doc.getImageProperties(logoDataUrl);
     const pdfWidth = doc.internal.pageSize.getWidth();
-    const imgWidth = 50; // Adjust the width as needed
+    const imgWidth = 30; // Adjust the width as needed
     const imgHeight = (imgProps.height * imgWidth) / imgProps.width; // Maintain aspect ratio
     const xPos = (pdfWidth - imgWidth) / 2; // Center horizontally
     const yPos = 10; // Position from top
@@ -89,14 +92,16 @@ const addHeader = (doc, logoDataUrl, reportDetails) => {
 
   doc.setFontSize(10);
   doc.text('GSTIN: 32AAUCS7002H1ZV', doc.internal.pageSize.getWidth() / 2, 35, { align: 'center' });
-  
+
   // Add Report Title
-  doc.setFontSize(16);
-  const reportTitle = `${capitalizeFirstLetter(reportDetails.type)} Report - ${capitalizeFirstLetter(reportDetails.reportTypeLabel)}`;
-  doc.text(reportTitle, doc.internal.pageSize.getWidth() / 2, 50, { align: 'center' });
+  doc.setFontSize(14);
+  const reportTitle = `${capitalizeFirstLetter(reportDetails.type)} Report - ${capitalizeFirstLetter(
+    reportDetails.reportTypeLabel
+  )}`;
+  doc.text(reportTitle, doc.internal.pageSize.getWidth() / 2, 45, { align: 'center' });
 
   // Add Report Period
-  doc.setFontSize(12);
+  doc.setFontSize(10);
   let periodText = '';
   if (reportDetails.type === 'Daily') {
     periodText = `Date: ${reportDetails.date}`;
@@ -105,7 +110,12 @@ const addHeader = (doc, logoDataUrl, reportDetails) => {
   } else if (reportDetails.type === 'Date Range') {
     periodText = `From: ${reportDetails.fromDate} To: ${reportDetails.toDate}`;
   }
-  doc.text(periodText, doc.internal.pageSize.getWidth() / 2, 60, { align: 'center' });
+  doc.text(periodText, doc.internal.pageSize.getWidth() / 2, 50, { align: 'center' });
+
+  // Add Branch Information
+  doc.setFontSize(10);
+  const branchesText = `Branches: ${reportDetails.isCombined ? 'All Branches' : reportDetails.branches.join(', ')}`;
+  doc.text(branchesText, doc.internal.pageSize.getWidth() / 2, 55, { align: 'center' });
 };
 
 const addFooter = (doc) => {
@@ -113,27 +123,32 @@ const addFooter = (doc) => {
   doc.setFontSize(8);
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
-    doc.text(`Page ${i} of ${pageCount}`, doc.internal.pageSize.getWidth() / 2, doc.internal.pageSize.getHeight() - 10, { align: 'center' });
+    doc.text(
+      `Page ${i} of ${pageCount}`,
+      doc.internal.pageSize.getWidth() / 2,
+      doc.internal.pageSize.getHeight() - 5,
+      { align: 'center' }
+    );
   }
 };
 
 const ReportGenerator = ({ isCollapsed }) => {
   // State Variables
-  const [reportType, setReportType] = useState('sales_orders'); // 'sales_orders', 'work_orders', 'privilegecards', 'products'
+  const { branch: userBranch, name: employeeName } = useAuth(); // Fetch branch and employee name from AuthContext
+  const [reportType, setReportType] = useState('sales_orders'); // 'sales_orders', 'work_orders', 'privilegecards', 'product_sales'
   const [reportPeriod, setReportPeriod] = useState('daily'); // 'daily', 'monthly', 'range'
   const [date, setDate] = useState(''); // For daily reports
   const [monthYear, setMonthYear] = useState(''); // For monthly reports (format: YYYY-MM)
   const [fromDate, setFromDate] = useState(''); // Start date for range reports
   const [toDate, setToDate] = useState(''); // End date for range reports
+  const [selectedBranches, setSelectedBranches] = useState([userBranch]); // Initialize with user's branch code
+  const [allBranches, setAllBranches] = useState([]); // Fetch all branches from the database
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+  const [isCombined, setIsCombined] = useState(false); // For combined reports
 
   const [logoDataUrl, setLogoDataUrl] = useState('');
-  const pageWidth = 297; // A4 Landscape width in mm
-  const leftMargin = 10;
-  const rightMargin = 10;
-  const availableWidth = pageWidth - leftMargin - rightMargin; // 277mm
 
   // References for inputs and buttons
   const reportTypeRef = useRef();
@@ -142,6 +157,7 @@ const ReportGenerator = ({ isCollapsed }) => {
   const monthYearRef = useRef();
   const fromDateRef = useRef();
   const toDateRef = useRef();
+  const branchSelectionRef = useRef();
   const generateButtonRef = useRef();
 
   useEffect(() => {
@@ -170,6 +186,29 @@ const ReportGenerator = ({ isCollapsed }) => {
       .catch((err) => console.error('Failed to load logo image:', err));
   }, []);
 
+  // Fetch all branches from the database
+  const fetchAllBranches = async () => {
+    const { data, error } = await supabase
+      .from('branches') // Ensure you have a 'branches' table
+      .select('branch_code, branch_name');
+
+    if (error) {
+      console.error("Error fetching branches:", error);
+      return [];
+    }
+
+    return data.map(branch => ({ code: branch.branch_code, name: branch.branch_name }));
+  };
+
+  useEffect(() => {
+    const getBranches = async () => {
+      const branches = await fetchAllBranches();
+      setAllBranches(branches);
+      setSelectedBranches([userBranch]); // Default to user's branch code
+    };
+    getBranches();
+  }, [userBranch]);
+
   // Utility function to get the last day of a month
   const getLastDayOfMonth = (year, month) => {
     return new Date(year, month, 0).getDate();
@@ -188,6 +227,7 @@ const ReportGenerator = ({ isCollapsed }) => {
       // Validate and Determine Date Range
       let startDate, endDate;
       let reportTypeLabel = '';
+      let branchesToReport = isCombined ? [] : selectedBranches;
 
       if (reportPeriod === 'daily') {
         if (!date) {
@@ -205,9 +245,11 @@ const ReportGenerator = ({ isCollapsed }) => {
         endDate = new Date(`${date}T23:59:59Z`);
         reportDetails = {
           type: 'Daily',
-          date: convertUTCToIST(startDate.toISOString(), "dd-MM-yyyy"),
+          date: convertUTCToIST(startDate.toISOString(), 'dd-MM-yyyy'),
           identifier: date,
           reportTypeLabel: getReportTypeLabel(reportType),
+          branches: branchesToReport,
+          isCombined,
         };
       } else if (reportPeriod === 'monthly') {
         if (!monthYear) {
@@ -230,6 +272,8 @@ const ReportGenerator = ({ isCollapsed }) => {
           year,
           identifier: `${month}-${year}`,
           reportTypeLabel: getReportTypeLabel(reportType),
+          branches: branchesToReport,
+          isCombined,
         };
       } else if (reportPeriod === 'range') {
         if (!fromDate || !toDate) {
@@ -253,12 +297,17 @@ const ReportGenerator = ({ isCollapsed }) => {
         endDate = new Date(`${toDate}T23:59:59Z`);
         reportDetails = {
           type: 'Date Range',
-          fromDate: convertUTCToIST(startDate.toISOString(), "dd-MM-yyyy"),
-          toDate: convertUTCToIST(endDate.toISOString(), "dd-MM-yyyy"),
+          fromDate: convertUTCToIST(startDate.toISOString(), 'dd-MM-yyyy'),
+          toDate: convertUTCToIST(endDate.toISOString(), 'dd-MM-yyyy'),
           identifier: `${fromDate}_to_${toDate}`,
           reportTypeLabel: getReportTypeLabel(reportType),
+          branches: branchesToReport,
+          isCombined,
         };
       }
+
+      // Debugging Logs
+      console.log('Report Details:', reportDetails);
 
       // Initialize variables for data and error
       let { data, error } = { data: [], error: null };
@@ -269,72 +318,121 @@ const ReportGenerator = ({ isCollapsed }) => {
       // Fetch data based on report type
       switch (reportType) {
         case 'sales_orders': {
-          ({ data, error } = await supabase
+          const query = supabase
             .from('sales_orders')
             .select('*')
             .gte('created_at', startDate.toISOString())
-            .lte('created_at', endDate.toISOString()));
+            .lte('created_at', endDate.toISOString());
+
+          if (!isCombined) {
+            query.in('branch', branchesToReport);
+          }
+
+          ({ data, error } = await query);
           if (error) throw error;
           fetchedData = data;
           break;
         }
         case 'work_orders': {
-          ({ data, error } = await supabase
+          const query = supabase
             .from('work_orders')
             .select('*')
             .gte('created_at', startDate.toISOString())
-            .lte('created_at', endDate.toISOString()));
+            .lte('created_at', endDate.toISOString());
+
+          if (!isCombined) {
+            query.in('branch', branchesToReport);
+          }
+
+          ({ data, error } = await query);
           if (error) throw error;
           fetchedData = data;
           break;
         }
         case 'privilegecards': {
-          ({ data, error } = await supabase
+          const query = supabase
             .from('privilegecards')
             .select('*')
             .gte('created_at', startDate.toISOString())
-            .lte('created_at', endDate.toISOString()));
+            .lte('created_at', endDate.toISOString());
+
+          if (!isCombined) {
+            query.in('branch', branchesToReport);
+          }
+
+          ({ data, error } = await query);
           if (error) throw error;
           fetchedData = data;
           break;
         }
-        case 'products': {
-          ({ data, error } = await supabase
-            .from('products')
-            .select('*')
+        case 'product_sales': {
+          // Fetch stock entries with selected branches and include product details
+          const query = supabase
+            .from('stock')
+            .select(`
+              *,
+              product:products(product_name, product_id, mrp, rate, hsn_code)
+            `)
             .gte('created_at', startDate.toISOString())
-            .lte('created_at', endDate.toISOString()));
+            .lte('created_at', endDate.toISOString());
+
+          if (!isCombined) {
+            query.in('branch_code', branchesToReport);
+          }
+
+          ({ data, error } = await query);
           if (error) throw error;
           fetchedData = data;
 
-          // Summarize by Product ID
-          const productIdSummary = data.reduce((acc, curr) => {
-            const productId = curr.product_id || 'N/A';
-            if (!acc[productId]) {
-              acc[productId] = {
-                product_name: curr.product_name || 'N/A',
+          if (fetchedData.length === 0) {
+            setError('No stock records found for the selected period and branch.');
+            setLoading(false);
+            return;
+          }
+
+          // Combine stock and product data based on product_id
+          const combinedData = fetchedData.map((stockItem) => {
+            const product = stockItem.product || {};
+            return {
+              product_id: product.product_id || 'N/A',
+              product_name: product.product_name || 'N/A',
+              mrp: product.mrp || 'N/A',
+              rate: product.rate || 'N/A',
+              hsn_code: product.hsn_code || 'N/A',
+              quantity: stockItem.quantity || 0,
+              total_value: stockItem.total_value || 0,
+              stock_created_at: convertUTCToIST(stockItem.created_at, 'dd-MM-yyyy hh:mm a'),
+              stock_updated_at: convertUTCToIST(stockItem.updated_at, 'dd-MM-yyyy hh:mm a'),
+              // Add any additional stock fields if necessary
+            };
+          });
+
+          // Remove duplicates and summarize data by product_id
+          const productSummary = combinedData.reduce((acc, curr) => {
+            const pid = curr.product_id;
+            if (!acc[pid]) {
+              acc[pid] = {
+                ...curr,
                 total_quantity: 0,
                 total_revenue: 0,
-                total_price: 0,
-                count: 0,
               };
             }
-            acc[productId].total_quantity += curr.quantity || 0;
-            acc[productId].total_revenue += (curr.price || 0) * (curr.quantity || 0);
-            acc[productId].total_price += curr.price || 0;
-            acc[productId].count += 1;
+            acc[pid].total_quantity += curr.quantity;
+            acc[pid].total_revenue += curr.total_value;
             return acc;
           }, {});
 
-          formattedProductIdSummary = Object.entries(productIdSummary)
-            .map(([productId, details]) => ({
-              'Product ID': productId,
-              'Product Name': details.product_name,
-              'Total Quantity Sold': details.total_quantity,
-              'Total Revenue': details.total_revenue.toFixed(2),
-              'Average Price': details.count ? (details.total_price / details.count).toFixed(2) : '0.00',
-            }))
-            .sort((a, b) => b['Total Revenue'] - a['Total Revenue']); // Optional: Sort by revenue
+          formattedProductIdSummary = Object.values(productSummary).map((item) => ({
+            'Product ID': item.product_id,
+            'Product Name': item.product_name,
+            'MRP': item.mrp,
+            'Rate': Number(item.rate).toFixed(2),
+            'HSN Code': item.hsn_code,
+            'Total Quantity Sold': item.total_quantity,
+            'Total Revenue': item.total_revenue.toFixed(2),
+            'Stock Created At': item.stock_created_at,
+            'Stock Updated At': item.stock_updated_at,
+          }));
           break;
         }
         default:
@@ -343,8 +441,8 @@ const ReportGenerator = ({ isCollapsed }) => {
           return;
       }
 
-      if (fetchedData.length === 0) {
-        setError('No records found for the selected period.');
+      if (!isCombined && fetchedData.length === 0) {
+        setError('No records found for the selected period and branch.');
         setLoading(false);
         return;
       }
@@ -370,8 +468,8 @@ const ReportGenerator = ({ isCollapsed }) => {
         return 'Work Orders';
       case 'privilegecards':
         return 'Privilege Cards';
-      case 'products':
-        return 'Products';
+      case 'product_sales':
+        return 'Product Sales';
       default:
         return '';
     }
@@ -379,7 +477,11 @@ const ReportGenerator = ({ isCollapsed }) => {
 
   // Function to generate PDF
   const generatePDF = (data, reportDetails, reportType, formattedProductIdSummary) => {
-    const doc = new jsPDF('landscape'); // Landscape orientation
+    const doc = new jsPDF({
+      orientation: 'landscape', // Portrait orientation
+      unit: 'mm',
+      format: 'a5', // A5 size
+    });
     doc.setFont('Helvetica', '');
 
     // Add Header
@@ -420,6 +522,7 @@ const ReportGenerator = ({ isCollapsed }) => {
           'HSN Code',
           'Created At',
           'Updated At',
+          'Branch',
         ];
         break;
       case 'privilegecards':
@@ -431,19 +534,21 @@ const ReportGenerator = ({ isCollapsed }) => {
           'Loyalty Points',
           'Card Tier',
           'Created At',
+          'Branch',
+          'Employee',
         ];
         break;
-      case 'products':
+      case 'product_sales':
         tableColumn = [
-          'ID',
-          'Work Order ID',
-          'Product Name',
           'Product ID',
-          'Price',
-          'Quantity',
+          'Product Name',
+          'MRP',
+          'Rate',
           'HSN Code',
-          'Created At',
-          'Updated At',
+          'Total Quantity Sold',
+          'Total Revenue',
+          'Stock Created At',
+          'Stock Updated At',
         ];
         break;
       default:
@@ -451,115 +556,119 @@ const ReportGenerator = ({ isCollapsed }) => {
     }
 
     // Prepare table rows
-    const tableRows = data.map((record) => {
-      switch (reportType) {
-        case 'sales_orders':
-          return [
-            record.sales_order_id || 'N/A',
-            record.mr_number || 'N/A',
-            record.is_b2b ? 'Yes' : 'No',
-            record.subtotal ? Number(record.subtotal).toFixed(2) : '0.00',
-            record.cgst ? Number(record.cgst).toFixed(2) : '0.00',
-            record.sgst ? Number(record.sgst).toFixed(2) : '0.00',
-            record.total_amount ? Number(record.total_amount).toFixed(2) : '0.00',
-            record.employee || 'N/A',
-            record.payment_method || 'N/A',
-            record.loyalty_points_redeemed !== undefined
-              ? record.loyalty_points_redeemed
-              : "0",
-            record.loyalty_points_added !== undefined
-              ? record.loyalty_points_added
-              : "0",
-            record.created_at
-              ? convertUTCToIST(record.created_at, "dd-MM-yyyy hh:mm a")
-              : 'N/A',
-            record.updated_at
-              ? convertUTCToIST(record.updated_at, "dd-MM-yyyy hh:mm a")
-              : 'N/A',
-          ];
-        case 'work_orders':
-          return [
-            record.work_order_id || 'N/A',
-            record.advance_details
-              ? Number(record.advance_details).toFixed(2)
-              : '0.00',
-            record.due_date ? record.due_date : 'N/A',
-            record.mr_number || 'N/A',
-            record.employee || 'N/A',
-            record.payment_method || 'N/A',
-            record.total_amount
-              ? Number(record.total_amount).toFixed(2)
-              : '0.00',
-            record.cgst ? Number(record.cgst).toFixed(2) : '0.00',
-            record.sgst ? Number(record.sgst).toFixed(2) : '0.00',
-            record.is_b2b ? 'Yes' : 'No',
-            record.hsn_code || 'N/A',
-            record.created_at
-              ? convertUTCToIST(record.created_at, "dd-MM-yyyy hh:mm a")
-              : 'N/A',
-            record.updated_at
-              ? convertUTCToIST(record.updated_at, "dd-MM-yyyy hh:mm a")
-              : 'N/A',
-          ];
-        case 'privilegecards':
-          return [
-            record.pc_number || 'N/A',
-            record.customer_name || 'N/A',
-            record.phone_number || 'N/A',
-            record.top_up_amount
-              ? Number(record.top_up_amount).toFixed(2)
-              : '0.00',
-            record.loyalty_points !== undefined
-              ? record.loyalty_points
-              : 'N/A',
-            record.card_tier || 'N/A',
-            record.created_at
-              ? convertUTCToIST(record.created_at, "dd-MM-yyyy hh:mm a")
-              : 'N/A',
-          ];
-        case 'products':
-          return [
-            record.id || 'N/A',
-            record.work_order_id || 'N/A',
-            record.product_name || 'N/A',
-            record.product_id || 'N/A',
-            record.price ? Number(record.price).toFixed(2) : '0.00',
-            record.quantity !== undefined ? record.quantity : '0',
-            record.hsn_code || 'N/A',
-            record.created_at
-              ? convertUTCToIST(record.created_at, "dd-MM-yyyy hh:mm a")
-              : 'N/A',
-            record.updated_at
-              ? convertUTCToIST(record.updated_at, "dd-MM-yyyy hh:mm a")
-              : 'N/A',
-          ];
-        default:
-          return [];
-      }
-    });
+    let tableRows = [];
+    switch (reportType) {
+      case 'sales_orders':
+        tableRows = data.map((record) => [
+          record.sales_order_id || 'N/A',
+          record.mr_number || 'N/A',
+          record.is_b2b ? 'Yes' : 'No',
+          record.subtotal ? Number(record.subtotal).toFixed(2) : '0.00',
+          record.cgst ? Number(record.cgst).toFixed(2) : '0.00',
+          record.sgst ? Number(record.sgst).toFixed(2) : '0.00',
+          record.total_amount ? Number(record.total_amount).toFixed(2) : '0.00',
+          record.employee || 'N/A',
+          record.payment_method || 'N/A',
+          record.loyalty_points_redeemed !== undefined
+            ? record.loyalty_points_redeemed
+            : '0',
+          record.loyalty_points_added !== undefined
+            ? record.loyalty_points_added
+            : '0',
+          record.created_at
+            ? convertUTCToIST(record.created_at, 'dd-MM-yyyy hh:mm a')
+            : 'N/A',
+          record.updated_at
+            ? convertUTCToIST(record.updated_at, 'dd-MM-yyyy hh:mm a')
+            : 'N/A',
+        ]);
+        break;
+      case 'work_orders':
+        tableRows = data.map((record) => [
+          record.work_order_id || 'N/A',
+          record.advance_details
+            ? Number(record.advance_details).toFixed(2)
+            : '0.00',
+          record.due_date ? record.due_date : 'N/A',
+          record.mr_number || 'N/A',
+          record.employee || 'N/A',
+          record.payment_method || 'N/A',
+          record.total_amount
+            ? Number(record.total_amount).toFixed(2)
+            : '0.00',
+          record.cgst ? Number(record.cgst).toFixed(2) : '0.00',
+          record.sgst ? Number(record.sgst).toFixed(2) : '0.00',
+          record.is_b2b ? 'Yes' : 'No',
+          record.hsn_code || 'N/A',
+          record.created_at
+            ? convertUTCToIST(record.created_at, 'dd-MM-yyyy hh:mm a')
+            : 'N/A',
+          record.updated_at
+            ? convertUTCToIST(record.updated_at, 'dd-MM-yyyy hh:mm a')
+            : 'N/A',
+          record.branch || 'N/A', // Branch
+        ]);
+        break;
+      case 'privilegecards':
+        tableRows = data.map((record) => [
+          record.pc_number || 'N/A',
+          record.customer_name || 'N/A',
+          record.phone_number || 'N/A',
+          record.top_up_amount
+            ? Number(record.top_up_amount).toFixed(2)
+            : '0.00',
+          record.loyalty_points !== undefined
+            ? record.loyalty_points
+            : 'N/A',
+          record.card_tier || 'N/A',
+          record.created_at
+            ? convertUTCToIST(record.created_at, 'dd-MM-yyyy hh:mm a')
+            : 'N/A',
+          record.branch || 'N/A', // Branch
+          record.employee_name || 'N/A', // Employee
+        ]);
+        break;
+      case 'product_sales':
+        tableRows = formattedProductIdSummary.map((item) => [
+          item['Product ID'],
+          item['Product Name'],
+          item['MRP'],
+          item['Rate'],
+          item['HSN Code'],
+          item['Total Quantity Sold'],
+          item['Total Revenue'],
+          item['Stock Created At'],
+          item['Stock Updated At'],
+        ]);
+        break;
+      default:
+        tableRows = [];
+    }
 
-    const maxColumnWidth = 30;
     // Generate the main table
     doc.autoTable({
       head: [tableColumn],
       body: tableRows,
-      startY: 70, // Adjusted to utilize more vertical space
-      styles: { fontSize: 10, cellPadding: 2, halign: 'center' }, // Center align all entries
+      startY: 65, // Adjusted to utilize more vertical space
+      styles: { fontSize: 7, cellPadding: 1, halign: 'center', overflow: 'linebreak' }, // Smaller font, linebreak for overflow
       headStyles: {
-        fillColor: [0, 160, 0], // Changed to green
+        fillColor: [0, 160, 0], // Green header
         halign: 'center',
         textColor: 255,
-        fontSize: 10, // Adequate font size to prevent wrapping
+        fontSize: 9,
       },
       alternateRowStyles: { fillColor: [245, 245, 245] },
-      margin: { left: leftMargin, right: rightMargin },
+      margin: { left: 10, right: 10 },
       theme: 'striped',
       showHead: 'everyPage',
       pageBreak: 'auto',
       columnStyles: getColumnStyles(reportType),
+      tableWidth: 'auto',
+      // Merge the styles objects into one to fix the duplicate key issue
+      styles: { cellWidth: 'wrap', fontSize: 7, cellPadding: 1, halign: 'center', overflow: 'linebreak' },
       didParseCell: function (data) {
         if (data.section === 'head' && data.cell.raw.length > 15) {
-          const lines = doc.splitTextToSize(data.cell.raw, maxColumnWidth);
+          const lines = doc.splitTextToSize(data.cell.raw, 30);
           data.cell.text = lines;
         }
       },
@@ -567,26 +676,47 @@ const ReportGenerator = ({ isCollapsed }) => {
 
     // Calculate and Add Summary
     let summaryStartY = doc.lastAutoTable.finalY + 10;
-    doc.setFontSize(12);
-    doc.text('Summary', 14, summaryStartY);
-    doc.setFontSize(10); // Increased font size for summary
+    doc.setFontSize(10);
+    doc.text('Summary', 10, summaryStartY);
+    doc.setFontSize(7); // Reduced font size for summary
 
     let summaryTable = [];
 
     switch (reportType) {
       case 'sales_orders': {
         const totalSalesOrders = data.length;
-        const totalAdvancePayments = data.reduce((acc, curr) => acc + (curr.advance_details || 0), 0);
-        const totalSaleValue = data.reduce((acc, curr) => acc + (curr.subtotal || 0), 0);
-        const totalCGST = data.reduce((acc, curr) => acc + (curr.cgst || 0), 0);
-        const totalSGST = data.reduce((acc, curr) => acc + (curr.sgst || 0), 0);
-        const totalAmount = data.reduce((acc, curr) => acc + (curr.total_amount || 0), 0);
-        const totalLoyaltyPointsAdded = data.reduce((acc, curr) => acc + (curr.loyalty_points_added || 0), 0);
+        const totalAdvancePayments = data.reduce(
+          (acc, curr) => acc + (curr.advance_details || 0),
+          0
+        );
+        const totalSaleValue = data.reduce(
+          (acc, curr) => acc + (curr.subtotal || 0),
+          0
+        );
+        const totalCGST = data.reduce(
+          (acc, curr) => acc + (curr.cgst || 0),
+          0
+        );
+        const totalSGST = data.reduce(
+          (acc, curr) => acc + (curr.sgst || 0),
+          0
+        );
+        const totalAmount = data.reduce(
+          (acc, curr) => acc + (curr.total_amount || 0),
+          0
+        );
+        const totalLoyaltyPointsAdded = data.reduce(
+          (acc, curr) => acc + (curr.loyalty_points_added || 0),
+          0
+        );
         const totalLoyaltyPoints = data.reduce(
           (acc, curr) => acc + (curr.loyalty_points_redeemed || 0),
           0
         );
-        const totalB2B = data.reduce((acc, curr) => acc + (curr.is_b2b ? 1 : 0), 0);
+        const totalB2B = data.reduce(
+          (acc, curr) => acc + (curr.is_b2b ? 1 : 0),
+          0
+        );
 
         summaryTable = [
           ['Total Sales Orders', totalSalesOrders],
@@ -598,26 +728,51 @@ const ReportGenerator = ({ isCollapsed }) => {
           ['Total Loyalty Points Added', totalLoyaltyPointsAdded],
           ['Total Loyalty Points Redeemed', totalLoyaltyPoints],
           ['Total B2B Orders', totalB2B],
+          ['Total Branches Reported', reportDetails.isCombined ? 'All Branches' : reportDetails.branches.length],
         ];
         break;
       }
       case 'work_orders': {
         const totalWorkOrders = data.length;
-        const totalAdvance = data.reduce((acc, curr) => acc + (curr.advance_details || 0), 0);
-        const totalWorkAmount = data.reduce((acc, curr) => acc + (curr.total_amount || 0), 0);
-        const totalSaleValue = data.reduce((acc, curr) => acc + (curr.subtotal || 0), 0);
-        const totalworkCGST = data.reduce((acc, curr) => acc + (curr.cgst || 0), 0);
-        const totalworkSGST = data.reduce((acc, curr) => acc + (curr.sgst || 0), 0);
-        const totalWorkB2B = data.reduce((acc, curr) => acc + (curr.is_b2b ? 1 : 0), 0);
+        const totalAdvance = data.reduce(
+          (acc, curr) => acc + (curr.advance_details || 0),
+          0
+        );
+        const totalWorkAmount = data.reduce(
+          (acc, curr) => acc + (curr.total_amount || 0),
+          0
+        );
+        const totalSaleValue = data.reduce(
+          (acc, curr) => acc + (curr.subtotal || 0),
+          0
+        );
+        const totalWorkCGST = data.reduce(
+          (acc, curr) => acc + (curr.cgst || 0),
+          0
+        );
+        const totalWorkSGST = data.reduce(
+          (acc, curr) => acc + (curr.sgst || 0),
+          0
+        );
+        const totalWorkB2B = data.reduce(
+          (acc, curr) => acc + (curr.is_b2b ? 1 : 0),
+          0
+        );
 
         // Summarize JSONB fields (if any)
         const productEntriesSummary = data.reduce((acc, curr) => {
           if (curr.product_entries) {
             let entries;
             try {
-              entries = typeof curr.product_entries === 'string' ? JSON.parse(curr.product_entries) : curr.product_entries;
+              entries =
+                typeof curr.product_entries === 'string'
+                  ? JSON.parse(curr.product_entries)
+                  : curr.product_entries;
             } catch (e) {
-              console.error('Invalid JSON in product_entries:', curr.product_entries);
+              console.error(
+                'Invalid JSON in product_entries:',
+                curr.product_entries
+              );
               return acc;
             }
             Object.entries(entries).forEach(([key, value]) => {
@@ -631,9 +786,15 @@ const ReportGenerator = ({ isCollapsed }) => {
           if (curr.patient_details) {
             let details;
             try {
-              details = typeof curr.patient_details === 'string' ? JSON.parse(curr.patient_details) : curr.patient_details;
+              details =
+                typeof curr.patient_details === 'string'
+                  ? JSON.parse(curr.patient_details)
+                  : curr.patient_details;
             } catch (e) {
-              console.error('Invalid JSON in patient_details:', curr.patient_details);
+              console.error(
+                'Invalid JSON in patient_details:',
+                curr.patient_details
+              );
               return acc;
             }
             // Example: Counting patients by condition
@@ -643,30 +804,42 @@ const ReportGenerator = ({ isCollapsed }) => {
           return acc;
         }, {});
 
-        const formattedProductEntriesSummary = Object.entries(productEntriesSummary)
-          .map(([key, value]) => `${capitalizeFirstLetter(key)}: ${value}`)
+        const formattedProductEntriesSummary = Object.entries(
+          productEntriesSummary
+        )
+          .map(
+            ([key, value]) => `${capitalizeFirstLetter(key)}: ${value}`
+          )
           .join(', ');
 
-        const formattedPatientDetailsSummary = Object.entries(patientDetailsSummary)
-          .map(([key, value]) => `${capitalizeFirstLetter(key)}: ${value}`)
+        const formattedPatientDetailsSummary = Object.entries(
+          patientDetailsSummary
+        )
+          .map(
+            ([key, value]) => `${capitalizeFirstLetter(key)}: ${value}`
+          )
           .join(', ');
 
         summaryTable = [
           ['Total Work Orders', totalWorkOrders],
           ['Total Advance Details', totalAdvance.toFixed(2)],
           ['Total Sale Value', totalSaleValue.toFixed(2)],
-          ['Total CGST', totalworkCGST.toFixed(2)],
-          ['Total SGST', totalworkSGST.toFixed(2)],
+          ['Total CGST', totalWorkCGST.toFixed(2)],
+          ['Total SGST', totalWorkSGST.toFixed(2)],
           ['Total Amount', totalWorkAmount.toFixed(2)],
           ['Total B2B Orders', totalWorkB2B],
           ['Product Entries Summary', formattedProductEntriesSummary || 'N/A'],
           ['Patient Details Summary', formattedPatientDetailsSummary || 'N/A'],
+          ['Total Branches Reported', reportDetails.isCombined ? 'All Branches' : reportDetails.branches.length],
         ];
         break;
       }
       case 'privilegecards': {
         const totalPrivilegeCards = data.length;
-        const totalTopUp = data.reduce((acc, curr) => acc + (curr.top_up_amount || 0), 0);
+        const totalTopUp = data.reduce(
+          (acc, curr) => acc + (curr.top_up_amount || 0),
+          0
+        );
         const totalLoyaltyPointsPrivilege = data.reduce(
           (acc, curr) => acc + (curr.loyalty_points || 0),
           0
@@ -685,13 +858,20 @@ const ReportGenerator = ({ isCollapsed }) => {
           ['Total Top-Up Amount', totalTopUp.toFixed(2)],
           ['Total Loyalty Points', totalLoyaltyPointsPrivilege],
           ['Card Tier Distribution', distributionText],
+          ['Total Branches Reported', reportDetails.isCombined ? 'All Branches' : reportDetails.branches.length],
         ];
         break;
       }
-      case 'products': {
-        const totalProducts = data.length;
-        const totalQuantity = data.reduce((acc, curr) => acc + (curr.quantity || 0), 0);
-        const totalRevenue = data.reduce((acc, curr) => acc + ((curr.price || 0) * (curr.quantity || 0)), 0);
+      case 'product_sales': {
+        const totalProducts = formattedProductIdSummary.length;
+        const totalQuantity = formattedProductIdSummary.reduce(
+          (acc, curr) => acc + parseInt(curr['Total Quantity Sold'] || 0, 10),
+          0
+        );
+        const totalRevenue = formattedProductIdSummary.reduce(
+          (acc, curr) => acc + parseFloat(curr['Total Revenue'] || 0),
+          0
+        );
         const averagePrice = totalQuantity ? (totalRevenue / totalQuantity) : 0;
 
         // Summarize HSN Code distribution
@@ -701,16 +881,19 @@ const ReportGenerator = ({ isCollapsed }) => {
           return acc;
         }, {});
 
-        const formattedHsnCodeDistribution = Object.entries(hsnCodeDistribution)
+        const formattedHsnCodeDistribution = Object.entries(
+          hsnCodeDistribution
+        )
           .map(([hsn, count]) => `${hsn}: ${count}`)
           .join(', ');
 
         summaryTable = [
           ['Total Products', totalProducts],
-          ['Total Quantity', totalQuantity],
+          ['Total Quantity Sold', totalQuantity],
           ['Total Revenue', totalRevenue.toFixed(2)],
           ['Average Price per Product', averagePrice.toFixed(2)],
           ['HSN Code Distribution', formattedHsnCodeDistribution || 'N/A'],
+          ['Total Branches Reported', reportDetails.isCombined ? 'All Branches' : reportDetails.branches.length],
         ];
         break;
       }
@@ -723,44 +906,52 @@ const ReportGenerator = ({ isCollapsed }) => {
       startY: summaryStartY + 5,
       head: [['Metric', 'Value']],
       body: summaryTable,
-      styles: { fontSize: 10, cellPadding: 1.5, halign: 'center' }, // Center align entries
+      styles: { fontSize: 7, cellPadding: 1, halign: 'center' }, // Reduced font size
       headStyles: { fillColor: [41, 128, 185], halign: 'center', textColor: 255 },
-      margin: { left: 14, right: 14 },
+      margin: { left: 10, right: 10 },
       theme: 'striped',
       columnStyles: {
-        0: { halign: 'left', cellWidth: 80 },
+        0: { halign: 'left', cellWidth: 60 },
         1: { halign: 'center', cellWidth: 30 },
       },
     });
 
-    // If report type is 'products', add detailed summary by Product ID
-    if (reportType === 'products' && formattedProductIdSummary) {
+    // If report type is 'product_sales', add detailed summary by Product ID
+    if (reportType === 'product_sales' && formattedProductIdSummary) {
       const detailedSummaryStartY = doc.lastAutoTable.finalY + 10;
-      doc.setFontSize(12);
-      doc.text('Detailed Summary by Product ID', 14, detailedSummaryStartY);
-      doc.setFontSize(10); // Increased font size for detailed summary
+      doc.setFontSize(10);
+      doc.text('Detailed Summary by Product ID', 10, detailedSummaryStartY);
+      doc.setFontSize(7); // Reduced font size for detailed summary
 
       // Generate the detailed summary table
       doc.autoTable({
         startY: detailedSummaryStartY + 5,
-        head: [['Product ID', 'Product Name', 'Total Quantity Sold', 'Total Revenue', 'Average Price']],
+        head: [['Product ID', 'Product Name', 'MRP', 'Rate', 'HSN Code', 'Total Quantity Sold', 'Total Revenue', 'Stock Created At', 'Stock Updated At']],
         body: formattedProductIdSummary.map((item) => [
           item['Product ID'],
           item['Product Name'],
+          item['MRP'],
+          item['Rate'],
+          item['HSN Code'],
           item['Total Quantity Sold'],
           item['Total Revenue'],
-          item['Average Price'],
+          item['Stock Created At'],
+          item['Stock Updated At'],
         ]),
-        styles: { fontSize: 10, cellPadding: 1.5, halign: 'center' }, // Center align entries
+        styles: { fontSize: 7, cellPadding: 1, halign: 'center', overflow: 'linebreak' }, // Smaller font, linebreak for overflow
         headStyles: { fillColor: [41, 128, 185], halign: 'center', textColor: 255 },
-        margin: { left: 14, right: 14 },
+        margin: { left: 10, right: 10 },
         theme: 'grid',
         columnStyles: {
-          0: { halign: 'center', cellWidth: 30 },
-          1: { halign: 'center', cellWidth: 50 },
-          2: { halign: 'center', cellWidth: 30 },
-          3: { halign: 'center', cellWidth: 40 },
-          4: { halign: 'center', cellWidth: 40 },
+          0: { halign: 'center', cellWidth: 15 },
+          1: { halign: 'center', cellWidth: 25 },
+          2: { halign: 'center', cellWidth: 10 },
+          3: { halign: 'center', cellWidth: 10 },
+          4: { halign: 'center', cellWidth: 15 },
+          5: { halign: 'center', cellWidth: 15 },
+          6: { halign: 'center', cellWidth: 15 },
+          7: { halign: 'center', cellWidth: 20 },
+          8: { halign: 'center', cellWidth: 20 },
         },
       });
     }
@@ -773,6 +964,7 @@ const ReportGenerator = ({ isCollapsed }) => {
     doc.save(fileName);
   };
 
+  // Handle keyboard navigation
   const handleKeyDown = (event, nextRef) => {
     if (event.key === 'Enter') {
       event.preventDefault();
@@ -784,165 +976,252 @@ const ReportGenerator = ({ isCollapsed }) => {
 
   return (
     <div
-      className={`transition-all duration-300 ${
-        isCollapsed ? "mx-20" : "mx-20 px-20"
-      } justify-center mt-20 py-10 rounded-xl mx-auto max-w-2xl bg-green-50 shadow-inner`}
+      className={`flex flex-col items-center transition-all duration-300 ${isCollapsed ? 'ml-0' : 'ml-14'} my-8 pt-16 min-h-screen px-20 max-w-full mx-auto`}
     >
-      <h2 className="text-2xl font-semibold text-center mb-6">Generate Reports</h2>
+      <div className="w-full">
+        <h1 className="text-4xl font-bold mb-8 text-center text-gray-800">Generate Stock Reports</h1>
 
-      <div className="mb-6 flex flex-col md:flex-row md:space-x-4">
-        {/* Report Type Selection */}
-        <div className="flex-1">
-          <label htmlFor="reportType" className="block mb-2 font-medium">Report Type</label>
-          <select
-            id="reportType"
-            ref={reportTypeRef}
-            value={reportType}
-            onChange={(e) => setReportType(e.target.value)}
-            onKeyDown={(e) => handleKeyDown(e, reportPeriodRef)}
-            className="w-full p-2 border rounded"
-            aria-label="Select Report Type"
-          >
-            <option value="sales_orders">Sales Orders</option>
-            <option value="work_orders">Work Orders</option>
-            <option value="privilegecards">Privilege Cards</option>
-            <option value="products">Products</option>
-          </select>
-        </div>
+        {/* Notification */}
+        {error && (
+          <div className="flex items-center mb-6 p-4 rounded-lg bg-red-100 text-red-700">
+            <ExclamationCircleIcon className="w-6 h-6 mr-2" />
+            <span>{error}</span>
+          </div>
+        )}
+        {success && (
+          <div className="flex items-center mb-6 p-4 rounded-lg bg-green-100 text-green-700">
+            <CheckCircleIcon className="w-6 h-6 mr-2" />
+            <span>{success}</span>
+          </div>
+        )}
 
-        {/* Report Period Selection */}
-        <div className="flex-1">
-          <label htmlFor="reportPeriod" className="block mb-2 font-medium">Report Period</label>
-          <select
-            id="reportPeriod"
-            value={reportPeriod}
-            ref={reportPeriodRef}
-            onChange={(e) => {
-              setReportPeriod(e.target.value);
-              // Reset date inputs when report period changes
-              setDate('');
-              setMonthYear('');
-              setFromDate('');
-              setToDate('');
-            }}
-            onKeyDown={(e) => handleKeyDown(e, reportPeriod === 'daily' ? dateRef : reportPeriod === 'monthly' ? monthYearRef : fromDateRef)}
-            className="w-full p-2 border rounded"
-            aria-label="Select Report Period"
-          >
-            <option value="daily">Daily</option>
-            <option value="monthly">Monthly</option>
-            <option value="range">Date Range</option>
-          </select>
+        {/* Report Type and Period Selection */}
+        <div className="bg-white shadow-lg rounded-lg p-8 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Report Type Selection */}
+            <div>
+              <label htmlFor="reportType" className="block text-sm font-medium text-gray-700 mb-2">
+                Report Type
+              </label>
+              <select
+                id="reportType"
+                ref={reportTypeRef}
+                value={reportType}
+                onChange={(e) => setReportType(e.target.value)}
+                onKeyDown={(e) =>
+                  handleKeyDown(e, reportPeriodRef)
+                }
+                className="w-full p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
+                aria-label="Select Report Type"
+              >
+                <option value="sales_orders">Sales Orders</option>
+                <option value="work_orders">Work Orders</option>
+                <option value="privilegecards">Privilege Cards</option>
+                <option value="product_sales">Product Sales</option>
+              </select>
+            </div>
+
+            {/* Report Period Selection */}
+            <div>
+              <label htmlFor="reportPeriod" className="block text-sm font-medium text-gray-700 mb-2">
+                Report Period
+              </label>
+              <select
+                id="reportPeriod"
+                value={reportPeriod}
+                ref={reportPeriodRef}
+                onChange={(e) => {
+                  setReportPeriod(e.target.value);
+                  // Reset date inputs when report period changes
+                  setDate('');
+                  setMonthYear('');
+                  setFromDate('');
+                  setToDate('');
+                }}
+                onKeyDown={(e) =>
+                  handleKeyDown(
+                    e,
+                    reportPeriod === 'daily'
+                      ? dateRef
+                      : reportPeriod === 'monthly'
+                      ? monthYearRef
+                      : fromDateRef
+                  )
+                }
+                className="w-full p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
+                aria-label="Select Report Period"
+              >
+                <option value="daily">Daily</option>
+                <option value="monthly">Monthly</option>
+                <option value="range">Date Range</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Report Scope Selection */}
+          <div className="mt-6">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Report Scope
+            </label>
+            <div className="flex items-center space-x-4">
+              <label className="inline-flex items-center">
+                <input
+                  type="radio"
+                  name="reportScope"
+                  value="branch"
+                  checked={!isCombined}
+                  onChange={() => setIsCombined(false)}
+                  className="form-radio h-4 w-4 text-green-600"
+                />
+                <span className="ml-2">Branch-wise</span>
+              </label>
+              <label className="inline-flex items-center">
+                <input
+                  type="radio"
+                  name="reportScope"
+                  value="combined"
+                  checked={isCombined}
+                  onChange={() => setIsCombined(true)}
+                  className="form-radio h-4 w-4 text-green-600"
+                />
+                <span className="ml-2">Combined (All Branches)</span>
+              </label>
+            </div>
+          </div>
+
+          {/* Branch Selection */}
+          {!isCombined && (
+            <div className="mt-6">
+              <label htmlFor="branchSelection" className="block text-sm font-medium text-gray-700 mb-2">
+                Branch Selection
+              </label>
+              <select
+                id="branchSelection"
+                multiple
+                value={selectedBranches}
+                onChange={(e) => {
+                  const options = e.target.options;
+                  const selected = [];
+                  for (let i = 0; i < options.length; i++) {
+                    if (options[i].selected) {
+                      selected.push(options[i].value);
+                    }
+                  }
+                  setSelectedBranches(selected);
+                }}
+                ref={branchSelectionRef}
+                className="w-full p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
+                aria-label="Select Branches"
+              >
+                {allBranches.map((branch) => (
+                  <option key={branch.code} value={branch.code}>
+                    {branch.name}
+                  </option>
+                ))}
+              </select>
+              <p className="text-sm text-gray-500 mt-2">Hold down the Ctrl (Windows) or Command (Mac) button to select multiple branches.</p>
+            </div>
+          )}
+
+          {/* Date Selection */}
+          {reportPeriod === 'daily' ? (
+            <div className="mt-6">
+              <label htmlFor="selectDate" className="block text-sm font-medium text-gray-700 mb-2">Select Date</label>
+              <input
+                type="date"
+                id="selectDate"
+                ref={dateRef}
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                onKeyDown={(e) => handleKeyDown(e, isCombined ? generateButtonRef : branchSelectionRef)}
+                className="w-full p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
+                required
+                aria-required="true"
+              />
+            </div>
+          ) : reportPeriod === 'monthly' ? (
+            <div className="mt-6">
+              <label htmlFor="selectMonthYear" className="block text-sm font-medium text-gray-700 mb-2">Select Month and Year</label>
+              <input
+                type="month"
+                id="selectMonthYear"
+                ref={monthYearRef}
+                value={monthYear}
+                onChange={(e) => setMonthYear(e.target.value)}
+                onKeyDown={(e) => handleKeyDown(e, isCombined ? generateButtonRef : branchSelectionRef)}
+                className="w-full p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
+                required
+                aria-required="true"
+              />
+            </div>
+          ) : reportPeriod === 'range' ? (
+            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* From Date */}
+              <div>
+                <label htmlFor="fromDate" className="block text-sm font-medium text-gray-700 mb-2">From Date</label>
+                <input
+                  type="date"
+                  id="fromDate"
+                  value={fromDate}
+                  ref={fromDateRef}
+                  onChange={(e) => setFromDate(e.target.value)}
+                  onKeyDown={(e) => handleKeyDown(e, toDateRef)}
+                  className="w-full p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
+                  required
+                  aria-required="true"
+                />
+              </div>
+              {/* To Date */}
+              <div>
+                <label htmlFor="toDate" className="block text-sm font-medium text-gray-700 mb-2">To Date</label>
+                <input
+                  type="date"
+                  id="toDate"
+                  value={toDate}
+                  ref={toDateRef}
+                  onChange={(e) => setToDate(e.target.value)}
+                  onKeyDown={(e) => handleKeyDown(e, generateButtonRef)}
+                  className="w-full p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
+                  required
+                  aria-required="true"
+                />
+              </div>
+            </div>
+          ) : null}
+
+          {/* Generate Report Button */}
+          <div className="mt-8 flex justify-center">
+            <button
+              ref={generateButtonRef}
+              onClick={handleGenerateReport}
+              className={`w-full sm:w-1/2 px-6 py-3 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-md flex items-center justify-center transition ${
+                loading ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleGenerateReport();
+              }}
+              disabled={loading}
+            >
+              {loading ? (
+                <>
+                  <svg
+                    className="animate-spin h-5 w-5 mr-3 border-t-2 border-b-2 border-white rounded-full"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path d="M4 12a8 8 0 018-8" stroke="currentColor" strokeWidth="4"></path>
+                  </svg>
+                  Generating Report...
+                </>
+              ) : (
+                'Generate Report'
+              )}
+            </button>
+          </div>
         </div>
       </div>
-
-      {/* Date Selection */}
-      {reportPeriod === 'daily' ? (
-        <div className="mb-6">
-          <label htmlFor="selectDate" className="block mb-2 font-medium">Select Date</label>
-          <input
-            type="date"
-            id="selectDate"
-            ref={dateRef}
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            onKeyDown={(e) => handleKeyDown(e, generateButtonRef)}
-            className="w-full p-2 border rounded"
-            required
-            aria-required="true"
-          />
-        </div>
-      ) : reportPeriod === 'monthly' ? (
-        <div className="mb-6">
-          <label htmlFor="selectMonthYear" className="block mb-2 font-medium">Select Month and Year</label>
-          <input
-            type="month"
-            id="selectMonthYear"
-            ref={monthYearRef}
-            value={monthYear}
-            onChange={(e) => setMonthYear(e.target.value)}
-            onKeyDown={(e) => handleKeyDown(e, generateButtonRef)}
-            className="w-full p-2 border rounded"
-            required
-            aria-required="true"
-          />
-        </div>
-      ) : reportPeriod === 'range' ? (
-        <div className="mb-6 flex flex-col md:flex-row md:space-x-4">
-          {/* From Date */}
-          <div className="flex-1">
-            <label htmlFor="fromDate" className="block mb-2 font-medium">From Date</label>
-            <input
-              type="date"
-              id="fromDate"
-              value={fromDate}
-              ref={fromDateRef}
-              onChange={(e) => setFromDate(e.target.value)}
-              onKeyDown={(e) => handleKeyDown(e, toDateRef)}
-              className="w-full p-2 border rounded"
-              required
-              aria-required="true"
-            />
-          </div>
-          {/* To Date */}
-          <div className="flex-1">
-            <label htmlFor="toDate" className="block mb-2 font-medium">To Date</label>
-            <input
-              type="date"
-              id="toDate"
-              value={toDate}
-              ref={toDateRef}
-              onChange={(e) => setToDate(e.target.value)}
-              onKeyDown={(e) => handleKeyDown(e, generateButtonRef)}
-              className="w-full p-2 border rounded"
-              required
-              aria-required="true"
-            />
-          </div>
-        </div>
-      ) : null}
-
-      {/* Error and Success Messages */}
-      {error && (
-        <div className="flex items-center text-red-500 mb-4">
-          <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <span>{error}</span>
-        </div>
-      )}
-      {success && (
-        <div className="flex items-center text-green-500 mb-4">
-          <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-          </svg>
-          <span>{success}</span>
-        </div>
-      )}
-
-      {/* Generate Report Button */}
-      <button
-        ref={generateButtonRef}
-        onClick={handleGenerateReport}
-        className={`w-full p-2 text-white rounded flex items-center justify-center ${
-          loading
-            ? 'bg-blue-500 cursor-not-allowed'
-            : 'bg-green-500 hover:bg-green-600'
-        }`}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') handleGenerateReport();
-        }}
-        disabled={loading}
-      >
-        {loading ? (
-          <>
-            <svg className="animate-spin h-5 w-5 mr-3 border-t-2 border-b-2 border-white rounded-full" viewBox="0 0 24 24"></svg>
-            Generating Report...
-          </>
-        ) : (
-          'Generate Report'
-        )}
-      </button>
     </div>
   );
 };
