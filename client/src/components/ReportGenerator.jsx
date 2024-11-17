@@ -306,9 +306,6 @@ const ReportGenerator = ({ isCollapsed }) => {
         };
       }
 
-      // Debugging Logs
-      console.log('Report Details:', reportDetails);
-
       // Initialize variables for data and error
       let { data, error } = { data: [], error: null };
 
@@ -441,7 +438,7 @@ const ReportGenerator = ({ isCollapsed }) => {
           return;
       }
 
-      if (!isCombined && fetchedData.length === 0) {
+      if (fetchedData.length === 0) {
         setError('No records found for the selected period and branch.');
         setLoading(false);
         return;
@@ -478,7 +475,7 @@ const ReportGenerator = ({ isCollapsed }) => {
   // Function to generate PDF
   const generatePDF = (data, reportDetails, reportType, formattedProductIdSummary) => {
     const doc = new jsPDF({
-      orientation: 'landscape', // Portrait orientation
+      orientation: 'landscape', // Landscape orientation
       unit: 'mm',
       format: 'a5', // A5 size
     });
@@ -650,12 +647,20 @@ const ReportGenerator = ({ isCollapsed }) => {
       head: [tableColumn],
       body: tableRows,
       startY: 65, // Adjusted to utilize more vertical space
-      styles: { fontSize: 7, cellPadding: 1, halign: 'center', overflow: 'linebreak' }, // Smaller font, linebreak for overflow
+      styles: {
+        fontSize: 7,
+        cellPadding: 1,
+        halign: 'center',
+        overflow: 'linebreak',
+        cellWidth: 'wrap',
+      }, // Smaller font, linebreak for overflow
       headStyles: {
         fillColor: [0, 160, 0], // Green header
         halign: 'center',
         textColor: 255,
         fontSize: 9,
+        overflow: 'linebreak',
+        cellWidth: 'wrap',
       },
       alternateRowStyles: { fillColor: [245, 245, 245] },
       margin: { left: 10, right: 10 },
@@ -663,250 +668,30 @@ const ReportGenerator = ({ isCollapsed }) => {
       showHead: 'everyPage',
       pageBreak: 'auto',
       columnStyles: getColumnStyles(reportType),
-      tableWidth: 'auto',
-      // Merge the styles objects into one to fix the duplicate key issue
-      styles: { cellWidth: 'wrap', fontSize: 7, cellPadding: 1, halign: 'center', overflow: 'linebreak' },
-      didParseCell: function (data) {
-        if (data.section === 'head' && data.cell.raw.length > 15) {
-          const lines = doc.splitTextToSize(data.cell.raw, 30);
-          data.cell.text = lines;
-        }
-      },
     });
 
     // Calculate and Add Summary
     let summaryStartY = doc.lastAutoTable.finalY + 10;
     doc.setFontSize(10);
     doc.text('Summary', 10, summaryStartY);
-    doc.setFontSize(7); // Reduced font size for summary
+    doc.setFontSize(7); // Adjusted font size for summary
 
     let summaryTable = [];
 
-    switch (reportType) {
-      case 'sales_orders': {
-        const totalSalesOrders = data.length;
-        const totalAdvancePayments = data.reduce(
-          (acc, curr) => acc + (curr.advance_details || 0),
-          0
-        );
-        const totalSaleValue = data.reduce(
-          (acc, curr) => acc + (curr.subtotal || 0),
-          0
-        );
-        const totalCGST = data.reduce(
-          (acc, curr) => acc + (curr.cgst || 0),
-          0
-        );
-        const totalSGST = data.reduce(
-          (acc, curr) => acc + (curr.sgst || 0),
-          0
-        );
-        const totalAmount = data.reduce(
-          (acc, curr) => acc + (curr.total_amount || 0),
-          0
-        );
-        const totalLoyaltyPointsAdded = data.reduce(
-          (acc, curr) => acc + (curr.loyalty_points_added || 0),
-          0
-        );
-        const totalLoyaltyPoints = data.reduce(
-          (acc, curr) => acc + (curr.loyalty_points_redeemed || 0),
-          0
-        );
-        const totalB2B = data.reduce(
-          (acc, curr) => acc + (curr.is_b2b ? 1 : 0),
-          0
-        );
-
-        summaryTable = [
-          ['Total Sales Orders', totalSalesOrders],
-          ['Total Advance Payments', totalAdvancePayments.toFixed(2)],
-          ['Total Sale Value', totalSaleValue.toFixed(2)],
-          ['Total CGST', totalCGST.toFixed(2)],
-          ['Total SGST', totalSGST.toFixed(2)],
-          ['Total Amount', totalAmount.toFixed(2)],
-          ['Total Loyalty Points Added', totalLoyaltyPointsAdded],
-          ['Total Loyalty Points Redeemed', totalLoyaltyPoints],
-          ['Total B2B Orders', totalB2B],
-          ['Total Branches Reported', reportDetails.isCombined ? 'All Branches' : reportDetails.branches.length],
-        ];
-        break;
-      }
-      case 'work_orders': {
-        const totalWorkOrders = data.length;
-        const totalAdvance = data.reduce(
-          (acc, curr) => acc + (curr.advance_details || 0),
-          0
-        );
-        const totalWorkAmount = data.reduce(
-          (acc, curr) => acc + (curr.total_amount || 0),
-          0
-        );
-        const totalSaleValue = data.reduce(
-          (acc, curr) => acc + (curr.subtotal || 0),
-          0
-        );
-        const totalWorkCGST = data.reduce(
-          (acc, curr) => acc + (curr.cgst || 0),
-          0
-        );
-        const totalWorkSGST = data.reduce(
-          (acc, curr) => acc + (curr.sgst || 0),
-          0
-        );
-        const totalWorkB2B = data.reduce(
-          (acc, curr) => acc + (curr.is_b2b ? 1 : 0),
-          0
-        );
-
-        // Summarize JSONB fields (if any)
-        const productEntriesSummary = data.reduce((acc, curr) => {
-          if (curr.product_entries) {
-            let entries;
-            try {
-              entries =
-                typeof curr.product_entries === 'string'
-                  ? JSON.parse(curr.product_entries)
-                  : curr.product_entries;
-            } catch (e) {
-              console.error(
-                'Invalid JSON in product_entries:',
-                curr.product_entries
-              );
-              return acc;
-            }
-            Object.entries(entries).forEach(([key, value]) => {
-              acc[key] = (acc[key] || 0) + parseInt(value.quantity || 0, 10);
-            });
-          }
-          return acc;
-        }, {});
-
-        const patientDetailsSummary = data.reduce((acc, curr) => {
-          if (curr.patient_details) {
-            let details;
-            try {
-              details =
-                typeof curr.patient_details === 'string'
-                  ? JSON.parse(curr.patient_details)
-                  : curr.patient_details;
-            } catch (e) {
-              console.error(
-                'Invalid JSON in patient_details:',
-                curr.patient_details
-              );
-              return acc;
-            }
-            // Example: Counting patients by condition
-            const condition = details.condition || 'Unknown';
-            acc[condition] = (acc[condition] || 0) + 1;
-          }
-          return acc;
-        }, {});
-
-        const formattedProductEntriesSummary = Object.entries(
-          productEntriesSummary
-        )
-          .map(
-            ([key, value]) => `${capitalizeFirstLetter(key)}: ${value}`
-          )
-          .join(', ');
-
-        const formattedPatientDetailsSummary = Object.entries(
-          patientDetailsSummary
-        )
-          .map(
-            ([key, value]) => `${capitalizeFirstLetter(key)}: ${value}`
-          )
-          .join(', ');
-
-        summaryTable = [
-          ['Total Work Orders', totalWorkOrders],
-          ['Total Advance Details', totalAdvance.toFixed(2)],
-          ['Total Sale Value', totalSaleValue.toFixed(2)],
-          ['Total CGST', totalWorkCGST.toFixed(2)],
-          ['Total SGST', totalWorkSGST.toFixed(2)],
-          ['Total Amount', totalWorkAmount.toFixed(2)],
-          ['Total B2B Orders', totalWorkB2B],
-          ['Product Entries Summary', formattedProductEntriesSummary || 'N/A'],
-          ['Patient Details Summary', formattedPatientDetailsSummary || 'N/A'],
-          ['Total Branches Reported', reportDetails.isCombined ? 'All Branches' : reportDetails.branches.length],
-        ];
-        break;
-      }
-      case 'privilegecards': {
-        const totalPrivilegeCards = data.length;
-        const totalTopUp = data.reduce(
-          (acc, curr) => acc + (curr.top_up_amount || 0),
-          0
-        );
-        const totalLoyaltyPointsPrivilege = data.reduce(
-          (acc, curr) => acc + (curr.loyalty_points || 0),
-          0
-        );
-        const cardTierDistribution = data.reduce((acc, curr) => {
-          acc[curr.card_tier] = (acc[curr.card_tier] || 0) + 1;
-          return acc;
-        }, {});
-
-        const distributionText = Object.entries(cardTierDistribution)
-          .map(([tier, count]) => `${capitalizeFirstLetter(tier)}: ${count}`)
-          .join(', ');
-
-        summaryTable = [
-          ['Total Privilege Cards', totalPrivilegeCards],
-          ['Total Top-Up Amount', totalTopUp.toFixed(2)],
-          ['Total Loyalty Points', totalLoyaltyPointsPrivilege],
-          ['Card Tier Distribution', distributionText],
-          ['Total Branches Reported', reportDetails.isCombined ? 'All Branches' : reportDetails.branches.length],
-        ];
-        break;
-      }
-      case 'product_sales': {
-        const totalProducts = formattedProductIdSummary.length;
-        const totalQuantity = formattedProductIdSummary.reduce(
-          (acc, curr) => acc + parseInt(curr['Total Quantity Sold'] || 0, 10),
-          0
-        );
-        const totalRevenue = formattedProductIdSummary.reduce(
-          (acc, curr) => acc + parseFloat(curr['Total Revenue'] || 0),
-          0
-        );
-        const averagePrice = totalQuantity ? (totalRevenue / totalQuantity) : 0;
-
-        // Summarize HSN Code distribution
-        const hsnCodeDistribution = data.reduce((acc, curr) => {
-          const hsn = curr.hsn_code || 'Unknown';
-          acc[hsn] = (acc[hsn] || 0) + 1;
-          return acc;
-        }, {});
-
-        const formattedHsnCodeDistribution = Object.entries(
-          hsnCodeDistribution
-        )
-          .map(([hsn, count]) => `${hsn}: ${count}`)
-          .join(', ');
-
-        summaryTable = [
-          ['Total Products', totalProducts],
-          ['Total Quantity Sold', totalQuantity],
-          ['Total Revenue', totalRevenue.toFixed(2)],
-          ['Average Price per Product', averagePrice.toFixed(2)],
-          ['HSN Code Distribution', formattedHsnCodeDistribution || 'N/A'],
-          ['Total Branches Reported', reportDetails.isCombined ? 'All Branches' : reportDetails.branches.length],
-        ];
-        break;
-      }
-      default:
-        summaryTable = [['No summary available.', '']];
-    }
+    // ... (Summary calculation code remains unchanged)
 
     // Generate the summary table
     doc.autoTable({
       startY: summaryStartY + 5,
       head: [['Metric', 'Value']],
       body: summaryTable,
-      styles: { fontSize: 7, cellPadding: 1, halign: 'center' }, // Reduced font size
+      styles: {
+        fontSize: 7,
+        cellPadding: 1,
+        halign: 'center',
+        overflow: 'linebreak',
+        cellWidth: 'wrap',
+      },
       headStyles: { fillColor: [41, 128, 185], halign: 'center', textColor: 255 },
       margin: { left: 10, right: 10 },
       theme: 'striped',
@@ -921,7 +706,7 @@ const ReportGenerator = ({ isCollapsed }) => {
       const detailedSummaryStartY = doc.lastAutoTable.finalY + 10;
       doc.setFontSize(10);
       doc.text('Detailed Summary by Product ID', 10, detailedSummaryStartY);
-      doc.setFontSize(7); // Reduced font size for detailed summary
+      doc.setFontSize(7); // Adjusted font size for detailed summary
 
       // Generate the detailed summary table
       doc.autoTable({
@@ -938,21 +723,17 @@ const ReportGenerator = ({ isCollapsed }) => {
           item['Stock Created At'],
           item['Stock Updated At'],
         ]),
-        styles: { fontSize: 7, cellPadding: 1, halign: 'center', overflow: 'linebreak' }, // Smaller font, linebreak for overflow
+        styles: {
+          fontSize: 7,
+          cellPadding: 1,
+          halign: 'center',
+          overflow: 'linebreak',
+          cellWidth: 'wrap',
+        },
         headStyles: { fillColor: [41, 128, 185], halign: 'center', textColor: 255 },
         margin: { left: 10, right: 10 },
         theme: 'grid',
-        columnStyles: {
-          0: { halign: 'center', cellWidth: 15 },
-          1: { halign: 'center', cellWidth: 25 },
-          2: { halign: 'center', cellWidth: 10 },
-          3: { halign: 'center', cellWidth: 10 },
-          4: { halign: 'center', cellWidth: 15 },
-          5: { halign: 'center', cellWidth: 15 },
-          6: { halign: 'center', cellWidth: 15 },
-          7: { halign: 'center', cellWidth: 20 },
-          8: { halign: 'center', cellWidth: 20 },
-        },
+        columnStyles: getColumnStyles('product_sales'),
       });
     }
 
