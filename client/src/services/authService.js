@@ -91,52 +91,41 @@ export const signOut = async () => {
 };
 
 // Function to add or update stock for a specific branch
-export const addOrUpdateStock = async (productId, branchCode, quantity, rate = null, mrp = null) => {
+export const addOrUpdateStock = async (externalProductId, branchCode, quantity, rate = null, mrp = null) => {
   try {
-    // Check if the product exists
+    // Step 1: Fetch internal product ID
     const { data: product, error: productError } = await supabase
-      .from('products')
-      .select('*')
-      .eq('id', productId)
+      .from("products")
+      .select("id, rate, mrp")
+      .eq("product_id", externalProductId)
       .single();
 
-    if (productError) throw productError;
+    if (productError || !product) throw productError;
 
-    // If rate or mrp is provided, update the product details
-    if (rate !== null || mrp !== null) {
-      const { error: updateProductError } = await supabase
-        .from('products')
-        .update({
-          rate: rate !== null ? rate : product.rate,
-          mrp: mrp !== null ? mrp : product.mrp,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', productId);
+    const internalProductId = product.id;
 
-      if (updateProductError) throw updateProductError;
-    }
-
-    // Insert or update stock
+    // Step 2: Insert or update stock
     const { error: stockError } = await supabase
-      .from('stock')
+      .from("stock")
       .upsert(
         {
-          product_id: productId,
+          product_id: internalProductId,
           branch_code: branchCode,
-          quantity: quantity,
+          quantity,
           updated_at: new Date().toISOString(),
         },
-        { onConflict: ['product_id', 'branch_code'] }
+        { onConflict: ["product_id", "branch_code"] }
       );
 
     if (stockError) throw stockError;
 
     return { success: true };
   } catch (error) {
-    console.error('Error adding/updating stock:', error);
+    console.error("Error adding/updating stock:", error);
     return { success: false, error: error.message };
   }
 };
+
 
 // Function to parse CSV file
 const parseCSV = (file) => {
@@ -343,40 +332,146 @@ export const editStock = async (productId, branchCode, newQuantity) => {
   }
 };
 
-// Function to deduct stock upon purchase
-export const deductStock = async (productId, branchCode, purchaseQuantity) => {
+export async function deductStockForMultipleProducts(products, branchCode) {
   try {
-    // Start a transaction-like sequence
-    // Note: Supabase doesn't support multi-operation transactions via API,
-    // but you can use RPC (Stored Procedures)
+    // Step 1: Filter out invalid products
+    const validProducts = products.filter(
+      (product) => product.product_id && product.purchase_quantity > 0
+    );
 
-    const { data, error } = await supabase.rpc('deduct_stock', {
-      p_product_id: productId,
-      p_branch_code: branchCode,
-      p_purchase_quantity: purchaseQuantity,
-    });
+    if (validProducts.length === 0) {
+      console.error("No valid products to process for stock deduction");
+      return { success: false, error: "No valid products to process" };
+    }
 
-    if (error) throw error;
+    // Step 2: Fetch internal IDs for the external product_ids
+    const productIds = validProducts.map((product) => product.product_id);
+    const { data: productData, error: productError } = await supabase
+      .from("products")
+      .select("id, product_id")
+      .in("product_id", productIds);
+
+    if (productError || !productData) {
+      console.error("Error fetching product IDs:", productError);
+      return { success: false, error: "Failed to fetch product data" };
+    }
+
+    // Create a map of external product_id to internal id
+    const productMap = productData.reduce((acc, product) => {
+      acc[product.product_id] = product.id;
+      return acc;
+    }, {});
+
+    // Step 3: Prepare stock updates using internal IDs
+    const updates = validProducts.map((product) => {
+      const internalProductId = productMap[product.product_id];
+      if (!internalProductId) {
+        console.error(`Product ID ${product.product_id} not found`);
+        return null;
+      }
+      return {
+        product_id: internalProductId,
+        branch_code: branchCode,
+        quantity: -product.purchase_quantity,
+      };
+    }).filter(update => update !== null);
+
+    if (updates.length === 0) {
+      console.error("No valid stock updates to process");
+      return { success: false, error: "No valid stock updates" };
+    }
+
+    // Step 4: Perform the batch update
+    const { error: updateError } = await supabase
+      .from("stock")
+      .upsert(updates, { onConflict: ["product_id", "branch_code"] });
+
+    if (updateError) {
+      console.error("Error updating stock:", updateError);
+      return { success: false, error: "Failed to update stock" };
+    }
 
     return { success: true };
+  } catch (err) {
+    console.error("Unexpected error during stock deduction:", err);
+    return { success: false, error: err.message };
+  }
+}
+
+
+
+// Function to fetch stock by external product_id and branch_code
+export const fetchStockByProductCode = async (internalProductId, branchCode) => {
+  try {
+    console.log('Fetching stock for Product ID:', internalProductId, 'Branch:', branchCode);
+
+    if (!internalProductId) {
+      console.error("Internal Product ID is missing");
+      return { success: false, error: "Internal Product ID is missing" };
+    }
+
+    const { data, error } = await supabase.rpc('get_stock_by_product_code', {
+      p_product_code: internalProductId,
+      p_branch_code: branchCode,
+    });
+
+    if (error) {
+      console.error('get_stock_by_product_code error:', error);
+      return { success: false, error: error.message };
+    }
+
+    console.log('Stock Data:', data);
+    return { success: true, data };
   } catch (error) {
-    console.error('Error deducting stock:', error);
+    console.error('Error fetching stock by product code:', error);
     return { success: false, error: error.message };
   }
 };
 
-// Function to deduct multiple stocks
+
+// client/src/services/authService.js
+
 export const deductMultipleStocks = async (deductions) => {
   try {
+    console.log('Sending deductions to RPC:', deductions); // Log the deductions array
+
     const { data, error } = await supabase.rpc('deduct_multiple_stock', {
       p_deductions: deductions,
     });
 
-    if (error) throw error;
+    if (error) {
+      console.error('deduct_multiple_stock error:', error);
+      return { success: false, error: error.message };
+    }
 
+    console.log('deduct_multiple_stock response:', data);
     return { success: true };
   } catch (error) {
     console.error('Error deducting multiple stocks:', error);
     return { success: false, error: error.message };
   }
+};
+
+
+
+import bcrypt from 'bcryptjs';
+
+const hashPin = async (plainTextPin) => {
+  const salt = await bcrypt.genSalt(10);
+  return await bcrypt.hash(plainTextPin, salt);
+};
+
+export const verifyEmployeePin = async (phoneNumber, enteredPin) => {
+  const { data, error } = await supabase
+    .from("employees")
+    .select("pin")
+    .eq("phone_number", phoneNumber)
+    .single();
+
+  if (error || !data) {
+    return { success: false, message: "Employee not found" };
+  }
+
+  const isMatch = await bcrypt.compare(enteredPin, data.pin);
+  return isMatch ? { success: true } : { success: false, message: "Invalid PIN" };
 };
