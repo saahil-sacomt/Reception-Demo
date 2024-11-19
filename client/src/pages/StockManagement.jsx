@@ -8,9 +8,10 @@ import {
 } from '../services/authService'; // Updated import path
 import supabase from '../supabaseClient';
 import { useAuth } from '../context/AuthContext';
-import EditStockModal from '../components/EditStockModal'; // Ensure this component exists
+import EditStockModal from '../components/EditStockModal';
+import { debounce } from 'lodash'; // Ensure this component exists
 
-const StockManagement = ({isCollapsed}) => {
+const StockManagement = ({ isCollapsed }) => {
   const { user, role } = useAuth();
   const [branches, setBranches] = useState([]);
   const [products, setProducts] = useState([]);
@@ -26,6 +27,10 @@ const StockManagement = ({isCollapsed}) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [stockToEdit, setStockToEdit] = useState(null);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [productSuggestions, setProductSuggestions] = useState([]); // Define the state
+  // To toggle suggestion dropdown
+
 
   const [searchProduct, setSearchProduct] = useState('');
   const [filteredStocks, setFilteredStocks] = useState([]);
@@ -67,6 +72,22 @@ const StockManagement = ({isCollapsed}) => {
 
     fetchData();
   }, []);
+
+
+  const handleSearchInput = async (e) => {
+    const query = e.target.value;
+    setSearchProduct(query); // Corrected: use `searchProduct` instead of `searchTerm`
+
+    if (query.length > 1) {
+      await fetchProductSuggestions(query); // Fetch matching products
+      setShowSuggestions(true); // Show dropdown
+    } else {
+      setProductSuggestions([]); // Clear suggestions if query is too short
+      setShowSuggestions(false);
+    }
+  };
+
+
 
   // Fetch stock data based on selectedBranch and searchProduct
   useEffect(() => {
@@ -114,10 +135,15 @@ const StockManagement = ({isCollapsed}) => {
   }, [selectedBranch, searchProduct]);
 
   // Handler to open edit modal
+  // StockManagement.jsx
   const openEditModal = (stockEntry) => {
-    setStockToEdit(stockEntry);
+    setStockToEdit({
+      ...stockEntry,
+      branch_code: selectedBranch, // Ensure branch_code is included
+    });
     setIsEditModalOpen(true);
   };
+
 
   // Handler to close edit modal
   const closeEditModal = () => {
@@ -214,6 +240,37 @@ const StockManagement = ({isCollapsed}) => {
     }
   };
 
+  const fetchProductSuggestions = async (query) => {
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('id, product_name, product_id')
+        .ilike('product_name', `%${query}%`) // Match query anywhere in the name
+        .limit(10);
+
+      if (error) {
+        console.error('Error fetching suggestions:', error);
+        setProductSuggestions([]);
+        return;
+      }
+
+      setProductSuggestions(data || []); // Update suggestions list
+    } catch (err) {
+      console.error('Error fetching product suggestions:', err);
+    }
+  };
+
+
+  // Debounced fetch function to avoid excessive API calls
+  const debouncedFetchSuggestions = useRef(debounce(fetchProductSuggestions, 300)).current;
+
+  const handleSuggestionClick = (product) => {
+    setSelectedProduct(product.id); // Set product ID
+    setSearchProduct(`${product.product_name} (${product.product_id})`); // Corrected: use `searchProduct` instead of `searchTerm`
+    setShowSuggestions(false); // Hide suggestions
+  };
+
+
   // Handler for bulk upload
   const handleBulkUpload = async (e) => {
     e.preventDefault();
@@ -232,8 +289,7 @@ const StockManagement = ({isCollapsed}) => {
 
     if (!allowedExtensions.includes(fileExtension)) {
       setError(
-        `Invalid file format. Please upload a ${
-          uploadFormat === 'csv' ? 'CSV' : 'XML'
+        `Invalid file format. Please upload a ${uploadFormat === 'csv' ? 'CSV' : 'XML'
         } file.`
       );
       return;
@@ -273,7 +329,7 @@ const StockManagement = ({isCollapsed}) => {
 
   return (
     <div className={`transition-all duration-300 ${isCollapsed ? "mx-20" : "mx-20 px-20"
-        } justify-center mt-20 p-8 rounded-xl mx-auto max-w-2xl bg-green-50 shadow-inner`}>
+      } justify-center mt-20 p-8 rounded-xl mx-auto max-w-2xl bg-green-50 shadow-inner`}>
       <h1 className="text-2xl font-semibold mb-6 text-center">Stock Management</h1>
 
       {/* Display Error and Success Messages */}
@@ -343,26 +399,36 @@ const StockManagement = ({isCollapsed}) => {
 
           {/* Product Selection */}
           <div>
-            <label htmlFor="product" className="block mb-2 font-medium">
-              Select Product
+            <label htmlFor="productSearch" className="block mb-2 font-medium">
+              Search Product
             </label>
-            <select
-              id="product"
-              value={selectedProduct}
-              onChange={(e) => setSelectedProduct(e.target.value)}
+            <input
+              id="productSearch"
+              type="text"
+              value={searchProduct} // Corrected: use `searchProduct` instead of `searchTerm`
+              onChange={handleSearchInput}
+              onFocus={() => setShowSuggestions(true)}
+              onBlur={() => setTimeout(() => setShowSuggestions(false), 200)} // Delay to allow click
+              placeholder="Type product name or ID"
               className="w-full p-2 border rounded"
-              required
-            >
-              <option value="" disabled>
-                Select Product
-              </option>
-              {products.map((product) => (
-                <option key={product.id} value={product.id}>
-                  {product.product_name} ({product.product_id})
-                </option>
-              ))}
-            </select>
+            />
+
+            {/* Suggestion Dropdown */}
+            {showSuggestions && productSuggestions.length > 0 && (
+              <ul className="border rounded bg-white shadow-md max-h-40 overflow-y-auto">
+                {productSuggestions.map((product) => (
+                  <li
+                    key={product.id}
+                    onClick={() => handleSuggestionClick(product)}
+                    className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                  >
+                    {product.product_name} ({product.product_id})
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
+
 
           {/* Quantity Input */}
           <div>
@@ -415,11 +481,10 @@ const StockManagement = ({isCollapsed}) => {
 
         <button
           type="submit"
-          className={`mt-4 w-full p-2 text-white rounded ${
-            isLoading
-              ? 'bg-blue-500 cursor-not-allowed'
-              : 'bg-green-500 hover:bg-green-600'
-          }`}
+          className={`mt-4 w-full p-2 text-white rounded ${isLoading
+            ? 'bg-blue-500 cursor-not-allowed'
+            : 'bg-green-500 hover:bg-green-600'
+            }`}
           disabled={isLoading}
         >
           {isLoading ? 'Updating...' : 'Add/Update Stock'}
@@ -489,14 +554,13 @@ const StockManagement = ({isCollapsed}) => {
 
         <button
           type="submit"
-          className={`mt-4 w-full p-2 text-white rounded ${
-            isLoading
-              ? 'bg-blue-500 cursor-not-allowed'
-              : 'bg-green-500 hover:bg-green-600'
-          }`}
+          className={`mt-4 w-full p-2 text-white rounded ${isLoading
+            ? 'bg-blue-500 cursor-not-allowed'
+            : 'bg-green-500 hover:bg-green-600'
+            }`}
           disabled={isLoading}
         >
-          {isLoading ? 'Uploading...' : 'Upload Stock'}
+          {isLoading ? 'Uploading...be Patient' : 'Upload Stock'}
         </button>
       </form>
 
@@ -579,15 +643,14 @@ const StockManagement = ({isCollapsed}) => {
       {/* Edit Stock Modal */}
       {isEditModalOpen && stockToEdit && (
         <EditStockModal
-          stockEntry={stockToEdit}
+          isOpen={isEditModalOpen}
           onClose={closeEditModal}
-          onUpdateSuccess={() => {
-            setSuccess('Stock updated successfully.');
-            refreshStockData();
-          }}
-          onUpdateError={(msg) => setError(msg)}
+          stockEntry={stockToEdit}
+          refreshStockData={refreshStockData} // Pass the function
         />
+
       )}
+
     </div>
   );
 };

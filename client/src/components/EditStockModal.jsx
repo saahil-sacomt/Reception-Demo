@@ -1,21 +1,19 @@
-// components/EditStockModal.jsx
-
 import React, { useState, useEffect } from 'react';
 import { editStock } from '../services/authService';
 
-const EditStockModal = ({ isOpen, onClose, stockEntry }) => {
-  const [quantity, setQuantity] = useState(stockEntry.quantity);
-  const [rate, setRate] = useState(stockEntry.product.rate);
-  const [mrp, setMrp] = useState(stockEntry.product.mrp);
+const EditStockModal = ({ isOpen, onClose, stockEntry, refreshStockData }) => {
+  const [quantity, setQuantity] = useState(stockEntry?.quantity || 0);
+  const [rate, setRate] = useState(stockEntry?.product?.rate || 0);
+  const [mrp, setMrp] = useState(stockEntry?.product?.mrp || 0);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     if (stockEntry) {
-      setQuantity(stockEntry.quantity);
-      setRate(stockEntry.product.rate);
-      setMrp(stockEntry.product.mrp);
+      setQuantity(stockEntry.quantity || 0);
+      setRate(stockEntry.product?.rate || 0);
+      setMrp(stockEntry.product?.mrp || 0);
     }
   }, [stockEntry]);
 
@@ -24,35 +22,34 @@ const EditStockModal = ({ isOpen, onClose, stockEntry }) => {
     setError('');
     setSuccess('');
 
-    if (quantity === '' || isNaN(quantity) || quantity < 0) {
-      setError('Please enter a valid quantity.');
-      return;
-    }
+    const productId = stockEntry.product?.product_id; // Alphanumeric product_id
+    const branchCode = stockEntry.branch_code;
 
-    if (rate !== '' && (isNaN(rate) || rate < 0)) {
-      setError('Please enter a valid rate.');
-      return;
-    }
-
-    if (mrp !== '' && (isNaN(mrp) || mrp < 0)) {
-      setError('Please enter a valid MRP.');
+    if (!productId || !branchCode) {
+      setError('Missing product ID or branch code.');
       return;
     }
 
     setIsLoading(true);
-    const response = await editStock(stockEntry.product.id, stockEntry.branch_code, parseInt(quantity, 10));
+    const response = await editStock(
+      productId,
+      branchCode,
+      parseInt(quantity, 10),
+      parseFloat(rate),
+      parseFloat(mrp)
+    );
+    setIsLoading(false);
 
     if (response.success) {
-      setSuccess('Stock updated successfully.');
-      // Optionally, refresh stock data in parent component
+      setSuccess('Stock updated successfully!');
+      refreshStockData(); // Refresh stock data
       setTimeout(() => {
+        setSuccess(''); // Clear success message after 2 seconds
         onClose();
-      }, 1000);
+      }, 2000);
     } else {
-      setError(response.error);
+      setError(response.error || 'Failed to update stock.');
     }
-
-    setIsLoading(false);
   };
 
   if (!isOpen) return null;
@@ -61,27 +58,14 @@ const EditStockModal = ({ isOpen, onClose, stockEntry }) => {
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
         <h2 className="text-xl font-semibold mb-4">Edit Stock</h2>
-
-        {error && (
-          <div className="flex items-center text-red-500 mb-4">
-            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span>{error}</span>
-          </div>
-        )}
-        {success && (
-          <div className="flex items-center text-green-500 mb-4">
-            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
-            <span>{success}</span>
-          </div>
-        )}
+        {error && <div className="text-red-500 mb-4">{error}</div>}
+        {success && <div className="text-green-500 mb-4">{success}</div>}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="quantity" className="block mb-1 font-medium">Quantity</label>
+            <label htmlFor="quantity" className="block mb-1 font-medium">
+              Quantity
+            </label>
             <input
               type="number"
               id="quantity"
@@ -92,9 +76,10 @@ const EditStockModal = ({ isOpen, onClose, stockEntry }) => {
               required
             />
           </div>
-
           <div>
-            <label htmlFor="rate" className="block mb-1 font-medium">Rate</label>
+            <label htmlFor="rate" className="block mb-1 font-medium">
+              Rate
+            </label>
             <input
               type="number"
               id="rate"
@@ -105,9 +90,10 @@ const EditStockModal = ({ isOpen, onClose, stockEntry }) => {
               step="0.01"
             />
           </div>
-
           <div>
-            <label htmlFor="mrp" className="block mb-1 font-medium">MRP</label>
+            <label htmlFor="mrp" className="block mb-1 font-medium">
+              MRP
+            </label>
             <input
               type="number"
               id="mrp"
@@ -129,10 +115,12 @@ const EditStockModal = ({ isOpen, onClose, stockEntry }) => {
             </button>
             <button
               type="submit"
-              className={`px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+              className={`px-4 py-2 bg-green-500 text-white rounded ${
+                isLoading ? 'opacity-50' : ''
+              }`}
               disabled={isLoading}
             >
-              {isLoading ? 'Updating...' : 'Update Stock'}
+              {isLoading ? 'Updating...' : 'Update'}
             </button>
           </div>
         </form>

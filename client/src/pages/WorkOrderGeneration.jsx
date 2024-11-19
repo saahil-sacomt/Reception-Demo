@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import { CalendarIcon, PrinterIcon, TrashIcon } from "@heroicons/react/24/outline";
 import supabase from '../supabaseClient';
 import { useAuth } from '../context/AuthContext';
+import EmployeeVerification from "../components/EmployeeVerification";
 
 const WorkOrderGeneration = ({ isCollapsed }) => {
   const { branch, name, user } = useAuth();
@@ -15,6 +16,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   const [advanceDetails, setAdvanceDetails] = useState(0);
   const [dueDate, setDueDate] = useState("");
   const [mrNumber, setMrNumber] = useState("");
+  const [isPinVerified, setIsPinVerified] = useState(false);
   const [patientDetails, setPatientDetails] = useState(null);
   const [employee, setEmployee] = useState("");
   const [employees] = useState(["John Doe", "Jane Smith", "Alex Brown"]);
@@ -24,9 +26,9 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   const [isB2B, setIsB2B] = useState(false);
   const [gstNumber, setGstNumber] = useState("");
   const [isSaving, setIsSaving] = useState(false);
-   
 
-  
+
+
 
   // Utility function to get the current financial year
   const getFinancialYear = () => {
@@ -72,22 +74,20 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
 
   // GST Rate
   const GST_RATE = 12; // Total GST is 12% (6% CGST + 6% SGST)
-  const HSN_CODE = "12345678"; // Dummy HSN Code
+  const HSN_CODE = "9001"; // Dummy HSN Code
 
-  // Calculate total with GST
-  const calculateTotalWithGST = (entries) => {
+  // Calculate totals
+  const calculateTotals = (entries) => {
     const subtotal = entries.reduce((total, product) => {
       const price = parseFloat(product.price) || 0;
       const quantity = parseInt(product.quantity) || 0;
       return total + price * quantity;
     }, 0);
 
-    // Calculate CGST and SGST
-    const cgst = (subtotal * 6) / 100;
-    const sgst = (subtotal * 6) / 100;
-    const totalWithGST = subtotal + cgst + sgst;
+    const cgst = (subtotal * 6) / 100 || 0;
+    const sgst = (subtotal * 6) / 100 || 0;
 
-    return { subtotal, cgst, sgst, totalWithGST };
+    return { subtotal, cgst, sgst };
   };
 
   // References for managing field focus
@@ -174,27 +174,27 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       return null;
     }
   };
-  
 
 
-// Update handleProductEntryChange to use the Supabase fetch function
-const handleProductEntryChange = async (index, field, value) => {
-  const updatedEntries = [...productEntries];
-  updatedEntries[index][field] = value;
 
-  if (field === "id") {
-    const productDetails = await fetchProductDetailsFromSupabase(value);
-    if (productDetails) {
-      updatedEntries[index].name = productDetails.product_name;
-      updatedEntries[index].price = productDetails.mrp;
-    } else {
-      updatedEntries[index].name = "";
-      updatedEntries[index].price = "";
+  // Update handleProductEntryChange to use the Supabase fetch function
+  const handleProductEntryChange = async (index, field, value) => {
+    const updatedEntries = [...productEntries];
+    updatedEntries[index][field] = value;
+
+    if (field === "id") {
+      const productDetails = await fetchProductDetailsFromSupabase(value);
+      if (productDetails) {
+        updatedEntries[index].name = productDetails.product_name;
+        updatedEntries[index].price = productDetails.mrp;
+      } else {
+        updatedEntries[index].name = "";
+        updatedEntries[index].price = "";
+      }
     }
-  }
 
-  setProductEntries(updatedEntries);
-};
+    setProductEntries(updatedEntries);
+  };
 
 
   const addNewProductEntry = () => {
@@ -244,10 +244,15 @@ const handleProductEntryChange = async (index, field, value) => {
   };
 
   // Memoize the calculation to optimize performance
-  const { subtotal, cgst, sgst, totalWithGST } = useMemo(
-    () => calculateTotalWithGST(productEntries),
+  // Memoize calculated values
+  const { subtotal = 0, cgst = 0, sgst = 0 } = useMemo(
+    () => calculateTotals(productEntries),
     [productEntries]
   );
+
+  // Balance calculations
+  const advance = parseFloat(advanceDetails) || 0;
+  const balanceDue = subtotal - advance;
 
   const saveWorkOrder = async () => {
     if (isSaving) {
@@ -255,6 +260,13 @@ const handleProductEntryChange = async (index, field, value) => {
       return;
     }
     setIsSaving(true);
+
+    if (!employee) {
+      setValidationErrors({ employee: "Employee selection is required." });
+      employeeRef.current?.focus();
+      setIsSaving(false);
+      return;
+    }
 
     // Validate Advance Details in Step 5
     if (isB2B && !gstNumber) {
@@ -269,11 +281,6 @@ const handleProductEntryChange = async (index, field, value) => {
       return;
     }
 
-    if (!advanceDetails) {
-      setValidationErrors({ advanceDetails: "Advance details are required" });
-      advanceDetailsRef.current?.focus();
-      return;
-    }
 
     // Validate all product entries
     let productErrors = {};
@@ -305,7 +312,7 @@ const handleProductEntryChange = async (index, field, value) => {
     const payload = {
       work_order_id: newWorkOrderId,
       product_entries: productEntries,
-      advance_details: parseFloat(advanceDetails) || 0,
+      advance_details: advance,
       due_date: dueDate,
       mr_number: mrNumber,
       patient_details: patientDetails,
@@ -314,13 +321,13 @@ const handleProductEntryChange = async (index, field, value) => {
       subtotal,
       cgst,
       sgst,
-      total_amount: totalWithGST,
+      total_amount: subtotal,
       hsn_code: HSN_CODE,
       is_b2b: isB2B,
       gst_number: isB2B ? gstNumber : null,
       created_at: currentUTCDateTime,
       updated_at: currentUTCDateTime,
-      branch:branch,
+      branch: branch,
     };
 
     console.log('Payload being sent:', payload);
@@ -329,14 +336,14 @@ const handleProductEntryChange = async (index, field, value) => {
       const { data, error } = await supabase
         .from("work_orders")
         .insert([payload]);
-  
+
       if (error) {
         console.error("Error saving work order:", error);
         alert("Failed to save work order.");
       } else {
         alert("Work order saved successfully!");
         setAllowPrint(true);
-        resetForm();
+
       }
     } catch (err) {
       console.error("Unexpected error saving work order:", err);
@@ -363,9 +370,17 @@ const handleProductEntryChange = async (index, field, value) => {
       // Validate Step 3: MR Number
       if (!mrNumber) errors.mrNumber = "MR Number is required";
     } else if (step === 4) {
-      // Validate Step 4: Employee Selection and GST Number if B2B
-      if (isB2B && !gstNumber) errors.gstNumber = "GST Number is required";
-      if (!employee) errors.employee = "Employee selection is required";
+      if (!employee) {
+        errors.employee = "Employee selection is required.";
+      } else if (!isPinVerified) {
+        errors.employeeVerification = "Employee must be verified to proceed.";
+      }
+      if (isB2B && !gstNumber) {
+        errors.gstNumber = "GST Number is required for B2B orders.";
+      }
+
+
+
     } else if (step === 5) {
       // Validate Step 5: Payment Method and Advance Details
       if (!paymentMethod) errors.paymentMethod = "Payment method is required";
@@ -533,12 +548,12 @@ const handleProductEntryChange = async (index, field, value) => {
 
                     {/* Product Price Input (auto-filled, read-only) */}
                     <div className="relative w-1/4">
-                    <input
-                      type="text"
-                      value={product.price}
-                      readOnly
-                      className="border border-gray-300 px-4 py-3 rounded-lg w-full text-center bg-gray-100"
-                    />
+                      <input
+                        type="text"
+                        value={product.price}
+                        readOnly
+                        className="border border-gray-300 px-4 py-3 rounded-lg w-full text-center bg-gray-100"
+                      />
                       {validationErrors[`productPrice-${index}`] && (
                         <p className="text-red-500 text-xs absolute -bottom-5 left-0">
                           {validationErrors[`productPrice-${index}`]}
@@ -683,11 +698,23 @@ const handleProductEntryChange = async (index, field, value) => {
                 </option>
               ))}
             </select>
+            {employee && (
+              <EmployeeVerification
+                employee={employee}
+                onVerify={(isVerified) => {
+                  setIsPinVerified(isVerified);
+                  if (isVerified) {
+                    setTimeout(() => nextButtonRef.current?.focus(), 100);
+                  }
+                }}
+              />
+            )}
             {validationErrors.employee && (
               <p className="text-red-500 text-xs mt-1">
                 {validationErrors.employee}
               </p>
             )}
+
 
             <div className="flex items-center space-x-4 mt-6">
               <label className="flex items-center cursor-pointer space-x-4">
@@ -817,9 +844,7 @@ const handleProductEntryChange = async (index, field, value) => {
               <div className="financial-summary grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Left Column */}
                 <div className="space-y-2">
-                  <p>
-                    <span className="font-semibold">Subtotal:</span> ₹{subtotal.toFixed(2)}
-                  </p>
+
                   <p>
                     <span className="font-semibold">CGST (6%):</span> ₹{cgst.toFixed(2)}
                   </p>
@@ -831,13 +856,14 @@ const handleProductEntryChange = async (index, field, value) => {
                 {/* Right Column */}
                 <div className="space-y-2">
                   <p>
-                    <span className="font-semibold">Total Amount (incl. GST):</span> ₹{totalWithGST.toFixed(2)}
+                    <span className="font-semibold">Subtotal:</span> ₹{subtotal.toFixed(2)}
+                  </p>
+
+                  <p>
+                    <span className="font-semibold">Advance Paid:</span> ₹{advance.toFixed(2)}
                   </p>
                   <p>
-                    <span className="font-semibold">Advance Paid:</span> ₹{parseFloat(advanceDetails).toFixed(2)}
-                  </p>
-                  <p>
-                    <span className="font-semibold">Balance Due:</span> ₹{(totalWithGST - parseFloat(advanceDetails)).toFixed(2)}
+                    <span className="font-semibold">Balance Due:</span> ₹{balanceDue.toFixed(2)}
                   </p>
                 </div>
               </div>
@@ -872,7 +898,7 @@ const handleProductEntryChange = async (index, field, value) => {
                 {/* Advance Details */}
                 <div className="w-full md:w-1/2 mb-4 md:mb-0">
                   <label htmlFor="advanceDetails" className="block font-semibold mb-1">
-                    Advance Details:
+                    Advance Paying:
                   </label>
                   <input
                     type="number"
@@ -884,11 +910,6 @@ const handleProductEntryChange = async (index, field, value) => {
                     ref={advanceDetailsRef}
                     className="border border-gray-300 w-full px-4 py-3 rounded-lg"
                   />
-                  {validationErrors.advanceDetails && (
-                    <p className="text-red-500 text-xs ml-1">
-                      {validationErrors.advanceDetails}
-                    </p>
-                  )}
                 </div>
               </div>
             </div>
@@ -962,6 +983,7 @@ const handleProductEntryChange = async (index, field, value) => {
               ref={nextButtonRef}
               onClick={nextStep}
               className="bg-green-500 hover:bg-green-600 text-white mx-2 px-4 py-2 rounded-lg"
+              disabled={step === 4 && !isPinVerified}
             >
               Next
             </button>

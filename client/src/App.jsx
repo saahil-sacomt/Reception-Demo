@@ -13,7 +13,7 @@ import OrderGenerationPage from './pages/OrderGenerationPage';
 import WorkOrderGeneration from './pages/WorkOrderGeneration';
 import SalesOrderGeneration from './pages/SalesOrderGeneration';
 import PrivilegeGeneration from './pages/PrivilegeGeneration';
-import SettingsPage from './pages/SettingsPage';
+// import SettingsPage from './pages/SettingsPage';
 import ReportGenerator from './components/ReportGenerator';
 import Unauthorized from './pages/Unauthorized';
 import RaiseRequest from './pages/RaiseRequest';
@@ -82,7 +82,7 @@ const App = () => {
             <Route element={<RequireAuth allowedRoles={['super_admin', 'admin']}/>}>
             <Route path="/reportgenerator" element={<ReportGenerator isCollapsed={isCollapsed} />} />
             <Route path="/stock-manage" element={<StockManagement isCollapsed={isCollapsed} />} />
-            <Route path="/settings" element={<SettingsPage isCollapsed={isCollapsed} />} />
+            {/* <Route path="/settings" element={<SettingsPage isCollapsed={isCollapsed} />} /> */}
             <Route path="/signup" element={<Signup isCollapsed={isCollapsed} />} />
 
             </Route>
