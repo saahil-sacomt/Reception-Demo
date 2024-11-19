@@ -4,6 +4,7 @@ import { CalendarIcon, PrinterIcon, TrashIcon } from "@heroicons/react/24/outlin
 import supabase from '../supabaseClient';
 import { useAuth } from '../context/AuthContext';
 import EmployeeVerification from "../components/EmployeeVerification";
+import { useNavigate} from 'react-router-dom';
 
 const WorkOrderGeneration = ({ isCollapsed }) => {
   const { branch, name, user } = useAuth();
@@ -26,9 +27,10 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   const [isB2B, setIsB2B] = useState(false);
   const [gstNumber, setGstNumber] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [productSuggestions, setProductSuggestions] = useState([]);
 
 
-
+  const navigate = useNavigate();
 
   // Utility function to get the current financial year
   const getFinancialYear = () => {
@@ -50,10 +52,89 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     return `${financialYearStart}-${financialYearEnd}`;
   };
 
-  // Function to fetch product details based on ID
-  const fetchProductDetails = (productId) => {
-    return productDatabase.find((product) => product.id === productId) || null;
+  // Fetch product suggestions from Supabase based on user input
+  // Fetch suggestions for Product ID or Product Name
+  const fetchProductSuggestions = async (query, type) => {
+    if (!query) return [];
+    try {
+      const column = type === "id" ? "product_id" : "product_name";
+      const { data, error } = await supabase
+        .from("products")
+        .select(`product_id, product_name, mrp`)
+        .ilike(column, `%${query}%`)
+        .limit(10);
+
+      if (error) {
+        console.error(`Error fetching ${type} suggestions:`, error.message);
+        return [];
+      }
+      return data || [];
+    } catch (err) {
+      console.error(`Unexpected error fetching ${type} suggestions:`, err);
+      return [];
+    }
   };
+
+
+  const handleProductInput = async (index, value) => {
+    setProductEntries((prevEntries) => {
+      const updatedEntries = [...prevEntries];
+      updatedEntries[index].id = value; // Update the input value
+      return updatedEntries;
+    });
+
+    if (value) {
+      const suggestions = await fetchProductSuggestions(value);
+      setProductSuggestions(suggestions); // Keep suggestions updated
+    } else {
+      setProductSuggestions([]); // Clear suggestions when input is empty
+    }
+  };
+
+  const validateField = (index, field) => {
+    const errors = { ...validationErrors };
+
+    if (field === "id" && !productEntries[index].id) {
+      errors[`productId-${index}`] = "Product ID is required";
+    } else if (field === "price" && !productEntries[index].price) {
+      errors[`productPrice-${index}`] = "Price is required";
+    } else if (field === "quantity" && !productEntries[index].quantity) {
+      errors[`productQuantity-${index}`] = "Quantity is required";
+    } else {
+      delete errors[`${field}-${index}`];
+    }
+
+    setValidationErrors(errors);
+  };
+
+
+  const handleProductSelection = async (index, value) => {
+    const selectedProduct = productSuggestions.find(
+      (product) => product.product_name === value || product.product_id === value
+    );
+
+    if (selectedProduct) {
+      // Fetch full product details from the database
+      const productDetails = await fetchProductDetailsFromSupabase(selectedProduct.product_id);
+
+      if (productDetails) {
+        setProductEntries((prevEntries) => {
+          const updatedEntries = [...prevEntries];
+          updatedEntries[index] = {
+            id: productDetails.product_id,
+            name: productDetails.product_name,
+            price: productDetails.mrp || "",
+            quantity: "", // Reset quantity on product change
+          };
+          return updatedEntries;
+        });
+      }
+    }
+
+    setProductSuggestions([]); // Clear suggestions after selection
+  };
+
+
 
   const resetForm = () => {
     setProductEntries([{ id: "", name: "", price: "", quantity: "" }]);
@@ -68,8 +149,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     setIsB2B(false);
     setAllowPrint(false);
     setWorkOrderId("");
-    generateNewWorkOrderId(); // Generate a new Work Order ID when resetting
-    setStep(1);
+    generateNewWorkOrderId();
   };
 
   // GST Rate
@@ -102,6 +182,8 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   const newWorkOrderButtonRef = useRef(null);
   const nextButtonRef = useRef(null);
   const fetchButtonRef = useRef(null);
+  const quantityRefs = useRef([]);
+
 
   const getTodayDate = () => {
     const today = new Date();
@@ -147,47 +229,40 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     }
   };
 
-  const fetchProductDetailsFromSupabase = async (productId) => {
+  const fetchProductDetailsFromSupabase = async (value, type) => {
     try {
-      // Fetch product details with correct headers
-      const { data, error, count } = await supabase
+      const column = type === "id" ? "product_id" : "product_name";
+      const { data, error } = await supabase
         .from("products")
-        .select("*", { count: "exact" })
-        .eq("product_id", productId)
+        .select("product_id, product_name, mrp")
+        .eq(column, value);
 
-      // Check if no product was found
       if (error) {
-        console.error("Error fetching product:", error.message);
+        console.error(`Error fetching product details by ${type}:`, error.message);
         return null;
       }
 
-      // Handle multiple rows scenario
-      if (count > 1) {
-        console.error("Multiple products found with the same ID");
-        return null;
-      }
-
-      // Return the single product entry
-      return data?.length === 1 ? data[0] : null;
+      return data && data.length > 0 ? data[0] : null;
     } catch (err) {
-      console.error("Unexpected error fetching product details:", err);
+      console.error(`Unexpected error fetching product details by ${type}:`, err);
       return null;
     }
   };
 
-
-
   // Update handleProductEntryChange to use the Supabase fetch function
+  // Update handleProductEntryChange to fetch product by ID or name
   const handleProductEntryChange = async (index, field, value) => {
     const updatedEntries = [...productEntries];
     updatedEntries[index][field] = value;
 
-    if (field === "id") {
+    if (field === "id" || field === "name") {
       const productDetails = await fetchProductDetailsFromSupabase(value);
       if (productDetails) {
+        updatedEntries[index].id = productDetails.product_id; // Ensure ID is updated
         updatedEntries[index].name = productDetails.product_name;
         updatedEntries[index].price = productDetails.mrp;
       } else {
+        updatedEntries[index].id = "";
         updatedEntries[index].name = "";
         updatedEntries[index].price = "";
       }
@@ -196,6 +271,14 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     setProductEntries(updatedEntries);
   };
 
+  // Function to handle Exit button functionality
+  const handleExit = () => {
+    const confirmExit = window.confirm("Are you sure you want to exit?");
+    if (confirmExit) {
+      resetForm();
+      navigate("/home");
+    }
+  };
 
   const addNewProductEntry = () => {
     setProductEntries([
@@ -216,32 +299,43 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     setProductEntries(updatedEntries);
   };
 
-  const handleProductEntryShiftEnter = (e, index, field) => {
+  const handleProductEntryShiftEnter = async (e, index, field) => {
     if (e.key === "Enter") {
       e.preventDefault();
-      if (e.shiftKey) {
-        // Shift + Enter behavior: Add new product entry and focus on its 'id' field
-        if (index === productEntries.length - 1) {
-          addNewProductEntry();
+
+      if (field === "id" || field === "name") {
+        // Fetch product details and move focus
+        const value = productEntries[index][field];
+        const productDetails = await fetchProductDetailsFromSupabase(value, field);
+
+        if (productDetails) {
+          setProductEntries((prevEntries) => {
+            const updatedEntries = [...prevEntries];
+            updatedEntries[index] = {
+              id: productDetails.product_id,
+              name: productDetails.product_name,
+              price: productDetails.mrp || "",
+              quantity: prevEntries[index].quantity || "", // Preserve quantity
+            };
+            return updatedEntries;
+          });
+
+          // Move focus to Quantity field
           setTimeout(() => {
-            document.getElementById(`productId-${productEntries.length}`)?.focus();
-          }, 0);
-        } else {
-          // If not the last entry, focus on the next product's 'id' field
-          document.getElementById(`productId-${index + 1}`)?.focus();
+            quantityRefs.current[index]?.focus();
+          }, 100);
         }
-      } else {
-        // Regular Enter behavior
-        if (field === "id") {
-          // After entering Product ID, focus on Quantity
-          document.getElementById(`productQuantity-${index}`)?.focus();
-        } else if (field === "quantity") {
-          // After entering Quantity, move to next step
-          nextStep();
-        }
+      } else if (field === "quantity") {
+        // Validate the current field and proceed to the next step
+        validateField(index, "quantity");
+        nextStep();
       }
     }
   };
+  const handleBlur = (index, field) => {
+    validateField(index, field);
+  };
+
 
   // Memoize the calculation to optimize performance
   // Memoize calculated values
@@ -360,7 +454,6 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       // Validate Step 1: Product Entries
       productEntries.forEach((product, index) => {
         if (!product.id) errors[`productId-${index}`] = "Product ID is required";
-        if (!product.price) errors[`productPrice-${index}`] = "Price is required";
         if (!product.quantity) errors[`productQuantity-${index}`] = "Quantity is required";
       });
     } else if (step === 2) {
@@ -520,12 +613,51 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                       <input
                         type="text"
                         id={`productId-${index}`}
-                        placeholder="Product ID / Scan Barcode"
-                        value={product.id || ""}
-                        onChange={(e) => handleProductEntryChange(index, "id", e.target.value)}
-                        onKeyDown={(e) => handleProductEntryShiftEnter(e, index, "id")}
+                        placeholder="Enter Product ID"
+                        value={productEntries[index].id}
+                        onKeyDown={async (e) => {
+                          if (e.key === "Enter") {
+                            setTimeout(() => {
+                              quantityRefs.current[index]?.focus();
+                            }, 100);
+                          }
+                        }}
+                        onChange={async (e) => {
+                          const value = e.target.value;
+                          const suggestions = await fetchProductSuggestions(value, "id");
+                          setProductSuggestions(suggestions);
+                          setProductEntries((prevEntries) => {
+                            const updatedEntries = [...prevEntries];
+                            updatedEntries[index].id = value; // Update ID field
+                            return updatedEntries;
+                          });
+                        }}
+                        onBlur={async () => {
+                          const selectedProduct = productSuggestions.find(
+                            (prod) => prod.product_id === productEntries[index].id
+                          );
+                          if (selectedProduct) {
+                            setProductEntries((prevEntries) => {
+                              const updatedEntries = [...prevEntries];
+                              updatedEntries[index] = {
+                                id: selectedProduct.product_id,
+                                name: selectedProduct.product_name,
+                                price: selectedProduct.mrp || "",
+                                quantity: prevEntries[index].quantity,
+                              };
+                              return updatedEntries;
+                            });
+                          }
+                          setProductSuggestions([]); // Clear suggestions
+                        }}
+                        list={`productIdSuggestions-${index}`}
                         className="border border-gray-300 px-4 py-3 rounded-lg w-full"
                       />
+                      <datalist id={`productIdSuggestions-${index}`}>
+                        {productSuggestions.map((suggestion) => (
+                          <option key={suggestion.product_id} value={suggestion.product_id} />
+                        ))}
+                      </datalist>
                       {validationErrors[`productId-${index}`] && (
                         <p className="text-red-500 text-xs absolute -bottom-5 left-0">
                           {validationErrors[`productId-${index}`]}
@@ -533,17 +665,57 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                       )}
                     </div>
 
+
                     {/* Product Name Input (auto-filled, read-only) */}
                     <div className="relative w-1/2">
                       <input
                         type="text"
                         id={`productName-${index}`}
-                        placeholder="Product Name"
-                        value={product.name || ""}
-                        onChange={(e) => handleProductEntryChange(index, "name", e.target.value)}
-                        className="border border-gray-300 px-4 py-3 rounded-lg w-full bg-gray-100"
-                        readOnly
+                        placeholder="Enter Product Name"
+                        value={productEntries[index].name}
+                        onKeyDown={async (e) => {
+                          if (e.key === "Enter") {
+                            setTimeout(() => {
+                              quantityRefs.current[index]?.focus();
+                            }, 100);
+                          }
+                        }}
+                        onChange={async (e) => {
+                          const value = e.target.value;
+                          const suggestions = await fetchProductSuggestions(value, "name");
+                          setProductSuggestions(suggestions);
+                          setProductEntries((prevEntries) => {
+                            const updatedEntries = [...prevEntries];
+                            updatedEntries[index].name = value; // Update Name field
+                            return updatedEntries;
+                          });
+                        }}
+                        onBlur={async () => {
+                          const selectedProduct = productSuggestions.find(
+                            (prod) => prod.product_name === productEntries[index].name
+                          );
+                          if (selectedProduct) {
+                            setProductEntries((prevEntries) => {
+                              const updatedEntries = [...prevEntries];
+                              updatedEntries[index] = {
+                                id: selectedProduct.product_id,
+                                name: selectedProduct.product_name,
+                                price: selectedProduct.mrp || "",
+                                quantity: prevEntries[index].quantity,
+                              };
+                              return updatedEntries;
+                            });
+                          }
+                          setProductSuggestions([]); // Clear suggestions
+                        }}
+                        list={`productNameSuggestions-${index}`}
+                        className="border border-gray-300 px-4 py-3 rounded-lg w-full"
                       />
+                      <datalist id={`productNameSuggestions-${index}`}>
+                        {productSuggestions.map((suggestion) => (
+                          <option key={suggestion.product_id} value={suggestion.product_name} />
+                        ))}
+                      </datalist>
                     </div>
 
                     {/* Product Price Input (auto-filled, read-only) */}
@@ -554,11 +726,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                         readOnly
                         className="border border-gray-300 px-4 py-3 rounded-lg w-full text-center bg-gray-100"
                       />
-                      {validationErrors[`productPrice-${index}`] && (
-                        <p className="text-red-500 text-xs absolute -bottom-5 left-0">
-                          {validationErrors[`productPrice-${index}`]}
-                        </p>
-                      )}
+                      
                     </div>
 
                     {/* Product Quantity Input */}
@@ -568,13 +736,14 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                         id={`productQuantity-${index}`}
                         placeholder="Quantity"
                         value={product.quantity || ""}
+                        ref={(el) => (quantityRefs.current[index] = el)}
                         onChange={(e) => handleProductEntryChange(index, "quantity", e.target.value)}
                         onKeyDown={(e) => handleProductEntryShiftEnter(e, index, "quantity")}
                         className="border border-gray-300 px-4 py-3 rounded-lg w-full text-center appearance-none"
                       />
-                      {validationErrors[`productQuantity-${index}`] && (
+                      {validationErrors[`productId-${index}`] && (
                         <p className="text-red-500 text-xs absolute -bottom-5 left-0">
-                          {validationErrors[`productQuantity-${index}`]}
+                          {validationErrors[`productId-${index}`]}
                         </p>
                       )}
                     </div>
@@ -941,15 +1110,12 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                 <button
                   onClick={() => window.print()}
                   ref={printButtonRef}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      window.print();
-                      setTimeout(() => {
-                        newWorkOrderButtonRef.current?.focus();
-                      }, 100);
-                    }
-                  }}
+                  // onKeyDown={(e) => {
+                  //   if (e.key === 'Enter') {
+                  //     e.preventDefault();
+                  //     window.print();
+                  //   }
+                  // }}
                   className="flex items-center bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-lg transition w-fit ml-2"
                 >
                   <PrinterIcon className="w-5 h-5 mr-2" />
@@ -957,13 +1123,17 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                 </button>
               )}
 
-              <button
-                onClick={resetForm}
-                ref={newWorkOrderButtonRef}
-                className="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-lg flex items-center justify-center w-fit"
-              >
-                Create New Work Order
-              </button>
+              {/* Exit Button */}
+              {allowPrint && (
+                <div className="flex justify-center text-center mt-6">
+                  <button
+                    onClick={handleExit}
+                    className="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg flex items-center justify-center w-fit"
+                  >
+                    Exit
+                  </button>
+                </div>
+              )}
             </div>
           </>
         )}
