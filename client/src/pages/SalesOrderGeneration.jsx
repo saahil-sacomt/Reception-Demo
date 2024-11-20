@@ -120,7 +120,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
   const [otp, setOtp] = useState("");
   const [isOtpVerified, setIsOtpVerified] = useState(false);
   const [employee, setEmployee] = useState("");
-  const [employees] = useState(["John Doe", "Jane Smith", "Alex Brown"]);
+  const [employees, setEmployees] = useState([]);
   const [allowPrint, setAllowPrint] = useState(false);
   const [advanceDetails, setAdvanceDetails] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState("");
@@ -215,6 +215,38 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [productSuggestions, setProductSuggestions] = useState([]);
+  const fetchEmployees = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("employees")
+        .select("name")
+        .eq("branch", branch); // Filter by branch if necessary
+
+      if (error) {
+        console.error("Error fetching employees:", error.message);
+      } else {
+        setEmployees(data.map((emp) => emp.name)); // Extract only names
+      }
+    } catch (err) {
+      console.error("Unexpected error fetching employees:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (branch) {
+      fetchEmployees(); // Fetch employees when `branch` is available
+    }
+  }, [branch]);
+
+  // Validation for Employee Dropdown
+  const validateEmployeeSelection = () => {
+    if (!employee) {
+      setValidationErrors({ employee: "Employee selection is required." });
+      employeeRef.current?.focus();
+    } else {
+      setValidationErrors({});
+    }
+  };
 
 
 
@@ -1872,25 +1904,21 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                 Order Created by Employee Details
               </h2>
               <select
-                value={employee}
-                onChange={(e) => setEmployee(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && employee) {
-                    employeeRef.current?.focus();
-                  }
-                }}
-                ref={employeeRef}
-                className="border border-gray-300 w-full px-4 py-3 rounded-lg text-center"
-              >
-                <option value="" disabled>
-                  Select Employee
-                </option>
-                {employees.map((emp) => (
-                  <option key={emp} value={emp}>
-                    {emp}
-                  </option>
-                ))}
-              </select>
+            value={employee}
+            onChange={(e) => setEmployee(e.target.value)}
+            ref={employeeRef}
+            onBlur={validateEmployeeSelection}
+            className="border border-gray-300 w-full px-4 py-3 rounded-lg focus:outline-none focus:border-green-500"
+          >
+            <option value="" disabled>
+              Select Employee
+            </option>
+            {employees.map((emp, index) => (
+              <option key={index} value={emp}>
+                {emp}
+              </option>
+            ))}
+          </select>
               {employee && (
                 <EmployeeVerification
                   employee={employee}
