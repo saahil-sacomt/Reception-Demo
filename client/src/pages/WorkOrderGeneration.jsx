@@ -1038,9 +1038,9 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                         <td className="py-2 px-4 border-b">{product.id}</td>
                         <td className="py-2 px-4 border-b">{product.name}</td>
                         <td className="py-2 px-4 border-b">9001</td>
-                        <td className="py-2 px-4 border-b">₹ {parseFloat(product.price).toFixed(2)}</td>
+                        <td className="py-2 px-4 border-b">{parseFloat(product.price).toFixed(2)}</td>
                         <td className="py-2 px-4 border-b">{product.quantity}</td>
-                        <td className="py-2 px-4 border-b">₹ {productSubtotal.toFixed(2)}</td>
+                        <td className="py-2 px-4 border-b">{productSubtotal.toFixed(2)}</td>
                       </tr>
                     );
                   })}
@@ -1153,7 +1153,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                     window.print();
                   }}
                   ref={printButtonRef}
-                  className="flex items-center justify-center w-44 h-12 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition"
+                  className="flex items-center justify-center w-44 h-12 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition"
 
                 >
                   <PrinterIcon className="w-5 h-5 mr-2" />
