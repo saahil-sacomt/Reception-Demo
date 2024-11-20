@@ -63,6 +63,23 @@ const EmployeeVerification = ({ employee, onVerify }) => {
     }
   };
 
+  const handleModifyOrder = (orderId) => {
+    navigate(`/modify-order/${orderId}`, {
+      state: {
+        onModificationSuccess: () => {
+          setActionRequests((prevRequests) =>
+            prevRequests.filter((request) => request.order_id !== orderId)
+          );
+          setNotification({
+            type: 'success',
+            message: `Modification for Order ID ${orderId} completed successfully.`,
+          });
+        },
+      },
+    });
+  };
+  
+
   // Focus on the PIN input field when the component mounts
   useEffect(() => {
     pinInputRef.current?.focus();

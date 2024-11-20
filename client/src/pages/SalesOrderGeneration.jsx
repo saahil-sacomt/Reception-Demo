@@ -6,6 +6,7 @@ import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { deductStockForMultipleProducts } from '../services/authService.js';
 import EmployeeVerification from "../components/EmployeeVerification";
+import { useModificationContext } from "../context/ModificationContext";
 
 
 
@@ -102,7 +103,7 @@ const calculateLoyaltyPoints = (
 };
 
 // Main Component
-const SalesOrderGeneration = memo(({ isCollapsed }) => {
+const SalesOrderGeneration = memo(({ isCollapsed ,onModificationSuccess}) => {
   const { user, role, name, branch, loading: authLoading } = useAuth(); // Destructure branch from AuthContext
 
   const [step, setStep] = useState(0); // Adjusted step numbering
@@ -110,8 +111,7 @@ const SalesOrderGeneration = memo(({ isCollapsed }) => {
   const [productEntries, setProductEntries] = useState([
     { id: "", name: "", price: "", quantity: "" },
   ]);
-
-
+  
   const [patientDetails, setPatientDetails] = useState(null);
   const [privilegeCard, setPrivilegeCard] = useState(true);
   const [isPinVerified, setIsPinVerified] = useState(false);
@@ -168,6 +168,10 @@ const SalesOrderGeneration = memo(({ isCollapsed }) => {
     setProductEntries(updatedEntries);
   };
 
+
+
+  
+
   const addNewProductEntry = () => {
     setProductEntries([
       ...productEntries,
@@ -204,13 +208,14 @@ const SalesOrderGeneration = memo(({ isCollapsed }) => {
 
   const navigate = useNavigate();
   const location = useLocation();
+  const { state } = useLocation();
   const { orderId } = useParams();
   const [isEditing, setIsEditing] = useState(false);
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [productSuggestions, setProductSuggestions] = useState([]);
 
-
+  
 
 
 
@@ -714,6 +719,22 @@ const SalesOrderGeneration = memo(({ isCollapsed }) => {
     }
   };
 
+  const validateField = (index, field) => {
+    const errors = { ...validationErrors };
+
+    if (field === "id" && !productEntries[index].id) {
+      errors[`productId-${index}`] = "Product ID is required";
+    } else if (field === "price" && !productEntries[index].price) {
+      errors[`productPrice-${index}`] = "Price is required";
+    } else if (field === "quantity" && !productEntries[index].quantity) {
+      errors[`productQuantity-${index}`] = "Quantity is required";
+    } else {
+      delete errors[`${field}-${index}`];
+    }
+
+    setValidationErrors(errors);
+  };
+
   const handleProductEntryShiftEnter = async (e, index, field) => {
     if (e.key === "Enter") {
       e.preventDefault();
@@ -834,6 +855,14 @@ const SalesOrderGeneration = memo(({ isCollapsed }) => {
     }
   };
 
+  useEffect(() => {
+    if (location.state?.isFromApproval) {
+      setStep(location.state.step || 1);
+      setIsEditing(true);
+    }
+  }, [location]);
+  
+
 
   const handleOrderCompletion = async () => {
     const currentUTCDateTime = getCurrentUTCDateTime();
@@ -900,6 +929,9 @@ const SalesOrderGeneration = memo(({ isCollapsed }) => {
         }
 
         alert("Sales order updated successfully!");
+
+        
+        
       } else {
         // Step 4: Insert New Sales Order
         const newSalesOrderId = await generateSalesOrderId();
@@ -934,6 +966,8 @@ const SalesOrderGeneration = memo(({ isCollapsed }) => {
         }
 
         alert("Sales order created successfully!");
+
+        
 
         // Step 5: Mark Work Order as Used (if applicable)
         if (selectedWorkOrder) {
@@ -978,8 +1012,22 @@ const SalesOrderGeneration = memo(({ isCollapsed }) => {
       }
 
       // Step 7: Reset the Form After Successful Submission
+      if (onModificationSuccess) {
+        await supabase
+          .from("modification_requests")
+          .update({ status: "completed" })
+          .eq("order_id", orderId);
+      
+        // Trigger the callback to notify EmployeeActionRequired
+        console.log("Triggering onModificationSuccess with orderId:", orderId);
+        onModificationSuccess(orderId);
+      }
 
       setAllowPrint(true);
+      
+  
+      alert("Order processed successfully!");
+      navigate('/home');
     } catch (error) {
       console.error("Error completing the order:", error);
       setErrorMessage("Failed to complete the order.");

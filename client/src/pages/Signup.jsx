@@ -20,6 +20,8 @@ const Signup = () => {
   const [isSuccess, setIsSuccess] = useState(false); // New state for success
   const [showPassword, setShowPassword] = useState(false);
   const [selectedBranch, setSelectedBranch] = useState('');
+  const [pin, setPin] = useState('');
+
   const navigate = useNavigate();
 
 
@@ -42,6 +44,12 @@ const branches = [
   const handleSignup = async (e) => {
     e.preventDefault();
     setErrorMessage('');
+
+    // Add PIN validation
+  if (pin.length < 4 || pin.length > 6) {
+    setErrorMessage('PIN must be between 4 to 6 digits.');
+    return;
+  }
   
     // Frontend Validations
     if (!name.trim()) {
@@ -93,7 +101,8 @@ const branches = [
         address,
         phoneNumber,
         emergencyContact,
-        selectedBranch // Pass the selected branch code
+        selectedBranch ,
+        pin// Pass the selected branch code
       );
   
       if (error) {
@@ -371,6 +380,20 @@ const branches = [
                   placeholder="123 Main St, City, Country"
                 />
               </div>
+              {/* PIN */}
+<div>
+  <Input
+    label="Employee PIN"
+    type="password"
+    name="pin"
+    id="pin"
+    value={pin}
+    onChange={(e) => setPin(e.target.value)}
+    required
+    placeholder="Enter a secure PIN"
+  />
+</div>
+
 
               {/* Phone Number */}
               <div>

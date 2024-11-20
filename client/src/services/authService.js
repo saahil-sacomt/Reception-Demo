@@ -3,6 +3,7 @@
 import supabase from '../supabaseClient';
 import Papa from 'papaparse'; // For CSV parsing
 import xml2js from 'xml2js'; // For XML parsing
+import bcrypt from 'bcryptjs';
 
 // Function to sign up a new user and add to 'employees' table
 export const signUp = async (
@@ -13,7 +14,8 @@ export const signUp = async (
   address,
   phoneNumber,
   emergencyContact,
-  branch
+  branch,
+  pin
 ) => {
   try {
     // Step 1: Sign up the user using Supabase Auth
@@ -27,6 +29,7 @@ export const signUp = async (
     }
 
     const userId = authData.user.id;
+    const hashedPin = await bcrypt.hash(pin, 10);
 
     // Step 2: Insert additional details into the 'employees' table
     const { data: existingUser } = await supabase
@@ -51,6 +54,7 @@ export const signUp = async (
           emergency_contact: emergencyContact,
           emp_id: `emp${Math.floor(1000 + Math.random() * 9000)}`, // Generate emp_id
           branch,
+          pin: hashedPin,
         },
       ]);
 
@@ -546,26 +550,47 @@ export const deductMultipleStocks = async (deductions) => {
   }
 };
 
-
-
-import bcrypt from 'bcryptjs';
-
 const hashPin = async (plainTextPin) => {
   const salt = await bcrypt.genSalt(10);
   return await bcrypt.hash(plainTextPin, salt);
 };
 
-export const verifyEmployeePin = async (phoneNumber, enteredPin) => {
-  const { data, error } = await supabase
-    .from("employees")
-    .select("pin")
-    .eq("phone_number", phoneNumber)
-    .single();
+const verifyPin = async () => {
+  setError(""); // Reset error message
+  setSuccessMessage(""); // Reset success message
 
-  if (error || !data) {
-    return { success: false, message: "Employee not found" };
+  if (pin.length !== 4) {
+    setError("PIN must be exactly 4 digits.");
+    return;
   }
 
-  const isMatch = await bcrypt.compare(enteredPin, data.pin);
-  return isMatch ? { success: true } : { success: false, message: "Invalid PIN" };
+  try {
+    // Fetch the employee's hashed PIN from the database
+    const { data, error } = await supabase
+      .from("employees")
+      .select("pin")
+      .eq("name", employee)
+      .single(); // Ensure we fetch a single matching record
+
+    if (error || !data || !data.pin) {
+      setError("Employee not found or no PIN set.");
+      onVerify(false);
+      return;
+    }
+
+    // Verify the entered PIN against the stored hashed PIN
+    const isValidPin = await bcrypt.compare(pin, data.pin);
+    if (isValidPin) {
+      setSuccessMessage("PIN Verified Successfully!");
+      setError("");
+      onVerify(true);
+    } else {
+      setError("Incorrect PIN. Please try again.");
+      onVerify(false);
+    }
+  } catch (err) {
+    console.error("Error verifying PIN:", err);
+    setError("Failed to verify PIN. Please try again.");
+    onVerify(false);
+  }
 };

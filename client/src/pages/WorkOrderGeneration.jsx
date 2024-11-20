@@ -108,15 +108,9 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   };
 
 
-  const handleProductSelection = async (index, value) => {
-    const selectedProduct = productSuggestions.find(
-      (product) => product.product_name === value || product.product_id === value
-    );
-
-    if (selectedProduct) {
-      // Fetch full product details from the database
-      const productDetails = await fetchProductDetailsFromSupabase(selectedProduct.product_id);
-
+  const handleProductSelection = async (index, productId) => {
+    try {
+      const productDetails = await fetchProductDetailsFromSupabase(productId, "id");
       if (productDetails) {
         setProductEntries((prevEntries) => {
           const updatedEntries = [...prevEntries];
@@ -124,15 +118,21 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
             id: productDetails.product_id,
             name: productDetails.product_name,
             price: productDetails.mrp || "",
-            quantity: "", // Reset quantity on product change
+            quantity: "", // Reset quantity on product selection
           };
           return updatedEntries;
         });
+  
+        // Automatically move focus to the Quantity field
+        setTimeout(() => {
+          quantityRefs.current[index]?.focus();
+        }, 100);
       }
+    } catch (error) {
+      console.error("Error fetching product details:", error);
     }
-
-    setProductSuggestions([]); // Clear suggestions after selection
   };
+  
 
 
 
@@ -285,6 +285,11 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       ...productEntries,
       { id: "", name: "", price: "", quantity: "" },
     ]);
+    if (e.key === "Enter" && e.shiftKey) {
+      e.preventDefault();
+      addNewProductEntry();
+    }
+    
     setTimeout(
       () =>
         document
@@ -585,192 +590,160 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       >
         {/* Step 1: Work Order ID and Product Entries */}
         {step === 1 && (
-          <div className="w-fit bg-gray-50 p-6 rounded-md shadow-inner space-y-4">
-            {/* Generated Work Order ID */}
-            <div>
-              <label className="block text-gray-700 font-medium mb-1">
-                Generated Work Order ID
-              </label>
-              <input
-                type="text"
-                value={workOrderId}
-                readOnly
-                className="border border-gray-300 px-4 py-3 rounded-lg bg-gray-200 text-gray-700 w-full text-center"
-              />
-            </div>
+  <div className="w-fit bg-gray-50 p-6 rounded-md shadow-inner space-y-4">
+    {/* Generated Work Order ID */}
+    <div>
+      <label className="block text-gray-700 font-medium mb-1">
+        Generated Work Order ID
+      </label>
+      <input
+        type="text"
+        value={workOrderId}
+        readOnly
+        className="border border-gray-300 px-4 py-3 rounded-lg bg-gray-200 text-gray-700 w-full text-center"
+      />
+    </div>
 
-            {/* Product Details */}
-            <label className="block text-gray-700 font-medium mb-4">
-              Product Details
-            </label>
-            <div className="space-y-6">
-              {productEntries &&
-                Array.isArray(productEntries) &&
-                productEntries.map((product, index) => (
-                  <div key={index} className="flex space-x-2 items-center">
-                    {/* Product ID Input */}
-                    <div className="relative w-2/4">
-                      <input
-                        type="text"
-                        id={`productId-${index}`}
-                        placeholder="Enter Product ID"
-                        value={productEntries[index].id}
-                        onKeyDown={async (e) => {
-                          if (e.key === "Enter") {
-                            setTimeout(() => {
-                              quantityRefs.current[index]?.focus();
-                            }, 100);
-                          }
-                        }}
-                        onChange={async (e) => {
-                          const value = e.target.value;
-                          const suggestions = await fetchProductSuggestions(value, "id");
-                          setProductSuggestions(suggestions);
-                          setProductEntries((prevEntries) => {
-                            const updatedEntries = [...prevEntries];
-                            updatedEntries[index].id = value; // Update ID field
-                            return updatedEntries;
-                          });
-                        }}
-                        onBlur={async () => {
-                          const selectedProduct = productSuggestions.find(
-                            (prod) => prod.product_id === productEntries[index].id
-                          );
-                          if (selectedProduct) {
-                            setProductEntries((prevEntries) => {
-                              const updatedEntries = [...prevEntries];
-                              updatedEntries[index] = {
-                                id: selectedProduct.product_id,
-                                name: selectedProduct.product_name,
-                                price: selectedProduct.mrp || "",
-                                quantity: prevEntries[index].quantity,
-                              };
-                              return updatedEntries;
-                            });
-                          }
-                          setProductSuggestions([]); // Clear suggestions
-                        }}
-                        list={`productIdSuggestions-${index}`}
-                        className="border border-gray-300 px-4 py-3 rounded-lg w-full"
-                      />
-                      <datalist id={`productIdSuggestions-${index}`}>
-                        {productSuggestions.map((suggestion) => (
-                          <option key={suggestion.product_id} value={suggestion.product_id} />
-                        ))}
-                      </datalist>
-                      {validationErrors[`productId-${index}`] && (
-                        <p className="text-red-500 text-xs absolute -bottom-5 left-0">
-                          {validationErrors[`productId-${index}`]}
-                        </p>
-                      )}
-                    </div>
+    {/* Product Details */}
+    <label className="block text-gray-700 font-medium mb-4">Product Details</label>
+    <div className="space-y-6">
+  {productEntries.map((product, index) => (
+    <div key={index} className="flex space-x-2 items-center">
+      {/* Product ID Input */}
+      <div className="relative w-2/4">
+        <input
+          type="text"
+          id={`productId-${index}`}
+          placeholder="Enter Product ID or Scan Barcode"
+          value={productEntries[index].id}
+          onChange={async (e) => {
+            const value = e.target.value;
 
+            // Update the product ID dynamically
+            setProductEntries((prevEntries) => {
+              const updatedEntries = [...prevEntries];
+              updatedEntries[index].id = value;
+              return updatedEntries;
+            });
 
-                    {/* Product Name Input (auto-filled, read-only) */}
-                    <div className="relative w-1/2">
-                      <input
-                        type="text"
-                        id={`productName-${index}`}
-                        placeholder="Enter Product Name"
-                        value={productEntries[index].name}
-                        onKeyDown={async (e) => {
-                          if (e.key === "Enter") {
-                            setTimeout(() => {
-                              quantityRefs.current[index]?.focus();
-                            }, 100);
-                          }
-                        }}
-                        onChange={async (e) => {
-                          const value = e.target.value;
-                          const suggestions = await fetchProductSuggestions(value, "name");
-                          setProductSuggestions(suggestions);
-                          setProductEntries((prevEntries) => {
-                            const updatedEntries = [...prevEntries];
-                            updatedEntries[index].name = value; // Update Name field
-                            return updatedEntries;
-                          });
-                        }}
-                        onBlur={async () => {
-                          const selectedProduct = productSuggestions.find(
-                            (prod) => prod.product_name === productEntries[index].name
-                          );
-                          if (selectedProduct) {
-                            setProductEntries((prevEntries) => {
-                              const updatedEntries = [...prevEntries];
-                              updatedEntries[index] = {
-                                id: selectedProduct.product_id,
-                                name: selectedProduct.product_name,
-                                price: selectedProduct.mrp || "",
-                                quantity: prevEntries[index].quantity,
-                              };
-                              return updatedEntries;
-                            });
-                          }
-                          setProductSuggestions([]); // Clear suggestions
-                        }}
-                        list={`productNameSuggestions-${index}`}
-                        className="border border-gray-300 px-4 py-3 rounded-lg w-full"
-                      />
-                      <datalist id={`productNameSuggestions-${index}`}>
-                        {productSuggestions.map((suggestion) => (
-                          <option key={suggestion.product_id} value={suggestion.product_name} />
-                        ))}
-                      </datalist>
-                    </div>
+            // Fetch product suggestions dynamically
+            const suggestions = await fetchProductSuggestions(value, "id");
+            setProductSuggestions(suggestions);
 
-                    {/* Product Price Input (auto-filled, read-only) */}
-                    <div className="relative w-1/4">
-                      <input
-                        type="text"
-                        value={product.price}
-                        readOnly
-                        className="border border-gray-300 px-4 py-3 rounded-lg w-full text-center bg-gray-100"
-                      />
-                      
-                    </div>
+            // Automatically fetch details and focus quantity if exact match
+            if (suggestions.length === 1 && suggestions[0].product_id === value) {
+              await handleProductSelection(index, suggestions[0].product_id);
+            }
+          }}
+          onKeyDown={async (e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
 
-                    {/* Product Quantity Input */}
-                    <div className="relative w-1/4">
-                      <input
-                        type="number"
-                        id={`productQuantity-${index}`}
-                        placeholder="Quantity"
-                        value={product.quantity || ""}
-                        ref={(el) => (quantityRefs.current[index] = el)}
-                        onChange={(e) => handleProductEntryChange(index, "quantity", e.target.value)}
-                        onKeyDown={(e) => handleProductEntryShiftEnter(e, index, "quantity")}
-                        className="border border-gray-300 px-4 py-3 rounded-lg w-full text-center appearance-none"
-                      />
-                      {validationErrors[`productId-${index}`] && (
-                        <p className="text-red-500 text-xs absolute -bottom-5 left-0">
-                          {validationErrors[`productId-${index}`]}
-                        </p>
-                      )}
-                    </div>
+              const selectedProduct = productSuggestions.find(
+                (prod) => prod.product_id === productEntries[index].id
+              );
 
-                    {/* Delete Product Entry Button */}
-                    {productEntries.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removeProductEntry(index)}
-                        className="text-red-500 hover:text-red-700 transition"
-                      >
-                        <TrashIcon className="w-5 h-5" />
-                      </button>
-                    )}
-                  </div>
-                ))}
+              // Fetch product details if a valid ID is entered or selected
+              if (selectedProduct) {
+                await handleProductSelection(index, selectedProduct.product_id);
+              } else if (productEntries[index].id) {
+                await handleProductSelection(index, productEntries[index].id);
+              }
+            }
 
-              <button
-                type="button"
-                onClick={addNewProductEntry}
-                className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition"
-              >
-                Add Product
-              </button>
-            </div>
-          </div>
-        )}
+            // Shift + Enter for adding a new product entry
+            if (e.key === "Enter" && e.shiftKey) {
+              e.preventDefault();
+              addNewProductEntry();
+            }
+          }}
+          onBlur={async () => {
+            const selectedProduct = productSuggestions.find(
+              (prod) => prod.product_id === productEntries[index].id
+            );
+
+            // Fetch product details on blur if a valid ID exists
+            if (selectedProduct || productEntries[index].id) {
+              await handleProductSelection(index, productEntries[index].id);
+            }
+          }}
+          list={`productIdSuggestions-${index}`}
+          className="border border-gray-300 px-4 py-3 rounded-lg w-full"
+        />
+        <datalist id={`productIdSuggestions-${index}`}>
+          {productSuggestions.map((suggestion) => (
+            <option key={suggestion.product_id} value={suggestion.product_id} />
+          ))}
+        </datalist>
+      </div>
+
+      {/* Product Name (Read-Only) */}
+      <div className="relative w-1/2">
+        <input
+          type="text"
+          value={product.name}
+          readOnly
+          className="border border-gray-300 px-4 py-3 rounded-lg w-full bg-gray-100"
+        />
+      </div>
+
+      {/* Product Price (Read-Only) */}
+      <div className="relative w-1/4">
+        <input
+          type="text"
+          value={product.price}
+          readOnly
+          className="border border-gray-300 px-4 py-3 rounded-lg w-full bg-gray-100"
+        />
+      </div>
+
+      {/* Quantity Input */}
+      <div className="relative w-1/4">
+        <input
+          type="number"
+          id={`productQuantity-${index}`}
+          placeholder="Quantity"
+          value={product.quantity}
+          ref={(el) => (quantityRefs.current[index] = el)}
+          onChange={(e) =>
+            handleProductEntryChange(index, "quantity", e.target.value)
+          }
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              nextStep();
+            }
+          }}
+          className="border border-gray-300 px-4 py-3 rounded-lg w-full text-center"
+        />
+      </div>
+
+      {/* Delete Button */}
+      {productEntries.length > 1 && (
+        <button
+          type="button"
+          onClick={() => removeProductEntry(index)}
+          className="text-red-500 hover:text-red-700 transition"
+        >
+          <TrashIcon className="w-5 h-5" />
+        </button>
+      )}
+    </div>
+  ))}
+
+  {/* Add New Product Button */}
+  <button
+    type="button"
+    onClick={addNewProductEntry}
+    className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition"
+  >
+    Add Product
+  </button>
+</div>
+
+  </div>
+)}
+
 
         {/* Step 2: Due Date */}
         {step === 2 && (
@@ -946,7 +919,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
               <div className="invoice-header text-center mb-6">
                 <h1 className="text-3xl font-bold">Screenetra Eye Care</h1>
                 <p className="text-sm text-gray-600">GST Number: 32AAUCS7002H1ZV</p>
-                <h2 className="text-2xl font-semibold mt-2">WorkOrder Summary</h2>
+                <h2 className="text-2xl font-semibold mt-2">Work Order Summary</h2>
               </div>
 
               {/* Invoice Details */}

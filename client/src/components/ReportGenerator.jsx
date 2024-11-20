@@ -18,60 +18,72 @@ const getColumnStyles = (reportType) => {
   switch (reportType) {
     case 'sales_orders':
       return {
-        0: { halign: 'center', cellWidth: 20 }, // Sales Order ID
-        1: { halign: 'center', cellWidth: 15 }, // MR Number
-        2: { halign: 'center', cellWidth: 10 }, // Is B2B
-        3: { halign: 'center', cellWidth: 15 }, // Sale Value
-        4: { halign: 'center', cellWidth: 10 }, // CGST
-        5: { halign: 'center', cellWidth: 10 }, // SGST
-        6: { halign: 'center', cellWidth: 15 }, // Total Amount
+        0: { halign: 'center', cellWidth: 25 }, // Sales Order ID
+        1: { halign: 'center', cellWidth: 20 }, // MR Number
+        2: { halign: 'center', cellWidth: 15 }, // Is B2B
+        3: { halign: 'center', cellWidth: 20 }, // Sale Value
+        4: { halign: 'center', cellWidth: 15 }, // CGST
+        5: { halign: 'center', cellWidth: 15 }, // SGST
+        6: { halign: 'center', cellWidth: 20 }, // Total Amount
         7: { halign: 'center', cellWidth: 20 }, // Employee
-        8: { halign: 'center', cellWidth: 15 }, // Payment Method
-        9: { halign: 'center', cellWidth: 15 }, // Loyalty Points Redeemed
-        10: { halign: 'center', cellWidth: 15 }, // Loyalty Points Added
-        11: { halign: 'center', cellWidth: 20 }, // Created At
-        12: { halign: 'center', cellWidth: 20 }, // Updated At
+        8: { halign: 'center', cellWidth: 20 }, // Payment Method
+        9: { halign: 'center', cellWidth: 20 }, // Loyalty Points Redeemed
+        10: { halign: 'center', cellWidth: 20 }, // Loyalty Points Added
+        11: { halign: 'center', cellWidth: 25 }, // Created At
+        12: { halign: 'center', cellWidth: 25 }, // Updated At
       };
     case 'work_orders':
       return {
-        0: { halign: 'center', cellWidth: 20 }, // Work Order ID
-        1: { halign: 'center', cellWidth: 15 }, // Advance Details
-        2: { halign: 'center', cellWidth: 15 }, // Due Date
-        3: { halign: 'center', cellWidth: 15 }, // MR Number
+        0: { halign: 'center', cellWidth: 25 }, // Work Order ID
+        1: { halign: 'center', cellWidth: 20 }, // Advance Details
+        2: { halign: 'center', cellWidth: 20 }, // Due Date
+        3: { halign: 'center', cellWidth: 20 }, // MR Number
         4: { halign: 'center', cellWidth: 20 }, // Employee
-        5: { halign: 'center', cellWidth: 15 }, // Payment Method
-        6: { halign: 'center', cellWidth: 15 }, // Total Amount
-        7: { halign: 'center', cellWidth: 10 }, // CGST
-        8: { halign: 'center', cellWidth: 10 }, // SGST
-        9: { halign: 'center', cellWidth: 10 }, // Is B2B
-        10: { halign: 'center', cellWidth: 15 }, // HSN Code
-        11: { halign: 'center', cellWidth: 20 }, // Created At
-        12: { halign: 'center', cellWidth: 20 }, // Updated At
-        13: { halign: 'center', cellWidth: 15 }, // Branch
+        5: { halign: 'center', cellWidth: 20 }, // Payment Method
+        6: { halign: 'center', cellWidth: 20 }, // Total Amount
+        7: { halign: 'center', cellWidth: 15 }, // CGST
+        8: { halign: 'center', cellWidth: 15 }, // SGST
+        9: { halign: 'center', cellWidth: 15 }, // Is B2B
+        10: { halign: 'center', cellWidth: 20 }, // HSN Code
+        11: { halign: 'center', cellWidth: 25 }, // Created At
+        12: { halign: 'center', cellWidth: 25 }, // Updated At
+        13: { halign: 'center', cellWidth: 20 }, // Branch
       };
     case 'privilegecards':
       return {
-        0: { halign: 'center', cellWidth: 20 }, // PC Number
-        1: { halign: 'center', cellWidth: 25 }, // Customer Name
+        0: { halign: 'center', cellWidth: 25 }, // PC Number
+        1: { halign: 'center', cellWidth: 30 }, // Customer Name
         2: { halign: 'center', cellWidth: 20 }, // Phone Number
-        3: { halign: 'center', cellWidth: 15 }, // Top-Up Amount
-        4: { halign: 'center', cellWidth: 15 }, // Loyalty Points
-        5: { halign: 'center', cellWidth: 15 }, // Card Tier
-        6: { halign: 'center', cellWidth: 20 }, // Created At
-        7: { halign: 'center', cellWidth: 15 }, // Branch
-        8: { halign: 'center', cellWidth: 15 }, // Employee
+        3: { halign: 'center', cellWidth: 20 }, // Top-Up Amount
+        4: { halign: 'center', cellWidth: 20 }, // Loyalty Points
+        5: { halign: 'center', cellWidth: 20 }, // Card Tier
+        6: { halign: 'center', cellWidth: 25 }, // Created At
+        7: { halign: 'center', cellWidth: 20 }, // Branch
+        8: { halign: 'center', cellWidth: 20 }, // Employee
       };
     case 'product_sales':
       return {
-        0: { halign: 'center', cellWidth: 15 }, // Product ID
-        1: { halign: 'center', cellWidth: 25 }, // Product Name
-        2: { halign: 'center', cellWidth: 10 }, // MRP
-        3: { halign: 'center', cellWidth: 10 }, // Rate
-        4: { halign: 'center', cellWidth: 15 }, // HSN Code
-        5: { halign: 'center', cellWidth: 15 }, // Total Quantity Sold
-        6: { halign: 'center', cellWidth: 15 }, // Total Revenue
-        7: { halign: 'center', cellWidth: 20 }, // Stock Created At
-        8: { halign: 'center', cellWidth: 20 }, // Stock Updated At
+        0: { halign: 'center', cellWidth: 20 }, // Product ID
+        1: { halign: 'center', cellWidth: 30 }, // Product Name
+        2: { halign: 'center', cellWidth: 15 }, // MRP
+        3: { halign: 'center', cellWidth: 15 }, // Rate
+        4: { halign: 'center', cellWidth: 20 }, // HSN Code
+        5: { halign: 'center', cellWidth: 20 }, // Total Quantity Sold
+        6: { halign: 'center', cellWidth: 20 }, // Total Revenue
+        7: { halign: 'center', cellWidth: 25 }, // Stock Created At
+        8: { halign: 'center', cellWidth: 25 }, // Stock Updated At
+      };
+    case 'modification_reports':
+      return {
+        0: { halign: 'center', cellWidth: 20 }, // Request ID
+        1: { halign: 'center', cellWidth: 25 }, // Order ID
+        2: { halign: 'center', cellWidth: 20 }, // Order Type
+        3: { halign: 'center', cellWidth: 25 }, // Employee Name
+        4: { halign: 'center', cellWidth: 25 }, // Modification Type
+        5: { halign: 'center', cellWidth: 30 }, // Modification Reason
+        6: { halign: 'center', cellWidth: 20 }, // Status
+        7: { halign: 'center', cellWidth: 25 }, // Created At
+        8: { halign: 'center', cellWidth: 25 }, // Updated At
       };
     default:
       return {};
@@ -135,7 +147,7 @@ const addFooter = (doc) => {
 const ReportGenerator = ({ isCollapsed }) => {
   // State Variables
   const { branch: userBranch, name: employeeName } = useAuth(); // Fetch branch and employee name from AuthContext
-  const [reportType, setReportType] = useState('sales_orders'); // 'sales_orders', 'work_orders', 'privilegecards', 'product_sales'
+  const [reportType, setReportType] = useState('sales_orders'); // 'sales_orders', 'work_orders', 'privilegecards', 'product_sales', 'modification_reports'
   const [reportPeriod, setReportPeriod] = useState('daily'); // 'daily', 'monthly', 'range'
   const [date, setDate] = useState(''); // For daily reports
   const [monthYear, setMonthYear] = useState(''); // For monthly reports (format: YYYY-MM)
@@ -432,6 +444,22 @@ const ReportGenerator = ({ isCollapsed }) => {
           }));
           break;
         }
+        case 'modification_reports': {
+          const query = supabase
+            .from('modification_requests')
+            .select('*')
+            .gte('created_at', startDate.toISOString())
+            .lte('created_at', endDate.toISOString());
+
+          if (!isCombined) {
+            query.in('branch', branchesToReport); // Now works since 'branch' exists
+          }
+
+          ({ data, error } = await query);
+          if (error) throw error;
+          fetchedData = data;
+          break;
+        }
         default:
           setError('Invalid report type selected.');
           setLoading(false);
@@ -467,6 +495,8 @@ const ReportGenerator = ({ isCollapsed }) => {
         return 'Privilege Cards';
       case 'product_sales':
         return 'Product Sales';
+      case 'modification_reports':
+        return 'Modification Reports';
       default:
         return '';
     }
@@ -477,7 +507,7 @@ const ReportGenerator = ({ isCollapsed }) => {
     const doc = new jsPDF({
       orientation: 'landscape', // Landscape orientation
       unit: 'mm',
-      format: 'a5', // A5 size
+      format: 'a4', // Changed to A4 for more space
     });
     doc.setFont('Helvetica', '');
 
@@ -546,6 +576,19 @@ const ReportGenerator = ({ isCollapsed }) => {
           'Total Revenue',
           'Stock Created At',
           'Stock Updated At',
+        ];
+        break;
+      case 'modification_reports':
+        tableColumn = [
+          'Request ID',
+          'Order ID',
+          'Order Type',
+          'Employee Name',
+          'Modification Type',
+          'Modification Reason',
+          'Status',
+          'Created At',
+          'Updated At',
         ];
         break;
       default:
@@ -638,6 +681,23 @@ const ReportGenerator = ({ isCollapsed }) => {
           item['Stock Updated At'],
         ]);
         break;
+      case 'modification_reports':
+        tableRows = data.map((record) => [
+          record.request_id || 'N/A',
+          record.order_id || 'N/A',
+          record.order_type || 'N/A',
+          record.employee_name || 'N/A',
+          record.modification_type || 'N/A',
+          record.modification_reason || 'N/A',
+          capitalizeFirstLetter(record.status) || 'N/A',
+          record.created_at
+            ? convertUTCToIST(record.created_at, 'dd-MM-yyyy hh:mm a')
+            : 'N/A',
+          record.updated_at
+            ? convertUTCToIST(record.updated_at, 'dd-MM-yyyy hh:mm a')
+            : 'N/A',
+        ]);
+        break;
       default:
         tableRows = [];
     }
@@ -649,8 +709,9 @@ const ReportGenerator = ({ isCollapsed }) => {
       startY: 65, // Adjusted to utilize more vertical space
       styles: {
         fontSize: 7,
-        cellPadding: 1,
+        cellPadding: 2,
         halign: 'center',
+        valign: 'middle',
         overflow: 'linebreak',
         cellWidth: 'wrap',
       }, // Smaller font, linebreak for overflow
@@ -678,7 +739,54 @@ const ReportGenerator = ({ isCollapsed }) => {
 
     let summaryTable = [];
 
-    // ... (Summary calculation code remains unchanged)
+    // Example summary data based on report type
+    switch (reportType) {
+      case 'sales_orders':
+        const totalSales = data.reduce((acc, curr) => acc + (curr.total_amount || 0), 0);
+        const totalCGST = data.reduce((acc, curr) => acc + (curr.cgst || 0), 0);
+        const totalSGST = data.reduce((acc, curr) => acc + (curr.sgst || 0), 0);
+        summaryTable = [
+          ['Total Sales Amount', totalSales.toFixed(2)],
+          ['Total CGST', totalCGST.toFixed(2)],
+          ['Total SGST', totalSGST.toFixed(2)],
+        ];
+        break;
+      case 'work_orders':
+        const totalWorkAmount = data.reduce((acc, curr) => acc + (curr.total_amount || 0), 0);
+        summaryTable = [
+          ['Total Work Orders', data.length],
+          ['Total Amount', totalWorkAmount.toFixed(2)],
+        ];
+        break;
+      case 'privilegecards':
+        const totalCards = data.length;
+        const totalLoyaltyPoints = data.reduce((acc, curr) => acc + (curr.loyalty_points || 0), 0);
+        summaryTable = [
+          ['Total Privilege Cards', totalCards],
+          ['Total Loyalty Points', totalLoyaltyPoints],
+        ];
+        break;
+      case 'product_sales':
+        const totalQuantity = formattedProductIdSummary.reduce((acc, curr) => acc + Number(curr['Total Quantity Sold']), 0);
+        const totalRevenue = formattedProductIdSummary.reduce((acc, curr) => acc + Number(curr['Total Revenue']), 0);
+        summaryTable = [
+          ['Total Quantity Sold', totalQuantity],
+          ['Total Revenue', totalRevenue.toFixed(2)],
+        ];
+        break;
+      case 'modification_reports':
+        const totalModifications = data.length;
+        const approvedModifications = data.filter(record => record.status === 'approved').length;
+        const pendingModifications = data.filter(record => record.status === 'pending').length;
+        summaryTable = [
+          ['Total Modification Requests', totalModifications],
+          ['Approved', approvedModifications],
+          ['Pending', pendingModifications],
+        ];
+        break;
+      default:
+        summaryTable = [];
+    }
 
     // Generate the summary table
     doc.autoTable({
@@ -687,8 +795,9 @@ const ReportGenerator = ({ isCollapsed }) => {
       body: summaryTable,
       styles: {
         fontSize: 7,
-        cellPadding: 1,
+        cellPadding: 2,
         halign: 'center',
+        valign: 'middle',
         overflow: 'linebreak',
         cellWidth: 'wrap',
       },
@@ -725,8 +834,9 @@ const ReportGenerator = ({ isCollapsed }) => {
         ]),
         styles: {
           fontSize: 7,
-          cellPadding: 1,
+          cellPadding: 2,
           halign: 'center',
+          valign: 'middle',
           overflow: 'linebreak',
           cellWidth: 'wrap',
         },
@@ -734,6 +844,47 @@ const ReportGenerator = ({ isCollapsed }) => {
         margin: { left: 10, right: 10 },
         theme: 'grid',
         columnStyles: getColumnStyles('product_sales'),
+      });
+    }
+
+    // If report type is 'modification_reports', add detailed summary
+    if (reportType === 'modification_reports') {
+      const detailedSummaryStartY = doc.lastAutoTable.finalY + 10;
+      doc.setFontSize(10);
+      doc.text('Detailed Modification Reports', 10, detailedSummaryStartY);
+      doc.setFontSize(7); // Adjusted font size for detailed summary
+
+      // Generate the detailed summary table
+      doc.autoTable({
+        startY: detailedSummaryStartY + 5,
+        head: [['Request ID', 'Order ID', 'Order Type', 'Employee Name', 'Modification Type', 'Modification Reason', 'Status', 'Created At', 'Updated At']],
+        body: data.map((record) => [
+          record.request_id || 'N/A',
+          record.order_id || 'N/A',
+          record.order_type || 'N/A',
+          record.employee_name || 'N/A',
+          record.modification_type || 'N/A',
+          record.modification_reason || 'N/A',
+          capitalizeFirstLetter(record.status) || 'N/A',
+          record.created_at
+            ? convertUTCToIST(record.created_at, 'dd-MM-yyyy hh:mm a')
+            : 'N/A',
+          record.updated_at
+            ? convertUTCToIST(record.updated_at, 'dd-MM-yyyy hh:mm a')
+            : 'N/A',
+        ]),
+        styles: {
+          fontSize: 7,
+          cellPadding: 2,
+          halign: 'center',
+          valign: 'middle',
+          overflow: 'linebreak',
+          cellWidth: 'wrap',
+        },
+        headStyles: { fillColor: [41, 128, 185], halign: 'center', textColor: 255 },
+        margin: { left: 10, right: 10 },
+        theme: 'grid',
+        columnStyles: getColumnStyles('modification_reports'),
       });
     }
 
@@ -755,12 +906,30 @@ const ReportGenerator = ({ isCollapsed }) => {
     }
   };
 
+  // Toggle selection for report scope
+  const toggleReportScope = (scope) => {
+    if (scope === 'combined') {
+      setIsCombined(true);
+    } else {
+      setIsCombined(false);
+    }
+  };
+
+  // Toggle branch selection
+  const toggleBranch = (branchCode) => {
+    if (selectedBranches.includes(branchCode)) {
+      setSelectedBranches(selectedBranches.filter(code => code !== branchCode));
+    } else {
+      setSelectedBranches([...selectedBranches, branchCode]);
+    }
+  };
+
   return (
     <div
-      className={`flex flex-col items-center transition-all duration-300 ${isCollapsed ? 'ml-0' : 'ml-14'} my-8 pt-16 min-h-screen px-20 max-w-full mx-auto`}
+      className={`flex justify-center transition-all duration-300 ${isCollapsed ? 'ml-0' : 'ml-14'} my-8 px-4`}
     >
-      <div className="w-full">
-        <h1 className="text-4xl font-bold mb-8 text-center text-gray-800">Generate Stock Reports</h1>
+      <div className="w-full max-w-4xl">
+        <h1 className="text-3xl font-bold mb-6 text-center text-gray-800">Generate Stock Reports</h1>
 
         {/* Notification */}
         {error && (
@@ -777,11 +946,11 @@ const ReportGenerator = ({ isCollapsed }) => {
         )}
 
         {/* Report Type and Period Selection */}
-        <div className="bg-white shadow-lg rounded-lg p-8 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="bg-white shadow-lg rounded-lg p-6 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Report Type Selection */}
             <div>
-              <label htmlFor="reportType" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="reportType" className="block text-sm font-medium text-gray-700 mb-1">
                 Report Type
               </label>
               <select
@@ -792,19 +961,20 @@ const ReportGenerator = ({ isCollapsed }) => {
                 onKeyDown={(e) =>
                   handleKeyDown(e, reportPeriodRef)
                 }
-                className="w-full p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
+                className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
                 aria-label="Select Report Type"
               >
                 <option value="sales_orders">Sales Orders</option>
                 <option value="work_orders">Work Orders</option>
                 <option value="privilegecards">Privilege Cards</option>
                 <option value="product_sales">Product Sales</option>
+                <option value="modification_reports">Modification Reports</option>
               </select>
             </div>
 
             {/* Report Period Selection */}
             <div>
-              <label htmlFor="reportPeriod" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="reportPeriod" className="block text-sm font-medium text-gray-700 mb-1">
                 Report Period
               </label>
               <select
@@ -829,7 +999,7 @@ const ReportGenerator = ({ isCollapsed }) => {
                       : fromDateRef
                   )
                 }
-                className="w-full p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
+                className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
                 aria-label="Select Report Period"
               >
                 <option value="daily">Daily</option>
@@ -841,32 +1011,34 @@ const ReportGenerator = ({ isCollapsed }) => {
 
           {/* Report Scope Selection */}
           <div className="mt-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
               Report Scope
             </label>
-            <div className="flex items-center space-x-4">
-              <label className="inline-flex items-center">
-                <input
-                  type="radio"
-                  name="reportScope"
-                  value="branch"
-                  checked={!isCombined}
-                  onChange={() => setIsCombined(false)}
-                  className="form-radio h-4 w-4 text-green-600"
-                />
-                <span className="ml-2">Branch-wise</span>
-              </label>
-              <label className="inline-flex items-center">
-                <input
-                  type="radio"
-                  name="reportScope"
-                  value="combined"
-                  checked={isCombined}
-                  onChange={() => setIsCombined(true)}
-                  className="form-radio h-4 w-4 text-green-600"
-                />
-                <span className="ml-2">Combined (All Branches)</span>
-              </label>
+            <div className="flex space-x-4">
+              {/* Branch-wise Button */}
+              <button
+                type="button"
+                onClick={() => toggleReportScope('branch')}
+                className={`px-4 py-2 rounded-md border ${
+                  !isCombined
+                    ? 'bg-green-500 text-white border-green-500'
+                    : 'bg-white text-gray-700 border-gray-300'
+                } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500`}
+              >
+                Branch-wise
+              </button>
+              {/* Combined Button */}
+              <button
+                type="button"
+                onClick={() => toggleReportScope('combined')}
+                className={`px-4 py-2 rounded-md border ${
+                  isCombined
+                    ? 'bg-green-500 text-white border-green-500'
+                    : 'bg-white text-gray-700 border-gray-300'
+                } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500`}
+              >
+                Combined (All Branches)
+              </button>
             </div>
           </div>
 
@@ -874,40 +1046,34 @@ const ReportGenerator = ({ isCollapsed }) => {
           {!isCombined && (
             <div className="mt-6">
               <label htmlFor="branchSelection" className="block text-sm font-medium text-gray-700 mb-2">
-                Branch Selection
+                Select Branches
               </label>
-              <select
-                id="branchSelection"
-                multiple
-                value={selectedBranches}
-                onChange={(e) => {
-                  const options = e.target.options;
-                  const selected = [];
-                  for (let i = 0; i < options.length; i++) {
-                    if (options[i].selected) {
-                      selected.push(options[i].value);
-                    }
-                  }
-                  setSelectedBranches(selected);
-                }}
-                ref={branchSelectionRef}
-                className="w-full p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
-                aria-label="Select Branches"
-              >
+              <div className="flex flex-wrap gap-2">
                 {allBranches.map((branch) => (
-                  <option key={branch.code} value={branch.code}>
+                  <button
+                    key={branch.code}
+                    type="button"
+                    onClick={() => toggleBranch(branch.code)}
+                    className={`px-4 py-2 rounded-md border ${
+                      selectedBranches.includes(branch.code)
+                        ? 'bg-green-500 text-white border-green-500'
+                        : 'bg-white text-gray-700 border-gray-300'
+                    } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500`}
+                  >
                     {branch.name}
-                  </option>
+                  </button>
                 ))}
-              </select>
-              <p className="text-sm text-gray-500 mt-2">Hold down the Ctrl (Windows) or Command (Mac) button to select multiple branches.</p>
+              </div>
+              {selectedBranches.length === 0 && (
+                <p className="text-sm text-red-500 mt-1">Please select at least one branch.</p>
+              )}
             </div>
           )}
 
           {/* Date Selection */}
           {reportPeriod === 'daily' ? (
             <div className="mt-6">
-              <label htmlFor="selectDate" className="block text-sm font-medium text-gray-700 mb-2">Select Date</label>
+              <label htmlFor="selectDate" className="block text-sm font-medium text-gray-700 mb-1">Select Date</label>
               <input
                 type="date"
                 id="selectDate"
@@ -915,14 +1081,14 @@ const ReportGenerator = ({ isCollapsed }) => {
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
                 onKeyDown={(e) => handleKeyDown(e, isCombined ? generateButtonRef : branchSelectionRef)}
-                className="w-full p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
+                className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
                 required
                 aria-required="true"
               />
             </div>
           ) : reportPeriod === 'monthly' ? (
             <div className="mt-6">
-              <label htmlFor="selectMonthYear" className="block text-sm font-medium text-gray-700 mb-2">Select Month and Year</label>
+              <label htmlFor="selectMonthYear" className="block text-sm font-medium text-gray-700 mb-1">Select Month and Year</label>
               <input
                 type="month"
                 id="selectMonthYear"
@@ -930,16 +1096,16 @@ const ReportGenerator = ({ isCollapsed }) => {
                 value={monthYear}
                 onChange={(e) => setMonthYear(e.target.value)}
                 onKeyDown={(e) => handleKeyDown(e, isCombined ? generateButtonRef : branchSelectionRef)}
-                className="w-full p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
+                className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
                 required
                 aria-required="true"
               />
             </div>
           ) : reportPeriod === 'range' ? (
-            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* From Date */}
               <div>
-                <label htmlFor="fromDate" className="block text-sm font-medium text-gray-700 mb-2">From Date</label>
+                <label htmlFor="fromDate" className="block text-sm font-medium text-gray-700 mb-1">From Date</label>
                 <input
                   type="date"
                   id="fromDate"
@@ -947,14 +1113,14 @@ const ReportGenerator = ({ isCollapsed }) => {
                   ref={fromDateRef}
                   onChange={(e) => setFromDate(e.target.value)}
                   onKeyDown={(e) => handleKeyDown(e, toDateRef)}
-                  className="w-full p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
+                  className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
                   required
                   aria-required="true"
                 />
               </div>
               {/* To Date */}
               <div>
-                <label htmlFor="toDate" className="block text-sm font-medium text-gray-700 mb-2">To Date</label>
+                <label htmlFor="toDate" className=" block text-sm font-medium text-gray-700 mb-1">To Date</label>
                 <input
                   type="date"
                   id="toDate"
@@ -962,7 +1128,7 @@ const ReportGenerator = ({ isCollapsed }) => {
                   ref={toDateRef}
                   onChange={(e) => setToDate(e.target.value)}
                   onKeyDown={(e) => handleKeyDown(e, generateButtonRef)}
-                  className="w-full p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
+                  className="w-fit p-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
                   required
                   aria-required="true"
                 />
@@ -975,7 +1141,7 @@ const ReportGenerator = ({ isCollapsed }) => {
             <button
               ref={generateButtonRef}
               onClick={handleGenerateReport}
-              className={`w-full sm:w-1/2 px-6 py-3 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-md flex items-center justify-center transition ${
+              className={`w-full sm:w-1/2 px-4 py-2 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-md flex items-center justify-center transition ${
                 loading ? 'opacity-50 cursor-not-allowed' : ''
               }`}
               onKeyDown={(e) => {

@@ -127,7 +127,7 @@ const Header = ({ selectedTab, setSelectedTab, isCollapsed, toggleSidebar }) => 
   <FolderPlusIcon className='h-5 w-5 mr-2' /> Raise Request
 </button>
 
-              {role !== 'employee' && (
+              {role !== 'employee' && role != 'admin' && (
                 <button
                   onClick={() => handleCreateNavigate('/signup')}
                   className="flex flex-row items-center block w-full text-left px-4 py-2 text-sm hover:bg-green-50 hover:text-green-600 rounded-lg"

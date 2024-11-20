@@ -1,13 +1,18 @@
-// client/src/pages/ModifyOrder.jsx
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import supabase from "../supabaseClient";
+import { useModificationContext } from "../context/ModificationContext";
 
 const ModifyOrder = () => {
   const { orderId } = useParams();
   const navigate = useNavigate();
+  const { setOnModificationSuccess } = useModificationContext();
   const [loading, setLoading] = useState(false);
   const [request, setRequest] = useState(null);
+
+  const handleModificationSuccess = (modifiedOrderId) => {
+    console.log("Modification success callback triggered for order:", modifiedOrderId);
+  };
 
   // Fetch modification request details
   const fetchRequestDetails = async () => {
@@ -29,8 +34,11 @@ const ModifyOrder = () => {
     setRequest(approvedRequest);
 
     if (approvedRequest) {
-      // Navigate to the SalesOrderGeneration page with the orderId
-      navigate(`/sales-order/${orderId}`);
+      // Set the callback in the context
+      setOnModificationSuccess(() => handleModificationSuccess);
+
+      // Navigate to the SalesOrderGeneration page
+      navigate(`/sales-order/${orderId}`, { state: { isFromApproval: true } });
     } else {
       setLoading(false);
     }
