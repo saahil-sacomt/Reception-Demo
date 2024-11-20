@@ -4,17 +4,19 @@ import { CalendarIcon, PrinterIcon, TrashIcon } from "@heroicons/react/24/outlin
 import supabase from '../supabaseClient';
 import { useAuth } from '../context/AuthContext';
 import EmployeeVerification from "../components/EmployeeVerification";
-import { useNavigate} from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 
 const WorkOrderGeneration = ({ isCollapsed }) => {
   const { branch, name, user } = useAuth();
 
   const [step, setStep] = useState(1);
   const [workOrderId, setWorkOrderId] = useState("");
+  const [isPrinted, setIsPrinted] = useState(false);
+
   const [productEntries, setProductEntries] = useState([
     { id: "", name: "", price: "", quantity: "" },
   ]);
-  const [advanceDetails, setAdvanceDetails] = useState(0);
+  const [advanceDetails, setAdvanceDetails] = useState();
   const [dueDate, setDueDate] = useState("");
   const [mrNumber, setMrNumber] = useState("");
   const [isPinVerified, setIsPinVerified] = useState(false);
@@ -122,7 +124,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
           };
           return updatedEntries;
         });
-  
+
         // Automatically move focus to the Quantity field
         setTimeout(() => {
           quantityRefs.current[index]?.focus();
@@ -132,7 +134,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       console.error("Error fetching product details:", error);
     }
   };
-  
+
 
 
 
@@ -271,14 +273,21 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     setProductEntries(updatedEntries);
   };
 
+
+
   // Function to handle Exit button functionality
   const handleExit = () => {
-    const confirmExit = window.confirm("Are you sure you want to exit?");
+    const confirmExit = window.confirm(
+      isPrinted ? "Form has been printed. Do you want to exit?" : "Are you sure you want to exit without saving or printing?"
+    );
     if (confirmExit) {
       resetForm();
       navigate("/home");
+    } else {
+      setIsPrinted(false); // Reset printing state
     }
   };
+  
 
   const addNewProductEntry = () => {
     setProductEntries([
@@ -289,7 +298,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       e.preventDefault();
       addNewProductEntry();
     }
-    
+
     setTimeout(
       () =>
         document
@@ -561,6 +570,22 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   };
 
   useEffect(() => {
+    const handleAfterPrint = () => {
+      if (isPrinted) {
+        resetForm();
+        navigate("/home");
+      }
+    };
+
+    window.onafterprint = handleAfterPrint;
+
+    return () => {
+      window.onafterprint = null; // Cleanup the event listener
+    };
+  }, [isPrinted, navigate]);
+
+
+  useEffect(() => {
     if (branch) {
       generateNewWorkOrderId();
     }
@@ -590,159 +615,159 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       >
         {/* Step 1: Work Order ID and Product Entries */}
         {step === 1 && (
-  <div className="w-fit bg-gray-50 p-6 rounded-md shadow-inner space-y-4">
-    {/* Generated Work Order ID */}
-    <div>
-      <label className="block text-gray-700 font-medium mb-1">
-        Generated Work Order ID
-      </label>
-      <input
-        type="text"
-        value={workOrderId}
-        readOnly
-        className="border border-gray-300 px-4 py-3 rounded-lg bg-gray-200 text-gray-700 w-full text-center"
-      />
-    </div>
+          <div className="w-fit bg-gray-50 p-6 rounded-md shadow-inner space-y-4">
+            {/* Generated Work Order ID */}
+            <div>
+              <label className="block text-gray-700 font-medium mb-1">
+                Generated Work Order ID
+              </label>
+              <input
+                type="text"
+                value={workOrderId}
+                readOnly
+                className="border border-gray-300 px-4 py-3 rounded-lg bg-gray-200 text-gray-700 w-full text-center"
+              />
+            </div>
 
-    {/* Product Details */}
-    <label className="block text-gray-700 font-medium mb-4">Product Details</label>
-    <div className="space-y-6">
-  {productEntries.map((product, index) => (
-    <div key={index} className="flex space-x-2 items-center">
-      {/* Product ID Input */}
-      <div className="relative w-2/4">
-        <input
-          type="text"
-          id={`productId-${index}`}
-          placeholder="Enter Product ID or Scan Barcode"
-          value={productEntries[index].id}
-          onChange={async (e) => {
-            const value = e.target.value;
+            {/* Product Details */}
+            <label className="block text-gray-700 font-medium mb-4">Product Details</label>
+            <div className="space-y-6">
+              {productEntries.map((product, index) => (
+                <div key={index} className="flex space-x-2 items-center">
+                  {/* Product ID Input */}
+                  <div className="relative w-2/4">
+                    <input
+                      type="text"
+                      id={`productId-${index}`}
+                      placeholder="Enter Product ID or Scan Barcode"
+                      value={productEntries[index].id}
+                      onChange={async (e) => {
+                        const value = e.target.value;
 
-            // Update the product ID dynamically
-            setProductEntries((prevEntries) => {
-              const updatedEntries = [...prevEntries];
-              updatedEntries[index].id = value;
-              return updatedEntries;
-            });
+                        // Update the product ID dynamically
+                        setProductEntries((prevEntries) => {
+                          const updatedEntries = [...prevEntries];
+                          updatedEntries[index].id = value;
+                          return updatedEntries;
+                        });
 
-            // Fetch product suggestions dynamically
-            const suggestions = await fetchProductSuggestions(value, "id");
-            setProductSuggestions(suggestions);
+                        // Fetch product suggestions dynamically
+                        const suggestions = await fetchProductSuggestions(value, "id");
+                        setProductSuggestions(suggestions);
 
-            // Automatically fetch details and focus quantity if exact match
-            if (suggestions.length === 1 && suggestions[0].product_id === value) {
-              await handleProductSelection(index, suggestions[0].product_id);
-            }
-          }}
-          onKeyDown={async (e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
+                        // Automatically fetch details and focus quantity if exact match
+                        if (suggestions.length === 1 && suggestions[0].product_id === value) {
+                          await handleProductSelection(index, suggestions[0].product_id);
+                        }
+                      }}
+                      onKeyDown={async (e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
 
-              const selectedProduct = productSuggestions.find(
-                (prod) => prod.product_id === productEntries[index].id
-              );
+                          const selectedProduct = productSuggestions.find(
+                            (prod) => prod.product_id === productEntries[index].id
+                          );
 
-              // Fetch product details if a valid ID is entered or selected
-              if (selectedProduct) {
-                await handleProductSelection(index, selectedProduct.product_id);
-              } else if (productEntries[index].id) {
-                await handleProductSelection(index, productEntries[index].id);
-              }
-            }
+                          // Fetch product details if a valid ID is entered or selected
+                          if (selectedProduct) {
+                            await handleProductSelection(index, selectedProduct.product_id);
+                          } else if (productEntries[index].id) {
+                            await handleProductSelection(index, productEntries[index].id);
+                          }
+                        }
 
-            // Shift + Enter for adding a new product entry
-            if (e.key === "Enter" && e.shiftKey) {
-              e.preventDefault();
-              addNewProductEntry();
-            }
-          }}
-          onBlur={async () => {
-            const selectedProduct = productSuggestions.find(
-              (prod) => prod.product_id === productEntries[index].id
-            );
+                        // Shift + Enter for adding a new product entry
+                        if (e.key === "Enter" && e.shiftKey) {
+                          e.preventDefault();
+                          addNewProductEntry();
+                        }
+                      }}
+                      onBlur={async () => {
+                        const selectedProduct = productSuggestions.find(
+                          (prod) => prod.product_id === productEntries[index].id
+                        );
 
-            // Fetch product details on blur if a valid ID exists
-            if (selectedProduct || productEntries[index].id) {
-              await handleProductSelection(index, productEntries[index].id);
-            }
-          }}
-          list={`productIdSuggestions-${index}`}
-          className="border border-gray-300 px-4 py-3 rounded-lg w-full"
-        />
-        <datalist id={`productIdSuggestions-${index}`}>
-          {productSuggestions.map((suggestion) => (
-            <option key={suggestion.product_id} value={suggestion.product_id} />
-          ))}
-        </datalist>
-      </div>
+                        // Fetch product details on blur if a valid ID exists
+                        if (selectedProduct || productEntries[index].id) {
+                          await handleProductSelection(index, productEntries[index].id);
+                        }
+                      }}
+                      list={`productIdSuggestions-${index}`}
+                      className="border border-gray-300 px-4 py-3 rounded-lg w-full"
+                    />
+                    <datalist id={`productIdSuggestions-${index}`}>
+                      {productSuggestions.map((suggestion) => (
+                        <option key={suggestion.product_id} value={suggestion.product_id} />
+                      ))}
+                    </datalist>
+                  </div>
 
-      {/* Product Name (Read-Only) */}
-      <div className="relative w-1/2">
-        <input
-          type="text"
-          value={product.name}
-          readOnly
-          className="border border-gray-300 px-4 py-3 rounded-lg w-full bg-gray-100"
-        />
-      </div>
+                  {/* Product Name (Read-Only) */}
+                  <div className="relative w-1/2">
+                    <input
+                      type="text"
+                      value={product.name}
+                      readOnly
+                      className="border border-gray-300 px-4 py-3 rounded-lg w-full bg-gray-100"
+                    />
+                  </div>
 
-      {/* Product Price (Read-Only) */}
-      <div className="relative w-1/4">
-        <input
-          type="text"
-          value={product.price}
-          readOnly
-          className="border border-gray-300 px-4 py-3 rounded-lg w-full bg-gray-100"
-        />
-      </div>
+                  {/* Product Price (Read-Only) */}
+                  <div className="relative w-1/4">
+                    <input
+                      type="text"
+                      value={product.price}
+                      readOnly
+                      className="border border-gray-300 px-4 py-3 rounded-lg w-full bg-gray-100"
+                    />
+                  </div>
 
-      {/* Quantity Input */}
-      <div className="relative w-1/4">
-        <input
-          type="number"
-          id={`productQuantity-${index}`}
-          placeholder="Quantity"
-          value={product.quantity}
-          ref={(el) => (quantityRefs.current[index] = el)}
-          onChange={(e) =>
-            handleProductEntryChange(index, "quantity", e.target.value)
-          }
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              nextStep();
-            }
-          }}
-          className="border border-gray-300 px-4 py-3 rounded-lg w-full text-center"
-        />
-      </div>
+                  {/* Quantity Input */}
+                  <div className="relative w-1/4">
+                    <input
+                      type="number"
+                      id={`productQuantity-${index}`}
+                      placeholder="Quantity"
+                      value={product.quantity}
+                      ref={(el) => (quantityRefs.current[index] = el)}
+                      onChange={(e) =>
+                        handleProductEntryChange(index, "quantity", e.target.value)
+                      }
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          nextStep();
+                        }
+                      }}
+                      className="border border-gray-300 px-4 py-3 rounded-lg w-full text-center"
+                    />
+                  </div>
 
-      {/* Delete Button */}
-      {productEntries.length > 1 && (
-        <button
-          type="button"
-          onClick={() => removeProductEntry(index)}
-          className="text-red-500 hover:text-red-700 transition"
-        >
-          <TrashIcon className="w-5 h-5" />
-        </button>
-      )}
-    </div>
-  ))}
+                  {/* Delete Button */}
+                  {productEntries.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeProductEntry(index)}
+                      className="text-red-500 hover:text-red-700 transition"
+                    >
+                      <TrashIcon className="w-5 h-5" />
+                    </button>
+                  )}
+                </div>
+              ))}
 
-  {/* Add New Product Button */}
-  <button
-    type="button"
-    onClick={addNewProductEntry}
-    className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition"
-  >
-    Add Product
-  </button>
-</div>
+              {/* Add New Product Button */}
+              <button
+                type="button"
+                onClick={addNewProductEntry}
+                className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition"
+              >
+                Add Product
+              </button>
+            </div>
 
-  </div>
-)}
+          </div>
+        )}
 
 
         {/* Step 2: Due Date */}
@@ -1068,44 +1093,45 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                     e.preventDefault();
                     if (!isSaving) {
                       saveWorkOrder();
-                    }
+                    
                     setTimeout(() => {
                       printButtonRef.current?.focus();
-                    }, 100);
-                  }
+                    }, 0);
+                  }}
                 }}
-                className="flex items-center bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition w-fit"
+                className="flex items-center justify-center w-44 h-12 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition"
+
               >
                 {isSaving ? "Saving..." : "Save Work Order"}
               </button>
 
               {allowPrint && (
                 <button
-                  onClick={() => window.print()}
+                  onClick={() => {
+                    setIsPrinted(true); // Mark as printed
+                    window.print();
+                  }}
                   ref={printButtonRef}
-                  // onKeyDown={(e) => {
-                  //   if (e.key === 'Enter') {
-                  //     e.preventDefault();
-                  //     window.print();
-                  //   }
-                  // }}
-                  className="flex items-center bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-lg transition w-fit ml-2"
+                  className="flex items-center justify-center w-44 h-12 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition"
+
                 >
                   <PrinterIcon className="w-5 h-5 mr-2" />
                   Print
                 </button>
+
               )}
 
               {/* Exit Button */}
               {allowPrint && (
-                <div className="flex justify-center text-center mt-6">
+                
                   <button
                     onClick={handleExit}
-                    className="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg flex items-center justify-center w-fit"
+                    className="flex items-center justify-center w-44 h-12 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition"
+
                   >
                     Exit
                   </button>
-                </div>
+                
               )}
             </div>
           </>
