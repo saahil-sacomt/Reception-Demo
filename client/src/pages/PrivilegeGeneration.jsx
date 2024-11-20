@@ -13,13 +13,13 @@ const PrivilegeGeneration = ({ isCollapsed }) => {
   const [name, setName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [otp, setOtp] = useState('');
-  const [topUpAmount, setTopUpAmount] = useState('');
+  const [topUpAmount, setTopUpAmount] = useState(500);
   const [isOtpRequested, setIsOtpRequested] = useState(false);
   const [isOtpVerified, setIsOtpVerified] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [cardPreview, setCardPreview] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [cardTier, setCardTier] = useState('gold');
+  const [cardTier, setCardTier] = useState('GOLD'); // Ensure card tiers are uppercase
 
   const mockOtp = "1234";
 
@@ -45,16 +45,16 @@ const PrivilegeGeneration = ({ isCollapsed }) => {
       throw new Error('Error fetching last PC number: ' + error.message);
     }
 
-    let lastPcNumber = lastRecord ? lastRecord.pc_number : null;
+    let lastPcNumber = lastRecord ? lastRecord.pc_number.toUpperCase() : null; // Ensure uppercase
 
-    // If no PC number exists, start from 'aa0002' (skip 'aa0001')
+    // If no PC number exists, start from 'AA0002' (skip 'AA0001')
     if (!lastPcNumber) {
-      return 'aa0002';
+      return 'AA0002';
     }
 
     // Split last PC number into alphabet and numeric parts
-    const alphaPart = lastPcNumber.slice(0, 2);
-    const numericPart = parseInt(lastPcNumber.slice(2));
+    const alphaPart = lastPcNumber.slice(0, 2).toUpperCase();
+    const numericPart = parseInt(lastPcNumber.slice(2), 10);
 
     // Increment numeric part
     let newNumericPart = numericPart + 1;
@@ -73,9 +73,9 @@ const PrivilegeGeneration = ({ isCollapsed }) => {
     // Combine new alpha and numeric parts
     let newPcNumber = `${newAlphaPart}${numericPartStr}`;
 
-    // Skip 'aa0001' if it's generated
-    if (newPcNumber === 'aa0001') {
-      newPcNumber = 'aa0002';
+    // Skip 'AA0001' if it's generated
+    if (newPcNumber === 'AA0001') {
+      newPcNumber = 'AA0002';
     }
 
     return newPcNumber;
@@ -86,10 +86,11 @@ const PrivilegeGeneration = ({ isCollapsed }) => {
     const firstCharCode = alpha.charCodeAt(0);
     const secondCharCode = alpha.charCodeAt(1);
 
-    if (secondCharCode < 122) { // 'z' in ASCII is 122
+    // 'A' to 'Z' are 65 to 90 in ASCII
+    if (secondCharCode < 90) { // 'Z' is 90
       return alpha[0] + String.fromCharCode(secondCharCode + 1);
-    } else if (firstCharCode < 122) {
-      return String.fromCharCode(firstCharCode + 1) + 'a';
+    } else if (firstCharCode < 90) {
+      return String.fromCharCode(firstCharCode + 1) + 'A';
     } else {
       throw new Error('PC number limit reached. No more unique PC numbers available.');
     }
@@ -166,12 +167,12 @@ const PrivilegeGeneration = ({ isCollapsed }) => {
 
       // Insert data into Supabase
       const { data, error } = await supabase.from('privilegecards').insert([{
-        pc_number: pcNumber,
-        customer_name: name,
+        pc_number: pcNumber.toUpperCase(), // Ensure uppercase
+        customer_name: name.toUpperCase(), // Optional: capitalize customer name
         phone_number: phoneNumber,
         top_up_amount: Number(topUpAmount),
         loyalty_points: Number(topUpAmount),
-        card_tier: cardTier,
+        card_tier: cardTier.toUpperCase(), // Ensure uppercase
         created_at: currentUTCDateTime,
         branch: branch, // Add branch from AuthContext
         employee_name: employeeName, // Add employee name from AuthContext
@@ -248,8 +249,8 @@ const PrivilegeGeneration = ({ isCollapsed }) => {
             onChange={(e) => setCardTier(e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white"
           >
-            <option value="GOLD">Gold</option>
-            <option value="PLATINUM" disabled>Platinum</option>
+            <option value="GOLD">GOLD</option>
+            <option value="PLATINUM" disabled>PLATINUM</option>
           </select>
 
           {/* Top-Up Amount Input */}

@@ -37,7 +37,7 @@ const Header = ({ selectedTab, setSelectedTab, isCollapsed, toggleSidebar }) => 
     if (tabName === 'Dashboard') {
       navigate('/home'); // Default route for Dashboard tab
     } else if (tabName === 'Documents') {
-      navigate('/reportgenerator'); // Default route for Documents tab
+      navigate('/stock-manage'); // Default route for Documents tab
     }
   };
 

@@ -302,6 +302,22 @@ const Home = ({ isCollapsed }) => {
                   <CircleStackIcon className='h-48 w-48 mr-2' />
                   <h2 className="text-xl font-bold text-gray-800 mt-4">Stock Management</h2>
                 </div>
+                
+              </div>
+      )}
+
+      {role == 'super_admin'  &&(
+              <div className="flex flex-col lg:flex-row lg:space-x-6 mt-10 lg:mt-0 w-full lg:w-1/2">
+                {/* Work Order Container */}
+                <div
+                  className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 w-full"
+                  onClick={() => navigate('/signup')}
+                >
+                  <ClipboardDocumentIcon className='h-48 w-48 mr-2' />
+                  <h2 className="text-xl font-bold text-gray-800 mt-4">Add New User</h2>
+                </div>
+                
+                
               </div>
       )}
             </div>

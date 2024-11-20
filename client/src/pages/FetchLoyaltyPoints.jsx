@@ -58,8 +58,11 @@ const FetchLoyaltyPoints = ({ isCollapsed }) => {
   };
 
   return (
-    <div className={`transition-all duration-300 ${isCollapsed ? "mx-20" : "mx-20 px-20"
-        } justify-center mt-0 p-20 rounded-xl mx-auto max-w-2xl`}>
+    <div
+      className={`transition-all duration-300 ${
+        isCollapsed ? "mx-20" : "mx-20 px-20"
+      } justify-center mt-0 p-20 rounded-xl mx-auto max-w-2xl`}
+    >
       <div className="bg-white shadow-lg rounded-lg p-8 w-full max-w-md">
         {/* <h2 className="text-2xl font-semibold text-gray-700 text-center mb-6">
           Fetch Privilege Card details
@@ -68,7 +71,10 @@ const FetchLoyaltyPoints = ({ isCollapsed }) => {
         <form onSubmit={handleSearch} className="space-y-4">
           {/* Phone Number Input */}
           <div>
-            <label htmlFor="phoneNumber" className="block text-gray-700 font-medium mb-1">
+            <label
+              htmlFor="phoneNumber"
+              className="block text-gray-700 font-medium mb-1"
+            >
               Phone Number
             </label>
             <input
@@ -90,7 +96,10 @@ const FetchLoyaltyPoints = ({ isCollapsed }) => {
 
           {/* PC Number Input */}
           <div>
-            <label htmlFor="pcNumber" className="block text-gray-700 font-medium mb-1">
+            <label
+              htmlFor="pcNumber"
+              className="block text-gray-700 font-medium mb-1"
+            >
               PC Number
             </label>
             <input
@@ -104,7 +113,9 @@ const FetchLoyaltyPoints = ({ isCollapsed }) => {
           </div>
 
           {/* Error Message */}
-          {error && <p className="text-red-500 text-sm text-center">{error}</p>}
+          {error && (
+            <p className="text-red-500 text-sm text-center">{error}</p>
+          )}
 
           {/* Search Button */}
           <button
@@ -126,25 +137,40 @@ const FetchLoyaltyPoints = ({ isCollapsed }) => {
             </h3>
             <div className="space-y-2">
               <p>
-                <span className="font-semibold">Customer Name:</span> {userData.customer_name}
+                <span className="font-semibold">Customer Name:</span>{" "}
+                {userData.customer_name
+                  ? userData.customer_name.toUpperCase()
+                  : "N/A"}
               </p>
               <p>
-                <span className="font-semibold">Phone Number:</span> {userData.phone_number}
+                <span className="font-semibold">Phone Number:</span>{" "}
+                {userData.phone_number
+                  ? userData.phone_number.toUpperCase()
+                  : "N/A"}
               </p>
               {userData.pc_number && (
                 <p>
-                  <span className="font-semibold">PC Number:</span> {userData.pc_number}
+                  <span className="font-semibold">PC Number:</span>{" "}
+                  {userData.pc_number.toUpperCase()}
                 </p>
               )}
               <p>
-                <span className="font-semibold">Loyalty Points:</span> {userData.loyalty_points}
+                <span className="font-semibold">Loyalty Points:</span>{" "}
+                {userData.loyalty_points}
               </p>
               <p>
-                <span className="font-semibold">Card Tier:</span> {userData.card_tier || "N/A"}
+                <span className="font-semibold">Card Tier:</span>{" "}
+                {userData.card_tier
+                  ? userData.card_tier.toUpperCase()
+                  : "N/A"}
               </p>
               <p>
                 <span className="font-semibold">Created At:</span>{" "}
-                {userData.created_at ? new Date(userData.created_at).toLocaleString() : "N/A"}
+                {userData.created_at
+                  ? new Date(userData.created_at)
+                      .toLocaleString()
+                      .toUpperCase()
+                  : "N/A"}
               </p>
             </div>
           </div>
