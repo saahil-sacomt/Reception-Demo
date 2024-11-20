@@ -1,6 +1,6 @@
 // client/src/pages/StockManagement.jsx
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   addOrUpdateStock,
   bulkUploadStock,
@@ -10,6 +10,8 @@ import supabase from "../supabaseClient";
 import { useAuth } from "../context/AuthContext";
 import EditStockModal from "../components/EditStockModal";
 import { debounce } from "lodash"; // Ensure this component exists
+import Papa from "papaparse"; // Ensure PapaParse is installed: npm install papaparse
+import xml2js from "xml2js"; // Ensure xml2js is installed: npm install xml2js
 
 const StockManagement = ({ isCollapsed }) => {
   const { user, role } = useAuth();
@@ -29,12 +31,28 @@ const StockManagement = ({ isCollapsed }) => {
   const [stockToEdit, setStockToEdit] = useState(null);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [productSuggestions, setProductSuggestions] = useState([]); // Define the state
-  // To toggle suggestion dropdown
 
   const [searchProduct, setSearchProduct] = useState("");
   const [filteredStocks, setFilteredStocks] = useState([]);
 
   const fileInputRef = useRef(null);
+  const isUploadingRef = useRef(false); // To track if upload is in progress
+
+  // Warn user before unloading the page during upload
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (isUploadingRef.current) {
+        e.preventDefault();
+        e.returnValue =
+          "A bulk upload is in progress. Are you sure you want to leave?";
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, []);
 
   // Fetch branches and products on component mount
   useEffect(() => {
@@ -72,18 +90,86 @@ const StockManagement = ({ isCollapsed }) => {
     fetchData();
   }, []);
 
-  const handleSearchInput = async (e) => {
-    const query = e.target.value;
-    setSearchProduct(query); // Corrected: use `searchProduct` instead of `searchTerm`
+  // Debounced fetchProductSuggestions to limit API calls
+  const fetchProductSuggestions = useCallback(
+    async (query) => {
+      try {
+        const { data, error } = await supabase
+          .from("products")
+          .select("id, product_name, product_id")
+          .ilike("product_name", `%${query}%`) // Match query anywhere in the name
+          .limit(10);
 
-    if (query.length > 1) {
-      await fetchProductSuggestions(query); // Fetch matching products
-      setShowSuggestions(true); // Show dropdown
-    } else {
-      setProductSuggestions([]); // Clear suggestions if query is too short
-      setShowSuggestions(false);
+        if (error) {
+          console.error("Error fetching suggestions:", error);
+          setProductSuggestions([]);
+          return;
+        }
+
+        setProductSuggestions(data || []); // Update suggestions list
+      } catch (err) {
+        console.error("Error fetching product suggestions:", err);
+      }
+    },
+    [setProductSuggestions]
+  );
+
+  const debouncedFetchSuggestions = useRef(
+    debounce(fetchProductSuggestions, 300)
+  ).current;
+
+  // Function to refresh stock data
+  const refreshStockData = useCallback(async () => {
+    if (!selectedBranch) return;
+
+    try {
+      const { data, error } = await supabase
+        .from("stock")
+        .select(
+          `
+            quantity,
+            product:products(id, product_name, product_id, rate, mrp)
+          `
+        )
+        .eq("branch_code", selectedBranch);
+
+      if (error) {
+        setError("Failed to refresh stock data.");
+        return;
+      }
+
+      let filtered = data;
+      if (searchProduct.trim()) {
+        const searchLower = searchProduct.toLowerCase();
+        filtered = data.filter(
+          (stock) =>
+            stock.product.product_id.toLowerCase().includes(searchLower) ||
+            stock.product.product_name.toLowerCase().includes(searchLower)
+        );
+      }
+
+      setFilteredStocks(filtered);
+    } catch (err) {
+      console.error("Error refreshing stock data:", err);
+      setError("An unexpected error occurred while refreshing stock data.");
     }
-  };
+  }, [selectedBranch, searchProduct]);
+
+  const handleSearchInput = useCallback(
+    (e) => {
+      const query = e.target.value;
+      setSearchProduct(query);
+
+      if (query.length > 1) {
+        debouncedFetchSuggestions(query); // Use the debounced function
+        setShowSuggestions(true);
+      } else {
+        setProductSuggestions([]);
+        setShowSuggestions(false);
+      }
+    },
+    [debouncedFetchSuggestions]
+  );
 
   // Fetch stock data based on selectedBranch and searchProduct
   useEffect(() => {
@@ -98,9 +184,9 @@ const StockManagement = ({ isCollapsed }) => {
           .from("stock")
           .select(
             `
-            quantity,
-            product:products(id, product_name, product_id, rate, mrp)
-          `
+              quantity,
+              product:products(id, product_name, product_id, rate, mrp)
+            `
           )
           .eq("branch_code", selectedBranch);
 
@@ -111,14 +197,11 @@ const StockManagement = ({ isCollapsed }) => {
 
         let filtered = data;
         if (searchProduct.trim()) {
+          const searchLower = searchProduct.toLowerCase();
           filtered = data.filter(
             (stock) =>
-              stock.product.product_id
-                .toLowerCase()
-                .includes(searchProduct.toLowerCase()) ||
-              stock.product.product_name
-                .toLowerCase()
-                .includes(searchProduct.toLowerCase())
+              stock.product.product_id.toLowerCase().includes(searchLower) ||
+              stock.product.product_name.toLowerCase().includes(searchLower)
           );
         }
 
@@ -133,204 +216,168 @@ const StockManagement = ({ isCollapsed }) => {
   }, [selectedBranch, searchProduct]);
 
   // Handler to open edit modal
-  // StockManagement.jsx
-  const openEditModal = (stockEntry) => {
-    setStockToEdit({
-      ...stockEntry,
-      branch_code: selectedBranch, // Ensure branch_code is included
-    });
-    setIsEditModalOpen(true);
-  };
+  const openEditModal = useCallback(
+    (stockEntry) => {
+      setStockToEdit({
+        ...stockEntry,
+        branch_code: selectedBranch, // Ensure branch_code is included
+      });
+      setIsEditModalOpen(true);
+    },
+    [selectedBranch]
+  );
 
   // Handler to close edit modal
-  const closeEditModal = () => {
+  const closeEditModal = useCallback(() => {
     setIsEditModalOpen(false);
     setStockToEdit(null);
-  };
+  }, []);
 
   // Handler for manual stock addition
-  const handleAddStock = async (e) => {
-    e.preventDefault();
-    setError("");
-    setSuccess("");
+  const handleAddStock = useCallback(
+    async (e) => {
+      e.preventDefault();
+      setError("");
+      setSuccess("");
 
-    if (!selectedBranch || !selectedProduct || !quantity) {
-      setError("Please fill in all required fields.");
-      return;
-    }
+      if (!selectedBranch || !selectedProduct || !quantity) {
+        setError("Please fill in all required fields.");
+        return;
+      }
 
-    const product = products.find(
-      (p) => p.id === parseInt(selectedProduct, 10)
-    );
+      const product = products.find(
+        (p) => p.id === parseInt(selectedProduct, 10)
+      );
 
-    if (!product) {
-      setError("Selected product does not exist.");
-      return;
-    }
+      if (!product) {
+        setError("Selected product does not exist.");
+        return;
+      }
 
-    const qty = parseInt(quantity, 10);
-    if (isNaN(qty) || qty < 0) {
-      setError("Please enter a valid quantity.");
-      return;
-    }
+      const qty = parseInt(quantity, 10);
+      if (isNaN(qty) || qty < 0) {
+        setError("Please enter a valid quantity.");
+        return;
+      }
 
-    setIsLoading(true);
-    const response = await addOrUpdateStock(
-      product.id,
+      setIsLoading(true);
+      const response = await addOrUpdateStock(
+        product.id,
+        selectedBranch,
+        qty,
+        rate ? parseFloat(rate) : null,
+        mrp ? parseFloat(mrp) : null
+      );
+      setIsLoading(false);
+
+      if (response.success) {
+        setSuccess("Stock updated successfully.");
+        // Reset form
+        setSelectedBranch("");
+        setSelectedProduct("");
+        setSearchProduct(""); // Clear search input
+        setQuantity("");
+        setRate("");
+        setMrp("");
+        setProductSuggestions([]); // Clear suggestions
+        setShowSuggestions(false); // Hide suggestions
+        // Refresh stock data
+        refreshStockData();
+      } else {
+        setError(response.error);
+      }
+    },
+    [
       selectedBranch,
-      qty,
-      rate ? parseFloat(rate) : null,
-      mrp ? parseFloat(mrp) : null
-    );
-    setIsLoading(false);
+      selectedProduct,
+      quantity,
+      rate,
+      mrp,
+      products,
+      addOrUpdateStock,
+      refreshStockData,
+    ]
+  );
 
-    if (response.success) {
-      setSuccess("Stock updated successfully.");
-      // Reset form
-      setSelectedBranch("");
-      setSelectedProduct("");
-      setQuantity("");
-      setRate("");
-      setMrp("");
-      // Refresh stock data
-      refreshStockData();
-    } else {
-      setError(response.error);
-    }
-  };
+  
 
-  // Function to refresh stock data
-  const refreshStockData = async () => {
-    if (!selectedBranch) return;
-
-    try {
-      const { data, error } = await supabase
-        .from("stock")
-        .select(
-          `
-          quantity,
-          product:products(id, product_name, product_id, rate, mrp)
-        `
-        )
-        .eq("branch_code", selectedBranch);
-
-      if (error) {
-        setError("Failed to refresh stock data.");
-        return;
-      }
-
-      let filtered = data;
-      if (searchProduct.trim()) {
-        filtered = data.filter(
-          (stock) =>
-            stock.product.product_id
-              .toLowerCase()
-              .includes(searchProduct.toLowerCase()) ||
-            stock.product.product_name
-              .toLowerCase()
-              .includes(searchProduct.toLowerCase())
-        );
-      }
-
-      setFilteredStocks(filtered);
-    } catch (err) {
-      console.error("Error refreshing stock data:", err);
-      setError("An unexpected error occurred while refreshing stock data.");
-    }
-  };
-
-  const fetchProductSuggestions = async (query) => {
-    try {
-      const { data, error } = await supabase
-        .from("products")
-        .select("id, product_name, product_id")
-        .ilike("product_name", `%${query}%`) // Match query anywhere in the name
-        .limit(10);
-
-      if (error) {
-        console.error("Error fetching suggestions:", error);
-        setProductSuggestions([]);
-        return;
-      }
-
-      setProductSuggestions(data || []); // Update suggestions list
-    } catch (err) {
-      console.error("Error fetching product suggestions:", err);
-    }
-  };
-
-  // Debounced fetch function to avoid excessive API calls
-  const debouncedFetchSuggestions = useRef(
-    debounce(fetchProductSuggestions, 300)
-  ).current;
-
-  const handleSuggestionClick = (product) => {
-    setSelectedProduct(product.id); // Set product ID
-    setSearchProduct(`${product.product_name} (${product.product_id})`); // Corrected: use `searchProduct` instead of `searchTerm`
-    setShowSuggestions(false); // Hide suggestions
-  };
+  const handleSuggestionClick = useCallback(
+    (product) => {
+      setSelectedProduct(product.id); // Set product ID
+      setSearchProduct(product.product_name); // Set only the product name
+      setShowSuggestions(false); // Hide suggestions
+    },
+    []
+  );
 
   // Handler for bulk upload
-  const handleBulkUpload = async (e) => {
-    e.preventDefault();
-    setError("");
-    setSuccess("");
+  const handleBulkUpload = useCallback(
+    async (e) => {
+      e.preventDefault();
+      setError("");
+      setSuccess("");
 
-    if (!file || !selectedBranch) {
-      setError("Please select a branch and upload a file.");
-      return;
-    }
-
-    // Validate file type based on uploadFormat
-    const allowedExtensions = uploadFormat === "csv" ? ["csv"] : ["xml"];
-    const fileExtension = file.name.split(".").pop().toLowerCase();
-
-    if (!allowedExtensions.includes(fileExtension)) {
-      setError(
-        `Invalid file format. Please upload a ${
-          uploadFormat === "csv" ? "CSV" : "XML"
-        } file.`
-      );
-      return;
-    }
-
-    setIsLoading(true);
-    const response = await bulkUploadStock(file, uploadFormat, selectedBranch);
-    setIsLoading(false);
-
-    if (response.success) {
-      let message = "Bulk stock upload successful.";
-
-      if (response.insertedProducts && response.insertedProducts.length > 0) {
-        message += `\nInserted ${response.insertedProducts.length} new product(s).`;
+      if (!file || !selectedBranch) {
+        setError("Please select a branch and upload a file.");
+        return;
       }
 
-      setSuccess(message);
-      setFile(null);
-      setUploadFormat("csv");
-      if (fileInputRef.current) fileInputRef.current.value = "";
-      // Refresh stock data
-      refreshStockData();
-    } else {
-      setError(response.error);
-    }
-  };
+      // Validate file type based on uploadFormat
+      const allowedExtensions = uploadFormat === "csv" ? ["csv"] : ["xml"];
+      const fileExtension = file.name.split(".").pop().toLowerCase();
+
+      if (!allowedExtensions.includes(fileExtension)) {
+        setError(
+          `Invalid file format. Please upload a ${
+            uploadFormat === "csv" ? "CSV" : "XML"
+          } file.`
+        );
+        return;
+      }
+
+      setIsLoading(true);
+      isUploadingRef.current = true; // Indicate that upload is in progress
+
+      const response = await bulkUploadStock(file, uploadFormat, selectedBranch);
+
+      isUploadingRef.current = false; // Reset the flag
+      setIsLoading(false);
+
+      if (response.success) {
+        let message = "Bulk stock upload successful.";
+
+        if (response.insertedProducts && response.insertedProducts.length > 0) {
+          message += `\nInserted ${response.insertedProducts.length} new product(s).`;
+        }
+
+        setSuccess(message);
+        setFile(null);
+        setUploadFormat("csv");
+        if (fileInputRef.current) fileInputRef.current.value = "";
+        // Refresh stock data
+        refreshStockData();
+      } else {
+        setError(response.error);
+      }
+    },
+    [file, selectedBranch, uploadFormat, bulkUploadStock, refreshStockData]
+  );
 
   // Handler for file selection
-  const handleFileChange = (e) => {
+  const handleFileChange = useCallback((e) => {
     const uploadedFile = e.target.files[0];
     if (uploadedFile) {
       setFile(uploadedFile);
     } else {
       setFile(null);
     }
-  };
+  }, []);
 
   return (
     <div
       className={`transition-all duration-300 ${
         isCollapsed ? "mx-20" : "mx-20 px-20"
-      } justify-center mt-20 p-8 rounded-xl mx-auto max-w-2xl bg-green-50 shadow-inner`}
+      } justify-center my-20 p-8 rounded-xl mx-auto max-w-4xl bg-green-50 shadow-inner`}
     >
       <h1 className="text-2xl font-semibold mb-6 text-center">
         Stock Management
@@ -404,14 +451,14 @@ const StockManagement = ({ isCollapsed }) => {
           </div>
 
           {/* Product Selection */}
-          <div>
+          <div className="relative">
             <label htmlFor="productSearch" className="block mb-2 font-medium">
               Search Product
             </label>
             <input
               id="productSearch"
               type="text"
-              value={searchProduct} // Corrected: use `searchProduct` instead of `searchTerm`
+              value={searchProduct}
               onChange={handleSearchInput}
               onFocus={() => setShowSuggestions(true)}
               onBlur={() => setTimeout(() => setShowSuggestions(false), 200)} // Delay to allow click
@@ -421,7 +468,7 @@ const StockManagement = ({ isCollapsed }) => {
 
             {/* Suggestion Dropdown */}
             {showSuggestions && productSuggestions.length > 0 && (
-              <ul className="border rounded bg-white shadow-md max-h-40 overflow-y-auto">
+              <ul className="absolute z-10 border rounded bg-white shadow-md max-h-40 overflow-y-auto w-full">
                 {productSuggestions.map((product) => (
                   <li
                     key={product.id}
@@ -567,7 +614,7 @@ const StockManagement = ({ isCollapsed }) => {
           }`}
           disabled={isLoading}
         >
-          {isLoading ? "Uploading...be Patient" : "Upload Stock"}
+          {isLoading ? "Uploading... Please wait" : "Upload Stock"}
         </button>
       </form>
 
@@ -585,7 +632,7 @@ const StockManagement = ({ isCollapsed }) => {
             type="text"
             placeholder="Search by Product ID or Name"
             value={searchProduct}
-            onChange={(e) => setSearchProduct(e.target.value)}
+            onChange={handleSearchInput}
             className="w-full p-2 border rounded mb-4"
           />
 

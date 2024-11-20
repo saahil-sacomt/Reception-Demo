@@ -5,7 +5,214 @@ import Papa from 'papaparse'; // For CSV parsing
 import xml2js from 'xml2js'; // For XML parsing
 import bcrypt from 'bcryptjs';
 
-// Function to sign up a new user and add to 'employees' table
+/**
+ * Parses a CSV file and returns the data as an array of objects.
+ * @param {File} file - The CSV file to parse.
+ * @returns {Promise<Array<Object>>} - Parsed CSV data.
+ */
+const parseCSV = (file) => {
+  return new Promise((resolve, reject) => {
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: (results) => {
+        resolve(results.data);
+      },
+      error: (error) => {
+        reject(error);
+      },
+    });
+  });
+};
+
+/**
+ * Parses an XML file and returns the data as an array of objects.
+ * Assumes the XML has a root <stocks> element with multiple <stock> children.
+ * @param {File} file - The XML file to parse.
+ * @returns {Promise<Array<Object>>} - Parsed XML data.
+ */
+const parseXML = (file) => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const xmlText = event.target.result;
+      const parser = new xml2js.Parser({ explicitArray: false });
+      try {
+        const parsedResult = await parser.parseStringPromise(xmlText);
+        // Adjust the path based on your XML structure
+        resolve(parsedResult.stocks.stock);
+      } catch (error) {
+        reject(error);
+      }
+    };
+    reader.onerror = () => {
+      reject(new Error("Failed to read the XML file."));
+    };
+    reader.readAsText(file);
+  });
+};
+
+/**
+ * Bulk uploads stock data from a CSV or XML file.
+ * @param {File} file - The uploaded file (CSV or XML).
+ * @param {string} format - The file format ('csv' or 'xml').
+ * @param {string} branchCode - The branch code to which the stock belongs.
+ * @returns {Object} - Success status and any error messages.
+ */
+export const bulkUploadStock = async (file, format, branchCode) => {
+  try {
+    let parsedData = [];
+
+    // Step 1: Parse the file
+    if (format === "csv") {
+      parsedData = await parseCSV(file);
+    } else if (format === "xml") {
+      parsedData = await parseXML(file);
+    } else {
+      throw new Error("Unsupported file format.");
+    }
+
+    console.log("Parsed Data:", parsedData);
+
+    // Step 2: Validate and normalize data
+    const requiredFields = ["product_id", "quantity"];
+    if (!parsedData.length) {
+      throw new Error("The uploaded file contains no data.");
+    }
+
+    // Check for required fields in each row
+    for (let i = 0; i < parsedData.length; i++) {
+      for (let field of requiredFields) {
+        if (
+          !parsedData[i].hasOwnProperty(field) ||
+          !parsedData[i][field] ||
+          parsedData[i][field].toString().trim() === ""
+        ) {
+          throw new Error(`Missing required field "${field}" in row ${i + 1}.`);
+        }
+      }
+    }
+
+    // Normalize data
+    parsedData = parsedData.map((item) => ({
+      product_id: item.product_id.trim().toUpperCase(),
+      quantity: parseInt(item.quantity, 10) || 0,
+      // 'rate' and 'mrp' are optional
+      rate: item.rate ? parseFloat(item.rate) : null,
+      mrp: item.mrp ? parseFloat(item.mrp) : null,
+      // Map 'name' to 'product_name'
+      product_name: item.name ? item.name.trim() : "Unnamed Product",
+      hsn_code: item.hsn_code ? item.hsn_code.trim() : "9001",
+      // Calculate total_value if needed
+      total_value: item.rate && !isNaN(item.rate) && !isNaN(item.quantity)
+        ? parseFloat(item.rate) * parseInt(item.quantity, 10)
+        : null,
+    }));
+
+    // Step 3: Resolve duplicates within the uploaded data
+    const consolidatedData = parsedData.reduce((acc, item) => {
+      if (!item.product_id) return acc;
+
+      if (!acc[item.product_id]) {
+        acc[item.product_id] = { ...item };
+      } else {
+        acc[item.product_id].quantity += item.quantity;
+        acc[item.product_id].rate = item.rate || acc[item.product_id].rate;
+        acc[item.product_id].mrp = item.mrp || acc[item.product_id].mrp;
+        acc[item.product_id].total_value =
+          acc[item.product_id].rate && acc[item.product_id].quantity
+            ? acc[item.product_id].rate * acc[item.product_id].quantity
+            : acc[item.product_id].total_value;
+      }
+      return acc;
+    }, {});
+
+    const uniqueProducts = Object.values(consolidatedData);
+
+    // Step 4: Fetch existing products
+    const productIds = uniqueProducts.map((p) => p.product_id);
+    const { data: existingProducts, error: fetchError } = await supabase
+      .from("products")
+      .select("id, product_id, rate, mrp")
+      .in("product_id", productIds);
+
+    if (fetchError) throw fetchError;
+
+    const existingProductMap = existingProducts.reduce((acc, product) => {
+      acc[product.product_id] = product;
+      return acc;
+    }, {});
+
+    // Step 5: Prepare bulk upsert data for products
+    const productsToUpsert = uniqueProducts.map((item) => ({
+      product_id: item.product_id,
+      product_name: item.product_name,
+      hsn_code: item.hsn_code,
+      rate: item.rate,
+      mrp: item.mrp,
+      total_value: item.total_value,
+      // Additional fields can be added here
+      // Assuming 'product_id' is a unique constraint
+    }));
+
+    // Step 6: Bulk upsert products (insert new and update existing)
+    const { data: upsertedProducts, error: upsertProductsError } = await supabase
+      .from("products")
+      .upsert(productsToUpsert, { onConflict: "product_id" })
+      .select();
+
+    if (upsertProductsError) throw upsertProductsError;
+
+    // Step 7: Create a mapping from product_id to product's database ID
+    const allProductsMap = upsertedProducts.reduce((acc, product) => {
+      acc[product.product_id] = product.id;
+      return acc;
+    }, {});
+
+    // Step 8: Fetch existing stock entries for these products and branch
+    const internalProductIds = uniqueProducts.map(
+      (item) => allProductsMap[item.product_id]
+    );
+
+    const { data: existingStocks, error: fetchStockError } = await supabase
+      .from("stock")
+      .select("product_id, quantity")
+      .in("product_id", internalProductIds)
+      .eq("branch_code", branchCode);
+
+    if (fetchStockError) throw fetchStockError;
+
+    // Create a map from product_id to existing quantity
+    const existingStockMap = existingStocks.reduce((acc, stock) => {
+      acc[stock.product_id] = stock.quantity;
+      return acc;
+    }, {});
+
+    // Step 9: Prepare stock entries with updated quantities
+    const stockEntries = uniqueProducts.map((item) => ({
+      product_id: allProductsMap[item.product_id],
+      branch_code: branchCode,
+      quantity: (existingStockMap[allProductsMap[item.product_id]] || 0) + item.quantity,
+      updated_at: new Date().toISOString(),
+    }));
+
+    // Step 10: Bulk upsert stock entries
+    const { error: upsertStockError } = await supabase
+      .from("stock")
+      .upsert(stockEntries, { onConflict: ["product_id", "branch_code"] });
+
+    if (upsertStockError) throw upsertStockError;
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error during bulk stock upload:", error);
+    return { success: false, error: error.message };
+  }
+};
+
+/**
+ * Function to sign up a new user and add to 'employees' table
+ */
 export const signUp = async (
   name,
   email,
@@ -71,7 +278,9 @@ export const signUp = async (
   }
 };
 
-// Function to sign in a user
+/**
+ * Function to sign in a user
+ */
 export const signIn = async (email, password) => {
   try {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
@@ -83,7 +292,9 @@ export const signIn = async (email, password) => {
   }
 };
 
-// Function to sign out a user
+/**
+ * Function to sign out a user
+ */
 export const signOut = async () => {
   try {
     const { error } = await supabase.auth.signOut();
@@ -94,40 +305,28 @@ export const signOut = async () => {
   }
 };
 
-export const addOrUpdateStock = async (productIdentifier, branchCode, quantity, rate = null, mrp = null) => {
+/**
+ * Function to add or update stock manually
+ */
+export const addOrUpdateStock = async (productId, branchCode, quantity, rate = null, mrp = null) => {
   try {
     // Normalize input and log
-    const normalizedInput = String(productIdentifier).trim().toUpperCase();
-    console.log('Normalized Input:', normalizedInput);
+    const normalizedProductId = String(productId).trim().toUpperCase();
+    console.log('Normalized Product ID:', normalizedProductId);
 
-    let internalProductId = null;
+    // Fetch the internal numeric product ID from the products table
+    const { data: product, error: productError } = await supabase
+      .from('products')
+      .select('id')
+      .eq('id', normalizedProductId)
+      .maybeSingle();
 
-    // Determine if input is an internal ID (numeric) or external product_id
-    if (!isNaN(normalizedInput)) {
-      // Treat as internal product ID
-      internalProductId = parseInt(normalizedInput, 10);
-    } else {
-      // Fetch internal product ID using external product_id
-      const { data: product, error: productError } = await supabase
-        .from('products')
-        .select('id') // Fetch only the `id` field
-        .eq('product_id', normalizedInput)
-        .maybeSingle();
-
-      if (productError) {
-        console.error('Error fetching product:', productError);
-        throw new Error('Error fetching product from the database');
-      }
-      if (!product) {
-        console.warn(`Product with external ID '${normalizedInput}' not found.`);
-        throw new Error('Product not found');
-      }
-
-      internalProductId = product.id;
+    if (productError || !product) {
+      console.error('Error fetching product:', productError);
+      throw new Error('Error fetching product from the database');
     }
 
-    // Log the internal product ID for debugging
-    console.log('Internal Product ID:', internalProductId);
+    const internalProductId = product.id;
 
     // Fetch existing stock details for this product and branch
     const { data: stock, error: stockError } = await supabase
@@ -175,198 +374,9 @@ export const addOrUpdateStock = async (productIdentifier, branchCode, quantity, 
   }
 };
 
-
-
-
-// Function to parse CSV file
-const parseCSV = (file) => {
-  return new Promise((resolve, reject) => {
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: (results) => resolve(results.data),
-      error: (error) => reject(error),
-    });
-  });
-};
-
-// Function to parse XML file
-const parseXML = (file) => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      xml2js.parseString(
-        reader.result,
-        { explicitArray: false },
-        (err, result) => {
-          if (err) reject(err);
-          else resolve(result);
-        }
-      );
-    };
-    reader.onerror = (error) => reject(error);
-    reader.readAsText(file);
-  });
-};
-
-// Function to handle bulk stock upload (CSV and XML)
-export const bulkUploadStock = async (file, format, branchCode) => {
-  try {
-    let parsedData = [];
-
-    // Step 1: Parse the file
-    if (format === 'csv') {
-      parsedData = await parseCSV(file);
-    } else if (format === 'xml') {
-      const xmlResult = await parseXML(file);
-      parsedData = xmlResult?.stocks?.stock || [];
-    } else {
-      throw new Error('Unsupported file format.');
-    }
-
-    console.log('Parsed Data:', parsedData);
-
-    // Step 2: Validate and normalize data
-    const requiredFields = ['product_id', 'quantity'];
-    for (let field of requiredFields) {
-      if (!parsedData[0]?.hasOwnProperty(field)) {
-        throw new Error(`Missing required field: ${field}`);
-      }
-    }
-
-    parsedData = parsedData.map((item) => ({
-      ...item,
-      product_id: item.product_id.trim().toUpperCase(),
-      quantity: parseInt(item.quantity, 10) || 0,
-      rate: parseFloat(item.rate) || null,
-      mrp: parseFloat(item.mrp) || null,
-    }));
-
-    // Step 3: Resolve duplicates within the uploaded data
-    const consolidatedData = parsedData.reduce((acc, item) => {
-      if (!item.product_id) return acc;
-
-      if (!acc[item.product_id]) {
-        acc[item.product_id] = { ...item };
-      } else {
-        acc[item.product_id].quantity += item.quantity;
-        acc[item.product_id].rate = item.rate || acc[item.product_id].rate;
-        acc[item.product_id].mrp = item.mrp || acc[item.product_id].mrp;
-      }
-      return acc;
-    }, {});
-
-    const uniqueProducts = Object.values(consolidatedData);
-
-    // Step 4: Fetch existing products
-    const productIds = uniqueProducts.map((p) => p.product_id);
-    const { data: existingProducts, error: fetchError } = await supabase
-      .from('products')
-      .select('id, product_id, rate, mrp')
-      .in('product_id', productIds);
-
-    if (fetchError) throw fetchError;
-
-    const existingProductMap = existingProducts.reduce((acc, product) => {
-      acc[product.product_id] = product;
-      return acc;
-    }, {});
-
-    // Step 5: Update or insert products and stock
-    const newProducts = [];
-    const stockUpdates = [];
-
-    for (const item of uniqueProducts) {
-      const existingProduct = existingProductMap[item.product_id];
-
-      if (existingProduct) {
-        // Update stock for existing product
-        stockUpdates.push({
-          product_id: existingProduct.id,
-          branch_code: branchCode,
-          quantity: item.quantity,
-        });
-
-        // Update product details if they have changed
-        if (item.rate !== existingProduct.rate || item.mrp !== existingProduct.mrp) {
-          await supabase
-            .from('products')
-            .update({
-              rate: item.rate,
-              mrp: item.mrp,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', existingProduct.id);
-        }
-      } else {
-        // Insert new product
-        newProducts.push({
-          product_id: item.product_id,
-          product_name: item.name,
-          hsn_code: item.hsn_code || '9001',
-          rate: item.rate,
-          mrp: item.mrp,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        });
-      }
-    }
-
-    // Step 6: Insert new products
-    if (newProducts.length > 0) {
-      const { data: insertedProducts, error: insertError } = await supabase
-        .from('products')
-        .insert(newProducts)
-        .select();
-
-      if (insertError) throw insertError;
-
-      // Add stock entries for newly inserted products
-      insertedProducts.forEach((product) => {
-        const item = uniqueProducts.find((p) => p.product_id === product.product_id);
-        stockUpdates.push({
-          product_id: product.id,
-          branch_code: branchCode,
-          quantity: item.quantity,
-        });
-      });
-    }
-
-    // Step 7: Upsert stock entries
-    for (const update of stockUpdates) {
-      const { data: stock, error: stockError } = await supabase
-        .from('stock')
-        .select('quantity')
-        .eq('product_id', update.product_id)
-        .eq('branch_code', update.branch_code)
-        .single();
-
-      const newQuantity = stock ? stock.quantity + update.quantity : update.quantity;
-
-      const { error: upsertError } = await supabase
-        .from('stock')
-        .upsert(
-          {
-            product_id: update.product_id,
-            branch_code: update.branch_code,
-            quantity: newQuantity,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: ['product_id', 'branch_code'] }
-        );
-
-      if (upsertError) throw upsertError;
-    }
-
-    return { success: true };
-  } catch (error) {
-    console.error('Error during bulk stock upload:', error);
-    return { success: false, error: error.message };
-  }
-};
-
-
-
+/**
+ * Function to edit stock details
+ */
 export const editStock = async (
   productId, // Alphanumeric product_id (e.g., "22T32")
   branchCode,
@@ -398,7 +408,7 @@ export const editStock = async (
       .from('stock')
       .upsert(
         {
-          product_id: internalProductId, // Use numeric ID here
+          product_id: internalProductId,
           branch_code: branchCode,
           quantity: newQuantity, // Replace with new quantity
           updated_at: new Date().toISOString(),
@@ -429,7 +439,9 @@ export const editStock = async (
   }
 };
 
-
+/**
+ * Function to deduct stock for multiple products
+ */
 export async function deductStockForMultipleProducts(products, branchCode) {
   try {
     // Step 1: Filter out invalid products
@@ -496,20 +508,20 @@ export async function deductStockForMultipleProducts(products, branchCode) {
   }
 }
 
-
-
-// Function to fetch stock by external product_id and branch_code
-export const fetchStockByProductCode = async (internalProductId, branchCode) => {
+/**
+ * Function to fetch stock by external product_id and branch_code
+ */
+export const fetchStockByProductCode = async (productId, branchCode) => {
   try {
-    console.log('Fetching stock for Product ID:', internalProductId, 'Branch:', branchCode);
+    console.log('Fetching stock for Product ID:', productId, 'Branch:', branchCode);
 
-    if (!internalProductId) {
-      console.error("Internal Product ID is missing");
-      return { success: false, error: "Internal Product ID is missing" };
+    if (!productId) {
+      console.error("Product ID is missing");
+      return { success: false, error: "Product ID is missing" };
     }
 
     const { data, error } = await supabase.rpc('get_stock_by_product_code', {
-      p_product_code: internalProductId,
+      p_product_code: productId,
       p_branch_code: branchCode,
     });
 
@@ -526,9 +538,9 @@ export const fetchStockByProductCode = async (internalProductId, branchCode) => 
   }
 };
 
-
-// client/src/services/authService.js
-
+/**
+ * Function to deduct multiple stocks via RPC
+ */
 export const deductMultipleStocks = async (deductions) => {
   try {
     console.log('Sending deductions to RPC:', deductions); // Log the deductions array
@@ -550,11 +562,17 @@ export const deductMultipleStocks = async (deductions) => {
   }
 };
 
+/**
+ * Helper function to hash PIN
+ */
 const hashPin = async (plainTextPin) => {
   const salt = await bcrypt.genSalt(10);
   return await bcrypt.hash(plainTextPin, salt);
 };
 
+/**
+ * Function to verify PIN
+ */
 const verifyPin = async () => {
   setError(""); // Reset error message
   setSuccessMessage(""); // Reset success message
