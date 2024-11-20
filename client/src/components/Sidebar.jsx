@@ -24,7 +24,7 @@ const Sidebar = ({ isCollapsed, toggleSidebar, selectedTab }) => {
       to: '/home',
       icon: HomeIcon,
       label: 'Home',
-      roles: ['admin', 'user', 'super_admin'], // Roles that can access
+      roles: ['admin', 'employee', 'super_admin'], // Roles that can access
       section: 'Dashboard',
     },
     {
@@ -38,7 +38,7 @@ const Sidebar = ({ isCollapsed, toggleSidebar, selectedTab }) => {
       to: '/appointment',
       icon: RectangleStackIcon,
       label: 'Appointments',
-      roles: ['admin', 'user','super_admin'],
+      roles: ['admin', 'employee','super_admin'],
       section: 'Dashboard',
     },
 
