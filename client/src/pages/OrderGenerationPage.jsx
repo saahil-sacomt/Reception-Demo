@@ -7,7 +7,7 @@ const OrderGenerationPage = ({ isCollapsed }) => {
 
   return (
     <div className={`transition-all duration-300 ${isCollapsed ? 'ml-0' : 'ml-14'} my-10 p-10 min-h-screen flex flex-col  space-y-10`}>
-      <div className="flex space-x-10">
+      <div className="flex space-x-12 mt-8 ml-12">
         <div
           className="max-w-lg bg-white shadow-lg rounded-xl overflow-hidden cursor-pointer hover:shadow-xl transition duration-200"
           onClick={() => navigate('/work-order')}
