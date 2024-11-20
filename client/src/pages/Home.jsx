@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import SplashScreen from '../components/SplashScreen';
 import walletImage from '../assets/pngwing.com.png';
-import { CreditCardIcon } from '@heroicons/react/24/outline';
+import { CircleStackIcon, ClipboardDocumentIcon, CreditCardIcon } from '@heroicons/react/24/outline';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import supabase from '../supabaseClient';
@@ -227,6 +227,7 @@ const Home = ({ isCollapsed }) => {
             {/* Purchase and Order Generation Sections (Horizontal Row) */}
             <div className="flex flex-col lg:flex-row items-start lg:space-x-6 mx-6">
               {/* Purchase Section */}
+              {role !== 'admin' && role !== 'super_admin' &&(
               <div className="flex flex-col lg:flex-row items-center bg-green-50 py-8 px-6 rounded-lg shadow w-full lg:w-1/2">
                 <img
                   src={walletImage}
@@ -245,9 +246,13 @@ const Home = ({ isCollapsed }) => {
                     <CreditCardIcon className="w-5 h-5 mr-1" /> Privilege Card
                   </button>
                 </div>
+              
               </div>
 
+            )}
+
               {/* Order Generation Section */}
+              {role !== 'admin' && role !== 'super_admin' &&(
               <div className="flex flex-col lg:flex-row lg:space-x-6 mt-10 lg:mt-0 w-full lg:w-1/2">
                 {/* Work Order Container */}
                 <div
@@ -259,7 +264,7 @@ const Home = ({ isCollapsed }) => {
                     alt="Work Order"
                     className="w-40 h-40 object-contain bg-white rounded-xl shadow-xl"
                   />
-                  <h2 className="text-xl text-gray-800 mt-4">Work Order Generation</h2>
+                  <h2 className="text-xl font-bold text-gray-800 mt-4">Work Order Generation</h2>
                 </div>
 
                 {/* Sales Order Container */}
@@ -272,9 +277,33 @@ const Home = ({ isCollapsed }) => {
                     alt="Sales Order"
                     className="w-40 h-40 object-contain bg-white rounded-xl shadow-xl"
                   />
-                  <h2 className="text-xl text-gray-800 mt-4">Sales Order Generation</h2>
+                  <h2 className="text-xl font-bold text-gray-800 mt-4">Sales Order Generation</h2>
                 </div>
               </div>
+      )}
+
+      {/* Order Generation Section */}
+      {role !== 'employee'  &&(
+              <div className="flex flex-col lg:flex-row lg:space-x-6 mt-10 lg:mt-0 w-full lg:w-1/2">
+                {/* Work Order Container */}
+                <div
+                  className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 w-full"
+                  onClick={() => navigate('/reportgenerator')}
+                >
+                  <ClipboardDocumentIcon className='h-48 w-48 mr-2' />
+                  <h2 className="text-xl font-bold text-gray-800 mt-4">Reports</h2>
+                </div>
+
+                {/* Sales Order Container */}
+                <div
+                  className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 w-full mt-6 lg:mt-0"
+                  onClick={() => navigate('/stock-manage')}
+                >
+                  <CircleStackIcon className='h-48 w-48 mr-2' />
+                  <h2 className="text-xl font-bold text-gray-800 mt-4">Stock Management</h2>
+                </div>
+              </div>
+      )}
             </div>
           </div>
         </div>

@@ -1,29 +1,29 @@
 // client/src/pages/StockManagement.jsx
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from "react";
 import {
   addOrUpdateStock,
   bulkUploadStock,
   editStock,
-} from '../services/authService'; // Updated import path
-import supabase from '../supabaseClient';
-import { useAuth } from '../context/AuthContext';
-import EditStockModal from '../components/EditStockModal';
-import { debounce } from 'lodash'; // Ensure this component exists
+} from "../services/authService"; // Updated import path
+import supabase from "../supabaseClient";
+import { useAuth } from "../context/AuthContext";
+import EditStockModal from "../components/EditStockModal";
+import { debounce } from "lodash"; // Ensure this component exists
 
 const StockManagement = ({ isCollapsed }) => {
   const { user, role } = useAuth();
   const [branches, setBranches] = useState([]);
   const [products, setProducts] = useState([]);
-  const [selectedBranch, setSelectedBranch] = useState('');
-  const [selectedProduct, setSelectedProduct] = useState('');
-  const [quantity, setQuantity] = useState('');
-  const [rate, setRate] = useState('');
-  const [mrp, setMrp] = useState('');
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [selectedBranch, setSelectedBranch] = useState("");
+  const [selectedProduct, setSelectedProduct] = useState("");
+  const [quantity, setQuantity] = useState("");
+  const [rate, setRate] = useState("");
+  const [mrp, setMrp] = useState("");
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [file, setFile] = useState(null);
-  const [uploadFormat, setUploadFormat] = useState('csv');
+  const [uploadFormat, setUploadFormat] = useState("csv");
   const [isLoading, setIsLoading] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [stockToEdit, setStockToEdit] = useState(null);
@@ -31,8 +31,7 @@ const StockManagement = ({ isCollapsed }) => {
   const [productSuggestions, setProductSuggestions] = useState([]); // Define the state
   // To toggle suggestion dropdown
 
-
-  const [searchProduct, setSearchProduct] = useState('');
+  const [searchProduct, setSearchProduct] = useState("");
   const [filteredStocks, setFilteredStocks] = useState([]);
 
   const fileInputRef = useRef(null);
@@ -43,11 +42,11 @@ const StockManagement = ({ isCollapsed }) => {
       try {
         // Fetch branches
         const { data: branchesData, error: branchesError } = await supabase
-          .from('branches')
-          .select('*');
+          .from("branches")
+          .select("*");
 
         if (branchesError) {
-          setError('Failed to fetch branches.');
+          setError("Failed to fetch branches.");
           return;
         }
 
@@ -55,24 +54,23 @@ const StockManagement = ({ isCollapsed }) => {
 
         // Fetch products
         const { data: productsData, error: productsError } = await supabase
-          .from('products')
-          .select('*');
+          .from("products")
+          .select("*");
 
         if (productsError) {
-          setError('Failed to fetch products.');
+          setError("Failed to fetch products.");
           return;
         }
 
         setProducts(productsData);
       } catch (err) {
-        console.error('Error fetching data:', err);
-        setError('An unexpected error occurred while fetching data.');
+        console.error("Error fetching data:", err);
+        setError("An unexpected error occurred while fetching data.");
       }
     };
 
     fetchData();
   }, []);
-
 
   const handleSearchInput = async (e) => {
     const query = e.target.value;
@@ -87,8 +85,6 @@ const StockManagement = ({ isCollapsed }) => {
     }
   };
 
-
-
   // Fetch stock data based on selectedBranch and searchProduct
   useEffect(() => {
     const fetchStockData = async () => {
@@ -99,15 +95,17 @@ const StockManagement = ({ isCollapsed }) => {
 
       try {
         const { data, error } = await supabase
-          .from('stock')
-          .select(`
+          .from("stock")
+          .select(
+            `
             quantity,
             product:products(id, product_name, product_id, rate, mrp)
-          `)
-          .eq('branch_code', selectedBranch);
+          `
+          )
+          .eq("branch_code", selectedBranch);
 
         if (error) {
-          setError('Failed to fetch stock data.');
+          setError("Failed to fetch stock data.");
           return;
         }
 
@@ -126,8 +124,8 @@ const StockManagement = ({ isCollapsed }) => {
 
         setFilteredStocks(filtered);
       } catch (err) {
-        console.error('Error fetching stock data:', err);
-        setError('An unexpected error occurred while fetching stock data.');
+        console.error("Error fetching stock data:", err);
+        setError("An unexpected error occurred while fetching stock data.");
       }
     };
 
@@ -144,7 +142,6 @@ const StockManagement = ({ isCollapsed }) => {
     setIsEditModalOpen(true);
   };
 
-
   // Handler to close edit modal
   const closeEditModal = () => {
     setIsEditModalOpen(false);
@@ -154,11 +151,11 @@ const StockManagement = ({ isCollapsed }) => {
   // Handler for manual stock addition
   const handleAddStock = async (e) => {
     e.preventDefault();
-    setError('');
-    setSuccess('');
+    setError("");
+    setSuccess("");
 
     if (!selectedBranch || !selectedProduct || !quantity) {
-      setError('Please fill in all required fields.');
+      setError("Please fill in all required fields.");
       return;
     }
 
@@ -167,13 +164,13 @@ const StockManagement = ({ isCollapsed }) => {
     );
 
     if (!product) {
-      setError('Selected product does not exist.');
+      setError("Selected product does not exist.");
       return;
     }
 
     const qty = parseInt(quantity, 10);
     if (isNaN(qty) || qty < 0) {
-      setError('Please enter a valid quantity.');
+      setError("Please enter a valid quantity.");
       return;
     }
 
@@ -188,13 +185,13 @@ const StockManagement = ({ isCollapsed }) => {
     setIsLoading(false);
 
     if (response.success) {
-      setSuccess('Stock updated successfully.');
+      setSuccess("Stock updated successfully.");
       // Reset form
-      setSelectedBranch('');
-      setSelectedProduct('');
-      setQuantity('');
-      setRate('');
-      setMrp('');
+      setSelectedBranch("");
+      setSelectedProduct("");
+      setQuantity("");
+      setRate("");
+      setMrp("");
       // Refresh stock data
       refreshStockData();
     } else {
@@ -208,15 +205,17 @@ const StockManagement = ({ isCollapsed }) => {
 
     try {
       const { data, error } = await supabase
-        .from('stock')
-        .select(`
+        .from("stock")
+        .select(
+          `
           quantity,
           product:products(id, product_name, product_id, rate, mrp)
-        `)
-        .eq('branch_code', selectedBranch);
+        `
+        )
+        .eq("branch_code", selectedBranch);
 
       if (error) {
-        setError('Failed to refresh stock data.');
+        setError("Failed to refresh stock data.");
         return;
       }
 
@@ -235,34 +234,35 @@ const StockManagement = ({ isCollapsed }) => {
 
       setFilteredStocks(filtered);
     } catch (err) {
-      console.error('Error refreshing stock data:', err);
-      setError('An unexpected error occurred while refreshing stock data.');
+      console.error("Error refreshing stock data:", err);
+      setError("An unexpected error occurred while refreshing stock data.");
     }
   };
 
   const fetchProductSuggestions = async (query) => {
     try {
       const { data, error } = await supabase
-        .from('products')
-        .select('id, product_name, product_id')
-        .ilike('product_name', `%${query}%`) // Match query anywhere in the name
+        .from("products")
+        .select("id, product_name, product_id")
+        .ilike("product_name", `%${query}%`) // Match query anywhere in the name
         .limit(10);
 
       if (error) {
-        console.error('Error fetching suggestions:', error);
+        console.error("Error fetching suggestions:", error);
         setProductSuggestions([]);
         return;
       }
 
       setProductSuggestions(data || []); // Update suggestions list
     } catch (err) {
-      console.error('Error fetching product suggestions:', err);
+      console.error("Error fetching product suggestions:", err);
     }
   };
 
-
   // Debounced fetch function to avoid excessive API calls
-  const debouncedFetchSuggestions = useRef(debounce(fetchProductSuggestions, 300)).current;
+  const debouncedFetchSuggestions = useRef(
+    debounce(fetchProductSuggestions, 300)
+  ).current;
 
   const handleSuggestionClick = (product) => {
     setSelectedProduct(product.id); // Set product ID
@@ -270,26 +270,25 @@ const StockManagement = ({ isCollapsed }) => {
     setShowSuggestions(false); // Hide suggestions
   };
 
-
   // Handler for bulk upload
   const handleBulkUpload = async (e) => {
     e.preventDefault();
-    setError('');
-    setSuccess('');
+    setError("");
+    setSuccess("");
 
     if (!file || !selectedBranch) {
-      setError('Please select a branch and upload a file.');
+      setError("Please select a branch and upload a file.");
       return;
     }
 
     // Validate file type based on uploadFormat
-    const allowedExtensions =
-      uploadFormat === 'csv' ? ['csv'] : ['xml'];
-    const fileExtension = file.name.split('.').pop().toLowerCase();
+    const allowedExtensions = uploadFormat === "csv" ? ["csv"] : ["xml"];
+    const fileExtension = file.name.split(".").pop().toLowerCase();
 
     if (!allowedExtensions.includes(fileExtension)) {
       setError(
-        `Invalid file format. Please upload a ${uploadFormat === 'csv' ? 'CSV' : 'XML'
+        `Invalid file format. Please upload a ${
+          uploadFormat === "csv" ? "CSV" : "XML"
         } file.`
       );
       return;
@@ -300,7 +299,7 @@ const StockManagement = ({ isCollapsed }) => {
     setIsLoading(false);
 
     if (response.success) {
-      let message = 'Bulk stock upload successful.';
+      let message = "Bulk stock upload successful.";
 
       if (response.insertedProducts && response.insertedProducts.length > 0) {
         message += `\nInserted ${response.insertedProducts.length} new product(s).`;
@@ -308,8 +307,8 @@ const StockManagement = ({ isCollapsed }) => {
 
       setSuccess(message);
       setFile(null);
-      setUploadFormat('csv');
-      if (fileInputRef.current) fileInputRef.current.value = '';
+      setUploadFormat("csv");
+      if (fileInputRef.current) fileInputRef.current.value = "";
       // Refresh stock data
       refreshStockData();
     } else {
@@ -328,9 +327,14 @@ const StockManagement = ({ isCollapsed }) => {
   };
 
   return (
-    <div className={`transition-all duration-300 ${isCollapsed ? "mx-20" : "mx-20 px-20"
-      } justify-center mt-20 p-8 rounded-xl mx-auto max-w-2xl bg-green-50 shadow-inner`}>
-      <h1 className="text-2xl font-semibold mb-6 text-center">Stock Management</h1>
+    <div
+      className={`transition-all duration-300 ${
+        isCollapsed ? "mx-20" : "mx-20 px-20"
+      } justify-center mt-20 p-8 rounded-xl mx-auto max-w-2xl bg-green-50 shadow-inner`}
+    >
+      <h1 className="text-2xl font-semibold mb-6 text-center">
+        Stock Management
+      </h1>
 
       {/* Display Error and Success Messages */}
       {error && (
@@ -372,7 +376,9 @@ const StockManagement = ({ isCollapsed }) => {
 
       {/* Manual Stock Addition Form */}
       <form onSubmit={handleAddStock} className="mb-8">
-        <h2 className="text-xl font-semibold mb-4">Add or Update Stock Manually</h2>
+        <h2 className="text-xl font-semibold mb-4">
+          Add or Update Stock Manually
+        </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Branch Selection */}
           <div>
@@ -429,7 +435,6 @@ const StockManagement = ({ isCollapsed }) => {
             )}
           </div>
 
-
           {/* Quantity Input */}
           <div>
             <label htmlFor="quantity" className="block mb-2 font-medium">
@@ -481,13 +486,14 @@ const StockManagement = ({ isCollapsed }) => {
 
         <button
           type="submit"
-          className={`mt-4 w-full p-2 text-white rounded ${isLoading
-            ? 'bg-blue-500 cursor-not-allowed'
-            : 'bg-green-500 hover:bg-green-600'
-            }`}
+          className={`mt-4 w-full p-2 text-white rounded ${
+            isLoading
+              ? "bg-blue-500 cursor-not-allowed"
+              : "bg-green-500 hover:bg-green-600"
+          }`}
           disabled={isLoading}
         >
-          {isLoading ? 'Updating...' : 'Add/Update Stock'}
+          {isLoading ? "Updating..." : "Add/Update Stock"}
         </button>
       </form>
 
@@ -543,7 +549,7 @@ const StockManagement = ({ isCollapsed }) => {
             <input
               type="file"
               id="file"
-              accept={uploadFormat === 'csv' ? '.csv' : '.xml'}
+              accept={uploadFormat === "csv" ? ".csv" : ".xml"}
               onChange={handleFileChange}
               className="w-full p-2 border rounded"
               required
@@ -554,13 +560,14 @@ const StockManagement = ({ isCollapsed }) => {
 
         <button
           type="submit"
-          className={`mt-4 w-full p-2 text-white rounded ${isLoading
-            ? 'bg-blue-500 cursor-not-allowed'
-            : 'bg-green-500 hover:bg-green-600'
-            }`}
+          className={`mt-4 w-full p-2 text-white rounded ${
+            isLoading
+              ? "bg-blue-500 cursor-not-allowed"
+              : "bg-green-500 hover:bg-green-600"
+          }`}
           disabled={isLoading}
         >
-          {isLoading ? 'Uploading...be Patient' : 'Upload Stock'}
+          {isLoading ? "Uploading...be Patient" : "Upload Stock"}
         </button>
       </form>
 
@@ -568,9 +575,9 @@ const StockManagement = ({ isCollapsed }) => {
       {selectedBranch && (
         <div className="mt-8">
           <h2 className="text-xl font-semibold mb-4">
-            Current Stock for{' '}
+            Current Stock for{" "}
             {branches.find((b) => b.branch_code === selectedBranch)
-              ?.branch_name || 'Selected Branch'}
+              ?.branch_name || "Selected Branch"}
           </h2>
 
           {/* Search Bar */}
@@ -610,12 +617,12 @@ const StockManagement = ({ isCollapsed }) => {
                     <td className="py-2 px-4 border-b text-center">
                       {stock.product.rate !== null
                         ? stock.product.rate.toFixed(2)
-                        : 'N/A'}
+                        : "N/A"}
                     </td>
                     <td className="py-2 px-4 border-b text-center">
                       {stock.product.mrp !== null
                         ? stock.product.mrp.toFixed(2)
-                        : 'N/A'}
+                        : "N/A"}
                     </td>
                     <td className="py-2 px-4 border-b text-center">
                       <button
@@ -648,9 +655,7 @@ const StockManagement = ({ isCollapsed }) => {
           stockEntry={stockToEdit}
           refreshStockData={refreshStockData} // Pass the function
         />
-
       )}
-
     </div>
   );
 };

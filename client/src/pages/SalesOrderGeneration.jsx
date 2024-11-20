@@ -1,15 +1,18 @@
 // client/src/pages/SalesOrderGeneration.jsx
-import React, { useState, useEffect, useRef, useMemo, memo, useCallback } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useMemo,
+  memo,
+} from "react";
 import { PrinterIcon, TrashIcon } from "@heroicons/react/24/outline";
 import supabase from "../supabaseClient";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { deductStockForMultipleProducts } from '../services/authService.js';
+import { deductStockForMultipleProducts } from "../services/authService.js";
 import EmployeeVerification from "../components/EmployeeVerification";
-import { useModificationContext } from "../context/ModificationContext";
-import logo from '../assets/sreenethraenglishisolated.png';
-
-
+import logo from "../assets/sreenethraenglishisolated.png";
 
 // Utility Functions
 const mockOtp = "1234";
@@ -36,6 +39,7 @@ const fetchPrivilegeCardByPhone = async (phone) => {
   }
   return data;
 };
+
 function calculateAmounts(
   productEntries,
   advanceDetails,
@@ -105,7 +109,8 @@ const calculateLoyaltyPoints = (
 
 // Main Component
 const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
-  const { user, role, name, branch, loading: authLoading } = useAuth(); // Destructure branch from AuthContext
+  const { user, role, name, branch, loading: authLoading } = useAuth();
+  console.log("branch:", branch); // Destructure branch from AuthContext
 
   const [step, setStep] = useState(0); // Adjusted step numbering
   const [salesOrderId, setSalesOrderId] = useState("");
@@ -163,58 +168,13 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
   const firstWorkOrderButtonRef = useRef(null);
   const fetchButtonRef = useRef(null);
   const productRefs = useRef([]);
-  const handleProductChange = (index, field, value) => {
-    const updatedEntries = [...productEntries];
-    updatedEntries[index][field] = value;
-    setProductEntries(updatedEntries);
-  };
-
-
-
-
-
-  const addNewProductEntry = () => {
-    setProductEntries([
-      ...productEntries,
-      { id: "", name: "", price: "", quantity: "" },
-    ]);
-    setTimeout(
-      () =>
-        document
-          .getElementById(`productId-${productEntries.length}`)
-          ?.focus(),
-      0
-    );
-  };
-
-
-  const handleProductEntryChange = async (index, field, value) => {
-    const updatedEntries = [...productEntries];
-    updatedEntries[index][field] = value;
-
-    if (field === "id" && value.trim()) {
-      const suggestions = await fetchProductSuggestions(value.trim());
-      if (suggestions.length > 0) {
-        updatedEntries[index] = {
-          ...updatedEntries[index],
-          id: suggestions[0].product_id,
-          name: suggestions[0].product_name,
-          price: suggestions[0].mrp,
-        };
-      }
-    }
-    setProductEntries(updatedEntries);
-  };
-
+  const [productSuggestions, setProductSuggestions] = useState([]);
 
   const navigate = useNavigate();
   const location = useLocation();
-  const { state } = useLocation();
   const { orderId } = useParams();
   const [isEditing, setIsEditing] = useState(false);
-  const [suggestions, setSuggestions] = useState([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [productSuggestions, setProductSuggestions] = useState([]);
+
   const fetchEmployees = async () => {
     try {
       const { data, error } = await supabase
@@ -247,10 +207,6 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
       setValidationErrors({});
     }
   };
-
-
-
-
 
   // Utility function to get the current financial year
   const getFinancialYear = () => {
@@ -351,23 +307,59 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     }
   };
 
-  const handleProductInputChange = async (index, value) => {
-    const updatedEntries = [...productEntries];
-    updatedEntries[index].id = value;
-    setProductEntries(updatedEntries);
-
-    if (value.trim()) {
-      const suggestions = await fetchProductSuggestions(value);
-      setSuggestions(suggestions);
-      setShowSuggestions(suggestions.length > 0);
-    } else {
-      setSuggestions([]);
-      setShowSuggestions(false);
-    }
+  const handleProductChange = (index, field, value) => {
+    setProductEntries((prevEntries) => {
+      const updatedEntries = [...prevEntries];
+      updatedEntries[index][field] = value;
+      return updatedEntries;
+    });
+    validateField(index, field);
   };
 
+  const handleProductInputChange = async (index, value) => {
+    if (!branch) {
+      console.error("Branch is undefined. Cannot fetch product details.");
+      setProductEntries((prevEntries) => {
+        const updatedEntries = [...prevEntries];
+        updatedEntries[index] = {
+          ...updatedEntries[index],
+          stock: 0, // Assume no stock if branch is missing
+        };
+        return updatedEntries;
+      });
+      return;
+    }
 
+    const productDetails = await fetchProductDetailsFromDatabase(value, branch);
+    if (productDetails) {
+      setProductEntries((prevEntries) => {
+        const updatedEntries = [...prevEntries];
+        updatedEntries[index] = {
+          id: productDetails.product_id,
+          name: productDetails.product_name,
+          price: productDetails.mrp || "",
+          stock: productDetails.stock || 0,
+          quantity: prevEntries[index].quantity || "", // Preserve quantity
+        };
+        return updatedEntries;
+      });
 
+      if (productDetails.stock > 0) {
+        setTimeout(() => {
+          quantityRefs.current[index]?.focus();
+        }, 100);
+      }
+    } else {
+      setProductEntries((prevEntries) => {
+        const updatedEntries = [...prevEntries];
+        updatedEntries[index] = {
+          ...updatedEntries[index],
+          stock: 0, // Assume no stock if fetching fails
+        };
+        return updatedEntries;
+      });
+    }
+  };
 
   const fetchExistingSalesOrder = async (orderId) => {
     try {
@@ -384,7 +376,9 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
 
       // Populate form fields with the fetched data
       setSalesOrderId(data.sales_order_id);
-      setProductEntries(data.items || [{ id: "", name: "", price: "", quantity: "" }]);
+      setProductEntries(
+        data.items || [{ id: "", name: "", price: "", quantity: "" }]
+      );
       setMrNumber(data.mr_number || "");
       setPhoneNumber(data.patient_phone || "");
       setAdvanceDetails(data.advance_details || 0);
@@ -393,7 +387,9 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
       setLoyaltyPoints(data.loyalty_points_redeemed || 0);
       setPrivilegeCard(true);
       setPrivilegeCardNumber(data.pc_number || "");
-      setSelectedWorkOrder(data.work_order_id ? { work_order_id: data.work_order_id } : null);
+      setSelectedWorkOrder(
+        data.work_order_id ? { work_order_id: data.work_order_id } : null
+      );
 
       // Fetch privilege card details based on pc_number
       if (data.pc_number) {
@@ -430,7 +426,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
 
   // Function to fetch and set a new Sales Order ID when the branch is available
   const fetchSalesOrderId = async () => {
-    if (branch && !isEditing) { // Only generate ID if not editing
+    if (branch && !isEditing) {
+      // Only generate ID if not editing
       setIsGeneratingId(true);
       const newSalesOrderId = await generateSalesOrderId();
       if (newSalesOrderId) {
@@ -479,7 +476,6 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     ]
   );
 
-
   // Calculate discountAmount
   const discountAmount = discount;
 
@@ -487,6 +483,9 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
   const removeProductEntry = (index) => {
     const updatedEntries = productEntries.filter((_, i) => i !== index);
     setProductEntries(updatedEntries);
+    const updatedSuggestions = [...productSuggestions];
+    updatedSuggestions.splice(index, 1);
+    setProductSuggestions(updatedSuggestions);
   };
 
   // Function to fetch privilege card by pc_number
@@ -512,6 +511,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         setLoyaltyPoints(data.loyalty_points || 0);
         setIsOtpVerified(true); // Skip OTP verification when using barcode
         setErrorMessage("");
+        setRedeemOption(null);
         setTimeout(() => nextButtonRef.current?.focus(), 0);
       }
     } catch (error) {
@@ -634,7 +634,6 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         step,
         formData: {
           productEntries,
-          // description, // Removed description
           mrNumber,
           patientDetails,
           phoneNumber,
@@ -662,7 +661,6 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
       const data = locationState.formData;
       if (data) {
         setProductEntries(data.productEntries);
-        // setDescription(data.description); // Removed description
         setMrNumber(data.mrNumber);
         setPatientDetails(data.patientDetails);
         setPhoneNumber(data.phoneNumber);
@@ -710,44 +708,65 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
 
   const handleEnterKey = (e, nextFieldRef, prevFieldRef) => {
     if (e.key === "Enter") {
-      e.preventDefault();
-
-      if (e.shiftKey && prevFieldRef?.current) {
-        prevFieldRef.current.focus();
-      } else if (nextFieldRef?.current) {
-        nextFieldRef.current.focus();
+      if (e.shiftKey) {
+        // Handle Shift+Enter if needed
+        if (prevFieldRef?.current) {
+          e.preventDefault();
+          prevFieldRef.current.focus();
+        }
       } else {
-        e.target.click();
+        e.preventDefault();
+        if (nextFieldRef?.current) {
+          nextFieldRef.current.focus();
+        } else {
+          e.target.click();
+        }
       }
     }
   };
 
-
   // Function to fetch product details from Supabase
-  const fetchProductDetailsFromDatabase = async (productId) => {
+  const fetchProductDetailsFromDatabase = async (productId, branch) => {
+    console.log(
+      "Fetching product details for productId:",
+      productId,
+      "and branch:",
+      branch
+    );
+    if (!branch) {
+      console.error("Branch code is undefined or missing.");
+      return null; // Prevent further execution
+    }
+
     try {
-      // Fetch product details with correct headers
-      const { data, error, count } = await supabase
+      // Step 1: Fetch the product details
+      const { data: productData, error: productError } = await supabase
         .from("products")
-        .select("*", { count: "exact" })
+        .select("*")
         .eq("product_id", productId)
+        .single();
 
-      // Check if no product was found
-      if (error) {
-        console.error("Error fetching product:", error.message);
+      if (productError || !productData) {
+        console.error("Error fetching product details:", productError);
         return null;
       }
 
-      // Handle multiple rows scenario
-      if (count > 1) {
-        console.error("Multiple products found with the same ID");
-        return null;
+      // Step 2: Fetch stock information
+      const { data: stockData, error: stockError } = await supabase
+        .from("stock")
+        .select("quantity")
+        .eq("product_id", productData.id) // Note: product_id here refers to products.id
+        .eq("branch_code", branch)
+        .single();
+
+      if (stockError || !stockData) {
+        console.error("Error fetching stock:", stockError);
+        return { ...productData, stock: 0 }; // Default stock to 0 if error occurs
       }
 
-      // Return the single product entry
-      return data?.length === 1 ? data[0] : null;
-    } catch (err) {
-      console.error("Unexpected error fetching product details:", err);
+      return { ...productData, stock: stockData.quantity || 0 };
+    } catch (error) {
+      console.error("Unexpected error:", error);
       return null;
     }
   };
@@ -759,47 +778,22 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
       errors[`productId-${index}`] = "Product ID is required";
     } else if (field === "price" && !productEntries[index].price) {
       errors[`productPrice-${index}`] = "Price is required";
-    } else if (field === "quantity" && !productEntries[index].quantity) {
-      errors[`productQuantity-${index}`] = "Quantity is required";
+    } else if (field === "quantity" && productEntries[index].stock > 0) {
+      const quantity = parseInt(productEntries[index].quantity, 10);
+      if (!quantity) {
+        errors[`productQuantity-${index}`] = "Quantity is required";
+      } else if (quantity <= 0) {
+        errors[`productQuantity-${index}`] = "Quantity must be greater than zero";
+      } else if (quantity > productEntries[index].stock) {
+        errors[`productQuantity-${index}`] = `Quantity cannot exceed available stock (${productEntries[index].stock})`;
+      } else {
+        delete errors[`productQuantity-${index}`];
+      }
     } else {
-      delete errors[`${field}-${index}`];
+      delete errors[`product${field.charAt(0).toUpperCase() + field.slice(1)}-${index}`];
     }
 
     setValidationErrors(errors);
-  };
-
-  const handleProductEntryShiftEnter = async (e, index, field) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-
-      if (field === "id" || field === "name") {
-        // Fetch product details and move focus
-        const value = productEntries[index][field];
-        const productDetails = await fetchProductDetailsFromSupabase(value, field);
-
-        if (productDetails) {
-          setProductEntries((prevEntries) => {
-            const updatedEntries = [...prevEntries];
-            updatedEntries[index] = {
-              id: productDetails.product_id,
-              name: productDetails.product_name,
-              price: productDetails.mrp || "",
-              quantity: prevEntries[index].quantity || "", // Preserve quantity
-            };
-            return updatedEntries;
-          });
-
-          // Move focus to Quantity field
-          setTimeout(() => {
-            quantityRefs.current[index]?.focus();
-          }, 100);
-        }
-      } else if (field === "quantity") {
-        // Validate the current field and proceed to the next step
-        validateField(index, "quantity");
-        nextStep();
-      }
-    }
   };
 
   const nextStep = async () => {
@@ -816,8 +810,16 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           errors[`productId-${index}`] = "Product ID is required";
         if (!product.price)
           errors[`productPrice-${index}`] = "Price is required";
-        if (!product.quantity)
+        if (product.stock > 0 && !product.quantity)
           errors[`productQuantity-${index}`] = "Quantity is required";
+        else if (product.stock > 0) {
+          const quantity = parseInt(product.quantity, 10);
+          if (isNaN(quantity) || quantity <= 0) {
+            errors[`productQuantity-${index}`] = "Enter a valid quantity";
+          } else if (quantity > product.stock) {
+            errors[`productQuantity-${index}`] = `Cannot exceed stock (${product.stock})`;
+          }
+        }
       });
     } else if (step === 2 && !mrNumber) {
       errors.mrNumber = "MR number is required";
@@ -863,8 +865,6 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     setStep((prevStep) => (prevStep > 0 ? prevStep - 1 : 0));
   };
 
-
-
   const handleMRNumberSearch = () => {
     // Simulate fetching patient details
     setPatientDetails({
@@ -882,8 +882,6 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     }
   }, [location]);
 
-
-
   const handleOrderCompletion = async () => {
     const currentUTCDateTime = getCurrentUTCDateTime();
     setIsLoading(true);
@@ -891,13 +889,14 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     try {
       // Step 1: Handle Loyalty Points Update (if applicable)
       if (privilegeCard && privilegeCardDetails) {
-        const { updatedPoints, pointsToRedeem, pointsToAdd } = calculateLoyaltyPoints(
-          subtotal,
-          redeemPointsAmount,
-          privilegeCard,
-          privilegeCardDetails,
-          loyaltyPoints
-        );
+        const { updatedPoints, pointsToRedeem, pointsToAdd } =
+          calculateLoyaltyPoints(
+            subtotal,
+            redeemPointsAmount,
+            privilegeCard,
+            privilegeCardDetails,
+            loyaltyPoints
+          );
 
         const { error: loyaltyError } = await supabase
           .from("privilegecards")
@@ -915,7 +914,9 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
       }
 
       // Step 2: Prepare Variables for Sales Order Data
-      const sanitizedRedeemedPoints = privilegeCard ? parseInt(redeemPointsAmount) || 0 : 0;
+      const sanitizedRedeemedPoints = privilegeCard
+        ? parseInt(redeemPointsAmount) || 0
+        : 0;
       const sanitizedPointsAdded = privilegeCard ? pointsToAdd || 0 : 0;
 
       // Step 3: Handle Existing Sales Order Update
@@ -949,9 +950,6 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         }
 
         alert("Sales order updated successfully!");
-
-
-
       } else {
         // Step 4: Insert New Sales Order
         const newSalesOrderId = await generateSalesOrderId();
@@ -959,7 +957,9 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           .from("sales_orders")
           .insert({
             sales_order_id: newSalesOrderId,
-            work_order_id: selectedWorkOrder ? selectedWorkOrder.work_order_id : null,
+            work_order_id: selectedWorkOrder
+              ? selectedWorkOrder.work_order_id
+              : null,
             items: productEntries,
             advance_details: parseFloat(advanceDetails),
             mr_number: mrNumber,
@@ -986,8 +986,6 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         }
 
         alert("Sales order created successfully!");
-
-
 
         // Step 5: Mark Work Order as Used (if applicable)
         if (selectedWorkOrder) {
@@ -1023,7 +1021,10 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           purchase_quantity: product.quantity,
         }));
 
-        const deductResponse = await deductStockForMultipleProducts(deductions, branch);
+        const deductResponse = await deductStockForMultipleProducts(
+          deductions,
+          branch
+        );
         if (!deductResponse.success) {
           console.error("Stock deduction failed:", deductResponse.error);
           setErrorMessage(`Failed to deduct stocks: ${deductResponse.error}`);
@@ -1045,12 +1046,10 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
 
       setAllowPrint(true);
 
-
       alert("Order processed successfully!");
       setTimeout(() => {
         printButtonRef.current?.focus(); // Move focus to the Print button
       }, 100);
-
     } catch (error) {
       console.error("Error completing the order:", error);
       setErrorMessage("Failed to complete the order.");
@@ -1058,7 +1057,6 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
       setIsLoading(false);
     }
   };
-
 
   // Function to reset the form
   const resetForm = () => {
@@ -1087,39 +1085,31 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     setRedeemOption(null);
     setPrivilegeCardNumber("");
     setIsEditing(false); // Reset isEditing to false
-    // Optionally retain the branch to allow multiple orders for the same branch
+    setProductSuggestions([]);
   };
-
 
   // Confirm and reset the form
   const handleExit = () => {
-    if (window.confirm("Are you sure you want to exit? Unsaved changes will be lost.")) {
+    if (
+      window.confirm(
+        "Are you sure you want to exit? Unsaved changes will be lost."
+      )
+    ) {
       resetForm();
       navigate("/home");
     }
   };
-
 
   const handlePrint = () => {
     setAllowPrint(true);
     window.print(); // Simply call print without extra state changes
   };
 
-
-
-  const focusFlowForStep3 = (e, currentRef, nextRef) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      if (nextRef && nextRef.current) {
-        nextRef.current.focus();
-      }
-    }
-  };
-
   return (
     <div
-      className={`transition-all duration-300 ${isCollapsed ? "mx-20" : "mx-20 px-20"
-        } justify-center mt-16 p-4 mx-auto`}
+      className={`transition-all duration-300 ${
+        isCollapsed ? "mx-20" : "mx-20 px-20"
+      } justify-center mt-16 p-4 mx-auto`}
     >
       {/* Modal for Work Order Details */}
       {showWorkOrderModal && (
@@ -1218,8 +1208,9 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         {Array.from({ length: 6 }, (_, i) => (
           <div
             key={i}
-            className={`flex-1 h-2 rounded-xl mx-1 ${step > i ? "bg-[#5db76d]" : "bg-gray-300"
-              } transition-all duration-300`}
+            className={`flex-1 h-2 rounded-xl mx-1 ${
+              step > i ? "bg-[#5db76d]" : "bg-gray-300"
+            } transition-all duration-300`}
           />
         ))}
       </div>
@@ -1287,10 +1278,12 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                         <div className="flex justify-between items-center">
                           <div>
                             <p>
-                              <strong>Work Order ID:</strong> {workOrder.work_order_id}
+                              <strong>Work Order ID:</strong>{" "}
+                              {workOrder.work_order_id}
                             </p>
                             <p>
-                              <strong>Description:</strong> {workOrder.description}
+                              <strong>Description:</strong>{" "}
+                              {workOrder.description}
                             </p>
                             <p>
                               <strong>Advance Paid:</strong> ₹
@@ -1332,7 +1325,6 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           )}
 
           {/* Step 1: Product Details */}
-          {/* Step 1: Product Details */}
           {step === 1 && (
             <div className="w-full bg-gray-50 p-6 rounded-md shadow-inner space-y-6">
               <h2 className="text-lg font-semibold text-gray-700 text-center">
@@ -1364,105 +1356,69 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                           value={productEntries[index].id}
                           onChange={async (e) => {
                             const value = e.target.value.trim();
+                            const updatedSuggestions = [...productSuggestions];
                             if (value) {
-                              const suggestions = await fetchProductSuggestions(value, "id");
-                              setProductSuggestions(suggestions);
+                              updatedSuggestions[index] = await fetchProductSuggestions(
+                                value,
+                                "id"
+                              );
                             } else {
-                              setProductSuggestions([]);
+                              updatedSuggestions[index] = [];
                             }
+                            setProductSuggestions(updatedSuggestions);
+
                             setProductEntries((prevEntries) => {
                               const updatedEntries = [...prevEntries];
                               updatedEntries[index].id = value; // Update ID field
                               return updatedEntries;
                             });
+                            await handleProductInputChange(index, value); // Fetch product details
                           }}
                           onBlur={async () => {
-                            const selectedProduct = productSuggestions.find(
-                              (prod) => prod.product_id === productEntries[index].id
+                            const selectedProduct = productSuggestions[index]?.find(
+                              (prod) =>
+                                prod.product_id === productEntries[index].id
                             );
                             if (selectedProduct) {
                               // Automatically fetch data and move focus to quantity
-                              const productDetails = await fetchProductDetailsFromDatabase(
-                                selectedProduct.product_id
-                              );
-                              if (productDetails) {
-                                setProductEntries((prevEntries) => {
-                                  const updatedEntries = [...prevEntries];
-                                  updatedEntries[index] = {
-                                    id: productDetails.product_id,
-                                    name: productDetails.product_name,
-                                    price: productDetails.mrp || "",
-                                    quantity: prevEntries[index].quantity || "", // Preserve quantity
-                                  };
-                                  return updatedEntries;
-                                });
-                                setTimeout(() => {
-                                  quantityRefs.current[index]?.focus();
-                                }, 100);
-                              }
-                            }
-                          }}
-                          onInput={async (e) => {
-                            // Handle barcode scanner input
-                            const value = e.target.value.trim();
-                            if (value.length >= 5) { // Assuming barcode length >= 5
-                              const productDetails = await fetchProductDetailsFromDatabase(value);
-                              if (productDetails) {
-                                setProductEntries((prevEntries) => {
-                                  const updatedEntries = [...prevEntries];
-                                  updatedEntries[index] = {
-                                    id: productDetails.product_id,
-                                    name: productDetails.product_name,
-                                    price: productDetails.mrp || "",
-                                    quantity: prevEntries[index].quantity || "", // Preserve quantity
-                                  };
-                                  return updatedEntries;
-                                });
-                                setTimeout(() => {
-                                  quantityRefs.current[index]?.focus();
-                                }, 100);
-                              }
-                            }
-                          }}
-                          onKeyDown={async (e) => {
-                            if (e.key === "Enter") {
-                              e.preventDefault();
-                              const selectedProduct = productSuggestions.find(
-                                (prod) => prod.product_id === productEntries[index].id
-                              );
-                              if (selectedProduct) {
-                                const productDetails = await fetchProductDetailsFromDatabase(
-                                  selectedProduct.product_id
+                              const productDetails =
+                                await fetchProductDetailsFromDatabase(
+                                  selectedProduct.product_id,
+                                  branch
                                 );
-                                if (productDetails) {
-                                  setProductEntries((prevEntries) => {
-                                    const updatedEntries = [...prevEntries];
-                                    updatedEntries[index] = {
-                                      id: productDetails.product_id,
-                                      name: productDetails.product_name,
-                                      price: productDetails.mrp || "",
-                                      quantity: prevEntries[index].quantity || "", // Preserve quantity
-                                    };
-                                    return updatedEntries;
-                                  });
+                              if (productDetails) {
+                                setProductEntries((prevEntries) => {
+                                  const updatedEntries = [...prevEntries];
+                                  updatedEntries[index] = {
+                                    id: productDetails.product_id,
+                                    name: productDetails.product_name,
+                                    price: productDetails.mrp || "",
+                                    stock: productDetails.stock || 0,
+                                    quantity: prevEntries[index].quantity || "", // Preserve quantity
+                                  };
+                                  return updatedEntries;
+                                });
+                                if (productDetails.stock > 0) {
                                   setTimeout(() => {
                                     quantityRefs.current[index]?.focus();
                                   }, 100);
                                 }
                               }
-                            } else if (e.key === "Enter" && e.shiftKey) {
-                              e.preventDefault();
-                              addNewProductEntry();
                             }
                           }}
                           list={`productIdSuggestions-${index}`}
                           className="border border-gray-300 px-4 py-3 rounded-lg w-full"
                         />
                         <datalist id={`productIdSuggestions-${index}`}>
-                          {productSuggestions.map((suggestion) => (
-                            <option key={suggestion.product_id} value={suggestion.product_id} />
-                          ))}
+                          {productSuggestions[index] &&
+                            productSuggestions[index].map((suggestion) => (
+                              <option
+                                key={suggestion.product_id}
+                                value={suggestion.product_id}
+                              />
+                            ))}
                         </datalist>
+
                         {validationErrors[`productId-${index}`] && (
                           <p className="text-red-500 text-xs absolute -bottom-5 left-0">
                             {validationErrors[`productId-${index}`]}
@@ -1495,25 +1451,56 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                         )}
                       </div>
 
-                      {/* Product Quantity Input */}
+                      {/* Quantity Input */}
                       <div className="relative w-1/4">
-                        <input
-                          type="number"
-                          id={`productQuantity-${index}`}
-                          placeholder="Quantity"
-                          value={product.quantity}
-                          ref={(el) => (quantityRefs.current[index] = el)}
-                          onChange={(e) =>
-                            handleProductEntryChange(index, "quantity", e.target.value)
-                          }
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              e.preventDefault();
-                              nextStep();
+                        {product.stock === 0 ? (
+                          <input
+                            type="text"
+                            value="Out of Stock"
+                            readOnly
+                            className="border border-gray-300 px-4 py-3 rounded-lg w-full text-center bg-red-100 text-red-600"
+                          />
+                        ) : (
+                          <input
+                            type="number"
+                            id={`productQuantity-${index}`}
+                            placeholder="Quantity"
+                            value={product.quantity}
+                            onChange={(e) =>
+                              handleProductChange(index, "quantity", e.target.value)
                             }
-                          }}
-                          className="border border-gray-300 px-4 py-3 rounded-lg w-full text-center"
-                        />
+                            className="border border-gray-300 px-4 py-3 rounded-lg w-full text-center"
+                            min="1"
+                            max={product.stock} // Prevent ordering more than available stock
+                            ref={(el) => (quantityRefs.current[index] = el)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                if (e.shiftKey) {
+                                  // Shift+Enter: Add new product
+                                  e.preventDefault();
+                                  setProductEntries([
+                                    ...productEntries,
+                                    { id: "", name: "", price: "", quantity: "" },
+                                  ]);
+                                  setProductSuggestions([...productSuggestions, []]);
+                                  setTimeout(
+                                    () =>
+                                      document
+                                        .getElementById(
+                                          `productId-${productEntries.length}`
+                                        )
+                                        ?.focus(),
+                                    0
+                                  );
+                                } else {
+                                  // Enter: Move to next step
+                                  e.preventDefault();
+                                  nextStep();
+                                }
+                              }
+                            }}
+                          />
+                        )}
                         {validationErrors[`productQuantity-${index}`] && (
                           <p className="text-red-500 text-xs absolute -bottom-5 left-0">
                             {validationErrors[`productQuantity-${index}`]}
@@ -1533,15 +1520,45 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                   ))}
                 <button
                   type="button"
-                  onClick={addNewProductEntry}
+                  onClick={() => {
+                    setProductEntries([
+                      ...productEntries,
+                      { id: "", name: "", price: "", quantity: "" },
+                    ]);
+                    setProductSuggestions([...productSuggestions, []]);
+                    setTimeout(
+                      () =>
+                        document
+                          .getElementById(`productId-${productEntries.length}`)
+                          ?.focus(),
+                      0
+                    );
+                  }}
                   className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && e.shiftKey) {
+                      e.preventDefault();
+                      // Trigger Add Product
+                      setProductEntries([
+                        ...productEntries,
+                        { id: "", name: "", price: "", quantity: "" },
+                      ]);
+                      setProductSuggestions([...productSuggestions, []]);
+                      setTimeout(
+                        () =>
+                          document
+                            .getElementById(`productId-${productEntries.length}`)
+                            ?.focus(),
+                        0
+                      );
+                    }
+                  }}
                 >
                   Add Product
                 </button>
               </div>
             </div>
           )}
-
 
           {/* Step 2: Patient Details */}
           {step === 2 && (
@@ -1619,8 +1636,9 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                       }
                     }, 0);
                   }}
-                  className={`px-4 py-2 rounded-lg ${privilegeCard ? "bg-green-500 text-white" : "bg-gray-200"
-                    }`}
+                  className={`px-4 py-2 rounded-lg ${
+                    privilegeCard ? "bg-green-500 text-white" : "bg-gray-200"
+                  }`}
                 >
                   Yes
                 </button>
@@ -1632,8 +1650,9 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                     setErrorMessage(""); // Clear previous errors
                     nextStep();
                   }}
-                  className={`px-4 py-2 rounded-lg ${!privilegeCard ? "bg-green-500 text-white" : "bg-gray-200"
-                    }`}
+                  className={`px-4 py-2 rounded-lg ${
+                    !privilegeCard ? "bg-green-500 text-white" : "bg-gray-200"
+                  }`}
                 >
                   No
                 </button>
@@ -1648,20 +1667,22 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                     <button
                       type="button" // Added type="button"
                       onClick={() => setRedeemOption("barcode")}
-                      className={`px-4 py-2 rounded-lg ${redeemOption === "barcode"
-                        ? "bg-green-500 text-white"
-                        : "bg-gray-200"
-                        }`}
+                      className={`px-4 py-2 rounded-lg ${
+                        redeemOption === "barcode"
+                          ? "bg-green-500 text-white"
+                          : "bg-gray-200"
+                      }`}
                     >
                       Scan Barcode
                     </button>
                     <button
                       type="button" // Added type="button"
                       onClick={() => setRedeemOption("phone")}
-                      className={`px-4 py-2 rounded-lg ${redeemOption === "phone"
-                        ? "bg-green-500 text-white"
-                        : "bg-gray-200"
-                        }`}
+                      className={`px-4 py-2 rounded-lg ${
+                        redeemOption === "phone"
+                          ? "bg-green-500 text-white"
+                          : "bg-gray-200"
+                      }`}
                     >
                       Use Phone Number
                     </button>
@@ -1793,10 +1814,11 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                               setRedeemPointsAmount(loyaltyPoints);
                               setRedeemPoints(true);
                             }}
-                            className={`px-4 py-2 mb-2 rounded-lg ${redeemOption === "full"
-                              ? "bg-green-500 text-white"
-                              : "bg-gray-200"
-                              }`}
+                            className={`px-4 py-2 mb-2 rounded-lg ${
+                              redeemOption === "full"
+                                ? "bg-green-500 text-white"
+                                : "bg-gray-200"
+                            }`}
                           >
                             Redeem Full Points
                           </button>
@@ -1811,10 +1833,11 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                                 0
                               ); // Focus on custom amount input
                             }}
-                            className={`px-4 py-2 mb-2 rounded-lg ${redeemOption === "custom"
-                              ? "bg-green-500 text-white"
-                              : "bg-gray-200"
-                              }`}
+                            className={`px-4 py-2 mb-2 rounded-lg ${
+                              redeemOption === "custom"
+                                ? "bg-green-500 text-white"
+                                : "bg-gray-200"
+                            }`}
                           >
                             Redeem Custom Amount
                           </button>
@@ -1847,9 +1870,9 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                                   e.target.value === ""
                                     ? ""
                                     : Math.min(
-                                      Number(e.target.value),
-                                      loyaltyPoints
-                                    )
+                                        Number(e.target.value),
+                                        loyaltyPoints
+                                      )
                                 )
                               }
                               className="border border-gray-300 w-full px-4 py-3 rounded-lg text-center my-2"
@@ -1904,21 +1927,21 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                 Order Created by Employee Details
               </h2>
               <select
-            value={employee}
-            onChange={(e) => setEmployee(e.target.value)}
-            ref={employeeRef}
-            onBlur={validateEmployeeSelection}
-            className="border border-gray-300 w-full px-4 py-3 rounded-lg focus:outline-none focus:border-green-500"
-          >
-            <option value="" disabled>
-              Select Employee
-            </option>
-            {employees.map((emp, index) => (
-              <option key={index} value={emp}>
-                {emp}
-              </option>
-            ))}
-          </select>
+                value={employee}
+                onChange={(e) => setEmployee(e.target.value)}
+                ref={employeeRef}
+                onBlur={validateEmployeeSelection}
+                className="border border-gray-300 w-full px-4 py-3 rounded-lg focus:outline-none focus:border-green-500"
+              >
+                <option value="" disabled>
+                  Select Employee
+                </option>
+                {employees.map((emp, index) => (
+                  <option key={index} value={emp}>
+                    {emp}
+                  </option>
+                ))}
+              </select>
               {employee && (
                 <EmployeeVerification
                   employee={employee}
@@ -1931,7 +1954,9 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                 />
               )}
               {validationErrors.employee && (
-                <p className="text-red-500 text-xs mt-1">{validationErrors.employee}</p>
+                <p className="text-red-500 text-xs mt-1">
+                  {validationErrors.employee}
+                </p>
               )}
             </div>
           )}
@@ -1957,12 +1982,13 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                       className="w-48 h-auto"
                     />
                   </div>
-                  </div>
-
+                </div>
 
                 {/* Invoice Details */}
                 <div className="grid grid-cols-2 gap-2 mt-20 mb-6">
-                <h2 className="text-2xl font-semibold mt-2">Invoice Summary</h2>
+                  <h2 className="text-2xl font-semibold mt-2">
+                    Invoice Summary
+                  </h2>
                   <div>
                     <p>
                       <span className="font-semibold">Sales Order ID:</span>{" "}
@@ -1984,7 +2010,6 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                       {employee}
                     </p>
                   </div>
-                  
                 </div>
 
                 {/* Product Table */}
@@ -2023,9 +2048,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                             <td className="py-2 px-4 border-b">
                               {product.name}
                             </td>
-                            <td className="py-2 px-4 border-b">
-                              9001
-                            </td>
+                            <td className="py-2 px-4 border-b">9001</td>
                             <td className="py-2 px-3 border-b text-right">
                               {parseFloat(product.price).toFixed(2)}
                             </td>
@@ -2046,7 +2069,6 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                   {/* Left Column */}
                   <div className="space-y-2">
-
                     <p>
                       <span className="font-semibold">CGST (6%):</span> ₹
                       {parseFloat(cgstAmount).toFixed(2)}
@@ -2060,7 +2082,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                   {/* Right Column */}
                   <div className="space-y-2">
                     <p>
-                      <span className="font-semibold">total:</span> ₹
+                      <span className="font-semibold">Total:</span> ₹
                       {subtotal.toFixed(2)}
                     </p>
                     <p>
@@ -2111,9 +2133,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                       value={paymentMethod}
                       onChange={(e) => setPaymentMethod(e.target.value)}
                       ref={paymentMethodRef}
-                      onKeyDown={(e) =>
-                        handleEnterKey(e, saveOrderRef)
-                      }
+                      onKeyDown={(e) => handleEnterKey(e, saveOrderRef)}
                       className="border border-gray-300 w-full px-4 py-3 rounded-lg"
                     >
                       <option value="" disabled>
@@ -2145,8 +2165,9 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                       setTimeout(() => printButtonRef.current?.focus(), 100); // Move focus to Print button after saving
                     }
                   }}
-                  className={`bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg transition ${!paymentMethod ? "opacity-50 cursor-not-allowed" : ""
-                    } w-full md:w-auto`}
+                  className={`bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg transition ${
+                    !paymentMethod ? "opacity-50 cursor-not-allowed" : ""
+                  } w-full md:w-auto`}
                   disabled={!paymentMethod || isLoading}
                 >
                   Submit Order{" "}
@@ -2163,11 +2184,13 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                       if (e.key === "Enter") {
                         e.preventDefault();
                         handlePrint();
-                        setTimeout(() => newWorkOrderButtonRef.current?.focus(), 100); // Move focus to Create New after printing
+                        setTimeout(
+                          () => newWorkOrderButtonRef.current?.focus(),
+                          100
+                        ); // Move focus to Create New after printing
                       }
                     }}
                     className="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-lg transition flex items-center justify-center w-full md:w-auto"
-
                   >
                     <PrinterIcon className="w-5 h-5 inline mr-2" />
                     Print
@@ -2204,7 +2227,11 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                 type="button" // Added type="button"
                 ref={nextButtonRef}
                 onClick={nextStep}
-                className={`bg-green-500 hover:bg-green-600 text-white mx-2 px-4 py-2 rounded-lg ${step === 4 && !isPinVerified ? 'opacity-50 cursor-not-allowed' : ''}`}
+                className={`bg-green-500 hover:bg-green-600 text-white mx-2 px-4 py-2 rounded-lg ${
+                  step === 4 && !isPinVerified
+                    ? "opacity-50 cursor-not-allowed"
+                    : ""
+                }`}
                 disabled={step === 4 && !isPinVerified}
               >
                 Next

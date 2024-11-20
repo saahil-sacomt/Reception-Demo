@@ -9,7 +9,7 @@ const Header = ({ selectedTab, setSelectedTab, isCollapsed, toggleSidebar }) => 
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false); // State for Create dropdown
   const navigate = useNavigate();
-  const { logout, user, role ,name } = useAuth();
+  const { logout, user, role, name } = useAuth();
 
   const handleLogout = async () => {
     await logout();
@@ -80,18 +80,24 @@ const Header = ({ selectedTab, setSelectedTab, isCollapsed, toggleSidebar }) => 
           {/* Create Dropdown */}
           {isCreateOpen && (
             <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg z-20 p-2 text-gray-700">
-              <button
-                onClick={() => handleCreateNavigate('/work-order')}
-                className="flex flex-row items-center block w-full text-left px-4 py-2 text-sm hover:bg-green-50 hover:text-green-600 rounded-lg"
-              >
-                <BriefcaseIcon className='h-5 w-5 mr-2' /> Work Order
-              </button>
-              <button
-                onClick={() => handleCreateNavigate('/sales-order')}
-                className="flex flex-row items-center block w-full text-left px-4 py-2 text-sm hover:bg-green-50 hover:text-green-600 rounded-lg"
-              >
-                <PresentationChartLineIcon className='h-5 w-5 mr-2' /> Sales Order
-              </button>
+              {role !== 'admin' && role !== 'super_admin' && (
+                <button
+                  onClick={() => handleCreateNavigate('/work-order')}
+                  className="flex flex-row items-center block w-full text-left px-4 py-2 text-sm hover:bg-green-50 hover:text-green-600 rounded-lg"
+                >
+                  <BriefcaseIcon className='h-5 w-5 mr-2' /> Work Order
+                </button>
+              )}
+              {role !== 'admin' && role !== 'super_admin' && (
+
+                <button
+                  onClick={() => handleCreateNavigate('/sales-order')}
+                  className="flex flex-row items-center block w-full text-left px-4 py-2 text-sm hover:bg-green-50 hover:text-green-600 rounded-lg"
+                >
+                  <PresentationChartLineIcon className='h-5 w-5 mr-2' /> Sales Order
+                </button>
+
+              )}
               <button
                 onClick={() => handleCreateNavigate('/privilege-generation')}
                 className="flex flex-row items-center block w-full text-left px-4 py-2 text-sm hover:bg-green-50 hover:text-green-600 rounded-lg"
@@ -120,12 +126,14 @@ const Header = ({ selectedTab, setSelectedTab, isCollapsed, toggleSidebar }) => 
               >
                 <PercentBadgeIcon className='h-5 w-5 mr-2' /> Privilege card details
               </button>
-              <button
-  onClick={() => handleCreateNavigate('/raise-request')}
-  className="flex flex-row items-center block w-full text-left px-4 py-2 text-sm hover:bg-green-50 hover:text-green-600 rounded-lg"
->
-  <FolderPlusIcon className='h-5 w-5 mr-2' /> Raise Request
-</button>
+              {role !== 'admin' && role !== 'super_admin' && (
+                <button
+                  onClick={() => handleCreateNavigate('/raise-request')}
+                  className="flex flex-row items-center block w-full text-left px-4 py-2 text-sm hover:bg-green-50 hover:text-green-600 rounded-lg"
+                >
+                  <FolderPlusIcon className='h-5 w-5 mr-2' /> Raise Request
+                </button>
+              )}
 
               {role !== 'employee' && role != 'admin' && (
                 <button
