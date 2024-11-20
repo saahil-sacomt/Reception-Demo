@@ -5,6 +5,7 @@ import supabase from '../supabaseClient';
 import { useAuth } from '../context/AuthContext';
 import EmployeeVerification from "../components/EmployeeVerification";
 import { useNavigate } from 'react-router-dom';
+import logo from '../assets/sreenethraenglishisolated.png';
 
 const WorkOrderGeneration = ({ isCollapsed }) => {
   const { branch, name, user } = useAuth();
@@ -287,7 +288,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       setIsPrinted(false); // Reset printing state
     }
   };
-  
+
 
   const addNewProductEntry = () => {
     setProductEntries([
@@ -451,8 +452,13 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       } else {
         alert("Work order saved successfully!");
         setAllowPrint(true);
-
+        // Move focus to Print button
+        setTimeout(() => {
+          printButtonRef.current?.focus();
+        }, 100); // Slight delay to ensure UI is updated
       }
+
+
     } catch (err) {
       console.error("Unexpected error saving work order:", err);
       alert("An unexpected error occurred.");
@@ -941,14 +947,26 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
             {/* Printable Area */}
             <div className="printable-area print:block print:absolute print:inset-0 print:w-full bg-white p-8 rounded-lg text-gray-800">
               {/* Invoice Header */}
-              <div className="invoice-header text-center mb-6">
-                <h1 className="text-3xl font-bold">Screenetra Eye Care</h1>
-                <p className="text-sm text-gray-600">GST Number: 32AAUCS7002H1ZV</p>
-                <h2 className="text-2xl font-semibold mt-2">Work Order Summary</h2>
+              <div className="flex justify-between items-center mb-8">
+                {/* GST Number on the left */}
+                <div>
+                  <p className="text-sm text-gray-600 font-semibold">
+                    GST Number: 32AAUCS7002H1ZV
+                  </p>
+                </div>
+                {/* Company Logo on the right */}
+                <div>
+                  <img
+                    src={logo} // Replace with your logo's file path
+                    alt="Company Logo"
+                    className="w-48 h-auto"
+                  />
+                </div>
               </div>
 
               {/* Invoice Details */}
-              <div className="invoice-details grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+              <div className="invoice-details grid grid-cols-1 md:grid-cols-2 gap-4 mt-20 mb-6">
+                <h2 className="text-2xl font-semibold mt-2">Work Order Summary</h2>
                 <div>
                   <p>
                     <span className="font-semibold">Work Order ID:</span> <span className="font-normal">{workOrderId}</span>
@@ -974,9 +992,6 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                       <span className="font-semibold">B2B GST Number:</span> <span className="font-normal">{gstNumber}</span>
                     </p>
                   )}
-                  <p>
-                    <span className="font-semibold">HSN Code:</span> <span className="font-normal">{HSN_CODE}</span>
-                  </p>
                 </div>
               </div>
 
@@ -986,6 +1001,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                   <tr className="bg-gray-100">
                     <th className="py-2 px-4 border-b">Product ID</th>
                     <th className="py-2 px-4 border-b">Product Name</th>
+                    <th className="py-2 px-4 border-b">HSN Code</th>
                     <th className="py-2 px-4 border-b">Price</th>
                     <th className="py-2 px-4 border-b">Quantity</th>
                     <th className="py-2 px-4 border-b">Subtotal</th>
@@ -998,6 +1014,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                       <tr key={index} className="text-center">
                         <td className="py-2 px-4 border-b">{product.id}</td>
                         <td className="py-2 px-4 border-b">{product.name}</td>
+                        <td className="py-2 px-4 border-b">9001</td>
                         <td className="py-2 px-4 border-b">₹ {parseFloat(product.price).toFixed(2)}</td>
                         <td className="py-2 px-4 border-b">{product.quantity}</td>
                         <td className="py-2 px-4 border-b">₹ {productSubtotal.toFixed(2)}</td>
@@ -1093,11 +1110,12 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                     e.preventDefault();
                     if (!isSaving) {
                       saveWorkOrder();
-                    
-                    setTimeout(() => {
-                      printButtonRef.current?.focus();
-                    }, 0);
-                  }}
+
+                      setTimeout(() => {
+                        printButtonRef.current?.focus();
+                      }, 0);
+                    }
+                  }
                 }}
                 className="flex items-center justify-center w-44 h-12 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition"
 
@@ -1123,15 +1141,15 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
 
               {/* Exit Button */}
               {allowPrint && (
-                
-                  <button
-                    onClick={handleExit}
-                    className="flex items-center justify-center w-44 h-12 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition"
 
-                  >
-                    Exit
-                  </button>
-                
+                <button
+                  onClick={handleExit}
+                  className="flex items-center justify-center w-44 h-12 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition"
+
+                >
+                  Exit
+                </button>
+
               )}
             </div>
           </>

@@ -7,6 +7,7 @@ import { useAuth } from "../context/AuthContext";
 import { deductStockForMultipleProducts } from '../services/authService.js';
 import EmployeeVerification from "../components/EmployeeVerification";
 import { useModificationContext } from "../context/ModificationContext";
+import logo from '../assets/sreenethraenglishisolated.png';
 
 
 
@@ -1017,7 +1018,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
       setTimeout(() => {
         printButtonRef.current?.focus(); // Move focus to the Print button
       }, 100);
-      
+
     } catch (error) {
       console.error("Error completing the order:", error);
       setErrorMessage("Failed to complete the order.");
@@ -1300,214 +1301,214 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
 
           {/* Step 1: Product Details */}
           {/* Step 1: Product Details */}
-{step === 1 && (
-  <div className="w-full bg-gray-50 p-6 rounded-md shadow-inner space-y-6">
-    <h2 className="text-lg font-semibold text-gray-700 text-center">
-      Product Information
-    </h2>
-    <label className="block text-gray-700 font-medium mb-1">
-      Generated Sales Order ID
-    </label>
-    <input
-      type="text"
-      value={salesOrderId}
-      readOnly
-      className="border border-gray-300 px-4 py-3 rounded-lg bg-gray-200 text-gray-700 w-full text-center"
-    />
-    <label className="block text-gray-700 font-medium mb-1">
-      Product Details
-    </label>
-    <div className="space-y-6">
-      {productEntries &&
-        Array.isArray(productEntries) &&
-        productEntries.map((product, index) => (
-          <div key={index} className="flex space-x-2 items-center">
-            {/* Product ID Input */}
-            <div className="relative w-2/4">
+          {step === 1 && (
+            <div className="w-full bg-gray-50 p-6 rounded-md shadow-inner space-y-6">
+              <h2 className="text-lg font-semibold text-gray-700 text-center">
+                Product Information
+              </h2>
+              <label className="block text-gray-700 font-medium mb-1">
+                Generated Sales Order ID
+              </label>
               <input
                 type="text"
-                id={`productId-${index}`}
-                placeholder="Enter Product ID"
-                value={productEntries[index].id}
-                onChange={async (e) => {
-                  const value = e.target.value.trim();
-                  if (value) {
-                    const suggestions = await fetchProductSuggestions(value, "id");
-                    setProductSuggestions(suggestions);
-                  } else {
-                    setProductSuggestions([]);
-                  }
-                  setProductEntries((prevEntries) => {
-                    const updatedEntries = [...prevEntries];
-                    updatedEntries[index].id = value; // Update ID field
-                    return updatedEntries;
-                  });
-                }}
-                onBlur={async () => {
-                  const selectedProduct = productSuggestions.find(
-                    (prod) => prod.product_id === productEntries[index].id
-                  );
-                  if (selectedProduct) {
-                    // Automatically fetch data and move focus to quantity
-                    const productDetails = await fetchProductDetailsFromDatabase(
-                      selectedProduct.product_id
-                    );
-                    if (productDetails) {
-                      setProductEntries((prevEntries) => {
-                        const updatedEntries = [...prevEntries];
-                        updatedEntries[index] = {
-                          id: productDetails.product_id,
-                          name: productDetails.product_name,
-                          price: productDetails.mrp || "",
-                          quantity: prevEntries[index].quantity || "", // Preserve quantity
-                        };
-                        return updatedEntries;
-                      });
-                      setTimeout(() => {
-                        quantityRefs.current[index]?.focus();
-                      }, 100);
-                    }
-                  }
-                }}
-                onInput={async (e) => {
-                  // Handle barcode scanner input
-                  const value = e.target.value.trim();
-                  if (value.length >= 5) { // Assuming barcode length >= 5
-                    const productDetails = await fetchProductDetailsFromDatabase(value);
-                    if (productDetails) {
-                      setProductEntries((prevEntries) => {
-                        const updatedEntries = [...prevEntries];
-                        updatedEntries[index] = {
-                          id: productDetails.product_id,
-                          name: productDetails.product_name,
-                          price: productDetails.mrp || "",
-                          quantity: prevEntries[index].quantity || "", // Preserve quantity
-                        };
-                        return updatedEntries;
-                      });
-                      setTimeout(() => {
-                        quantityRefs.current[index]?.focus();
-                      }, 100);
-                    }
-                  }
-                }}
-                onKeyDown={async (e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    const selectedProduct = productSuggestions.find(
-                      (prod) => prod.product_id === productEntries[index].id
-                    );
-                    if (selectedProduct) {
-                      const productDetails = await fetchProductDetailsFromDatabase(
-                        selectedProduct.product_id
-                      );
-                      if (productDetails) {
-                        setProductEntries((prevEntries) => {
-                          const updatedEntries = [...prevEntries];
-                          updatedEntries[index] = {
-                            id: productDetails.product_id,
-                            name: productDetails.product_name,
-                            price: productDetails.mrp || "",
-                            quantity: prevEntries[index].quantity || "", // Preserve quantity
-                          };
-                          return updatedEntries;
-                        });
-                        setTimeout(() => {
-                          quantityRefs.current[index]?.focus();
-                        }, 100);
-                      }
-                    }
-                  } else if (e.key === "Enter" && e.shiftKey) {
-                    e.preventDefault();
-                    addNewProductEntry();
-                  }
-                }}
-                list={`productIdSuggestions-${index}`}
-                className="border border-gray-300 px-4 py-3 rounded-lg w-full"
-              />
-              <datalist id={`productIdSuggestions-${index}`}>
-                {productSuggestions.map((suggestion) => (
-                  <option key={suggestion.product_id} value={suggestion.product_id} />
-                ))}
-              </datalist>
-              {validationErrors[`productId-${index}`] && (
-                <p className="text-red-500 text-xs absolute -bottom-5 left-0">
-                  {validationErrors[`productId-${index}`]}
-                </p>
-              )}
-            </div>
-
-            {/* Product Name Input (Read-Only) */}
-            <div className="relative w-1/2">
-              <input
-                type="text"
-                value={product.name}
+                value={salesOrderId}
                 readOnly
-                className="border border-gray-300 px-4 py-3 rounded-lg w-full bg-gray-100"
+                className="border border-gray-300 px-4 py-3 rounded-lg bg-gray-200 text-gray-700 w-full text-center"
               />
-            </div>
+              <label className="block text-gray-700 font-medium mb-1">
+                Product Details
+              </label>
+              <div className="space-y-6">
+                {productEntries &&
+                  Array.isArray(productEntries) &&
+                  productEntries.map((product, index) => (
+                    <div key={index} className="flex space-x-2 items-center">
+                      {/* Product ID Input */}
+                      <div className="relative w-2/4">
+                        <input
+                          type="text"
+                          id={`productId-${index}`}
+                          placeholder="Enter Product ID"
+                          value={productEntries[index].id}
+                          onChange={async (e) => {
+                            const value = e.target.value.trim();
+                            if (value) {
+                              const suggestions = await fetchProductSuggestions(value, "id");
+                              setProductSuggestions(suggestions);
+                            } else {
+                              setProductSuggestions([]);
+                            }
+                            setProductEntries((prevEntries) => {
+                              const updatedEntries = [...prevEntries];
+                              updatedEntries[index].id = value; // Update ID field
+                              return updatedEntries;
+                            });
+                          }}
+                          onBlur={async () => {
+                            const selectedProduct = productSuggestions.find(
+                              (prod) => prod.product_id === productEntries[index].id
+                            );
+                            if (selectedProduct) {
+                              // Automatically fetch data and move focus to quantity
+                              const productDetails = await fetchProductDetailsFromDatabase(
+                                selectedProduct.product_id
+                              );
+                              if (productDetails) {
+                                setProductEntries((prevEntries) => {
+                                  const updatedEntries = [...prevEntries];
+                                  updatedEntries[index] = {
+                                    id: productDetails.product_id,
+                                    name: productDetails.product_name,
+                                    price: productDetails.mrp || "",
+                                    quantity: prevEntries[index].quantity || "", // Preserve quantity
+                                  };
+                                  return updatedEntries;
+                                });
+                                setTimeout(() => {
+                                  quantityRefs.current[index]?.focus();
+                                }, 100);
+                              }
+                            }
+                          }}
+                          onInput={async (e) => {
+                            // Handle barcode scanner input
+                            const value = e.target.value.trim();
+                            if (value.length >= 5) { // Assuming barcode length >= 5
+                              const productDetails = await fetchProductDetailsFromDatabase(value);
+                              if (productDetails) {
+                                setProductEntries((prevEntries) => {
+                                  const updatedEntries = [...prevEntries];
+                                  updatedEntries[index] = {
+                                    id: productDetails.product_id,
+                                    name: productDetails.product_name,
+                                    price: productDetails.mrp || "",
+                                    quantity: prevEntries[index].quantity || "", // Preserve quantity
+                                  };
+                                  return updatedEntries;
+                                });
+                                setTimeout(() => {
+                                  quantityRefs.current[index]?.focus();
+                                }, 100);
+                              }
+                            }
+                          }}
+                          onKeyDown={async (e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              const selectedProduct = productSuggestions.find(
+                                (prod) => prod.product_id === productEntries[index].id
+                              );
+                              if (selectedProduct) {
+                                const productDetails = await fetchProductDetailsFromDatabase(
+                                  selectedProduct.product_id
+                                );
+                                if (productDetails) {
+                                  setProductEntries((prevEntries) => {
+                                    const updatedEntries = [...prevEntries];
+                                    updatedEntries[index] = {
+                                      id: productDetails.product_id,
+                                      name: productDetails.product_name,
+                                      price: productDetails.mrp || "",
+                                      quantity: prevEntries[index].quantity || "", // Preserve quantity
+                                    };
+                                    return updatedEntries;
+                                  });
+                                  setTimeout(() => {
+                                    quantityRefs.current[index]?.focus();
+                                  }, 100);
+                                }
+                              }
+                            } else if (e.key === "Enter" && e.shiftKey) {
+                              e.preventDefault();
+                              addNewProductEntry();
+                            }
+                          }}
+                          list={`productIdSuggestions-${index}`}
+                          className="border border-gray-300 px-4 py-3 rounded-lg w-full"
+                        />
+                        <datalist id={`productIdSuggestions-${index}`}>
+                          {productSuggestions.map((suggestion) => (
+                            <option key={suggestion.product_id} value={suggestion.product_id} />
+                          ))}
+                        </datalist>
+                        {validationErrors[`productId-${index}`] && (
+                          <p className="text-red-500 text-xs absolute -bottom-5 left-0">
+                            {validationErrors[`productId-${index}`]}
+                          </p>
+                        )}
+                      </div>
 
-            {/* Product Price Input (Read-Only) */}
-            <div className="relative w-1/4">
-              <input
-                type="text"
-                value={product.price}
-                readOnly
-                className="border border-gray-300 px-4 py-3 rounded-lg w-full text-center bg-gray-100"
-              />
-              {validationErrors[`productPrice-${index}`] && (
-                <p className="text-red-500 text-xs absolute -bottom-5 left-0">
-                  {validationErrors[`productPrice-${index}`]}
-                </p>
-              )}
-            </div>
+                      {/* Product Name Input (Read-Only) */}
+                      <div className="relative w-1/2">
+                        <input
+                          type="text"
+                          value={product.name}
+                          readOnly
+                          className="border border-gray-300 px-4 py-3 rounded-lg w-full bg-gray-100"
+                        />
+                      </div>
 
-            {/* Product Quantity Input */}
-            <div className="relative w-1/4">
-              <input
-                type="number"
-                id={`productQuantity-${index}`}
-                placeholder="Quantity"
-                value={product.quantity}
-                ref={(el) => (quantityRefs.current[index] = el)}
-                onChange={(e) =>
-                  handleProductEntryChange(index, "quantity", e.target.value)
-                }
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    nextStep();
-                  }
-                }}
-                className="border border-gray-300 px-4 py-3 rounded-lg w-full text-center"
-              />
-              {validationErrors[`productQuantity-${index}`] && (
-                <p className="text-red-500 text-xs absolute -bottom-5 left-0">
-                  {validationErrors[`productQuantity-${index}`]}
-                </p>
-              )}
-            </div>
+                      {/* Product Price Input (Read-Only) */}
+                      <div className="relative w-1/4">
+                        <input
+                          type="text"
+                          value={product.price}
+                          readOnly
+                          className="border border-gray-300 px-4 py-3 rounded-lg w-full text-center bg-gray-100"
+                        />
+                        {validationErrors[`productPrice-${index}`] && (
+                          <p className="text-red-500 text-xs absolute -bottom-5 left-0">
+                            {validationErrors[`productPrice-${index}`]}
+                          </p>
+                        )}
+                      </div>
 
-            {/* Delete Button */}
-            <button
-              type="button"
-              onClick={() => removeProductEntry(index)}
-              className="text-red-500 hover:text-red-700 transition"
-            >
-              <TrashIcon className="w-5 h-5" />
-            </button>
-          </div>
-        ))}
-      <button
-        type="button"
-        onClick={addNewProductEntry}
-        className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition"
-      >
-        Add Product
-      </button>
-    </div>
-  </div>
-)}
+                      {/* Product Quantity Input */}
+                      <div className="relative w-1/4">
+                        <input
+                          type="number"
+                          id={`productQuantity-${index}`}
+                          placeholder="Quantity"
+                          value={product.quantity}
+                          ref={(el) => (quantityRefs.current[index] = el)}
+                          onChange={(e) =>
+                            handleProductEntryChange(index, "quantity", e.target.value)
+                          }
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              nextStep();
+                            }
+                          }}
+                          className="border border-gray-300 px-4 py-3 rounded-lg w-full text-center"
+                        />
+                        {validationErrors[`productQuantity-${index}`] && (
+                          <p className="text-red-500 text-xs absolute -bottom-5 left-0">
+                            {validationErrors[`productQuantity-${index}`]}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Delete Button */}
+                      <button
+                        type="button"
+                        onClick={() => removeProductEntry(index)}
+                        className="text-red-500 hover:text-red-700 transition"
+                      >
+                        <TrashIcon className="w-5 h-5" />
+                      </button>
+                    </div>
+                  ))}
+                <button
+                  type="button"
+                  onClick={addNewProductEntry}
+                  className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition"
+                >
+                  Add Product
+                </button>
+              </div>
+            </div>
+          )}
 
 
           {/* Step 2: Patient Details */}
@@ -1535,16 +1536,16 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                 </p>
               )}
               <button
-              type="button"
-              onClick={() => {
-                handleMRNumberSearch();
-                // No need to focus next button here as focus is managed in handleMRNumberSearch
-              }}
-              ref={fetchButtonRef}
-              className="mt-2 text-white px-4 py-2 rounded-lg bg-green-500 hover:bg-green-600 transition"
-            >
-              Fetch Patient Details
-            </button>
+                type="button"
+                onClick={() => {
+                  handleMRNumberSearch();
+                  // No need to focus next button here as focus is managed in handleMRNumberSearch
+                }}
+                ref={fetchButtonRef}
+                className="mt-2 text-white px-4 py-2 rounded-lg bg-green-500 hover:bg-green-600 transition"
+              >
+                Fetch Patient Details
+              </button>
               {patientDetails && (
                 <div className="mt-4 bg-gray-100 p-4 rounded border border-gray-200">
                   <p>
@@ -1913,18 +1914,27 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
               {/* Printable Area */}
               <div className="printable-area print:block print:absolute print:inset-0 print:w-full bg-white p-8 rounded-lg text-gray-800">
                 {/* Invoice Header */}
-                <div className="text-center mb-8">
-                  <h1 className="text-3xl font-bold">Screenetra Eye Care</h1>
-                  <p className="text-sm text-gray-600">
-                    GST Number: 32AAUCS7002H1ZV
-                  </p>
-                  <h2 className="text-2xl font-semibold mt-2">
-                    Sales Order Summary
-                  </h2>
-                </div>
+                <div className="flex justify-between items-center mb-8">
+                  {/* GST Number on the left */}
+                  <div>
+                    <p className="text-sm text-gray-600 font-semibold">
+                      GST Number: 32AAUCS7002H1ZV
+                    </p>
+                  </div>
+                  {/* Company Logo on the right */}
+                  <div>
+                    <img
+                      src={logo} // Replace with your logo's file path
+                      alt="Company Logo"
+                      className="w-48 h-auto"
+                    />
+                  </div>
+                  </div>
+
 
                 {/* Invoice Details */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div className="grid grid-cols-2 gap-2 mt-20 mb-6">
+                <h2 className="text-2xl font-semibold mt-2">Invoice Summary</h2>
                   <div>
                     <p>
                       <span className="font-semibold">Sales Order ID:</span>{" "}
@@ -1946,11 +1956,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                       {employee}
                     </p>
                   </div>
-                  <div>
-                    <p>
-                      <span className="font-semibold">HSN Code:</span> 12345678
-                    </p>
-                  </div>
+                  
                 </div>
 
                 {/* Product Table */}
@@ -1963,6 +1969,9 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                         </th>
                         <th className="py-2 px-4 border-b text-left">
                           Product Name
+                        </th>
+                        <th className="py-2 px-4 border-b text-left">
+                          HSN Code
                         </th>
                         <th className="py-2 px-4 border-b text-right">
                           Price (₹)
@@ -1986,14 +1995,17 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                             <td className="py-2 px-4 border-b">
                               {product.name}
                             </td>
-                            <td className="py-2 px-4 border-b text-right">
-                              ₹ {parseFloat(product.price).toFixed(2)}
+                            <td className="py-2 px-4 border-b">
+                              9001
+                            </td>
+                            <td className="py-2 px-3 border-b text-right">
+                              {parseFloat(product.price).toFixed(2)}
                             </td>
                             <td className="py-2 px-4 border-b text-right">
                               {product.quantity}
                             </td>
                             <td className="py-2 px-4 border-b text-right">
-                              ₹ {productSubtotal.toFixed(2)}
+                              {productSubtotal.toFixed(2)}
                             </td>
                           </tr>
                         );
