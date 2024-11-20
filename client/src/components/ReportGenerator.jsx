@@ -1,5 +1,5 @@
 // client/src/components/ReportGenerator.jsx
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import supabase from '../supabaseClient';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
@@ -172,6 +172,8 @@ const ReportGenerator = ({ isCollapsed }) => {
   const branchSelectionRef = useRef();
   const generateButtonRef = useRef();
 
+  const navigateRef = useRef();
+
   useEffect(() => {
     const convertImageToDataUrl = (image) => {
       return new Promise((resolve, reject) => {
@@ -199,7 +201,7 @@ const ReportGenerator = ({ isCollapsed }) => {
   }, []);
 
   // Fetch all branches from the database
-  const fetchAllBranches = async () => {
+  const fetchAllBranches = useCallback(async () => {
     const { data, error } = await supabase
       .from('branches') // Ensure you have a 'branches' table
       .select('branch_code, branch_name');
@@ -210,7 +212,7 @@ const ReportGenerator = ({ isCollapsed }) => {
     }
 
     return data.map(branch => ({ code: branch.branch_code, name: branch.branch_name }));
-  };
+  }, []);
 
   useEffect(() => {
     const getBranches = async () => {
@@ -219,7 +221,7 @@ const ReportGenerator = ({ isCollapsed }) => {
       setSelectedBranches([userBranch]); // Default to user's branch code
     };
     getBranches();
-  }, [userBranch]);
+  }, [fetchAllBranches, userBranch]);
 
   // Utility function to get the last day of a month
   const getLastDayOfMonth = (year, month) => {
@@ -227,7 +229,7 @@ const ReportGenerator = ({ isCollapsed }) => {
   };
 
   // Handle Report Generation
-  const handleGenerateReport = async () => {
+  const handleGenerateReport = useCallback(async () => {
     setLoading(true);
     setError(null);
     setSuccess(null);
@@ -482,7 +484,7 @@ const ReportGenerator = ({ isCollapsed }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [reportType, reportPeriod, date, monthYear, fromDate, toDate, selectedBranches, isCombined]);
 
   // Helper function to get report type label
   const getReportTypeLabel = (reportType) => {
@@ -902,6 +904,8 @@ const ReportGenerator = ({ isCollapsed }) => {
       event.preventDefault();
       if (nextRef && nextRef.current) {
         nextRef.current.focus();
+      } else {
+        handleGenerateReport();
       }
     }
   };
@@ -1019,11 +1023,13 @@ const ReportGenerator = ({ isCollapsed }) => {
               <button
                 type="button"
                 onClick={() => toggleReportScope('branch')}
+                onKeyDown={(e) => handleKeyDown(e, isCombined ? generateButtonRef : branchSelectionRef)}
                 className={`px-4 py-2 rounded-md border ${
                   !isCombined
                     ? 'bg-green-500 text-white border-green-500'
                     : 'bg-white text-gray-700 border-gray-300'
                 } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500`}
+                aria-label="Select Branch-wise Report Scope"
               >
                 Branch-wise
               </button>
@@ -1031,11 +1037,13 @@ const ReportGenerator = ({ isCollapsed }) => {
               <button
                 type="button"
                 onClick={() => toggleReportScope('combined')}
+                onKeyDown={(e) => handleKeyDown(e, generateButtonRef)}
                 className={`px-4 py-2 rounded-md border ${
                   isCombined
                     ? 'bg-green-500 text-white border-green-500'
                     : 'bg-white text-gray-700 border-gray-300'
                 } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500`}
+                aria-label="Select Combined Report Scope"
               >
                 Combined (All Branches)
               </button>
@@ -1054,11 +1062,13 @@ const ReportGenerator = ({ isCollapsed }) => {
                     key={branch.code}
                     type="button"
                     onClick={() => toggleBranch(branch.code)}
+                    onKeyDown={(e) => handleKeyDown(e, e.target.nextSibling || generateButtonRef)}
                     className={`px-4 py-2 rounded-md border ${
                       selectedBranches.includes(branch.code)
                         ? 'bg-green-500 text-white border-green-500'
                         : 'bg-white text-gray-700 border-gray-300'
                     } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500`}
+                    aria-label={`Toggle branch ${branch.name}`}
                   >
                     {branch.name}
                   </button>
@@ -1128,7 +1138,7 @@ const ReportGenerator = ({ isCollapsed }) => {
                   ref={toDateRef}
                   onChange={(e) => setToDate(e.target.value)}
                   onKeyDown={(e) => handleKeyDown(e, generateButtonRef)}
-                  className="w-fit p-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
+                  className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
                   required
                   aria-required="true"
                 />
@@ -1141,13 +1151,17 @@ const ReportGenerator = ({ isCollapsed }) => {
             <button
               ref={generateButtonRef}
               onClick={handleGenerateReport}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleGenerateReport();
+                }
+              }}
               className={`w-full sm:w-1/2 px-4 py-2 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-md flex items-center justify-center transition ${
                 loading ? 'opacity-50 cursor-not-allowed' : ''
               }`}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleGenerateReport();
-              }}
-              disabled={loading}
+              disabled={loading || (!isCombined && selectedBranches.length === 0)}
+              aria-label="Generate Report"
             >
               {loading ? (
                 <>

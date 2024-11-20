@@ -181,7 +181,7 @@ const Home = ({ isCollapsed }) => {
             <div className="bg-white p-6 flex flex-col md:flex-row justify-between items-center">
               {/* Welcome Message */}
               <div className="mb-4 md:mb-0">
-                <h2 className="font-normal text-[25px] text-gray-800">{name ? `Welcome, ${name}` : 'Welcome, User'}</h2>
+                <h2 className="font-normal text-[25px] text-green-500">{name ? `Welcome, ${name}` : 'Welcome, User'}</h2>
                 <p className="text-sm text-gray-600">Send, track & manage your documents & Privilege cards.</p>
               </div>
 

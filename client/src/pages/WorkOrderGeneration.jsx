@@ -292,23 +292,8 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     const updatedEntries = [...productEntries];
     updatedEntries[index][field] = value;
 
-    if (field === "id" || field === "name") {
-      const productDetails = await fetchProductDetailsFromSupabase(value);
-      if (productDetails) {
-        updatedEntries[index].id = productDetails.product_id; // Ensure ID is updated
-        updatedEntries[index].name = productDetails.product_name;
-        updatedEntries[index].price = productDetails.mrp;
-      } else {
-        updatedEntries[index].id = "";
-        updatedEntries[index].name = "";
-        updatedEntries[index].price = "";
-      }
-    }
-
     setProductEntries(updatedEntries);
   };
-
-
 
   // Function to handle Exit button functionality
   const handleExit = () => {
@@ -325,22 +310,19 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
 
 
   const addNewProductEntry = () => {
-    setProductEntries([
-      ...productEntries,
-      { id: "", name: "", price: "", quantity: "" },
-    ]);
-    if (e.key === "Enter" && e.shiftKey) {
-      e.preventDefault();
-      addNewProductEntry();
-    }
-
-    setTimeout(
-      () =>
+    setProductEntries((prevEntries) => {
+      const updatedEntries = [
+        ...prevEntries,
+        { id: "", name: "", price: "", quantity: "" },
+      ];
+      // Focus on the new product id field
+      setTimeout(() => {
         document
-          .getElementById(`productId-${productEntries.length}`)
-          ?.focus(),
-      0
-    );
+          .getElementById(`productId-${updatedEntries.length - 1}`)
+          ?.focus();
+      }, 0);
+      return updatedEntries;
+    });
   };
 
   const removeProductEntry = (index) => {
@@ -631,6 +613,12 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     }
   }, [branch]);
 
+  useEffect(() => {
+    if (step === 4) {
+      setIsPinVerified(false);
+    }
+  }, [step]);
+
   return (
     <div
       className={`transition-all duration-300 ${isCollapsed ? "mx-20" : "mx-20 px-20"} justify-center mt-16 p-4 mx-auto`}
@@ -701,7 +689,10 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                         }
                       }}
                       onKeyDown={async (e) => {
-                        if (e.key === "Enter") {
+                        if (e.key === "Enter" && e.shiftKey) {
+                          e.preventDefault();
+                          addNewProductEntry();
+                        } else if (e.key === "Enter") {
                           e.preventDefault();
 
                           const selectedProduct = productSuggestions.find(
@@ -714,12 +705,6 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                           } else if (productEntries[index].id) {
                             await handleProductSelection(index, productEntries[index].id);
                           }
-                        }
-
-                        // Shift + Enter for adding a new product entry
-                        if (e.key === "Enter" && e.shiftKey) {
-                          e.preventDefault();
-                          addNewProductEntry();
                         }
                       }}
                       onBlur={async () => {
@@ -774,9 +759,13 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                         handleProductEntryChange(index, "quantity", e.target.value)
                       }
                       onKeyDown={(e) => {
-                        if (e.key === "Enter" && !e.shiftKey) {
+                        if (e.key === "Enter") {
                           e.preventDefault();
-                          nextStep();
+                          if (e.shiftKey) {
+                            addNewProductEntry();
+                          } else {
+                            nextStep();
+                          }
                         }
                       }}
                       className="border border-gray-300 px-4 py-3 rounded-lg w-full text-center"
@@ -890,21 +879,21 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
             </h2>
             {/* Employee Dropdown - Always Visible */}
             <select
-            value={employee}
-            onChange={(e) => setEmployee(e.target.value)}
-            ref={employeeRef}
-            onBlur={validateEmployeeSelection}
-            className="border border-gray-300 w-full px-4 py-3 rounded-lg focus:outline-none focus:border-green-500"
-          >
-            <option value="" disabled>
-              Select Employee
-            </option>
-            {employees.map((emp, index) => (
-              <option key={index} value={emp}>
-                {emp}
+              value={employee}
+              onChange={(e) => setEmployee(e.target.value)}
+              ref={employeeRef}
+              onBlur={validateEmployeeSelection}
+              className="border border-gray-300 w-full px-4 py-3 rounded-lg focus:outline-none focus:border-green-500"
+            >
+              <option value="" disabled>
+                Select Employee
               </option>
-            ))}
-          </select>
+              {employees.map((emp, index) => (
+                <option key={index} value={emp}>
+                  {emp}
+                </option>
+              ))}
+            </select>
             {employee && (
               <EmployeeVerification
                 employee={employee}
@@ -1164,7 +1153,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                     window.print();
                   }}
                   ref={printButtonRef}
-                  className="flex items-center justify-center w-44 h-12 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition"
+                  className="flex items-center justify-center w-44 h-12 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition"
 
                 >
                   <PrinterIcon className="w-5 h-5 mr-2" />
