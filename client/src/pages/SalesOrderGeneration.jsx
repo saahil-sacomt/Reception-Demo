@@ -103,7 +103,7 @@ const calculateLoyaltyPoints = (
 };
 
 // Main Component
-const SalesOrderGeneration = memo(({ isCollapsed ,onModificationSuccess}) => {
+const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
   const { user, role, name, branch, loading: authLoading } = useAuth(); // Destructure branch from AuthContext
 
   const [step, setStep] = useState(0); // Adjusted step numbering
@@ -111,7 +111,7 @@ const SalesOrderGeneration = memo(({ isCollapsed ,onModificationSuccess}) => {
   const [productEntries, setProductEntries] = useState([
     { id: "", name: "", price: "", quantity: "" },
   ]);
-  
+
   const [patientDetails, setPatientDetails] = useState(null);
   const [privilegeCard, setPrivilegeCard] = useState(true);
   const [isPinVerified, setIsPinVerified] = useState(false);
@@ -170,7 +170,7 @@ const SalesOrderGeneration = memo(({ isCollapsed ,onModificationSuccess}) => {
 
 
 
-  
+
 
   const addNewProductEntry = () => {
     setProductEntries([
@@ -215,7 +215,7 @@ const SalesOrderGeneration = memo(({ isCollapsed ,onModificationSuccess}) => {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [productSuggestions, setProductSuggestions] = useState([]);
 
-  
+
 
 
 
@@ -832,27 +832,14 @@ const SalesOrderGeneration = memo(({ isCollapsed ,onModificationSuccess}) => {
 
 
 
-  const handleMRNumberSearch = async () => {
-    try {
-      // Dummy data for testing
-      const response = {
-        data: {
-          name: "John Doe",
-          age: 30,
-          condition: "Myopia",
-          advanceAmount: 500,
-        },
-      };
-      setPatientDetails({
-        name: response.data.name,
-        age: response.data.age,
-        condition: response.data.condition,
-      });
-      setAdvanceDetails(response.data.advanceAmount || 0);
-      nextButtonRef.current?.focus();
-    } catch (error) {
-      console.error("Error fetching patient details:", error);
-    }
+  const handleMRNumberSearch = () => {
+    // Simulate fetching patient details
+    setPatientDetails({
+      name: "John Doe",
+      age: 35,
+      condition: "Myopia",
+    });
+    nextButtonRef.current?.focus();
   };
 
   useEffect(() => {
@@ -861,7 +848,7 @@ const SalesOrderGeneration = memo(({ isCollapsed ,onModificationSuccess}) => {
       setIsEditing(true);
     }
   }, [location]);
-  
+
 
 
   const handleOrderCompletion = async () => {
@@ -930,8 +917,8 @@ const SalesOrderGeneration = memo(({ isCollapsed ,onModificationSuccess}) => {
 
         alert("Sales order updated successfully!");
 
-        
-        
+
+
       } else {
         // Step 4: Insert New Sales Order
         const newSalesOrderId = await generateSalesOrderId();
@@ -967,7 +954,7 @@ const SalesOrderGeneration = memo(({ isCollapsed ,onModificationSuccess}) => {
 
         alert("Sales order created successfully!");
 
-        
+
 
         // Step 5: Mark Work Order as Used (if applicable)
         if (selectedWorkOrder) {
@@ -1017,17 +1004,20 @@ const SalesOrderGeneration = memo(({ isCollapsed ,onModificationSuccess}) => {
           .from("modification_requests")
           .update({ status: "completed" })
           .eq("order_id", orderId);
-      
+
         // Trigger the callback to notify EmployeeActionRequired
         console.log("Triggering onModificationSuccess with orderId:", orderId);
         onModificationSuccess(orderId);
       }
 
       setAllowPrint(true);
-      
-  
+
+
       alert("Order processed successfully!");
-      navigate('/home');
+      setTimeout(() => {
+        printButtonRef.current?.focus(); // Move focus to the Print button
+      }, 100);
+      
     } catch (error) {
       console.error("Error completing the order:", error);
       setErrorMessage("Failed to complete the order.");
@@ -1080,7 +1070,7 @@ const SalesOrderGeneration = memo(({ isCollapsed ,onModificationSuccess}) => {
   const handlePrint = () => {
     setAllowPrint(true);
     window.print(); // Simply call print without extra state changes
-};
+  };
 
 
 
@@ -1309,862 +1299,882 @@ const SalesOrderGeneration = memo(({ isCollapsed ,onModificationSuccess}) => {
           )}
 
           {/* Step 1: Product Details */}
-          {step === 1 && (
-            <div className="w-full bg-gray-50 p-6 rounded-md shadow-inner space-y-6">
-              <h2 className="text-lg font-semibold text-gray-700 text-center">
-                Product Information
+          {/* Step 1: Product Details */}
+{step === 1 && (
+  <div className="w-full bg-gray-50 p-6 rounded-md shadow-inner space-y-6">
+    <h2 className="text-lg font-semibold text-gray-700 text-center">
+      Product Information
+    </h2>
+    <label className="block text-gray-700 font-medium mb-1">
+      Generated Sales Order ID
+    </label>
+    <input
+      type="text"
+      value={salesOrderId}
+      readOnly
+      className="border border-gray-300 px-4 py-3 rounded-lg bg-gray-200 text-gray-700 w-full text-center"
+    />
+    <label className="block text-gray-700 font-medium mb-1">
+      Product Details
+    </label>
+    <div className="space-y-6">
+      {productEntries &&
+        Array.isArray(productEntries) &&
+        productEntries.map((product, index) => (
+          <div key={index} className="flex space-x-2 items-center">
+            {/* Product ID Input */}
+            <div className="relative w-2/4">
+              <input
+                type="text"
+                id={`productId-${index}`}
+                placeholder="Enter Product ID"
+                value={productEntries[index].id}
+                onChange={async (e) => {
+                  const value = e.target.value.trim();
+                  if (value) {
+                    const suggestions = await fetchProductSuggestions(value, "id");
+                    setProductSuggestions(suggestions);
+                  } else {
+                    setProductSuggestions([]);
+                  }
+                  setProductEntries((prevEntries) => {
+                    const updatedEntries = [...prevEntries];
+                    updatedEntries[index].id = value; // Update ID field
+                    return updatedEntries;
+                  });
+                }}
+                onBlur={async () => {
+                  const selectedProduct = productSuggestions.find(
+                    (prod) => prod.product_id === productEntries[index].id
+                  );
+                  if (selectedProduct) {
+                    // Automatically fetch data and move focus to quantity
+                    const productDetails = await fetchProductDetailsFromDatabase(
+                      selectedProduct.product_id
+                    );
+                    if (productDetails) {
+                      setProductEntries((prevEntries) => {
+                        const updatedEntries = [...prevEntries];
+                        updatedEntries[index] = {
+                          id: productDetails.product_id,
+                          name: productDetails.product_name,
+                          price: productDetails.mrp || "",
+                          quantity: prevEntries[index].quantity || "", // Preserve quantity
+                        };
+                        return updatedEntries;
+                      });
+                      setTimeout(() => {
+                        quantityRefs.current[index]?.focus();
+                      }, 100);
+                    }
+                  }
+                }}
+                onInput={async (e) => {
+                  // Handle barcode scanner input
+                  const value = e.target.value.trim();
+                  if (value.length >= 5) { // Assuming barcode length >= 5
+                    const productDetails = await fetchProductDetailsFromDatabase(value);
+                    if (productDetails) {
+                      setProductEntries((prevEntries) => {
+                        const updatedEntries = [...prevEntries];
+                        updatedEntries[index] = {
+                          id: productDetails.product_id,
+                          name: productDetails.product_name,
+                          price: productDetails.mrp || "",
+                          quantity: prevEntries[index].quantity || "", // Preserve quantity
+                        };
+                        return updatedEntries;
+                      });
+                      setTimeout(() => {
+                        quantityRefs.current[index]?.focus();
+                      }, 100);
+                    }
+                  }
+                }}
+                onKeyDown={async (e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    const selectedProduct = productSuggestions.find(
+                      (prod) => prod.product_id === productEntries[index].id
+                    );
+                    if (selectedProduct) {
+                      const productDetails = await fetchProductDetailsFromDatabase(
+                        selectedProduct.product_id
+                      );
+                      if (productDetails) {
+                        setProductEntries((prevEntries) => {
+                          const updatedEntries = [...prevEntries];
+                          updatedEntries[index] = {
+                            id: productDetails.product_id,
+                            name: productDetails.product_name,
+                            price: productDetails.mrp || "",
+                            quantity: prevEntries[index].quantity || "", // Preserve quantity
+                          };
+                          return updatedEntries;
+                        });
+                        setTimeout(() => {
+                          quantityRefs.current[index]?.focus();
+                        }, 100);
+                      }
+                    }
+                  } else if (e.key === "Enter" && e.shiftKey) {
+                    e.preventDefault();
+                    addNewProductEntry();
+                  }
+                }}
+                list={`productIdSuggestions-${index}`}
+                className="border border-gray-300 px-4 py-3 rounded-lg w-full"
+              />
+              <datalist id={`productIdSuggestions-${index}`}>
+                {productSuggestions.map((suggestion) => (
+                  <option key={suggestion.product_id} value={suggestion.product_id} />
+                ))}
+              </datalist>
+              {validationErrors[`productId-${index}`] && (
+                <p className="text-red-500 text-xs absolute -bottom-5 left-0">
+                  {validationErrors[`productId-${index}`]}
+                </p>
+              )}
+            </div>
+
+            {/* Product Name Input (Read-Only) */}
+            <div className="relative w-1/2">
+              <input
+                type="text"
+                value={product.name}
+                readOnly
+                className="border border-gray-300 px-4 py-3 rounded-lg w-full bg-gray-100"
+              />
+            </div>
+
+            {/* Product Price Input (Read-Only) */}
+            <div className="relative w-1/4">
+              <input
+                type="text"
+                value={product.price}
+                readOnly
+                className="border border-gray-300 px-4 py-3 rounded-lg w-full text-center bg-gray-100"
+              />
+              {validationErrors[`productPrice-${index}`] && (
+                <p className="text-red-500 text-xs absolute -bottom-5 left-0">
+                  {validationErrors[`productPrice-${index}`]}
+                </p>
+              )}
+            </div>
+
+            {/* Product Quantity Input */}
+            <div className="relative w-1/4">
+              <input
+                type="number"
+                id={`productQuantity-${index}`}
+                placeholder="Quantity"
+                value={product.quantity}
+                ref={(el) => (quantityRefs.current[index] = el)}
+                onChange={(e) =>
+                  handleProductEntryChange(index, "quantity", e.target.value)
+                }
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    nextStep();
+                  }
+                }}
+                className="border border-gray-300 px-4 py-3 rounded-lg w-full text-center"
+              />
+              {validationErrors[`productQuantity-${index}`] && (
+                <p className="text-red-500 text-xs absolute -bottom-5 left-0">
+                  {validationErrors[`productQuantity-${index}`]}
+                </p>
+              )}
+            </div>
+
+            {/* Delete Button */}
+            <button
+              type="button"
+              onClick={() => removeProductEntry(index)}
+              className="text-red-500 hover:text-red-700 transition"
+            >
+              <TrashIcon className="w-5 h-5" />
+            </button>
+          </div>
+        ))}
+      <button
+        type="button"
+        onClick={addNewProductEntry}
+        className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition"
+      >
+        Add Product
+      </button>
+    </div>
+  </div>
+)}
+
+
+          {/* Step 2: Patient Details */}
+          {step === 2 && (
+            <div className="bg-gray-50 p-6 rounded-md shadow-inner space-y-4">
+              <h2 className="text-lg font-semibold text-gray-700">
+                Patient Information
               </h2>
               <label className="block text-gray-700 font-medium mb-1">
-                Generated Sales Order ID
+                Enter MR Number
               </label>
               <input
                 type="text"
-                value={salesOrderId}
-                readOnly
-                className="border border-gray-300 px-4 py-3 rounded-lg bg-gray-200 text-gray-700 w-full text-center"
+                placeholder="Enter MR Number"
+                value={mrNumber}
+                onChange={(e) => setMrNumber(e.target.value)}
+                onKeyDown={(e) => handleEnterKey(e, fetchButtonRef)}
+                ref={mrNumberRef}
+                className="border border-gray-300 w-full px-4 py-3 rounded-lg"
               />
-              <label className="block text-gray-700 font-medium mb-1">
-                Product Details
-              </label>
-              <div className="space-y-6">
-              {productEntries &&
-                Array.isArray(productEntries) &&
-                productEntries.map((product, index) => (
-                  <div key={index} className="flex space-x-2 items-center">
-                    {/* Product ID Input */}
-                    <div className="relative w-2/4">
-                      <input
-                        type="text"
-                        id={`productId-${index}`}
-                        placeholder="Enter Product ID"
-                        value={productEntries[index].id}
-                        onKeyDown={async (e) => {
-                          if (e.key === "Enter") {
-                            setTimeout(() => {
-                              quantityRefs.current[index]?.focus();
-                            }, 100);
-                          }
-                        }}
-                        onChange={async (e) => {
-                          const value = e.target.value;
-                          const suggestions = await fetchProductSuggestions(value, "id");
-                          setProductSuggestions(suggestions);
-                          setProductEntries((prevEntries) => {
-                            const updatedEntries = [...prevEntries];
-                            updatedEntries[index].id = value; // Update ID field
-                            return updatedEntries;
-                          });
-                        }}
-                        onBlur={async () => {
-                          const selectedProduct = productSuggestions.find(
-                            (prod) => prod.product_id === productEntries[index].id
-                          );
-                          if (selectedProduct) {
-                            setProductEntries((prevEntries) => {
-                              const updatedEntries = [...prevEntries];
-                              updatedEntries[index] = {
-                                id: selectedProduct.product_id,
-                                name: selectedProduct.product_name,
-                                price: selectedProduct.mrp || "",
-                                quantity: prevEntries[index].quantity,
-                              };
-                              return updatedEntries;
-                            });
-                          }
-                          setProductSuggestions([]); // Clear suggestions
-                        }}
-                        list={`productIdSuggestions-${index}`}
-                        className="border border-gray-300 px-4 py-3 rounded-lg w-full"
-                      />
-                      <datalist id={`productIdSuggestions-${index}`}>
-                        {productSuggestions.map((suggestion) => (
-                          <option key={suggestion.product_id} value={suggestion.product_id} />
-                        ))}
-                      </datalist>
-                      {validationErrors[`productId-${index}`] && (
-                        <p className="text-red-500 text-xs absolute -bottom-5 left-0">
-                          {validationErrors[`productId-${index}`]}
-                        </p>
-                      )}
-                    </div>
 
-                          <div className="relative w-1/2">
-                            <input
-                              type="text"
-                              id={`productName-${index}`}
-                              placeholder="Enter Product Name"
-                              value={productEntries[index].name}
-                              onKeyDown={async (e) => {
-                                if (e.key === "Enter") {
-                                  setTimeout(() => {
-                                    quantityRefs.current[index]?.focus();
-                                  }, 100);
-                                }
-                              }}
-                              onChange={async (e) => {
-                                const value = e.target.value;
-                                const suggestions = await fetchProductSuggestions(value, "name");
-                                setProductSuggestions(suggestions);
-                                setProductEntries((prevEntries) => {
-                                  const updatedEntries = [...prevEntries];
-                                  updatedEntries[index].name = value; // Update Name field
-                                  return updatedEntries;
-                                });
-                              }}
-                              onBlur={async () => {
-                                const selectedProduct = productSuggestions.find(
-                                  (prod) => prod.product_name === productEntries[index].name
-                                );
-                                if (selectedProduct) {
-                                  setProductEntries((prevEntries) => {
-                                    const updatedEntries = [...prevEntries];
-                                    updatedEntries[index] = {
-                                      id: selectedProduct.product_id,
-                                      name: selectedProduct.product_name,
-                                      price: selectedProduct.mrp || "",
-                                      quantity: prevEntries[index].quantity,
-                                    };
-                                    return updatedEntries;
-                                  });
-                                }
-                                setProductSuggestions([]); // Clear suggestions
-                              }}
-                              list={`productNameSuggestions-${index}`}
-                              className="border border-gray-300 px-4 py-3 rounded-lg w-full"
-                            />
-                            <datalist id={`productNameSuggestions-${index}`}>
-                              {productSuggestions.map((suggestion) => (
-                                <option key={suggestion.product_id} value={suggestion.product_name} />
-                              ))}
-                            </datalist>
-                          </div>
-
-                          {/* Product Price Input (read-only) */}
-                          <div className="relative w-1/4">
-                            <input
-                              type="text"
-                              value={product.price}
-                              readOnly
-                              className="border border-gray-300 px-4 py-3 rounded-lg w-full text-center bg-gray-100"
-                            />
-                            {validationErrors[`productPrice-${index}`] && (
-                              <p className="text-red-500 text-xs absolute -bottom-5 left-0">
-                                {validationErrors[`productPrice-${index}`]}
-                              </p>
-                            )}
-                          </div>
-
-                          {/* Product Quantity Input */}
-                          <div className="relative w-1/4">
-                            <input
-                              type="text"
-                              id={`productQuantity-${index}`}
-                              placeholder="Quantity"
-                              value={product.quantity}
-                              ref={(el) => (quantityRefs.current[index] = el)}
-                              onChange={(e) =>
-                                handleProductEntryChange(
-                                  index,
-                                  "quantity",
-                                  e.target.value
-                                )
-                              }
-                              onKeyDown={(e) =>
-                                handleProductEntryShiftEnter(e, index, "quantity")
-                              }
-                              className="border border-gray-300 px-4 py-3 rounded-lg w-full text-center"
-                            />
-                            {validationErrors[`productQuantity-${index}`] && (
-                              <p className="text-red-500 text-xs absolute -bottom-5 left-0">
-                                {validationErrors[`productQuantity-${index}`]}
-                              </p>
-                            )}
-                          </div>
-                          {/* Delete Button */}
-                          <button
-                            type="button" // Added type="button"
-                            onClick={() => removeProductEntry(index)}
-                            className="text-red-500 hover:text-red-700 transition"
-                          >
-                            <TrashIcon className="w-5 h-5" />
-                          </button>
-                        </div>
-                      ))}
-
-                    <button
-                type="button"
-                onClick={addNewProductEntry}
-                className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition"
-              >
-                Add Product
-              </button>
+              {validationErrors.mrNumber && (
+                <p className="text-red-500 text-xs mt-1">
+                  {validationErrors.mrNumber}
+                </p>
+              )}
+              <button
+              type="button"
+              onClick={() => {
+                handleMRNumberSearch();
+                // No need to focus next button here as focus is managed in handleMRNumberSearch
+              }}
+              ref={fetchButtonRef}
+              className="mt-2 text-white px-4 py-2 rounded-lg bg-green-500 hover:bg-green-600 transition"
+            >
+              Fetch Patient Details
+            </button>
+              {patientDetails && (
+                <div className="mt-4 bg-gray-100 p-4 rounded border border-gray-200">
+                  <p>
+                    <strong>Name:</strong> {patientDetails.name}
+                  </p>
+                  <p>
+                    <strong>Age:</strong> {patientDetails.age}
+                  </p>
+                  <p>
+                    <strong>Condition:</strong> {patientDetails.condition}
+                  </p>
+                </div>
+              )}
             </div>
-          </div>
-        )}
+          )}
 
-                  {/* Step 2: Patient Details */}
-                  {step === 2 && (
-                    <div className="bg-gray-50 p-6 rounded-md shadow-inner space-y-4">
-                      <h2 className="text-lg font-semibold text-gray-700">
-                        Patient Information
-                      </h2>
-                      <label className="block text-gray-700 font-medium mb-1">
-                        Enter MR Number
-                      </label>
+          {/* Step 3: Privilege Card */}
+          {step === 3 && (
+            <div className="bg-gray-50 p-6 rounded-md shadow-inner space-y-4">
+              <h2 className="text-lg font-semibold text-gray-700">
+                Privilege Card
+              </h2>
+
+              <p className="font-semibold mb-2">
+                Do you have a Privilege Card?
+              </p>
+              <div className="flex space-x-4 mb-4">
+                <button
+                  type="button" // Added type="button"
+                  onClick={() => {
+                    setPrivilegeCard(true);
+                    setRedeemOption(null); // Reset redeem option
+                    setErrorMessage(""); // Clear previous errors
+                    setTimeout(() => {
+                      if (redeemOption === "barcode") {
+                        privilegeCardRef.current?.focus();
+                      } else {
+                        privilegePhoneRef.current?.focus();
+                      }
+                    }, 0);
+                  }}
+                  className={`px-4 py-2 rounded-lg ${privilegeCard ? "bg-green-500 text-white" : "bg-gray-200"
+                    }`}
+                >
+                  Yes
+                </button>
+                <button
+                  type="button" // Added type="button"
+                  onClick={() => {
+                    setPrivilegeCard(false);
+                    setRedeemOption(null); // Reset redeem option
+                    setErrorMessage(""); // Clear previous errors
+                    nextStep();
+                  }}
+                  className={`px-4 py-2 rounded-lg ${!privilegeCard ? "bg-green-500 text-white" : "bg-gray-200"
+                    }`}
+                >
+                  No
+                </button>
+              </div>
+
+              {privilegeCard && (
+                <>
+                  <p className="font-semibold mb-2">
+                    How would you like to fetch your Privilege Card?
+                  </p>
+                  <div className="flex space-x-4 mb-4">
+                    <button
+                      type="button" // Added type="button"
+                      onClick={() => setRedeemOption("barcode")}
+                      className={`px-4 py-2 rounded-lg ${redeemOption === "barcode"
+                        ? "bg-green-500 text-white"
+                        : "bg-gray-200"
+                        }`}
+                    >
+                      Scan Barcode
+                    </button>
+                    <button
+                      type="button" // Added type="button"
+                      onClick={() => setRedeemOption("phone")}
+                      className={`px-4 py-2 rounded-lg ${redeemOption === "phone"
+                        ? "bg-green-500 text-white"
+                        : "bg-gray-200"
+                        }`}
+                    >
+                      Use Phone Number
+                    </button>
+                  </div>
+
+                  {/* Barcode Scan Option */}
+                  {redeemOption === "barcode" && (
+                    <>
                       <input
                         type="text"
-                        placeholder="Enter MR Number"
-                        value={mrNumber}
-                        onChange={(e) => setMrNumber(e.target.value)}
-                        onKeyDown={(e) => handleEnterKey(e, fetchButtonRef)}
-                        ref={mrNumberRef}
-                        className="border border-gray-300 w-full px-4 py-3 rounded-lg"
-                      />
-
-                      {validationErrors.mrNumber && (
-                        <p className="text-red-500 text-xs mt-1">
-                          {validationErrors.mrNumber}
-                        </p>
-                      )}
-                      <button
-                        type="button"
-                        onClick={handleMRNumberSearch}
-                        ref={fetchButtonRef}
-                        onKeyDown={(e) => handleEnterKey(e, nextButtonRef)}
-                        className="mt-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition"
-                      >
-                        Fetch Patient Details
-                      </button>
-                      {patientDetails && (
-                        <div className="mt-4 bg-gray-100 p-4 rounded border border-gray-200">
-                          <p>
-                            <strong>Name:</strong> {patientDetails.name}
-                          </p>
-                          <p>
-                            <strong>Age:</strong> {patientDetails.age}
-                          </p>
-                          <p>
-                            <strong>Condition:</strong> {patientDetails.condition}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Step 3: Privilege Card */}
-                  {step === 3 && (
-                    <div className="bg-gray-50 p-6 rounded-md shadow-inner space-y-4">
-                      <h2 className="text-lg font-semibold text-gray-700">
-                        Privilege Card
-                      </h2>
-
-                      <p className="font-semibold mb-2">
-                        Do you have a Privilege Card?
-                      </p>
-                      <div className="flex space-x-4 mb-4">
-                        <button
-                          type="button" // Added type="button"
-                          onClick={() => {
-                            setPrivilegeCard(true);
-                            setRedeemOption(null); // Reset redeem option
-                            setErrorMessage(""); // Clear previous errors
-                            setTimeout(() => {
-                              if (redeemOption === "barcode") {
-                                privilegeCardRef.current?.focus();
-                              } else {
-                                privilegePhoneRef.current?.focus();
-                              }
-                            }, 0);
-                          }}
-                          className={`px-4 py-2 rounded-lg ${privilegeCard ? "bg-green-500 text-white" : "bg-gray-200"
-                            }`}
-                        >
-                          Yes
-                        </button>
-                        <button
-                          type="button" // Added type="button"
-                          onClick={() => {
-                            setPrivilegeCard(false);
-                            setRedeemOption(null); // Reset redeem option
-                            setErrorMessage(""); // Clear previous errors
-                            nextStep();
-                          }}
-                          className={`px-4 py-2 rounded-lg ${!privilegeCard ? "bg-green-500 text-white" : "bg-gray-200"
-                            }`}
-                        >
-                          No
-                        </button>
-                      </div>
-
-                      {privilegeCard && (
-                        <>
-                          <p className="font-semibold mb-2">
-                            How would you like to fetch your Privilege Card?
-                          </p>
-                          <div className="flex space-x-4 mb-4">
-                            <button
-                              type="button" // Added type="button"
-                              onClick={() => setRedeemOption("barcode")}
-                              className={`px-4 py-2 rounded-lg ${redeemOption === "barcode"
-                                ? "bg-green-500 text-white"
-                                : "bg-gray-200"
-                                }`}
-                            >
-                              Scan Barcode
-                            </button>
-                            <button
-                              type="button" // Added type="button"
-                              onClick={() => setRedeemOption("phone")}
-                              className={`px-4 py-2 rounded-lg ${redeemOption === "phone"
-                                ? "bg-green-500 text-white"
-                                : "bg-gray-200"
-                                }`}
-                            >
-                              Use Phone Number
-                            </button>
-                          </div>
-
-                          {/* Barcode Scan Option */}
-                          {redeemOption === "barcode" && (
-                            <>
-                              <input
-                                type="text"
-                                placeholder="Enter Privilege Card Number (pc_number)"
-                                value={privilegeCardNumber}
-                                onChange={(e) => setPrivilegeCardNumber(e.target.value)}
-                                className="border border-gray-300 w-full px-4 py-3 rounded-lg text-center mb-2"
-                                ref={privilegeCardRef}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter") {
-                                    e.preventDefault();
-                                    handleFetchPrivilegeCardByNumber();
-                                  }
-                                }}
-                              />
-                              <button
-                                type="button" // Added type="button"
-                                onClick={handleFetchPrivilegeCardByNumber}
-                                className="bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg w-full"
-                              >
-                                Fetch Privilege Card
-                              </button>
-                            </>
-                          )}
-
-                          {/* Phone Number and OTP Option */}
-                          {redeemOption === "phone" && (
-                            <>
-                              {/* Phone Number Input */}
-                              <input
-                                type="text"
-                                placeholder="Enter Phone Number"
-                                value={phoneNumber}
-                                onChange={(e) => setPhoneNumber(e.target.value)}
-                                className="border border-gray-300 w-full px-4 py-3 rounded-lg text-center mb-2"
-                                ref={privilegePhoneRef}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter") {
-                                    e.preventDefault();
-                                    handleSendOtp();
-                                  }
-                                }}
-                              />
-
-                              {/* Send OTP Button */}
-                              {!isOtpSent && (
-                                <button
-                                  type="button" // Added type="button"
-                                  onClick={handleSendOtp}
-                                  className="mt-4 bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg w-full"
-                                >
-                                  Send OTP
-                                </button>
-                              )}
-
-                              {isOtpSent && (
-                                <>
-                                  {/* OTP Input */}
-                                  <input
-                                    type="text"
-                                    placeholder="Enter OTP"
-                                    value={otp}
-                                    onChange={(e) => setOtp(e.target.value)}
-                                    className="border border-gray-300 w-full px-4 py-3 rounded-lg text-center mb-2"
-                                    ref={otpRef}
-                                    onKeyDown={(e) => {
-                                      if (e.key === "Enter") {
-                                        e.preventDefault();
-                                        handleVerifyOtp();
-                                      }
-                                    }}
-                                  />
-                                  {validationErrors.otp && (
-                                    <p className="text-red-500 text-xs mt-1">
-                                      {validationErrors.otp}
-                                    </p>
-                                  )}
-
-                                  {/* Verify OTP Button */}
-                                  <button
-                                    type="button" // Added type="button"
-                                    onClick={handleVerifyOtp}
-                                    className="bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg w-full"
-                                  >
-                                    Verify OTP
-                                  </button>
-
-                                  {/* Display Error Messages */}
-                                  {errorMessage && (
-                                    <p className="text-red-600 text-center mt-2">
-                                      {errorMessage}
-                                    </p>
-                                  )}
-                                </>
-                              )}
-                            </>
-                          )}
-
-                          {/* Show privilege card details if found */}
-                          {isOtpVerified && privilegeCardDetails && (
-                            <div className="mt-6 bg-gray-100 p-4 rounded border">
-                              <p>
-                                <strong>Customer Name:</strong>{" "}
-                                {privilegeCardDetails.customer_name}
-                              </p>
-                              <p>
-                                <strong>PC Number:</strong>{" "}
-                                {privilegeCardDetails.pc_number}
-                              </p>
-                              <p>
-                                <strong>Loyalty Points:</strong> {loyaltyPoints}
-                              </p>
-
-                              {/* Redeem Points Section */}
-                              <div className="mt-4">
-                                <p className="font-semibold">Redeem Loyalty Points:</p>
-                                <div className="flex space-x-4 mt-2">
-                                  <button
-                                    type="button" // Added type="button"
-                                    onClick={() => {
-                                      setRedeemOption("full");
-                                      setRedeemPointsAmount(loyaltyPoints);
-                                      setRedeemPoints(true);
-                                    }}
-                                    className={`px-4 py-2 mb-2 rounded-lg ${redeemOption === "full"
-                                      ? "bg-green-500 text-white"
-                                      : "bg-gray-200"
-                                      }`}
-                                  >
-                                    Redeem Full Points
-                                  </button>
-                                  <button
-                                    type="button" // Added type="button"
-                                    onClick={() => {
-                                      setRedeemOption("custom");
-                                      setRedeemPointsAmount("");
-                                      setRedeemPoints(true);
-                                      setTimeout(
-                                        () => redeemPointsAmountRef.current?.focus(),
-                                        0
-                                      ); // Focus on custom amount input
-                                    }}
-                                    className={`px-4 py-2 mb-2 rounded-lg ${redeemOption === "custom"
-                                      ? "bg-green-500 text-white"
-                                      : "bg-gray-200"
-                                      }`}
-                                  >
-                                    Redeem Custom Amount
-                                  </button>
-                                </div>
-
-                                {/* When 'Redeem Full' is selected */}
-                                {redeemOption === "full" && (
-                                  <div className="mt-2">
-                                    <input
-                                      type="number"
-                                      value={loyaltyPoints}
-                                      readOnly
-                                      className="border border-gray-300 w-full px-4 py-3 rounded-lg text-center my-2 bg-gray-100"
-                                    />
-                                    <p className="text-center">
-                                      You are redeeming your full loyalty points.
-                                    </p>
-                                  </div>
-                                )}
-
-                                {/* When 'Redeem Custom' is selected */}
-                                {redeemOption === "custom" && (
-                                  <div className="mt-2">
-                                    <input
-                                      type="number"
-                                      placeholder={`Enter amount to redeem (Max: ₹${loyaltyPoints})`}
-                                      value={redeemPointsAmount}
-                                      onChange={(e) =>
-                                        setRedeemPointsAmount(
-                                          e.target.value === ""
-                                            ? ""
-                                            : Math.min(
-                                              Number(e.target.value),
-                                              loyaltyPoints
-                                            )
-                                        )
-                                      }
-                                      className="border border-gray-300 w-full px-4 py-3 rounded-lg text-center my-2"
-                                      onKeyDown={(e) => {
-                                        if (e.key === "Enter") {
-                                          e.preventDefault();
-                                          nextButtonRef.current?.focus();
-                                        }
-                                      }}
-                                      ref={redeemPointsAmountRef}
-                                    />
-                                    {(parseFloat(redeemPointsAmount) > loyaltyPoints ||
-                                      parseFloat(redeemPointsAmount) < 0) && (
-                                        <p className="text-red-500 text-xs mt-1">
-                                          Please enter a valid amount up to your available
-                                          points.
-                                        </p>
-                                      )}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Prompt to create a new privilege card if not found */}
-                          {isOtpVerified && !privilegeCardDetails && (
-                            <div className="mt-6 bg-green-50 p-4 rounded">
-                              <p className="text-center text-red-500">
-                                No Privilege Card found for this{" "}
-                                {redeemOption === "phone"
-                                  ? "phone number."
-                                  : "PC Number."}
-                              </p>
-                              <button
-                                type="button" // Added type="button"
-                                onClick={handleNewPrivilegeCard}
-                                className="mt-4 bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg w-full"
-                              >
-                                Create New Privilege Card
-                              </button>
-                            </div>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Step 4: Employee Selection */}
-                  {step === 4 && (
-                    <div className="bg-gray-50 p-6 rounded-md shadow-inner space-y-4">
-                      <h2 className="text-lg font-semibold text-gray-700">
-                        Order Created by Employee Details
-                      </h2>
-                      <select
-                        value={employee}
-                        onChange={(e) => setEmployee(e.target.value)}
+                        placeholder="Enter Privilege Card Number (pc_number)"
+                        value={privilegeCardNumber}
+                        onChange={(e) => setPrivilegeCardNumber(e.target.value)}
+                        className="border border-gray-300 w-full px-4 py-3 rounded-lg text-center mb-2"
+                        ref={privilegeCardRef}
                         onKeyDown={(e) => {
-                          if (e.key === 'Enter' && employee) {
-                            employeeRef.current?.focus();
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            handleFetchPrivilegeCardByNumber();
                           }
                         }}
-                        ref={employeeRef}
-                        className="border border-gray-300 w-full px-4 py-3 rounded-lg text-center"
+                      />
+                      <button
+                        type="button" // Added type="button"
+                        onClick={handleFetchPrivilegeCardByNumber}
+                        className="bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg w-full"
                       >
-                        <option value="" disabled>
-                          Select Employee
-                        </option>
-                        {employees.map((emp) => (
-                          <option key={emp} value={emp}>
-                            {emp}
-                          </option>
-                        ))}
-                      </select>
-                      {employee && (
-                        <EmployeeVerification
-                          employee={employee}
-                          onVerify={(isVerified) => {
-                            setIsPinVerified(isVerified);
-                            if (isVerified) {
-                              setTimeout(() => nextButtonRef.current?.focus(), 100);
-                            }
-                          }}
-                        />
-                      )}
-                      {validationErrors.employee && (
-                        <p className="text-red-500 text-xs mt-1">{validationErrors.employee}</p>
-                      )}
-                    </div>
+                        Fetch Privilege Card
+                      </button>
+                    </>
                   )}
 
-                  {/* Step 5: Order Preview with Payment Method */}
-                  {step === 5 && (
-                    <div>
-                      {/* Printable Area */}
-                      <div className="printable-area print:block print:absolute print:inset-0 print:w-full bg-white p-8 rounded-lg text-gray-800">
-                        {/* Invoice Header */}
-                        <div className="text-center mb-8">
-                          <h1 className="text-3xl font-bold">Screenetra Eye Care</h1>
-                          <p className="text-sm text-gray-600">
-                            GST Number: 32AAUCS7002H1ZV
-                          </p>
-                          <h2 className="text-2xl font-semibold mt-2">
-                            Sales Order Summary
-                          </h2>
-                        </div>
+                  {/* Phone Number and OTP Option */}
+                  {redeemOption === "phone" && (
+                    <>
+                      {/* Phone Number Input */}
+                      <input
+                        type="text"
+                        placeholder="Enter Phone Number"
+                        value={phoneNumber}
+                        onChange={(e) => setPhoneNumber(e.target.value)}
+                        className="border border-gray-300 w-full px-4 py-3 rounded-lg text-center mb-2"
+                        ref={privilegePhoneRef}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            handleSendOtp();
+                          }
+                        }}
+                      />
 
-                        {/* Invoice Details */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                          <div>
-                            <p>
-                              <span className="font-semibold">Sales Order ID:</span>{" "}
-                              {salesOrderId}
-                            </p>
-                            {/* Description removed */}
-                            <p>
-                              <span className="font-semibold">Customer MR Number:</span>{" "}
-                              {mrNumber}
-                            </p>
-                            <p>
-                              <span className="font-semibold">Customer Name:</span>{" "}
-                              {patientDetails?.name ||
-                                privilegeCardDetails?.customer_name ||
-                                "N/A"}
-                            </p>
-                            <p>
-                              <span className="font-semibold">Billed by:</span>{" "}
-                              {employee}
-                            </p>
-                          </div>
-                          <div>
-                            <p>
-                              <span className="font-semibold">HSN Code:</span> 12345678
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Product Table */}
-                        <div className="overflow-x-auto mb-6">
-                          <table className="min-w-full border border-gray-300">
-                            <thead className="bg-gray-100">
-                              <tr>
-                                <th className="py-2 px-4 border-b text-left">
-                                  Product ID
-                                </th>
-                                <th className="py-2 px-4 border-b text-left">
-                                  Product Name
-                                </th>
-                                <th className="py-2 px-4 border-b text-right">
-                                  Price (₹)
-                                </th>
-                                <th className="py-2 px-4 border-b text-right">
-                                  Quantity
-                                </th>
-                                <th className="py-2 px-4 border-b text-right">
-                                  Subtotal (₹)
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {productEntries.map((product, index) => {
-                                const productSubtotal =
-                                  (parseFloat(product.price) || 0) *
-                                  (parseInt(product.quantity) || 0);
-                                return (
-                                  <tr key={index} className="hover:bg-gray-50">
-                                    <td className="py-2 px-4 border-b">{product.id}</td>
-                                    <td className="py-2 px-4 border-b">
-                                      {product.name}
-                                    </td>
-                                    <td className="py-2 px-4 border-b text-right">
-                                      ₹ {parseFloat(product.price).toFixed(2)}
-                                    </td>
-                                    <td className="py-2 px-4 border-b text-right">
-                                      {product.quantity}
-                                    </td>
-                                    <td className="py-2 px-4 border-b text-right">
-                                      ₹ {productSubtotal.toFixed(2)}
-                                    </td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
-                        </div>
-
-                        {/* Financial Summary */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                          {/* Left Column */}
-                          <div className="space-y-2">
-                            
-                            <p>
-                              <span className="font-semibold">CGST (6%):</span> ₹
-                              {parseFloat(cgstAmount).toFixed(2)}
-                            </p>
-                            <p>
-                              <span className="font-semibold">SGST (6%):</span> ₹
-                              {parseFloat(sgstAmount).toFixed(2)}
-                            </p>
-                          </div>
-
-                          {/* Right Column */}
-                          <div className="space-y-2">
-                          <p>
-                              <span className="font-semibold">total:</span> ₹
-                              {subtotal.toFixed(2)}
-                            </p>
-                            <p>
-                              <span className="font-semibold">Advance Paid:</span> ₹
-                              {parseFloat(advanceDetails).toFixed(2)}
-                            </p>
-                            <p>
-                              <span className="font-semibold">Discount Applied:</span> ₹
-                              {discountAmount.toFixed(2)}
-                            </p>
-                            <p>
-                              <span className="font-semibold">Balance Due:</span> ₹
-                              {finalAmount.toFixed(2)}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Loyalty Points Information */}
-                        {privilegeCard && privilegeCardDetails && (
-                          <div className="mb-6">
-                            <p>
-                              <span className="font-semibold">
-                                Loyalty Points Redeemed:
-                              </span>{" "}
-                              ₹{redeemPointsAmount.toFixed(2)}
-                            </p>
-                            <p>
-                              <span className="font-semibold">
-                                Loyalty Points Gained:
-                              </span>{" "}
-                              {pointsToAdd}
-                            </p>
-                          </div>
-                        )}
-
-                        {/* Payment Method and Advance Details */}
-                        <div className="flex flex-col md:flex-row items-center justify-between my-6 space-x-4">
-                          {/* Payment Method */}
-                          <div className="w-full md:w-1/2 mb-4 md:mb-0">
-                            <label
-                              htmlFor="paymentMethod"
-                              className="block font-semibold mb-1"
-                            >
-                              Payment Method:
-                            </label>
-                            <select
-                              id="paymentMethod"
-                              value={paymentMethod}
-                              onChange={(e) => setPaymentMethod(e.target.value)}
-                              ref={paymentMethodRef}
-                              onKeyDown={(e) =>
-                                handleEnterKey(e, redeemPointsAmountRef)
-                              }
-                              className="border border-gray-300 w-full px-4 py-3 rounded-lg"
-                            >
-                              <option value="" disabled>
-                                Select Payment Method
-                              </option>
-                              <option value="cash">Cash</option>
-                              <option value="credit">Card</option>
-                              <option value="online">UPI (Paytm/PhonePe/GPay)</option>
-                            </select>
-                            {validationErrors.paymentMethod && (
-                              <p className="text-red-500 text-xs ml-1">
-                                {validationErrors.paymentMethod}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Action Buttons Outside Printable Area */}
-                      <div className="flex flex-col md:flex-row justify-start mt-6 space-x-6 space-y-4 md:space-y-0">
+                      {/* Send OTP Button */}
+                      {!isOtpSent && (
                         <button
                           type="button" // Added type="button"
-                          onClick={handleOrderCompletion}
-                          ref={saveOrderRef}
-                          onKeyDown={async (e) => {
-                            if (e.key === "Enter") {
-                              e.preventDefault();
-                              await handleOrderCompletion();
-                              printButtonRef.current?.focus(); // Move focus to Print button after saving
-                            }
-                          }}
-                          className={`bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg transition ${!paymentMethod ? "opacity-50 cursor-not-allowed" : ""
-                            } w-full md:w-auto`}
-                          disabled={!paymentMethod || isLoading}
+                          onClick={handleSendOtp}
+                          className="mt-4 bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg w-full"
                         >
-                          Submit Order{" "}
-                          {privilegeCard && privilegeCardDetails
-                            ? "& Update Loyalty Points"
-                            : ""}
+                          Send OTP
                         </button>
-                        {allowPrint && (
-                          <button
-                            type="button" // Added type="button"
-                            onClick={handlePrint}
-                            ref={printButtonRef}
+                      )}
+
+                      {isOtpSent && (
+                        <>
+                          {/* OTP Input */}
+                          <input
+                            type="text"
+                            placeholder="Enter OTP"
+                            value={otp}
+                            onChange={(e) => setOtp(e.target.value)}
+                            className="border border-gray-300 w-full px-4 py-3 rounded-lg text-center mb-2"
+                            ref={otpRef}
                             onKeyDown={(e) => {
                               if (e.key === "Enter") {
                                 e.preventDefault();
-                                handlePrint();
-                                newWorkOrderButtonRef.current?.focus(); // Move focus to Create New after printing
+                                handleVerifyOtp();
                               }
                             }}
-                            className="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-lg transition flex items-center justify-center w-full md:w-auto"
+                          />
+                          {validationErrors.otp && (
+                            <p className="text-red-500 text-xs mt-1">
+                              {validationErrors.otp}
+                            </p>
+                          )}
 
+                          {/* Verify OTP Button */}
+                          <button
+                            type="button" // Added type="button"
+                            onClick={handleVerifyOtp}
+                            className="bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg w-full"
                           >
-                            <PrinterIcon className="w-5 h-5 inline mr-2" />
-                            Print
+                            Verify OTP
                           </button>
+
+                          {/* Display Error Messages */}
+                          {errorMessage && (
+                            <p className="text-red-600 text-center mt-2">
+                              {errorMessage}
+                            </p>
+                          )}
+                        </>
+                      )}
+                    </>
+                  )}
+
+                  {/* Show privilege card details if found */}
+                  {isOtpVerified && privilegeCardDetails && (
+                    <div className="mt-6 bg-gray-100 p-4 rounded border">
+                      <p>
+                        <strong>Customer Name:</strong>{" "}
+                        {privilegeCardDetails.customer_name}
+                      </p>
+                      <p>
+                        <strong>PC Number:</strong>{" "}
+                        {privilegeCardDetails.pc_number}
+                      </p>
+                      <p>
+                        <strong>Loyalty Points:</strong> {loyaltyPoints}
+                      </p>
+
+                      {/* Redeem Points Section */}
+                      <div className="mt-4">
+                        <p className="font-semibold">Redeem Loyalty Points:</p>
+                        <div className="flex space-x-4 mt-2">
+                          <button
+                            type="button" // Added type="button"
+                            onClick={() => {
+                              setRedeemOption("full");
+                              setRedeemPointsAmount(loyaltyPoints);
+                              setRedeemPoints(true);
+                            }}
+                            className={`px-4 py-2 mb-2 rounded-lg ${redeemOption === "full"
+                              ? "bg-green-500 text-white"
+                              : "bg-gray-200"
+                              }`}
+                          >
+                            Redeem Full Points
+                          </button>
+                          <button
+                            type="button" // Added type="button"
+                            onClick={() => {
+                              setRedeemOption("custom");
+                              setRedeemPointsAmount("");
+                              setRedeemPoints(true);
+                              setTimeout(
+                                () => redeemPointsAmountRef.current?.focus(),
+                                0
+                              ); // Focus on custom amount input
+                            }}
+                            className={`px-4 py-2 mb-2 rounded-lg ${redeemOption === "custom"
+                              ? "bg-green-500 text-white"
+                              : "bg-gray-200"
+                              }`}
+                          >
+                            Redeem Custom Amount
+                          </button>
+                        </div>
+
+                        {/* When 'Redeem Full' is selected */}
+                        {redeemOption === "full" && (
+                          <div className="mt-2">
+                            <input
+                              type="number"
+                              value={loyaltyPoints}
+                              readOnly
+                              className="border border-gray-300 w-full px-4 py-3 rounded-lg text-center my-2 bg-gray-100"
+                            />
+                            <p className="text-center">
+                              You are redeeming your full loyalty points.
+                            </p>
+                          </div>
                         )}
-                        {/* Exit Button */}
-                        {allowPrint && (
-                          <div className="flex justify-center text-center mt-6">
-                            <button
-                              onClick={handleExit}
-                              className="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg flex items-center justify-center w-fit"
-                            >
-                              Exit
-                            </button>
+
+                        {/* When 'Redeem Custom' is selected */}
+                        {redeemOption === "custom" && (
+                          <div className="mt-2">
+                            <input
+                              type="number"
+                              placeholder={`Enter amount to redeem (Max: ₹${loyaltyPoints})`}
+                              value={redeemPointsAmount}
+                              onChange={(e) =>
+                                setRedeemPointsAmount(
+                                  e.target.value === ""
+                                    ? ""
+                                    : Math.min(
+                                      Number(e.target.value),
+                                      loyaltyPoints
+                                    )
+                                )
+                              }
+                              className="border border-gray-300 w-full px-4 py-3 rounded-lg text-center my-2"
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  nextButtonRef.current?.focus();
+                                }
+                              }}
+                              ref={redeemPointsAmountRef}
+                            />
+                            {(parseFloat(redeemPointsAmount) > loyaltyPoints ||
+                              parseFloat(redeemPointsAmount) < 0) && (
+                                <p className="text-red-500 text-xs mt-1">
+                                  Please enter a valid amount up to your available
+                                  points.
+                                </p>
+                              )}
                           </div>
                         )}
                       </div>
                     </div>
                   )}
 
-                  {/* Navigation Buttons */}
-                  <div className="flex justify-center mt-6">
-                    {step > 0 && (
+                  {/* Prompt to create a new privilege card if not found */}
+                  {isOtpVerified && !privilegeCardDetails && (
+                    <div className="mt-6 bg-green-50 p-4 rounded">
+                      <p className="text-center text-red-500">
+                        No Privilege Card found for this{" "}
+                        {redeemOption === "phone"
+                          ? "phone number."
+                          : "PC Number."}
+                      </p>
                       <button
                         type="button" // Added type="button"
-                        onClick={prevStep}
-                        className="bg-green-500 hover:bg-green-600 text-white mx-2 px-4 py-2 rounded-lg"
+                        onClick={handleNewPrivilegeCard}
+                        className="mt-4 bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg w-full"
                       >
-                        Previous
+                        Create New Privilege Card
                       </button>
-                    )}
-                    {step < 5 && (
-                      <button
-                        type="button" // Added type="button"
-                        ref={nextButtonRef}
-                        onClick={nextStep}
-                        className={`bg-green-500 hover:bg-green-600 text-white mx-2 px-4 py-2 rounded-lg ${step === 4 && !isPinVerified ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        disabled={step === 4 && !isPinVerified}
-                      >
-                        Next
-                      </button>
-                    )}
-                  </div>
-                </form>
+                    </div>
+                  )}
+                </>
               )}
             </div>
-          );
+          )}
+
+          {/* Step 4: Employee Selection */}
+          {step === 4 && (
+            <div className="bg-gray-50 p-6 rounded-md shadow-inner space-y-4">
+              <h2 className="text-lg font-semibold text-gray-700">
+                Order Created by Employee Details
+              </h2>
+              <select
+                value={employee}
+                onChange={(e) => setEmployee(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && employee) {
+                    employeeRef.current?.focus();
+                  }
+                }}
+                ref={employeeRef}
+                className="border border-gray-300 w-full px-4 py-3 rounded-lg text-center"
+              >
+                <option value="" disabled>
+                  Select Employee
+                </option>
+                {employees.map((emp) => (
+                  <option key={emp} value={emp}>
+                    {emp}
+                  </option>
+                ))}
+              </select>
+              {employee && (
+                <EmployeeVerification
+                  employee={employee}
+                  onVerify={(isVerified) => {
+                    setIsPinVerified(isVerified);
+                    if (isVerified) {
+                      setTimeout(() => nextButtonRef.current?.focus(), 100);
+                    }
+                  }}
+                />
+              )}
+              {validationErrors.employee && (
+                <p className="text-red-500 text-xs mt-1">{validationErrors.employee}</p>
+              )}
+            </div>
+          )}
+
+          {/* Step 5: Order Preview with Payment Method */}
+          {step === 5 && (
+            <div>
+              {/* Printable Area */}
+              <div className="printable-area print:block print:absolute print:inset-0 print:w-full bg-white p-8 rounded-lg text-gray-800">
+                {/* Invoice Header */}
+                <div className="text-center mb-8">
+                  <h1 className="text-3xl font-bold">Screenetra Eye Care</h1>
+                  <p className="text-sm text-gray-600">
+                    GST Number: 32AAUCS7002H1ZV
+                  </p>
+                  <h2 className="text-2xl font-semibold mt-2">
+                    Sales Order Summary
+                  </h2>
+                </div>
+
+                {/* Invoice Details */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                  <div>
+                    <p>
+                      <span className="font-semibold">Sales Order ID:</span>{" "}
+                      {salesOrderId}
+                    </p>
+                    {/* Description removed */}
+                    <p>
+                      <span className="font-semibold">Customer MR Number:</span>{" "}
+                      {mrNumber}
+                    </p>
+                    <p>
+                      <span className="font-semibold">Customer Name:</span>{" "}
+                      {patientDetails?.name ||
+                        privilegeCardDetails?.customer_name ||
+                        "N/A"}
+                    </p>
+                    <p>
+                      <span className="font-semibold">Billed by:</span>{" "}
+                      {employee}
+                    </p>
+                  </div>
+                  <div>
+                    <p>
+                      <span className="font-semibold">HSN Code:</span> 12345678
+                    </p>
+                  </div>
+                </div>
+
+                {/* Product Table */}
+                <div className="overflow-x-auto mb-6">
+                  <table className="min-w-full border border-gray-300">
+                    <thead className="bg-gray-100">
+                      <tr>
+                        <th className="py-2 px-4 border-b text-left">
+                          Product ID
+                        </th>
+                        <th className="py-2 px-4 border-b text-left">
+                          Product Name
+                        </th>
+                        <th className="py-2 px-4 border-b text-right">
+                          Price (₹)
+                        </th>
+                        <th className="py-2 px-4 border-b text-right">
+                          Quantity
+                        </th>
+                        <th className="py-2 px-4 border-b text-right">
+                          Subtotal (₹)
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {productEntries.map((product, index) => {
+                        const productSubtotal =
+                          (parseFloat(product.price) || 0) *
+                          (parseInt(product.quantity) || 0);
+                        return (
+                          <tr key={index} className="hover:bg-gray-50">
+                            <td className="py-2 px-4 border-b">{product.id}</td>
+                            <td className="py-2 px-4 border-b">
+                              {product.name}
+                            </td>
+                            <td className="py-2 px-4 border-b text-right">
+                              ₹ {parseFloat(product.price).toFixed(2)}
+                            </td>
+                            <td className="py-2 px-4 border-b text-right">
+                              {product.quantity}
+                            </td>
+                            <td className="py-2 px-4 border-b text-right">
+                              ₹ {productSubtotal.toFixed(2)}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Financial Summary */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                  {/* Left Column */}
+                  <div className="space-y-2">
+
+                    <p>
+                      <span className="font-semibold">CGST (6%):</span> ₹
+                      {parseFloat(cgstAmount).toFixed(2)}
+                    </p>
+                    <p>
+                      <span className="font-semibold">SGST (6%):</span> ₹
+                      {parseFloat(sgstAmount).toFixed(2)}
+                    </p>
+                  </div>
+
+                  {/* Right Column */}
+                  <div className="space-y-2">
+                    <p>
+                      <span className="font-semibold">total:</span> ₹
+                      {subtotal.toFixed(2)}
+                    </p>
+                    <p>
+                      <span className="font-semibold">Advance Paid:</span> ₹
+                      {parseFloat(advanceDetails).toFixed(2)}
+                    </p>
+                    <p>
+                      <span className="font-semibold">Discount Applied:</span> ₹
+                      {discountAmount.toFixed(2)}
+                    </p>
+                    <p>
+                      <span className="font-semibold">Balance Due:</span> ₹
+                      {finalAmount.toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Loyalty Points Information */}
+                {privilegeCard && privilegeCardDetails && (
+                  <div className="mb-6">
+                    <p>
+                      <span className="font-semibold">
+                        Loyalty Points Redeemed:
+                      </span>{" "}
+                      ₹{redeemPointsAmount.toFixed(2)}
+                    </p>
+                    <p>
+                      <span className="font-semibold">
+                        Loyalty Points Gained:
+                      </span>{" "}
+                      {pointsToAdd}
+                    </p>
+                  </div>
+                )}
+
+                {/* Payment Method and Advance Details */}
+                <div className="flex flex-col md:flex-row items-center justify-between my-6 space-x-4">
+                  {/* Payment Method */}
+                  <div className="w-full md:w-1/2 mb-4 md:mb-0">
+                    <label
+                      htmlFor="paymentMethod"
+                      className="block font-semibold mb-1"
+                    >
+                      Payment Method:
+                    </label>
+                    <select
+                      id="paymentMethod"
+                      value={paymentMethod}
+                      onChange={(e) => setPaymentMethod(e.target.value)}
+                      ref={paymentMethodRef}
+                      onKeyDown={(e) =>
+                        handleEnterKey(e, saveOrderRef)
+                      }
+                      className="border border-gray-300 w-full px-4 py-3 rounded-lg"
+                    >
+                      <option value="" disabled>
+                        Select Payment Method
+                      </option>
+                      <option value="cash">Cash</option>
+                      <option value="credit">Card</option>
+                      <option value="online">UPI (Paytm/PhonePe/GPay)</option>
+                    </select>
+                    {validationErrors.paymentMethod && (
+                      <p className="text-red-500 text-xs ml-1">
+                        {validationErrors.paymentMethod}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons Outside Printable Area */}
+              <div className="flex flex-col md:flex-row justify-start mt-6 space-x-6 space-y-4 md:space-y-0">
+                <button
+                  type="button" // Added type="button"
+                  onClick={handleOrderCompletion}
+                  ref={saveOrderRef}
+                  onKeyDown={async (e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      await handleOrderCompletion();
+                      setTimeout(() => printButtonRef.current?.focus(), 100); // Move focus to Print button after saving
+                    }
+                  }}
+                  className={`bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg transition ${!paymentMethod ? "opacity-50 cursor-not-allowed" : ""
+                    } w-full md:w-auto`}
+                  disabled={!paymentMethod || isLoading}
+                >
+                  Submit Order{" "}
+                  {privilegeCard && privilegeCardDetails
+                    ? "& Update Loyalty Points"
+                    : ""}
+                </button>
+                {allowPrint && (
+                  <button
+                    type="button" // Added type="button"
+                    onClick={handlePrint}
+                    ref={printButtonRef}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handlePrint();
+                        setTimeout(() => newWorkOrderButtonRef.current?.focus(), 100); // Move focus to Create New after printing
+                      }
+                    }}
+                    className="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-lg transition flex items-center justify-center w-full md:w-auto"
+
+                  >
+                    <PrinterIcon className="w-5 h-5 inline mr-2" />
+                    Print
+                  </button>
+                )}
+                {/* Exit Button */}
+                {allowPrint && (
+                  <div className="flex justify-center text-center mt-6">
+                    <button
+                      onClick={handleExit}
+                      className="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg flex items-center justify-center w-fit"
+                    >
+                      Exit
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Navigation Buttons */}
+          <div className="flex justify-center mt-6">
+            {step > 0 && (
+              <button
+                type="button" // Added type="button"
+                onClick={prevStep}
+                className="bg-green-500 hover:bg-green-600 text-white mx-2 px-4 py-2 rounded-lg"
+              >
+                Previous
+              </button>
+            )}
+            {step < 5 && (
+              <button
+                type="button" // Added type="button"
+                ref={nextButtonRef}
+                onClick={nextStep}
+                className={`bg-green-500 hover:bg-green-600 text-white mx-2 px-4 py-2 rounded-lg ${step === 4 && !isPinVerified ? 'opacity-50 cursor-not-allowed' : ''}`}
+                disabled={step === 4 && !isPinVerified}
+              >
+                Next
+              </button>
+            )}
+          </div>
+        </form>
+      )}
+    </div>
+  );
 });
 
-          export default SalesOrderGeneration;
+export default SalesOrderGeneration;
