@@ -147,7 +147,7 @@ const Header = ({ selectedTab, setSelectedTab, isCollapsed, toggleSidebar }) => 
           )}
         </div>
 
-        {role !== 'employee' && (
+        {role !== 'employee' && role !== 'admin' &&(
 
           <button onClick={() => navigate('/settings')} className="text-gray-500 hover:text-green-500">
             <Cog8ToothIcon className="h-6 w-6" />

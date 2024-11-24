@@ -67,7 +67,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
             try {
                 const { data, error } = await supabase
                     .from("products")
-                    .select("id, product_name, product_id")
+                    .select("id, product_name, product_id, rate, mrp, purchase_from")
                     .or(`product_name.ilike.%${query}%,product_id.ilike.%${query}%`) // Combined conditions
                     .limit(20); // Limit to 20 suggestions
 
@@ -125,7 +125,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
             !newRate ||
             !newMrp ||
             !newQuantity ||
-            !newPurchaseFrom
+            !newPurchaseFrom.trim()
         ) {
             setError("Please fill in all required fields.");
             return;
@@ -168,7 +168,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
                 rate,
                 mrp,
                 hsn_code: "9001", // Default HSN code or make it dynamic if needed
-                purchase_from: newPurchaseFrom, // Include purchase_from
+                purchase_from: newPurchaseFrom.trim(), // Include purchase_from
             });
 
             if (!addProductResponse.success) {
@@ -235,7 +235,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
             !updateQuantity ||
             !updateRate ||
             !updateMrp ||
-            !updatePurchaseFrom
+            !updatePurchaseFrom.trim()
         ) {
             setError("Please fill in all required fields.");
             return;
@@ -278,7 +278,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
                 quantity,
                 rate,
                 mrp,
-                updatePurchaseFrom // Pass purchase_from if needed
+                updatePurchaseFrom.trim() // Pass purchase_from if needed
             );
 
             setIsLoading(false);
@@ -286,6 +286,15 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
 
             if (updateStockResponse.success) {
                 setSuccess("Stock updated successfully.");
+                // Append the new product to productSuggestions
+            setProductSuggestions((prevSuggestions) => [
+                ...prevSuggestions,
+                {
+                    id: addProductResponse.data.id,
+                    product_name: newProductName,
+                    product_id: newProductId,
+                },
+            ]);
                 // Reset form
                 setUpdateSearchQuery("");
                 setProductSuggestions([]);
@@ -328,11 +337,14 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
     const handleSelectProduct = (product) => {
         setSelectedProduct(product);
         setUpdateSearchQuery(`${product.product_name} (${product.product_id})`);
-        setProductSuggestions([]);
-        setUpdateRate(product.rate !== null ? product.rate.toString() : "");
-        setUpdateMrp(product.mrp !== null ? product.mrp.toString() : "");
-        setUpdatePurchaseFrom(product.purchase_from || "");
+        setProductSuggestions([]); // Clear suggestions dropdown
+
+        // Populate fields with the selected product's details
+        setUpdateRate(product.rate !== null ? product.rate.toString() : ""); // Populate rate
+        setUpdateMrp(product.mrp !== null ? product.mrp.toString() : "");   // Populate MRP
+        setUpdatePurchaseFrom(product.purchase_from || "");                // Populate purchase_from if available
     };
+
 
     // Fetch current stock data when component mounts or branch changes
     useEffect(() => {
@@ -370,17 +382,21 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
     // State for displaying current stock
     const [filteredStocks, setFilteredStocks] = useState([]);
 
-    // Memoized filtered stock based on search query
-    const allFilteredStocks = useMemo(() => {
-        return filteredStocks.filter((stock) => {
+    // Memoized filtered and sorted stock based on search query
+const allFilteredStocks = useMemo(() => {
+    return filteredStocks
+        .filter((stock) => {
             const searchTerm = stockSearchQuery.toLowerCase();
             const productName = stock.product.product_name.toLowerCase();
             const productId = stock.product.product_id.toLowerCase();
             return (
                 productName.includes(searchTerm) || productId.includes(searchTerm)
             );
-        });
-    }, [filteredStocks, stockSearchQuery]);
+        })
+        .sort((a, b) => 
+            a.product.product_name.localeCompare(b.product.product_name)
+        ); // Sort alphabetically by product name
+}, [filteredStocks, stockSearchQuery]);
 
     // Calculate total pages based on filtered stock
     const totalPages = useMemo(() => {
@@ -401,9 +417,8 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
 
     return (
         <div
-            className={`transition-all duration-300 ${
-                isCollapsed ? "mx-20" : "mx-20 px-20"
-            } justify-center my-20 p-8 rounded-xl mx-auto max-w-4xl bg-green-50 shadow-inner`}
+            className={`transition-all duration-300 ${isCollapsed ? "mx-20" : "mx-20 px-20"
+                } justify-center my-20 p-8 rounded-xl mx-auto max-w-4xl bg-green-50 shadow-inner`}
         >
             <h1 className="text-2xl font-semibold mb-6 text-center">
                 Product Purchase
@@ -413,21 +428,19 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
             <div className="flex justify-center mb-6">
                 <button
                     onClick={() => handleModeSelection("add")}
-                    className={`mx-2 px-4 py-2 rounded ${
-                        mode === "add"
+                    className={`mx-2 px-4 py-2 rounded ${mode === "add"
                             ? "bg-blue-500 text-white"
                             : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                    }`}
+                        }`}
                 >
                     Add New Product
                 </button>
                 <button
                     onClick={() => handleModeSelection("update")}
-                    className={`mx-2 px-4 py-2 rounded ${
-                        mode === "update"
+                    className={`mx-2 px-4 py-2 rounded ${mode === "update"
                             ? "bg-blue-500 text-white"
                             : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                    }`}
+                        }`}
                 >
                     Update Existing Product
                 </button>
@@ -523,14 +536,14 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
 
                         {/* Rate */}
                         <div>
-                            <label htmlFor="newRate" className="block mb-2 font-medium">
+                            <label htmlFor="updateRate" className="block mb-2 font-medium">
                                 Rate
                             </label>
                             <input
                                 type="number"
-                                id="newRate"
-                                value={newRate}
-                                onChange={(e) => setNewRate(e.target.value)}
+                                id="updateRate"
+                                value={updateRate}
+                                onChange={(e) => setUpdateRate(e.target.value)}
                                 className="w-full p-2 border rounded"
                                 min="0.01"
                                 step="0.01"
@@ -540,20 +553,24 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
 
                         {/* MRP */}
                         <div>
-                            <label htmlFor="newMrp" className="block mb-2 font-medium">
+                            <label htmlFor="updateMrp" className="block mb-2 font-medium">
                                 MRP
                             </label>
                             <input
                                 type="number"
-                                id="newMrp"
-                                value={newMrp}
-                                onChange={(e) => setNewMrp(e.target.value)}
+                                id="updateMrp"
+                                value={updateMrp}
+                                onChange={(e) => setUpdateMrp(e.target.value)}
                                 className="w-full p-2 border rounded"
                                 min="0.01"
                                 step="0.01"
                                 required
                             />
                         </div>
+
+                        {/* Purchase From */}
+                        
+
 
                         {/* Quantity */}
                         <div>
@@ -574,11 +591,10 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
 
                     <button
                         type="submit"
-                        className={`mt-4 w-full p-2 text-white rounded ${
-                            isLoading
+                        className={`mt-4 w-full p-2 text-white rounded ${isLoading
                                 ? "bg-blue-500 cursor-not-allowed"
                                 : "bg-green-500 hover:bg-green-600"
-                        }`}
+                            }`}
                         disabled={isLoading}
                     >
                         {isLoading ? "Adding..." : "Add New Product"}
@@ -591,8 +607,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
                 <form onSubmit={handleUpdateExistingProduct} className="mb-8">
                     <h2 className="text-xl font-semibold mb-4">Update Existing Product</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* Purchase From */}
-                        <div>
+                    <div>
                             <label htmlFor="updatePurchaseFrom" className="block mb-2 font-medium">
                                 Purchase From
                             </label>
@@ -609,7 +624,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
                         {/* Product Search */}
                         <div className="relative md:col-span-2">
                             <label htmlFor="searchProduct" className="block mb-2 font-medium">
-                                Search Product
+                                Search Product ID
                             </label>
                             <input
                                 type="text"
@@ -701,11 +716,10 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
                     {selectedProduct && (
                         <button
                             type="submit"
-                            className={`mt-4 w-full p-2 text-white rounded ${
-                                isLoading
+                            className={`mt-4 w-full p-2 text-white rounded ${isLoading
                                     ? "bg-blue-500 cursor-not-allowed"
                                     : "bg-green-500 hover:bg-green-600"
-                            }`}
+                                }`}
                             disabled={isLoading}
                         >
                             {isLoading ? "Updating..." : "Update Stock"}
@@ -794,11 +808,10 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
                             <button
                                 onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
                                 disabled={currentPage === 1}
-                                className={`px-3 py-1 rounded ${
-                                    currentPage === 1
+                                className={`px-3 py-1 rounded ${currentPage === 1
                                         ? "bg-gray-300 cursor-not-allowed"
                                         : "bg-blue-500 text-white hover:bg-blue-600"
-                                }`}
+                                    }`}
                             >
                                 Previous
                             </button>
@@ -808,11 +821,10 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
                                 <button
                                     key={number}
                                     onClick={() => setCurrentPage(number)}
-                                    className={`px-3 py-1 rounded ${
-                                        currentPage === number
+                                    className={`px-3 py-1 rounded ${currentPage === number
                                             ? "bg-green-500 text-white"
                                             : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                                    }`}
+                                        }`}
                                 >
                                     {number}
                                 </button>
@@ -822,11 +834,10 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
                             <button
                                 onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
                                 disabled={currentPage === totalPages}
-                                className={`px-3 py-1 rounded ${
-                                    currentPage === totalPages
+                                className={`px-3 py-1 rounded ${currentPage === totalPages
                                         ? "bg-gray-300 cursor-not-allowed"
                                         : "bg-blue-500 text-white hover:bg-blue-600"
-                                }`}
+                                    }`}
                             >
                                 Next
                             </button>

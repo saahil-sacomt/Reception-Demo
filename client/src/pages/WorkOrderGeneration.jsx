@@ -213,15 +213,18 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       const quantity = parseInt(product.quantity) || 0;
       return total + price * quantity;
     }, 0);
-
-    const discountAmount = discountPercentage ? (subtotal * discountPercentage) / 100 : 0;
-    const discountedSubtotal = subtotal - discountAmount;
-
+  
+    // Ensure discountPercentage is between 0 and 100
+    const validDiscountPercentage = Math.min(Math.max(discountPercentage || 0, 0), 100);
+    const discountAmount = (subtotal * validDiscountPercentage) / 100;
+    const discountedSubtotal = Math.max(subtotal - discountAmount, 0); // Prevent negative subtotal
+  
     const cgst = (subtotal * 6) / 100 || 0;
     const sgst = (subtotal * 6) / 100 || 0;
-
-    const totalAmount = discountedSubtotal + cgst + sgst;
-
+  
+    // Exclude cgst and sgst from totalAmount
+    const totalAmount = Math.max(discountedSubtotal, 0); // Prevent negative total
+  
     return { subtotal, discountAmount, discountedSubtotal, cgst, sgst, totalAmount };
   };
 
@@ -275,6 +278,23 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       discountRef.current?.focus(); // Start with discount field
     }
   };
+
+  // Updates in the Discount field handler
+const handleDiscountInput = (e) => {
+  let value = e.target.value.replace(/^0+/, ""); // Remove leading zeros
+  if (!value) value = ""; // Ensure empty string for invalid input
+  const numericValue = Math.min(Math.max(parseFloat(value) || 0, 0), 100); // Clamp value between 0 and 100
+  setDiscount(numericValue.toString()); // Set cleaned value
+};
+
+// Add advance amount validation
+const validateAdvanceAmount = () => {
+  if (advance > totalAmount) {
+    alert("Advance amount cannot exceed the total amount.");
+    return false;
+  }
+  return true;
+};
 
   const handleEnterKey = (e, nextFieldRef, action) => {
     if (e.key === "Enter") {
@@ -397,6 +417,11 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       return;
     }
     setIsSaving(true);
+
+    if (!validateAdvanceAmount()) {
+      setIsSaving(false);
+      return;
+    }
 
     // Validate Employee Selection
     if (!employee) {
@@ -526,7 +551,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
               .from('modification_requests')
               .update({ status: 'completed' })
               .eq('request_id', modificationRequestId);
-  
+
             if (modUpdateError) {
               console.error("Error updating modification request status:", modUpdateError);
             }
@@ -580,29 +605,47 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
           }
         } else {
           // Create a new customer
-          const { data: newCustomer, error: customerCreationError } = await supabase
-            .from('customers')
-            .insert([
-              { name: customerName, phone_number: customerPhone }
-            ])
-            .single();
-
-          if (customerCreationError) {
-            console.error("Error creating new customer:", customerCreationError.message);
-            alert("Failed to create new customer.");
+          if (!customerName.trim() || !customerPhone.trim()) {
+            alert("Customer Name and Phone Number are required.");
             setIsSaving(false);
             return;
           }
-
-          if (newCustomer && newCustomer.id) {
-            customerId = newCustomer.id;
-          } else {
-            alert("Failed to create new customer.");
+        
+          try {
+            const newCustomerPayload = {
+              name: customerName.trim(),
+              phone_number: customerPhone.trim(),
+              // Include `mr_number` only if it's valid (non-null and non-empty)
+              ...(mrNumber && mrNumber.trim() ? { mr_number: mrNumber.trim() } : {}),
+            };
+        
+            const { data: newCustomer, error: customerCreationError } = await supabase
+              .from('customers')
+              .insert(newCustomerPayload)
+              .select('id') // Select only the ID to reduce payload size
+              .single();
+        
+            if (customerCreationError) {
+              console.error("Error creating new customer:", customerCreationError.message);
+              alert(`Failed to create new customer. Error: ${customerCreationError.message}`);
+              setIsSaving(false);
+              return;
+            }
+        
+            if (newCustomer && newCustomer.id) {
+              customerId = newCustomer.id;
+            } else {
+              alert("Failed to create new customer.");
+              setIsSaving(false);
+              return;
+            }
+          } catch (err) {
+            console.error("Unexpected error creating new customer:", err);
+            alert("An unexpected error occurred while creating the customer.");
             setIsSaving(false);
             return;
           }
         }
-
         payload.customer_id = customerId;
 
         console.log('Payload being sent:', payload);
@@ -671,6 +714,9 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       }
       if (!paymentMethod) errors.paymentMethod = "Payment method is required.";
       if (!advanceDetails) errors.advanceDetails = "Advance details are required.";
+      if (step === 5 && !validateAdvanceAmount()) {
+        return; // Prevent proceeding if advance amount validation fails
+      }
     }
 
     if (Object.keys(errors).length > 0) {
@@ -789,18 +835,18 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
           setCustomerPhone(data.patient_details?.phone_number || "");
         }
         // Fetch the corresponding modification request
-      const { data: modData, error: modError } = await supabase
-      .from('modification_requests')
-      .select('*')
-      .eq('order_id', orderId)
-      .eq('status', 'approved') // Assuming the status was 'approved'
-      .single();
+        const { data: modData, error: modError } = await supabase
+          .from('modification_requests')
+          .select('*')
+          .eq('order_id', orderId)
+          .eq('status', 'approved') // Assuming the status was 'approved'
+          .single();
 
-    if (modError) {
-      console.error("Error fetching modification request:", modError);
-    } else {
-      setModificationRequestId(modData.request_id);
-    }
+        if (modError) {
+          console.error("Error fetching modification request:", modError);
+        } else {
+          setModificationRequestId(modData.request_id);
+        }
       }
     } catch (err) {
       console.error("Unexpected error fetching work order details:", err);
@@ -1320,23 +1366,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
           <>
             {/* Printable Area */}
             <div className="printable-area print:block print:absolute print:inset-0 print:w-full bg-white p-8 rounded-lg text-gray-800">
-              {/* Invoice Header */}
-              <div className="flex justify-between items-center mb-8">
-                {/* GST Number on the left */}
-                <div>
-                  <p className="text-sm text-gray-600 font-semibold">
-                    GST Number: 32AAUCS7002H1ZV
-                  </p>
-                </div>
-                {/* Company Logo on the right */}
-                <div>
-                  <img
-                    src={logo} // Replace with your logo's file path
-                    alt="Company Logo"
-                    className="w-48 h-auto"
-                  />
-                </div>
-              </div>
+              
 
               {/* Invoice Details */}
               <div className="invoice-details grid grid-cols-1 md:grid-cols-2 gap-4 mt-20 mb-6">
@@ -1458,7 +1488,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                     id="discount"
                     placeholder="Enter discount percentage"
                     value={discount}
-                    onChange={(e) => setDiscount(e.target.value)}
+                    onChange={handleDiscountInput}
                     onKeyDown={(e) => handleEnterKey(e, paymentMethodRef)}
                     ref={discountRef}
                     className={`border border-gray-300 w-full px-4 py-3 rounded-lg ${validationErrors.discount ? 'border-red-500' : ''}`}

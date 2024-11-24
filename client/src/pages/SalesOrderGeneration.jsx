@@ -334,7 +334,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           ? new Date(currentYear + 1, 2, 31) // March 31st of next year
           : new Date(currentYear, 2, 31); // March 31st of this year
 
-      // Fetch the last sales order ID for the selected branch
+      // Fetch the last sales ID for the selected branch
       const { data: lastSalesOrders, error } = await supabase
         .from("sales_orders")
         .select("sales_order_id")
@@ -355,13 +355,13 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         lastCount = parseInt(parts[1], 10);
       }
 
-      // Increment the count for the new Sales Order ID
+      // Increment the count for the new sales ID
       const newCount = lastCount + 1;
       const newSalesOrderId = `SO(${branch})-${newCount}-${financialYear}`;
 
       return newSalesOrderId;
     } catch (error) {
-      console.error("Error generating Sales Order ID:", error);
+      console.error("Error generating sales ID:", error);
       return null;
     }
   };
@@ -450,7 +450,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         .single();
 
       if (error || !data) {
-        setErrorMessage("Sales order not found");
+        setErrorMessage("sales not found");
         return;
       }
 
@@ -495,8 +495,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
       setStep(1); // Move to the Product Details step
       setErrorMessage("");
     } catch (error) {
-      console.error("Error fetching sales order:", error);
-      setErrorMessage("Failed to fetch sales order");
+      console.error("Error fetching sales:", error);
+      setErrorMessage("Failed to fetch sales");
     }
   };
 
@@ -507,7 +507,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     }
   }, [orderId]);
 
-  // Function to fetch and set a new Sales Order ID when the branch is available
+  // Function to fetch and set a new sales ID when the branch is available
   const fetchSalesOrderId = async () => {
     if (branch && !isEditing) {
       // Only generate ID if not editing
@@ -517,7 +517,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         setSalesOrderId(newSalesOrderId);
         setErrorMessage("");
       } else {
-        setErrorMessage("Failed to generate Sales Order ID.");
+        setErrorMessage("Failed to generate sales ID.");
       }
       setIsGeneratingId(false);
     }
@@ -525,7 +525,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
 
   useEffect(() => {
     if (branch) {
-      console.log("Fetching Sales Order ID for branch:", branch);
+      console.log("Fetching sales ID for branch:", branch);
       fetchSalesOrderId();
     }
   }, [branch]);
@@ -1147,13 +1147,13 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         setPointsToAdd(pointsToAdd);
       }
 
-      // Step 2: Prepare Variables for Sales Order Data
+      // Step 2: Prepare Variables for sales Data
       const sanitizedRedeemedPoints = privilegeCard
         ? parseInt(redeemPointsAmount) || 0
         : 0;
       const sanitizedPointsAdded = privilegeCard ? pointsToAdd || 0 : 0;
 
-      // Step 3: Handle Existing Sales Order Update
+      // Step 3: Handle Existing sales Update
       if (isEditing) {
         // a. Calculate Differences
         const differences = calculateProductDifferences(
@@ -1212,7 +1212,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           }
         }
 
-        // c. Update Sales Order
+        // c. Update sales
         const { error: updateError } = await supabase
           .from("sales_orders")
           .update({
@@ -1237,8 +1237,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           .eq("sales_order_id", salesOrderId);
 
         if (updateError) {
-          console.error("Error updating sales order:", updateError);
-          setErrorMessage("Failed to update sales order.");
+          console.error("Error updating sales:", updateError);
+          setErrorMessage("Failed to update sales.");
           return;
         }
 
@@ -1254,9 +1254,9 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           return;
         }
 
-        alert("Sales order updated successfully!");
+        alert("sales updated successfully!");
       } else {
-        // Step 4: Insert New Sales Order
+        // Step 4: Insert New sales
         const newSalesOrderId = await generateSalesOrderId();
         const { error: insertError } = await supabase
           .from("sales_orders")
@@ -1286,8 +1286,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           });
 
         if (insertError) {
-          console.error("Error inserting sales order:", insertError);
-          setErrorMessage("Failed to create sales order.");
+          console.error("Error inserting sales:", insertError);
+          setErrorMessage("Failed to create sales.");
           return;
         }
 
@@ -1383,7 +1383,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     setIsOtpVerified(false);
     setEmployee("");
     setAllowPrint(false);
-    setAdvanceDetails(0);
+    setAdvanceDetails();
     setPaymentMethod("");
     setValidationErrors({});
     setErrorMessage("");
@@ -1391,19 +1391,19 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     setPrivilegeCardDetails(null);
     setRedeemPoints(false);
     setRedeemPointsAmount("");
-    setLoyaltyPoints(0);
+    setLoyaltyPoints();
     setMrNumber("");
     setWorkOrders([]);
     setSelectedWorkOrder(null);
     setShowWorkOrderModal(false);
-    setPointsToAdd(0);
+    setPointsToAdd();
     setRedeemOption(null);
     setPrivilegeCardNumber("");
     setIsEditing(false); // Reset isEditing to false
     setProductSuggestions([]);
     setFetchMethod("work_order_id");
     setSearchQuery("");
-    setDiscountPercentage(0);
+    setDiscountPercentage();
   };
 
   // Confirm and reset the form
@@ -1528,13 +1528,13 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
       )}
 
       <h1 className="text-2xl font-semibold text-gray-700 text-center mb-8">
-        Sales Order Generation
+        sales Generation
       </h1>
 
       {/* Editing Indicator */}
       {isEditing && (
         <div className="bg-yellow-100 text-yellow-800 p-4 rounded-lg mb-6">
-          <p>You are editing an existing Sales Order (ID: {salesOrderId}).</p>
+          <p>You are editing an existing sales (ID: {salesOrderId}).</p>
         </div>
       )}
 
@@ -1719,7 +1719,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                 Product Information
               </h2>
               <label className="block text-gray-700 font-medium mb-1">
-                Generated Sales Order ID
+                Generated sales ID
               </label>
               <input
                 type="text"
@@ -2532,30 +2532,12 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
             <div>
               {/* Printable Area */}
               <div className="printable-area print:block print:absolute print:inset-0 print:w-full bg-white p-8 rounded-lg text-gray-800">
-                {/* Invoice Header */}
-                <div className="flex justify-between items-center mb-8">
-                  {/* GST Number on the left */}
-                  <div>
-                    <p className="text-sm text-gray-600 font-semibold">
-                      GST Number: 32AAUCS7002H1ZV
-                    </p>
-                  </div>
-                  {/* Company Logo on the right */}
-                  <div>
-                    <img
-                      src={logo} // Replace with your logo's file path
-                      alt="Company Logo"
-                      className="w-48 h-auto"
-                    />
-                  </div>
-                </div>
-
                 {/* Invoice Details */}
                 <div className="grid grid-cols-2 gap-2 mt-20 mb-6">
                   <h2 className="text-2xl font-semibold mt-2">Bill</h2>
                   <div>
                     <p>
-                      <span className="font-semibold">Sales Order ID:</span>{" "}
+                      <span className="font-semibold">sales ID:</span>{" "}
                       {salesOrderId}
                     </p>
                     {hasMrNumber === "yes" ? (

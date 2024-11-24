@@ -20,7 +20,7 @@ const Home = ({ isCollapsed }) => {
   // State Variables
   const [showSplash, setShowSplash] = useState(sessionStorage.getItem('showSplash') === 'true');
   const navigate = useNavigate();
-  const { user, name, loading, role, branch } = useAuth();
+  const { user, name, role, branch } = useAuth();
   const [actionRequests, setActionRequests] = useState([]);
   const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
   const [pendingWorkOrdersCount, setPendingWorkOrdersCount] = useState(0);
@@ -71,7 +71,7 @@ const Home = ({ isCollapsed }) => {
   };
 
   const handlePrivilegeCardClick = () => {
-    window.location.href = '/privilege-generation';
+    navigate('/privilege-generation');
   };
 
   // Fetch pending work orders
@@ -209,26 +209,131 @@ const Home = ({ isCollapsed }) => {
     return `${year}-${month}-${day}`;
   };
 
-  // useEffect Hooks
+  // Real-Time Subscriptions for Dynamic Count Updates (Supabase v2)
+  useEffect(() => {
+    // Function to set up real-time subscriptions for admin
+    const setupAdminSubscriptions = () => {
+      if (role !== 'admin') return;
+
+      const modificationRequestsSubscription = supabase
+        .channel('public:modification_requests')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'modification_requests' },
+          payload => {
+            if (payload.new.status === 'pending') {
+              if (payload.eventType === 'INSERT') {
+                setPendingRequestsCount(prev => prev + 1);
+              } else if (payload.eventType === 'UPDATE') {
+                if (payload.old.status !== 'pending') {
+                  setPendingRequestsCount(prev => prev + 1);
+                } else if (payload.new.status !== 'pending') {
+                  setPendingRequestsCount(prev => Math.max(prev - 1, 0));
+                }
+              } else if (payload.eventType === 'DELETE') {
+                setPendingRequestsCount(prev => Math.max(prev - 1, 0));
+              }
+            }
+          }
+        )
+        .subscribe();
+
+      return modificationRequestsSubscription;
+    };
+
+    // Function to set up real-time subscriptions for work_orders
+    const setupWorkOrdersSubscriptions = () => {
+      if (!branch) return;
+
+      const workOrdersSubscription = supabase
+        .channel('public:work_orders')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'work_orders' },
+          payload => {
+            const today = getTodayDate();
+            const isDueTodayOrFuture = (date) => date >= today;
+
+            if (isDueTodayOrFuture(payload.new?.due_date || payload.old?.due_date)) {
+              if (payload.eventType === 'INSERT') {
+                setPendingWorkOrdersCount(prev => prev + 1);
+              } else if (payload.eventType === 'UPDATE') {
+                const wasDue = isDueTodayOrFuture(payload.old.due_date);
+                const isDue = isDueTodayOrFuture(payload.new.due_date);
+                if (!wasDue && isDue) {
+                  setPendingWorkOrdersCount(prev => prev + 1);
+                } else if (wasDue && !isDue) {
+                  setPendingWorkOrdersCount(prev => Math.max(prev - 1, 0));
+                }
+              } else if (payload.eventType === 'DELETE') {
+                setPendingWorkOrdersCount(prev => Math.max(prev - 1, 0));
+              }
+            }
+          }
+        )
+        .subscribe();
+
+      return workOrdersSubscription;
+    };
+
+    // Function to set up real-time subscriptions for sales_orders
+    const setupSalesOrdersSubscriptions = () => {
+      if (!branch) return;
+
+      const salesOrdersSubscription = supabase
+        .channel('public:sales_orders')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'sales_orders' },
+          payload => {
+            const today = getTodayDate();
+            const isCreatedToday = (date) => date >= today;
+
+            if (isCreatedToday(payload.new?.created_at || payload.old?.created_at)) {
+              if (payload.eventType === 'INSERT') {
+                setSalesTodayCount(prev => prev + 1);
+              } else if (payload.eventType === 'UPDATE') {
+                const wasCreatedToday = isCreatedToday(payload.old.created_at);
+                const isCreatedNow = isCreatedToday(payload.new.created_at);
+                if (!wasCreatedToday && isCreatedNow) {
+                  setSalesTodayCount(prev => prev + 1);
+                } else if (wasCreatedToday && !isCreatedNow) {
+                  setSalesTodayCount(prev => Math.max(prev - 1, 0));
+                }
+              } else if (payload.eventType === 'DELETE') {
+                setSalesTodayCount(prev => Math.max(prev - 1, 0));
+              }
+            }
+          }
+        )
+        .subscribe();
+
+      return salesOrdersSubscription;
+    };
+
+    // Initialize Subscriptions
+    const adminSubscription = setupAdminSubscriptions();
+    const workOrdersSubscription = setupWorkOrdersSubscriptions();
+    const salesOrdersSubscription = setupSalesOrdersSubscriptions();
+
+    // Cleanup Subscriptions on Unmount
+    return () => {
+      if (adminSubscription) {
+        supabase.removeChannel(adminSubscription);
+      }
+      if (workOrdersSubscription) {
+        supabase.removeChannel(workOrdersSubscription);
+      }
+      if (salesOrdersSubscription) {
+        supabase.removeChannel(salesOrdersSubscription);
+      }
+    };
+  }, [role, branch]);
+
+  // Initial Fetch and Real-Time Updates for Admin and Employee
   useEffect(() => {
     if (user) {
       fetchApprovedRequests();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
-
-  useEffect(() => {
-    if (showSplash) {
-      const timer = setTimeout(() => {
-        setShowSplash(false);
-        sessionStorage.removeItem('showSplash'); // Clear flag after splash screen
-      }, 2000); // Duration matches animation
-      return () => clearTimeout(timer);
-    }
-  }, [showSplash]);
-
-  useEffect(() => {
-    if (user) {
       fetchActionRequests();
       fetchPendingWorkOrders();
       fetchSalesOrdersToday();
@@ -249,6 +354,17 @@ const Home = ({ isCollapsed }) => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, role]);
+
+  // Handle Splash Screen Timeout
+  useEffect(() => {
+    if (showSplash) {
+      const timer = setTimeout(() => {
+        setShowSplash(false);
+        sessionStorage.removeItem('showSplash'); // Clear flag after splash screen
+      }, 2000); // Duration matches animation
+      return () => clearTimeout(timer);
+    }
+  }, [showSplash]);
 
   // Navigate to employee action-required page
   const handleEmployeeActionClick = () => {
@@ -360,9 +476,6 @@ const Home = ({ isCollapsed }) => {
               </div>
             )}
 
-            
-
-
             {/* Reports and Stock Management Section */}
             {role !== 'employee' && (
               <div className="flex flex-col lg:flex-row lg:space-x-6 mt-10 lg:mt-0 w-full lg:w-1/2">
@@ -400,10 +513,10 @@ const Home = ({ isCollapsed }) => {
               </div>
             )}
 
-            {/* Reports and Stock Management Section */}
-          {role === 'admin' && (
+            {/* Reports and Stock Management Section for Admin */}
+            {role === 'admin' && (
               <div className="flex flex-col w-1/2">
-                {/* Reports Container */}
+                {/* Purchase Stock Container */}
                 <div
                   className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 w-1/2"
                   onClick={() => navigate('/employee-stock-management')}
@@ -414,13 +527,10 @@ const Home = ({ isCollapsed }) => {
               </div>
             )}
 
-            
-          </div>
-
-          {/* Reports and Stock Management Section */}
-          {role === 'employee' && (
+            {/* Reports and Stock Management Section for Employee */}
+            {role === 'employee' && (
               <div className="flex flex-col px-6 w-1/2">
-                {/* Reports Container */}
+                {/* Purchase Stock Container */}
                 <div
                   className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 w-1/2"
                   onClick={() => navigate('/employee-stock-management')}
@@ -430,7 +540,8 @@ const Home = ({ isCollapsed }) => {
                 </div>
               </div>
             )}
-          
+
+          </div>
         </div>
       )}
 
@@ -452,7 +563,7 @@ const Home = ({ isCollapsed }) => {
               <>
                 <h2 className="text-xl font-semibold mb-4">Pending Work Orders</h2>
                 {pendingWorkOrdersCount > 0 ? (
-                  <div className="grid grid-cols-1 gap-4 max-h-60 overflow-y-auto">
+                  <div className="grid grid-cols-1 gap-4 max-h-96 overflow-y-auto">
                     {pendingWorkOrders.map((order) => (
                       <div key={order.work_order_id} className="bg-white shadow-md rounded-lg p-4 flex flex-col">
                         <div className="flex justify-between items-center">
@@ -490,7 +601,7 @@ const Home = ({ isCollapsed }) => {
                 </button>
                 <h2 className="text-xl font-semibold mb-4">Work Order Details</h2>
                 {/* Display Work Order Details */}
-                <div className="space-y-2 overflow-y-auto max-h-96">
+                <div className="space-y-2 overflow-y-auto max-h-108">
                   <p><strong>Work Order ID:</strong> {selectedWorkOrder.work_order_id || 'N/A'}</p>
                   <p><strong>MR Number:</strong> {selectedWorkOrder.mr_number || 'N/A'}</p>
                   <p><strong>Customer Name:</strong> {selectedWorkOrder.patient_details?.name || 'N/A'}</p>
@@ -556,7 +667,7 @@ const Home = ({ isCollapsed }) => {
               <>
                 <h2 className="text-xl font-semibold mb-4">Sales Orders Today</h2>
                 {salesTodayCount > 0 ? (
-                  <div className="grid grid-cols-1 gap-4 max-h-60 overflow-y-auto">
+                  <div className="grid grid-cols-1 gap-4 max-h-96 overflow-y-auto">
                     {salesOrdersToday.map((order) => (
                       <div key={order.sales_order_id} className="bg-white shadow-md rounded-lg p-4 flex flex-col">
                         <div className="flex justify-between items-center">
@@ -595,7 +706,7 @@ const Home = ({ isCollapsed }) => {
                 </button>
                 <h2 className="text-xl font-semibold mb-4">Sales Order Details</h2>
                 {/* Display Sales Order Details */}
-                <div className="space-y-2 overflow-y-auto max-h-96">
+                <div className="space-y-2 overflow-y-auto max-h-108">
                   <p><strong>Sales Order ID:</strong> {selectedSalesOrder.sales_order_id || 'N/A'}</p>
                   <p><strong>MR Number:</strong> {selectedSalesOrder.mr_number || 'N/A'}</p>
                   <p><strong>Customer Phone:</strong> {selectedSalesOrder.patient_phone || 'N/A'}</p>
