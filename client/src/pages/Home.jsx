@@ -9,7 +9,8 @@ import {
   TicketIcon,
   WrenchScrewdriverIcon,
   XMarkIcon,
-  ArrowLeftIcon
+  ArrowLeftIcon,
+  ArchiveBoxArrowDownIcon
 } from '@heroicons/react/24/outline';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -261,7 +262,7 @@ const Home = ({ isCollapsed }) => {
       {showSplash ? (
         <SplashScreen />
       ) : (
-        <div className="space-y-10">
+        <div className="space-y-5">
           {/* Welcome and Metrics Section */}
           <div className="bg-white p-6 flex flex-col md:flex-row justify-between items-center">
             {/* Welcome Message */}
@@ -359,6 +360,9 @@ const Home = ({ isCollapsed }) => {
               </div>
             )}
 
+            
+
+
             {/* Reports and Stock Management Section */}
             {role !== 'employee' && (
               <div className="flex flex-col lg:flex-row lg:space-x-6 mt-10 lg:mt-0 w-full lg:w-1/2">
@@ -395,7 +399,38 @@ const Home = ({ isCollapsed }) => {
                 </div>
               </div>
             )}
+
+            {/* Reports and Stock Management Section */}
+          {role === 'admin' && (
+              <div className="flex flex-col w-1/2">
+                {/* Reports Container */}
+                <div
+                  className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 w-1/2"
+                  onClick={() => navigate('/employee-stock-management')}
+                >
+                  <ArchiveBoxArrowDownIcon className='h-36 w-36 text-green-500 mr-2' />
+                  <h2 className="text-xl text-gray-800 mt-4">Purchase Stock</h2>
+                </div>
+              </div>
+            )}
+
+            
           </div>
+
+          {/* Reports and Stock Management Section */}
+          {role === 'employee' && (
+              <div className="flex flex-col px-6 w-1/2">
+                {/* Reports Container */}
+                <div
+                  className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 w-1/2"
+                  onClick={() => navigate('/employee-stock-management')}
+                >
+                  <ArchiveBoxArrowDownIcon className='h-36 w-36 text-green-500 mr-2' />
+                  <h2 className="text-xl text-gray-800 mt-4">Purchase Stock</h2>
+                </div>
+              </div>
+            )}
+          
         </div>
       )}
 

@@ -28,6 +28,7 @@ import ModifyOrder from "./pages/ModifyOrder";
 import EmployeeActionRequired from "./pages/EmployeeActionRequired";
 import StockManagement from "./pages/StockManagement";
 import { supabase } from './supabaseClient'
+import EmployeeStockManagement from "./pages/EmployeeStockManagement";
 
 const App = () => {
   const location = useLocation();
@@ -149,6 +150,12 @@ const App = () => {
                 element={<FetchLoyaltyPoints isCollapsed={isCollapsed} />}
               />
             </Route>
+            {/* Employee Stock Management */}
+            <Route
+                path="/employee-stock-management"
+                element={<EmployeeStockManagement isCollapsed={isCollapsed} />}
+              />
+              
             <Route
               element={<RequireAuth allowedRoles={["super_admin", "admin"]} />}
             >

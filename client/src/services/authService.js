@@ -305,6 +305,153 @@ export const signOut = async () => {
   }
 };
 
+
+
+/**
+ * Adds a new product to the 'products' table.
+ * @param {Object} productData - The product details.
+ * @returns {Object} - Success status and any error message.
+ */
+export const addNewProduct = async (productData) => {
+  const { product_name, product_id, mrp, rate, hsn_code, purchase_from } = productData;
+
+  try {
+    // Check if product_id already exists
+    const { data: existingProduct, error: fetchError } = await supabase
+      .from("products")
+      .select("id")
+      .eq("product_id", product_id)
+      .single();
+
+    if (fetchError && fetchError.code !== "PGRST116") {
+      // PGRST116: No rows found, which is acceptable
+      throw fetchError;
+    }
+
+    if (existingProduct) {
+      return { success: false, error: "Product ID already exists." };
+    }
+
+    // Insert new product
+    const { data, error } = await supabase
+      .from("products")
+      .insert([
+        {
+          product_name,
+          product_id,
+          mrp,
+          rate,
+          hsn_code: hsn_code || "9001",
+          purchase_from, // Include the new purchase_from field
+        },
+      ])
+      .select("id"); // Select the inserted product's ID
+
+    if (error) {
+      console.error("Error adding new product:", error.message);
+      return { success: false, error: error.message };
+    }
+
+    console.log("Inserted product data:", data);
+
+    return { success: true, data: data[0] }; // Return the inserted product
+  } catch (error) {
+    console.error("Error in addNewProduct:", error.message);
+    return { success: false, error: error.message };
+  }
+};
+
+/**
+ * Updates the stock quantity and optionally Rate and MRP for an existing product in a specific branch.
+ * @param {number} productId - The internal ID of the product.
+ * @param {string} branchCode - The branch code.
+ * @param {number} quantity - The quantity to add.
+ * @param {number} rate - The new rate (optional).
+ * @param {number} mrp - The new MRP (optional).
+ * @param {string} purchaseFrom - The source of purchase (optional).
+ * @returns {Object} - Success status and any error message.
+ */
+export const updateExistingProduct = async (productId, branchCode, quantity, rate, mrp, purchaseFrom) => {
+  try {
+    // Log inputs to verify correctness
+    console.log(`Updating product ID: ${productId} for branch: ${branchCode} with quantity: ${quantity}, rate: ${rate}, mrp: ${mrp}, purchaseFrom: ${purchaseFrom}`);
+
+    // Fetch existing stock for the product and branch
+    const { data: existingStock, error: stockError } = await supabase
+      .from("stock")
+      .select("id, quantity")
+      .eq("product_id", productId)
+      .eq("branch_code", branchCode)
+      .single();
+
+    if (stockError && stockError.code !== "PGRST116") {
+      // PGRST116: No stock entry found, which is acceptable
+      throw stockError;
+    }
+
+    if (existingStock) {
+      // Update existing stock
+      const { error: updateError } = await supabase
+        .from("stock")
+        .update({
+          quantity: existingStock.quantity + quantity,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", existingStock.id);
+
+      if (updateError) {
+        console.error("Error updating stock:", updateError.message);
+        return { success: false, error: updateError.message };
+      }
+    } else {
+      // Insert new stock entry
+      const { error: insertError } = await supabase
+        .from("stock")
+        .insert([
+          {
+            product_id: productId,
+            branch_code: branchCode,
+            quantity: quantity,
+          },
+        ]);
+
+      if (insertError) {
+        console.error("Error inserting new stock:", insertError.message);
+        return { success: false, error: insertError.message };
+      }
+    }
+
+    // Optionally, update Rate and MRP if provided
+    if (rate !== null && mrp !== null) {
+      const productUpdateData = {
+        rate: rate,
+        mrp: mrp,
+        updated_at: new Date().toISOString(),
+      };
+
+      // Include purchase_from if provided
+      if (purchaseFrom) {
+        productUpdateData.purchase_from = purchaseFrom;
+      }
+
+      const { error: productUpdateError } = await supabase
+        .from("products")
+        .update(productUpdateData)
+        .eq("id", productId);
+
+      if (productUpdateError) {
+        console.error("Error updating product rate, MRP, and purchase_from:", productUpdateError.message);
+        return { success: false, error: productUpdateError.message };
+      }
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error in updateExistingProduct:", error.message);
+    return { success: false, error: error.message };
+  }
+};
+
 /**
  * Function to add or update stock manually
  */
