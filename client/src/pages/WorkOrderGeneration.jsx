@@ -1,14 +1,16 @@
 // client/src/pages/WorkOrderGeneration.jsx
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import { CalendarIcon, PrinterIcon, TrashIcon } from "@heroicons/react/24/outline";
+import { CalendarIcon, PrinterIcon, TrashIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import supabase from '../supabaseClient';
 import { useAuth } from '../context/AuthContext';
 import EmployeeVerification from "../components/EmployeeVerification";
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import logo from '../assets/sreenethraenglishisolated.png';
 
 const WorkOrderGeneration = ({ isCollapsed }) => {
   const { branch, name, user } = useAuth();
+  const { orderId } = useParams(); // Get orderId from route params
+  const isEditing = Boolean(orderId);
 
   const [step, setStep] = useState(1);
   const [workOrderId, setWorkOrderId] = useState("");
@@ -17,7 +19,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   const [productEntries, setProductEntries] = useState([
     { id: "", name: "", price: "", quantity: "" },
   ]);
-  const [advanceDetails, setAdvanceDetails] = useState();
+  const [advanceDetails, setAdvanceDetails] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [mrNumber, setMrNumber] = useState("");
   const [isPinVerified, setIsPinVerified] = useState(false);
@@ -26,11 +28,18 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   const [employees, setEmployees] = useState([]);
   const [allowPrint, setAllowPrint] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("");
+  const [discount, setDiscount] = useState(""); // New state for discount
   const [validationErrors, setValidationErrors] = useState({});
   const [isB2B, setIsB2B] = useState(false);
   const [gstNumber, setGstNumber] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [productSuggestions, setProductSuggestions] = useState([]);
+  const [hasMrNumber, setHasMrNumber] = useState(null); // New state to track MR number presence
+
+  // Customer details if MR number is not provided
+  const [customerName, setCustomerName] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
+  const [modificationRequestId, setModificationRequestId] = useState(null);
 
   // Fetch employees from the Supabase `employees` table
   const fetchEmployees = async () => {
@@ -59,13 +68,15 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   // Validation for Employee Dropdown
   const validateEmployeeSelection = () => {
     if (!employee) {
-      setValidationErrors({ employee: "Employee selection is required." });
+      setValidationErrors((prev) => ({ ...prev, employee: "Employee selection is required." }));
       employeeRef.current?.focus();
     } else {
-      setValidationErrors({});
+      setValidationErrors((prev) => {
+        const { employee, ...rest } = prev;
+        return rest;
+      });
     }
   };
-
 
   const navigate = useNavigate();
 
@@ -90,7 +101,6 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   };
 
   // Fetch product suggestions from Supabase based on user input
-  // Fetch suggestions for Product ID or Product Name
   const fetchProductSuggestions = async (query, type) => {
     if (!query) return [];
     try {
@@ -112,7 +122,6 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     }
   };
 
-
   const handleProductInput = async (index, value) => {
     setProductEntries((prevEntries) => {
       const updatedEntries = [...prevEntries];
@@ -121,8 +130,8 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     });
 
     if (value) {
-      const suggestions = await fetchProductSuggestions(value);
-      setProductSuggestions(suggestions); // Keep suggestions updated
+      const suggestions = await fetchProductSuggestions(value, "id");
+      setProductSuggestions(suggestions);
     } else {
       setProductSuggestions([]); // Clear suggestions when input is empty
     }
@@ -137,13 +146,14 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       errors[`productPrice-${index}`] = "Price is required";
     } else if (field === "quantity" && !productEntries[index].quantity) {
       errors[`productQuantity-${index}`] = "Quantity is required";
+    } else if (field === "discount" && discount && (isNaN(discount) || discount < 0 || discount > 100)) {
+      errors[`discount`] = "Enter a valid discount percentage (0-100)";
     } else {
       delete errors[`${field}-${index}`];
     }
 
     setValidationErrors(errors);
   };
-
 
   const handleProductSelection = async (index, productId) => {
     try {
@@ -155,7 +165,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
             id: productDetails.product_id,
             name: productDetails.product_name,
             price: productDetails.mrp || "",
-            quantity: "", // Reset quantity on product selection
+            quantity: prevEntries[index].quantity || "", // Preserve quantity
           };
           return updatedEntries;
         });
@@ -170,23 +180,26 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     }
   };
 
-
-
-
   const resetForm = () => {
     setProductEntries([{ id: "", name: "", price: "", quantity: "" }]);
-    setAdvanceDetails(0);
+    setAdvanceDetails("");
     setDueDate("");
     setMrNumber("");
     setPatientDetails(null);
     setEmployee("");
     setPaymentMethod("");
+    setDiscount(""); // Reset discount
     setGstNumber("");
     setValidationErrors({});
     setIsB2B(false);
     setAllowPrint(false);
-    setWorkOrderId("");
-    generateNewWorkOrderId();
+    if (!isEditing) {
+      setWorkOrderId("");
+      generateNewWorkOrderId();
+    }
+    setHasMrNumber(null); // Reset MR number presence
+    setCustomerName("");
+    setCustomerPhone("");
   };
 
   // GST Rate
@@ -194,17 +207,22 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   const HSN_CODE = "9001"; // Dummy HSN Code
 
   // Calculate totals
-  const calculateTotals = (entries) => {
+  const calculateTotals = (entries, discountPercentage) => {
     const subtotal = entries.reduce((total, product) => {
       const price = parseFloat(product.price) || 0;
       const quantity = parseInt(product.quantity) || 0;
       return total + price * quantity;
     }, 0);
 
+    const discountAmount = discountPercentage ? (subtotal * discountPercentage) / 100 : 0;
+    const discountedSubtotal = subtotal - discountAmount;
+
     const cgst = (subtotal * 6) / 100 || 0;
     const sgst = (subtotal * 6) / 100 || 0;
 
-    return { subtotal, cgst, sgst };
+    const totalAmount = discountedSubtotal + cgst + sgst;
+
+    return { subtotal, discountAmount, discountedSubtotal, cgst, sgst, totalAmount };
   };
 
   // References for managing field focus
@@ -214,13 +232,13 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   const paymentMethodRef = useRef(null);
   const gstNumberRef = useRef(null);
   const advanceDetailsRef = useRef(null);
+  const discountRef = useRef(null); // Ref for discount field
   const printButtonRef = useRef(null);
   const saveButtonRef = useRef(null);
   const newWorkOrderButtonRef = useRef(null);
   const nextButtonRef = useRef(null);
   const fetchButtonRef = useRef(null);
   const quantityRefs = useRef([]);
-
 
   const getTodayDate = () => {
     const today = new Date();
@@ -232,24 +250,29 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
 
   useEffect(() => {
     focusFirstFieldOfStep();
-  }, [step, isB2B]);
+  }, [step, isB2B, isEditing]);
 
   const focusFirstFieldOfStep = () => {
     if (step === 1) {
-      document.getElementById(`productId-0`)?.focus();
+      if (isEditing) {
+        document.getElementById(`productId-0`)?.focus();
+      } else {
+        document.getElementById(`productId-0`)?.focus();
+      }
     }
     if (step === 2) {
       dueDateRef.current?.focus();
     }
     if (step === 3) {
-      mrNumberRef.current?.focus();
+      // Focus on the "Yes" button initially
+      yesButtonRef.current?.focus();
     }
     if (step === 4) {
       if (isB2B) gstNumberRef.current?.focus();
       else employeeRef.current?.focus();
     }
     if (step === 5) {
-      paymentMethodRef.current?.focus();
+      discountRef.current?.focus(); // Start with discount field
     }
   };
 
@@ -286,15 +309,6 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     }
   };
 
-  // Update handleProductEntryChange to use the Supabase fetch function
-  // Update handleProductEntryChange to fetch product by ID or name
-  const handleProductEntryChange = async (index, field, value) => {
-    const updatedEntries = [...productEntries];
-    updatedEntries[index][field] = value;
-
-    setProductEntries(updatedEntries);
-  };
-
   // Function to handle Exit button functionality
   const handleExit = () => {
     const confirmExit = window.confirm(
@@ -307,7 +321,6 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       setIsPrinted(false); // Reset printing state
     }
   };
-
 
   const addNewProductEntry = () => {
     setProductEntries((prevEntries) => {
@@ -363,21 +376,20 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       }
     }
   };
+
   const handleBlur = (index, field) => {
     validateField(index, field);
   };
 
-
-  // Memoize the calculation to optimize performance
   // Memoize calculated values
-  const { subtotal = 0, cgst = 0, sgst = 0 } = useMemo(
-    () => calculateTotals(productEntries),
-    [productEntries]
+  const { subtotal = 0, discountAmount = 0, discountedSubtotal = 0, cgst = 0, sgst = 0, totalAmount = 0 } = useMemo(
+    () => calculateTotals(productEntries, parseFloat(discount)),
+    [productEntries, discount]
   );
 
   // Balance calculations
   const advance = parseFloat(advanceDetails) || 0;
-  const balanceDue = subtotal - advance;
+  const balanceDue = totalAmount - advance;
 
   const saveWorkOrder = async () => {
     if (isSaving) {
@@ -386,94 +398,231 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     }
     setIsSaving(true);
 
+    // Validate Employee Selection
     if (!employee) {
-      setValidationErrors({ employee: "Employee selection is required." });
+      setValidationErrors((prev) => ({ ...prev, employee: "Employee selection is required." }));
       employeeRef.current?.focus();
       setIsSaving(false);
       return;
     }
 
-    // Validate Advance Details in Step 5
+    // Validate B2B GST Number
     if (isB2B && !gstNumber) {
-      setValidationErrors({ gstNumber: "GST Number is required for B2B orders" });
+      setValidationErrors((prev) => ({ ...prev, gstNumber: "GST Number is required for B2B orders." }));
       gstNumberRef.current?.focus();
-      return;
-    }
-
-    if (!paymentMethod) {
-      setValidationErrors({ paymentMethod: "Payment method is required" });
-      paymentMethodRef.current?.focus();
-      return;
-    }
-
-
-    // Validate all product entries
-    let productErrors = {};
-    productEntries.forEach((product, index) => {
-      if (!product.id) productErrors[`productId-${index}`] = "Product ID is required";
-      if (!product.price) productErrors[`productPrice-${index}`] = "Price is required";
-      if (!product.quantity) productErrors[`productQuantity-${index}`] = "Quantity is required";
-    });
-
-    if (Object.keys(productErrors).length > 0) {
-      setValidationErrors(productErrors);
-      // Focus on the first product error
-      const firstErrorKey = Object.keys(productErrors)[0];
-      document.getElementById(firstErrorKey)?.focus();
-      return;
-    }
-
-    setIsSaving(true);
-    const newWorkOrderId = workOrderId;
-    if (!newWorkOrderId) {
-      alert('Failed to generate Work Order ID');
       setIsSaving(false);
       return;
     }
 
-    // Get current date and time in UTC format
-    const currentUTCDateTime = new Date().toISOString();
+    // Validate Discount Field
+    if (discount && (isNaN(discount) || discount < 0 || discount > 100)) {
+      setValidationErrors((prev) => ({ ...prev, discount: "Enter a valid discount percentage (0-100)." }));
+      discountRef.current?.focus();
+      setIsSaving(false);
+      return;
+    }
 
-    const payload = {
-      work_order_id: newWorkOrderId,
-      product_entries: productEntries,
-      advance_details: advance,
-      due_date: dueDate,
-      mr_number: mrNumber,
-      patient_details: patientDetails,
-      employee,
-      payment_method: paymentMethod,
-      subtotal,
-      cgst,
-      sgst,
-      total_amount: subtotal,
-      hsn_code: HSN_CODE,
-      is_b2b: isB2B,
-      gst_number: isB2B ? gstNumber : null,
-      created_at: currentUTCDateTime,
-      updated_at: currentUTCDateTime,
-      branch: branch,
-    };
+    // Validate Payment Method
+    if (!paymentMethod) {
+      setValidationErrors((prev) => ({ ...prev, paymentMethod: "Payment method is required." }));
+      paymentMethodRef.current?.focus();
+      setIsSaving(false);
+      return;
+    }
 
-    console.log('Payload being sent:', payload);
+    // Validate all product entries
+    let productErrors = {};
+    productEntries.forEach((product, index) => {
+      if (!product.id) productErrors[`productId-${index}`] = "Product ID is required.";
+      if (!product.price) productErrors[`productPrice-${index}`] = "Price is required.";
+      if (!product.quantity) productErrors[`productQuantity-${index}`] = "Quantity is required.";
+    });
+
+    // Validate Step 3 based on MR number presence
+    if (step === 3) {
+      if (hasMrNumber === null) {
+        productErrors["hasMrNumber"] = "Please indicate if you have an MR Number.";
+      } else if (hasMrNumber) {
+        if (!mrNumber) productErrors["mrNumber"] = "MR Number is required.";
+      } else {
+        if (!customerName) productErrors["customerName"] = "Customer name is required.";
+        if (!customerPhone) productErrors["customerPhone"] = "Customer phone number is required.";
+      }
+    }
+
+    if (Object.keys(productErrors).length > 0) {
+      setValidationErrors(productErrors);
+      // Focus on the first error field
+      const firstErrorKey = Object.keys(productErrors)[0];
+      if (firstErrorKey.startsWith('productId') || firstErrorKey.startsWith('productPrice') || firstErrorKey.startsWith('productQuantity')) {
+        const index = firstErrorKey.split('-')[1];
+        document.getElementById(firstErrorKey)?.focus();
+      } else if (firstErrorKey === 'dueDate') {
+        dueDateRef.current?.focus();
+      } else if (firstErrorKey === 'mrNumber') {
+        mrNumberRef.current?.focus();
+      } else if (firstErrorKey === 'gstNumber') {
+        gstNumberRef.current?.focus();
+      } else if (firstErrorKey === 'employee') {
+        employeeRef.current?.focus();
+      } else if (firstErrorKey === 'paymentMethod') {
+        paymentMethodRef.current?.focus();
+      } else if (firstErrorKey === 'advanceDetails') {
+        advanceDetailsRef.current?.focus();
+      } else if (firstErrorKey === 'discount') {
+        discountRef.current?.focus();
+      } else if (firstErrorKey === 'hasMrNumber') {
+        yesButtonRef.current?.focus();
+      } else if (firstErrorKey === 'customerName') {
+        customerNameRef.current?.focus();
+      } else if (firstErrorKey === 'customerPhone') {
+        customerPhoneRef.current?.focus();
+      }
+      setIsSaving(false); // Prevent saving
+      return;
+    }
+
+    // Clear errors and proceed to save
+    setValidationErrors({});
 
     try {
-      const { data, error } = await supabase
-        .from("work_orders")
-        .insert([payload]);
+      let payload = {
+        product_entries: productEntries,
+        advance_details: advance,
+        due_date: dueDate,
+        discount_percentage: discount ? parseFloat(discount) : 0, // New discount field
+        mr_number: hasMrNumber ? mrNumber : null,
+        patient_details: hasMrNumber ? { mr_number: mrNumber } : { name: customerName, phone_number: customerPhone },
+        employee,
+        payment_method: paymentMethod,
+        subtotal,
+        discount_amount: discountAmount, // New field for discount amount
+        discounted_subtotal: discountedSubtotal, // New field for discounted subtotal
+        cgst,
+        sgst,
+        total_amount: totalAmount, // Updated total amount with CGST and SGST
+        hsn_code: HSN_CODE,
+        is_b2b: isB2B,
+        gst_number: isB2B ? gstNumber : null,
+        updated_at: new Date().toISOString(),
+        branch: branch,
+      };
 
-      if (error) {
-        console.error("Error saving work order:", error);
-        alert("Failed to save work order.");
+      if (isEditing) {
+        // Update existing work order
+        payload.work_order_id = workOrderId;
+        const { error } = await supabase
+          .from("work_orders")
+          .update(payload)
+          .eq("work_order_id", workOrderId);
+
+        if (error) {
+          console.error("Error updating work order:", error);
+          alert("Failed to update work order.");
+        } else {
+          alert("Work order updated successfully!");
+          if (modificationRequestId) {
+            const { error: modUpdateError } = await supabase
+              .from('modification_requests')
+              .update({ status: 'completed' })
+              .eq('request_id', modificationRequestId);
+  
+            if (modUpdateError) {
+              console.error("Error updating modification request status:", modUpdateError);
+            }
+          }
+          setAllowPrint(true);
+          // Move focus to Print button
+          setTimeout(() => {
+            printButtonRef.current?.focus();
+          }, 100); // Slight delay to ensure UI is updated
+        }
       } else {
-        alert("Work order saved successfully!");
-        setAllowPrint(true);
-        // Move focus to Print button
-        setTimeout(() => {
-          printButtonRef.current?.focus();
-        }, 100); // Slight delay to ensure UI is updated
-      }
+        // Create new work order
+        if (!workOrderId) {
+          alert('Failed to generate Work Order ID.');
+          setIsSaving(false);
+          return;
+        }
 
+        payload.work_order_id = workOrderId;
+        payload.created_at = new Date().toISOString();
+
+        // Prepare payload for customer
+        let customerId = null;
+
+        if (hasMrNumber) {
+          // Fetch existing customer by MR number
+          const { data: existingCustomer, error: customerError } = await supabase
+            .from('customers')
+            .select('id')
+            .eq('mr_number', mrNumber)
+            .single();
+
+          if (customerError) {
+            if (customerError.code === 'PGRST116') { // No rows found
+              alert("No customer found with the provided MR Number.");
+            } else {
+              console.error("Error fetching customer by MR Number:", customerError.message);
+              alert("Failed to fetch customer by MR Number.");
+            }
+            setIsSaving(false);
+            return;
+          }
+
+          if (existingCustomer && existingCustomer.id) {
+            customerId = existingCustomer.id;
+          } else {
+            // This else block is redundant due to the above check, but added for safety
+            alert("No customer found with the provided MR Number.");
+            setIsSaving(false);
+            return;
+          }
+        } else {
+          // Create a new customer
+          const { data: newCustomer, error: customerCreationError } = await supabase
+            .from('customers')
+            .insert([
+              { name: customerName, phone_number: customerPhone }
+            ])
+            .single();
+
+          if (customerCreationError) {
+            console.error("Error creating new customer:", customerCreationError.message);
+            alert("Failed to create new customer.");
+            setIsSaving(false);
+            return;
+          }
+
+          if (newCustomer && newCustomer.id) {
+            customerId = newCustomer.id;
+          } else {
+            alert("Failed to create new customer.");
+            setIsSaving(false);
+            return;
+          }
+        }
+
+        payload.customer_id = customerId;
+
+        console.log('Payload being sent:', payload);
+
+        const { data, error } = await supabase
+          .from("work_orders")
+          .insert([payload]);
+
+        if (error) {
+          console.error("Error saving work order:", error);
+          alert("Failed to save work order.");
+        } else {
+          alert("Work order saved successfully!");
+          setAllowPrint(true);
+          // Move focus to Print button
+          setTimeout(() => {
+            printButtonRef.current?.focus();
+          }, 100); // Slight delay to ensure UI is updated
+        }
+      }
 
     } catch (err) {
       console.error("Unexpected error saving work order:", err);
@@ -489,15 +638,23 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     if (step === 1) {
       // Validate Step 1: Product Entries
       productEntries.forEach((product, index) => {
-        if (!product.id) errors[`productId-${index}`] = "Product ID is required";
-        if (!product.quantity) errors[`productQuantity-${index}`] = "Quantity is required";
+        if (!product.id) errors[`productId-${index}`] = "Product ID is required.";
+        if (!product.price) errors[`productPrice-${index}`] = "Price is required.";
+        if (!product.quantity) errors[`productQuantity-${index}`] = "Quantity is required.";
       });
     } else if (step === 2) {
       // Validate Step 2: Due Date
-      if (!dueDate) errors.dueDate = "Due date is required";
+      if (!dueDate) errors.dueDate = "Due date is required.";
     } else if (step === 3) {
-      // Validate Step 3: MR Number
-      if (!mrNumber) errors.mrNumber = "MR Number is required";
+      // Validate Step 3: MR Number or Customer Details
+      if (hasMrNumber === null) {
+        errors.hasMrNumber = "Please indicate if you have an MR Number.";
+      } else if (hasMrNumber) {
+        if (!mrNumber) errors.mrNumber = "MR Number is required.";
+      } else {
+        if (!customerName) errors.customerName = "Customer name is required.";
+        if (!customerPhone) errors.customerPhone = "Customer phone number is required.";
+      }
     } else if (step === 4) {
       if (!employee) {
         errors.employee = "Employee selection is required.";
@@ -507,13 +664,13 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       if (isB2B && !gstNumber) {
         errors.gstNumber = "GST Number is required for B2B orders.";
       }
-
-
-
     } else if (step === 5) {
-      // Validate Step 5: Payment Method and Advance Details
-      if (!paymentMethod) errors.paymentMethod = "Payment method is required";
-      if (!advanceDetails) errors.advanceDetails = "Advance details are required";
+      // Validate Step 5: Discount, Payment Method, and Advance Details
+      if (discount && (isNaN(discount) || discount < 0 || discount > 100)) {
+        errors.discount = "Enter a valid discount percentage (0-100).";
+      }
+      if (!paymentMethod) errors.paymentMethod = "Payment method is required.";
+      if (!advanceDetails) errors.advanceDetails = "Advance details are required.";
     }
 
     if (Object.keys(errors).length > 0) {
@@ -522,7 +679,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       const firstErrorKey = Object.keys(errors)[0];
       if (firstErrorKey.startsWith('productId') || firstErrorKey.startsWith('productPrice') || firstErrorKey.startsWith('productQuantity')) {
         const index = firstErrorKey.split('-')[1];
-        document.getElementById(`${firstErrorKey}-${index}`)?.focus();
+        document.getElementById(firstErrorKey)?.focus();
       } else if (firstErrorKey === 'dueDate') {
         dueDateRef.current?.focus();
       } else if (firstErrorKey === 'mrNumber') {
@@ -535,6 +692,14 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         paymentMethodRef.current?.focus();
       } else if (firstErrorKey === 'advanceDetails') {
         advanceDetailsRef.current?.focus();
+      } else if (firstErrorKey === 'discount') {
+        discountRef.current?.focus();
+      } else if (firstErrorKey === 'hasMrNumber') {
+        yesButtonRef.current?.focus();
+      } else if (firstErrorKey === 'customerName') {
+        customerNameRef.current?.focus();
+      } else if (firstErrorKey === 'customerPhone') {
+        customerPhoneRef.current?.focus();
       }
       return;
     }
@@ -553,7 +718,8 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       age: 35,
       condition: "Myopia",
     });
-    nextButtonRef.current?.focus();
+    setStep(4);
+    employeeRef.current?.focus();
   };
 
   const generateNewWorkOrderId = async () => {
@@ -591,6 +757,65 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     }
   };
 
+  const fetchWorkOrderDetails = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('work_orders')
+        .select('*')
+        .eq('work_order_id', orderId)
+        .single();
+
+      if (error) {
+        console.error("Error fetching work order details:", error);
+        alert("Failed to fetch work order details.");
+        navigate("/home");
+      } else {
+        // Populate the form with existing data
+        setWorkOrderId(data.work_order_id);
+        setProductEntries(data.product_entries || [{ id: "", name: "", price: "", quantity: "" }]);
+        setAdvanceDetails(data.advance_details || "");
+        setDueDate(data.due_date || "");
+        setDiscount(data.discount_percentage || "");
+        setPaymentMethod(data.payment_method || "");
+        setIsB2B(data.is_b2b || false);
+        setGstNumber(data.gst_number || "");
+        setEmployee(data.employee || "");
+        setHasMrNumber(data.mr_number ? true : false);
+        if (data.mr_number) {
+          setMrNumber(data.mr_number);
+          // Optionally, fetch patient details based on MR number
+        } else {
+          setCustomerName(data.patient_details?.name || "");
+          setCustomerPhone(data.patient_details?.phone_number || "");
+        }
+        // Fetch the corresponding modification request
+      const { data: modData, error: modError } = await supabase
+      .from('modification_requests')
+      .select('*')
+      .eq('order_id', orderId)
+      .eq('status', 'approved') // Assuming the status was 'approved'
+      .single();
+
+    if (modError) {
+      console.error("Error fetching modification request:", modError);
+    } else {
+      setModificationRequestId(modData.request_id);
+    }
+      }
+    } catch (err) {
+      console.error("Unexpected error fetching work order details:", err);
+      alert("An unexpected error occurred while fetching work order details.");
+      navigate("/home");
+    }
+  };
+
+  useEffect(() => {
+    if (isEditing && orderId) {
+      fetchWorkOrderDetails();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEditing, orderId]);
+
   useEffect(() => {
     const handleAfterPrint = () => {
       if (isPrinted) {
@@ -604,14 +829,13 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     return () => {
       window.onafterprint = null; // Cleanup the event listener
     };
-  }, [isPrinted, navigate]);
-
+  }, [isPrinted, navigate, isEditing]);
 
   useEffect(() => {
-    if (branch) {
+    if (!isEditing && branch) {
       generateNewWorkOrderId();
     }
-  }, [branch]);
+  }, [branch, isEditing]);
 
   useEffect(() => {
     if (step === 4) {
@@ -619,12 +843,18 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     }
   }, [step]);
 
+  // References for new fields in Step 3
+  const yesButtonRef = useRef(null);
+  const noButtonRef = useRef(null);
+  const customerNameRef = useRef(null);
+  const customerPhoneRef = useRef(null);
+
   return (
     <div
       className={`transition-all duration-300 ${isCollapsed ? "mx-20" : "mx-20 px-20"} justify-center mt-16 p-4 mx-auto`}
     >
       <h1 className="text-2xl font-semibold text-gray-700 text-center mb-8">
-        Work Order Generation
+        {isEditing ? "Edit Work Order" : "Work Order Generation"}
       </h1>
 
       {/* Progress Tracker */}
@@ -647,7 +877,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
             {/* Generated Work Order ID */}
             <div>
               <label className="block text-gray-700 font-medium mb-1">
-                Generated Work Order ID
+                {isEditing ? "Work Order ID" : "Generated Work Order ID"}
               </label>
               <input
                 type="text"
@@ -718,13 +948,18 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                         }
                       }}
                       list={`productIdSuggestions-${index}`}
-                      className="border border-gray-300 px-4 py-3 rounded-lg w-full"
+                      className={`border border-gray-300 px-4 py-3 rounded-lg w-full ${validationErrors[`productId-${index}`] ? 'border-red-500' : ''}`}
                     />
                     <datalist id={`productIdSuggestions-${index}`}>
                       {productSuggestions.map((suggestion) => (
                         <option key={suggestion.product_id} value={suggestion.product_id} />
                       ))}
                     </datalist>
+                    {validationErrors[`productId-${index}`] && (
+                      <p className="text-red-500 text-xs mt-1">
+                        {validationErrors[`productId-${index}`]}
+                      </p>
+                    )}
                   </div>
 
                   {/* Product Name (Read-Only) */}
@@ -756,7 +991,11 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                       value={product.quantity}
                       ref={(el) => (quantityRefs.current[index] = el)}
                       onChange={(e) =>
-                        handleProductEntryChange(index, "quantity", e.target.value)
+                        setProductEntries((prevEntries) => {
+                          const updatedEntries = [...prevEntries];
+                          updatedEntries[index].quantity = e.target.value;
+                          return updatedEntries;
+                        })
                       }
                       onKeyDown={(e) => {
                         if (e.key === "Enter") {
@@ -768,8 +1007,14 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                           }
                         }
                       }}
-                      className="border border-gray-300 px-4 py-3 rounded-lg w-full text-center"
+                      className={`border border-gray-300 px-4 py-3 rounded-lg w-full text-center ${validationErrors[`productQuantity-${index}`] ? 'border-red-500' : ''}`}
+                      onBlur={() => handleBlur(index, "quantity")}
                     />
+                    {validationErrors[`productQuantity-${index}`] && (
+                      <p className="text-red-500 text-xs mt-1">
+                        {validationErrors[`productQuantity-${index}`]}
+                      </p>
+                    )}
                   </div>
 
                   {/* Delete Button */}
@@ -778,13 +1023,13 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                       type="button"
                       onClick={() => removeProductEntry(index)}
                       className="text-red-500 hover:text-red-700 transition"
+                      aria-label={`Delete product entry ${index + 1}`}
                     >
                       <TrashIcon className="w-5 h-5" />
                     </button>
                   )}
                 </div>
               ))}
-
               {/* Add New Product Button */}
               <button
                 type="button"
@@ -794,10 +1039,8 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                 Add Product
               </button>
             </div>
-
           </div>
         )}
-
 
         {/* Step 2: Due Date */}
         {step === 2 && (
@@ -815,7 +1058,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                 onKeyDown={(e) => handleEnterKey(e, nextButtonRef)}
                 ref={dueDateRef}
                 min={getTodayDate()} // Set minimum date to today
-                className="border border-gray-300 w-full px-10 py-3 rounded-lg text-center appearance-none"
+                className={`border border-gray-300 w-full px-10 py-3 rounded-lg text-center appearance-none ${validationErrors.dueDate ? 'border-red-500' : ''}`}
               />
               {validationErrors.dueDate && (
                 <p className="text-red-500 text-xs mt-1">
@@ -826,47 +1069,154 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
           </div>
         )}
 
-        {/* Step 3: MR Number and Patient Details */}
+        {/* Step 3: MR Number or Customer Details */}
         {step === 3 && (
-          <div className="bg-gray-50 p-6 rounded-md shadow-inner space-y-4">
-            <h2 className="text-lg font-semibold text-gray-700">MR Number</h2>
-            <input
-              type="text"
-              placeholder="Enter MR Number of Patient"
-              value={mrNumber}
-              onChange={(e) => setMrNumber(e.target.value)}
-              onKeyDown={(e) => handleEnterKey(e, fetchButtonRef)}
-              ref={mrNumberRef}
-              className="border border-gray-300 w-full px-4 py-3 rounded-lg"
-            />
-            {validationErrors.mrNumber && (
+          <div className="bg-gray-50 p-6 rounded-md shadow-inner space-y-6">
+            <h2 className="text-lg font-semibold text-gray-700">Customer Details</h2>
+
+            {/* Prompt for MR Number */}
+            <div className="flex items-center space-x-4">
+              <span className="font-medium text-gray-700">Do you have an MR Number?</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setHasMrNumber(true);
+                  setValidationErrors((prev) => {
+                    const { hasMrNumber, ...rest } = prev;
+                    return rest;
+                  });
+                  // Move focus to MR Number input
+                  setTimeout(() => {
+                    mrNumberRef.current?.focus();
+                  }, 0);
+                }}
+                ref={yesButtonRef}
+                className={`px-4 py-2 rounded-lg focus:outline-none ${
+                  hasMrNumber === true ? "bg-green-600 text-white" : "bg-green-500 text-white hover:bg-green-600"
+                }`}
+              >
+                Yes
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setHasMrNumber(false);
+                  setValidationErrors((prev) => {
+                    const { hasMrNumber, ...rest } = prev;
+                    return rest;
+                  });
+                  // Move focus to Customer Name input
+                  setTimeout(() => {
+                    customerNameRef.current?.focus();
+                  }, 0);
+                }}
+                ref={noButtonRef}
+                className={`px-4 py-2 rounded-lg focus:outline-none ${
+                  hasMrNumber === false ? "bg-red-600 text-white" : "bg-red-500 text-white hover:bg-red-600"
+                }`}
+              >
+                No
+              </button>
+            </div>
+            {validationErrors.hasMrNumber && (
               <p className="text-red-500 text-xs mt-1">
-                {validationErrors.mrNumber}
+                {validationErrors.hasMrNumber}
               </p>
             )}
-            <button
-              type="button"
-              onClick={() => {
-                handleMRNumberSearch();
-                // No need to focus next button here as focus is managed in handleMRNumberSearch
-              }}
-              ref={fetchButtonRef}
-              className="mt-2 text-white px-4 py-2 rounded-lg bg-green-500 hover:bg-green-600 transition"
-            >
-              Fetch Patient Details
-            </button>
-            {patientDetails && (
-              <div className="mt-4 bg-gray-100 p-4 rounded border border-gray-200">
-                <p>
-                  <strong>Name:</strong> {patientDetails.name}
-                </p>
-                <p>
-                  <strong>Age:</strong> {patientDetails.age}
-                </p>
-                <p>
-                  <strong>Condition:</strong> {patientDetails.condition}
-                </p>
-              </div>
+
+            {/* Conditional Rendering based on MR Number Presence */}
+            {hasMrNumber ? (
+              <>
+                {/* MR Number Input */}
+                <div>
+                  <label className="block text-gray-700 font-medium mb-1">
+                    MR Number
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Enter MR Number of Patient"
+                    value={mrNumber}
+                    onChange={(e) => setMrNumber(e.target.value)}
+                    onKeyDown={(e) => handleEnterKey(e, fetchButtonRef)}
+                    ref={mrNumberRef}
+                    className={`border border-gray-300 w-full px-4 py-3 rounded-lg ${validationErrors.mrNumber ? 'border-red-500' : ''}`}
+                  />
+                  {validationErrors.mrNumber && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {validationErrors.mrNumber}
+                    </p>
+                  )}
+                </div>
+                {/* Fetch Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleMRNumberSearch();
+                    // No need to focus next button here as focus is managed in handleMRNumberSearch
+                  }}
+                  ref={fetchButtonRef}
+                  className="mt-2 text-white px-4 py-2 rounded-lg bg-green-500 hover:bg-green-600 transition"
+                >
+                  Fetch Patient Details
+                </button>
+                {/* Display Patient Details */}
+                {patientDetails && (
+                  <div className="mt-4 bg-gray-100 p-4 rounded border border-gray-200">
+                    <p>
+                      <strong>Name:</strong> {patientDetails.name}
+                    </p>
+                    <p>
+                      <strong>Age:</strong> {patientDetails.age}
+                    </p>
+                    <p>
+                      <strong>Condition:</strong> {patientDetails.condition}
+                    </p>
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                {/* Customer Name Input */}
+                <div>
+                  <label className="block text-gray-700 font-medium mb-1">
+                    Customer Name
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Enter Customer Name"
+                    value={customerName}
+                    onChange={(e) => setCustomerName(e.target.value)}
+                    onKeyDown={(e) => handleEnterKey(e, customerPhoneRef)}
+                    ref={customerNameRef}
+                    className={`border border-gray-300 w-full px-4 py-3 rounded-lg ${validationErrors.customerName ? 'border-red-500' : ''}`}
+                  />
+                  {validationErrors.customerName && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {validationErrors.customerName}
+                    </p>
+                  )}
+                </div>
+                {/* Customer Phone Number Input */}
+                <div>
+                  <label className="block text-gray-700 font-medium mb-1">
+                    Customer Phone Number
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Enter Customer Phone Number"
+                    value={customerPhone}
+                    onChange={(e) => setCustomerPhone(e.target.value)}
+                    onKeyDown={(e) => handleEnterKey(e, nextButtonRef)}
+                    ref={customerPhoneRef}
+                    className={`border border-gray-300 w-full px-4 py-3 rounded-lg ${validationErrors.customerPhone ? 'border-red-500' : ''}`}
+                  />
+                  {validationErrors.customerPhone && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {validationErrors.customerPhone}
+                    </p>
+                  )}
+                </div>
+              </>
             )}
           </div>
         )}
@@ -883,7 +1233,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
               onChange={(e) => setEmployee(e.target.value)}
               ref={employeeRef}
               onBlur={validateEmployeeSelection}
-              className="border border-gray-300 w-full px-4 py-3 rounded-lg focus:outline-none focus:border-green-500"
+              className={`border border-gray-300 w-full px-4 py-3 rounded-lg focus:outline-none focus:border-green-500 ${validationErrors.employee ? 'border-red-500' : ''}`}
             >
               <option value="" disabled>
                 Select Employee
@@ -894,6 +1244,12 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                 </option>
               ))}
             </select>
+            {validationErrors.employee && (
+              <p className="text-red-500 text-xs mt-1">
+                {validationErrors.employee}
+              </p>
+            )}
+
             {employee && (
               <EmployeeVerification
                 employee={employee}
@@ -905,13 +1261,8 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                 }}
               />
             )}
-            {validationErrors.employee && (
-              <p className="text-red-500 text-xs mt-1">
-                {validationErrors.employee}
-              </p>
-            )}
 
-
+            {/* B2B Toggle */}
             <div className="flex items-center space-x-4 mt-6">
               <label className="flex items-center cursor-pointer space-x-4">
                 <span className="font-semibold text-gray-700">
@@ -952,7 +1303,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                   onChange={(e) => setGstNumber(e.target.value)}
                   onKeyDown={(e) => handleEnterKey(e, nextButtonRef)}
                   ref={gstNumberRef}
-                  className="border border-gray-300 w-full px-4 py-3 rounded-lg"
+                  className={`border border-gray-300 w-full px-4 py-3 rounded-lg ${validationErrors.gstNumber ? 'border-red-500' : ''}`}
                 />
                 {validationErrors.gstNumber && (
                   <p className="text-red-500 text-xs mt-1">
@@ -964,7 +1315,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
           </div>
         )}
 
-        {/* Step 5: Payment Method, Advance Details, Save and Print */}
+        {/* Step 5: Discount, Payment Method, Advance Details, Save and Print */}
         {step === 5 && (
           <>
             {/* Printable Area */}
@@ -989,7 +1340,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
 
               {/* Invoice Details */}
               <div className="invoice-details grid grid-cols-1 md:grid-cols-2 gap-4 mt-20 mb-6">
-                <h2 className="text-2xl font-semibold mt-2">Work Order Summary</h2>
+                <h2 className="text-2xl font-semibold mt-2">Bill</h2>
                 <div>
                   <p>
                     <span className="font-semibold">Work Order ID:</span> <span className="font-normal">{workOrderId}</span>
@@ -997,12 +1348,23 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                   <p>
                     <span className="font-semibold">Due Date:</span> <span className="font-normal">{dueDate}</span>
                   </p>
-                  <p>
-                    <span className="font-semibold">Customer MR Number:</span> <span className="font-normal">{mrNumber}</span>
-                  </p>
-                  {patientDetails && (
+                  {hasMrNumber ? (
                     <p>
-                      <span className="font-semibold">Customer Name:</span> <span className="font-normal">{patientDetails.name}</span>
+                      <span className="font-semibold">Customer MR Number:</span> <span className="font-normal">{mrNumber || 'N/A'}</span>
+                    </p>
+                  ) : (
+                    <>
+                      <p>
+                        <span className="font-semibold">Customer Name:</span> <span className="font-normal">{customerName || 'N/A'}</span>
+                      </p>
+                      <p>
+                        <span className="font-semibold">Customer Phone Number:</span> <span className="font-normal">{customerPhone || 'N/A'}</span>
+                      </p>
+                    </>
+                  )}
+                  {patientDetails && hasMrNumber && (
+                    <p>
+                      <span className="font-semibold">Condition:</span> <span className="font-normal">{patientDetails.condition}</span>
                     </p>
                   )}
                 </div>
@@ -1010,6 +1372,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                   <p>
                     <span className="font-semibold">Billed by Employee:</span> <span className="font-normal">{employee || 'N/A'}</span>
                   </p>
+
                   {isB2B && (
                     <p>
                       <span className="font-semibold">B2B GST Number:</span> <span className="font-normal">{gstNumber}</span>
@@ -1037,7 +1400,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                       <tr key={index} className="text-center">
                         <td className="py-2 px-4 border-b">{product.id}</td>
                         <td className="py-2 px-4 border-b">{product.name}</td>
-                        <td className="py-2 px-4 border-b">9001</td>
+                        <td className="py-2 px-4 border-b">{HSN_CODE}</td>
                         <td className="py-2 px-4 border-b">{parseFloat(product.price).toFixed(2)}</td>
                         <td className="py-2 px-4 border-b">{product.quantity}</td>
                         <td className="py-2 px-4 border-b">{productSubtotal.toFixed(2)}</td>
@@ -1051,7 +1414,15 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
               <div className="financial-summary grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Left Column */}
                 <div className="space-y-2">
-
+                  <p>
+                    <span className="font-semibold">Subtotal:</span> ₹{subtotal.toFixed(2)}
+                  </p>
+                  <p>
+                    <span className="font-semibold">Discount ({discount || 0}%):</span> ₹{discountAmount.toFixed(2)}
+                  </p>
+                  <p>
+                    <span className="font-semibold">Discounted Subtotal:</span> ₹{discountedSubtotal.toFixed(2)}
+                  </p>
                   <p>
                     <span className="font-semibold">CGST (6%):</span> ₹{cgst.toFixed(2)}
                   </p>
@@ -1063,7 +1434,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                 {/* Right Column */}
                 <div className="space-y-2">
                   <p>
-                    <span className="font-semibold">Subtotal:</span> ₹{subtotal.toFixed(2)}
+                    <span className="font-semibold">Total Amount:</span> ₹{totalAmount.toFixed(2)}
                   </p>
 
                   <p>
@@ -1077,8 +1448,30 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
 
               {/* Payment Method and Advance Details on the Same Line */}
               <div className="flex flex-col md:flex-row items-center justify-between my-6 space-x-4">
+                {/* Discount Input Field */}
+                <div className="w-full md:w-1/3 mb-4 md:mb-0">
+                  <label htmlFor="discount" className="block font-semibold mb-1">
+                    Discount (%):
+                  </label>
+                  <input
+                    type="number"
+                    id="discount"
+                    placeholder="Enter discount percentage"
+                    value={discount}
+                    onChange={(e) => setDiscount(e.target.value)}
+                    onKeyDown={(e) => handleEnterKey(e, paymentMethodRef)}
+                    ref={discountRef}
+                    className={`border border-gray-300 w-full px-4 py-3 rounded-lg ${validationErrors.discount ? 'border-red-500' : ''}`}
+                  />
+                  {validationErrors.discount && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {validationErrors.discount}
+                    </p>
+                  )}
+                </div>
+
                 {/* Payment Method */}
-                <div className="w-full md:w-1/2 mb-4 md:mb-0">
+                <div className="w-full md:w-1/3 mb-4 md:mb-0">
                   <label htmlFor="paymentMethod" className="block font-semibold mb-1">
                     Payment Method:
                   </label>
@@ -1088,7 +1481,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                     onChange={(e) => setPaymentMethod(e.target.value)}
                     ref={paymentMethodRef}
                     onKeyDown={(e) => handleEnterKey(e, advanceDetailsRef)}
-                    className="border border-gray-300 w-full px-4 py-3 rounded-lg"
+                    className={`border border-gray-300 w-full px-4 py-3 rounded-lg ${validationErrors.paymentMethod ? 'border-red-500' : ''}`}
                   >
                     <option value="" disabled>Select Payment Method</option>
                     <option value="cash">Cash</option>
@@ -1096,14 +1489,14 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                     <option value="online">UPI (Paytm/PhonePe/GPay)</option>
                   </select>
                   {validationErrors.paymentMethod && (
-                    <p className="text-red-500 text-xs ml-1">
+                    <p className="text-red-500 text-xs mt-1">
                       {validationErrors.paymentMethod}
                     </p>
                   )}
                 </div>
 
                 {/* Advance Details */}
-                <div className="w-full md:w-1/2 mb-4 md:mb-0">
+                <div className="w-full md:w-1/3 mb-4 md:mb-0">
                   <label htmlFor="advanceDetails" className="block font-semibold mb-1">
                     Advance Paying:
                   </label>
@@ -1115,8 +1508,13 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                     onChange={(e) => setAdvanceDetails(e.target.value)}
                     onKeyDown={(e) => handleEnterKey(e, saveButtonRef)}
                     ref={advanceDetailsRef}
-                    className="border border-gray-300 w-full px-4 py-3 rounded-lg"
+                    className={`border border-gray-300 w-full px-4 py-3 rounded-lg ${validationErrors.advanceDetails ? 'border-red-500' : ''}`}
                   />
+                  {validationErrors.advanceDetails && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {validationErrors.advanceDetails}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -1141,7 +1539,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                   }
                 }}
                 className="flex items-center justify-center w-44 h-12 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition"
-
+                disabled={isSaving}
               >
                 {isSaving ? "Saving..." : "Save Work Order"}
               </button>
@@ -1154,25 +1552,21 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                   }}
                   ref={printButtonRef}
                   className="flex items-center justify-center w-44 h-12 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition"
-
                 >
                   <PrinterIcon className="w-5 h-5 mr-2" />
                   Print
                 </button>
-
               )}
 
               {/* Exit Button */}
               {allowPrint && (
-
                 <button
                   onClick={handleExit}
                   className="flex items-center justify-center w-44 h-12 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition"
-
                 >
+                  <XMarkIcon className="w-5 h-5 mr-2" />
                   Exit
                 </button>
-
               )}
             </div>
           </>

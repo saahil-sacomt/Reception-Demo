@@ -11,12 +11,13 @@
   },
   "dependencies": {
     "@heroicons/react": "^2.1.5",
-    "@supabase/supabase-js": "^2.45.6",
+    "@supabase/supabase-js": "^2.46.1",
     "axios": "^1.7.7",
     "bcryptjs": "^2.4.3",
     "canvas": "^2.11.2",
     "date-fns": "^4.1.0",
     "date-fns-tz": "^3.2.0",
+    "dayjs": "^1.11.13",
     "html5-qrcode": "^2.3.8",
     "jsbarcode": "^3.11.6",
     "jspdf": "^2.5.2",
@@ -32,6 +33,7 @@
     "react-to-print": "^3.0.2",
     "supabase": "^1.219.2",
     "uuid": "^11.0.2",
+    "vite-plugin-node-polyfills": "^0.22.0",
     "xml2js": "^0.6.2"
   },
   "devDependencies": {

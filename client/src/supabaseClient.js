@@ -5,7 +5,13 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseKey = import.meta.env.VITE_SUPABASE_KEY;
 
 
-export const supabase = createClient(supabaseUrl, supabaseKey);
+export const supabase = createClient(supabaseUrl, supabaseKey, {
+    auth: {
+      persistSession: true, // Ensures session is persisted
+      storage: localStorage, // Uses localStorage for session storage
+      detectSessionInUrl: true, // Handles session from URL (e.g., after OAuth redirect)
+    },
+  })
 export async function fetchCustomerDetails(mrNumber) {
     const { data, error } = await supabase
         .from('customers')

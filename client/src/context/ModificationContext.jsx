@@ -1,24 +1,16 @@
-// src/context/ModificationContext.js
-import React, { createContext, useContext, useState } from "react";
+// client/src/context/ModificationContext.jsx
+import React, { createContext, useContext, useState } from 'react';
 
 const ModificationContext = createContext();
 
-export const useModificationContext = () => useContext(ModificationContext);
-
 export const ModificationProvider = ({ children }) => {
   const [onModificationSuccess, setOnModificationSuccess] = useState(null);
-  const [actionRequests, setActionRequests] = useState([]);
 
   return (
-    <ModificationContext.Provider
-      value={{
-        actionRequests,
-        setActionRequests,
-        onModificationSuccess,
-        setOnModificationSuccess,
-      }}
-    >
+    <ModificationContext.Provider value={{ onModificationSuccess, setOnModificationSuccess }}>
       {children}
     </ModificationContext.Provider>
   );
 };
+
+export const useModificationContext = () => useContext(ModificationContext);

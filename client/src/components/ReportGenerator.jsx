@@ -18,19 +18,21 @@ const getColumnStyles = (reportType) => {
   switch (reportType) {
     case 'sales_orders':
       return {
-        0: { halign: 'center', cellWidth: 25 }, // Sales Order ID
-        1: { halign: 'center', cellWidth: 20 }, // MR Number
-        2: { halign: 'center', cellWidth: 15 }, // Is B2B
-        3: { halign: 'center', cellWidth: 20 }, // Sale Value
-        4: { halign: 'center', cellWidth: 15 }, // CGST
-        5: { halign: 'center', cellWidth: 15 }, // SGST
-        6: { halign: 'center', cellWidth: 20 }, // Total Amount
-        7: { halign: 'center', cellWidth: 20 }, // Employee
-        8: { halign: 'center', cellWidth: 20 }, // Payment Method
-        9: { halign: 'center', cellWidth: 20 }, // Loyalty Points Redeemed
-        10: { halign: 'center', cellWidth: 20 }, // Loyalty Points Added
-        11: { halign: 'center', cellWidth: 25 }, // Created At
-        12: { halign: 'center', cellWidth: 25 }, // Updated At
+        0: { halign: 'center', cellWidth: 24 }, // Sales Order ID
+        1: { halign: 'center', cellWidth: 19 }, // MR Number
+        2: { halign: 'center', cellWidth: 14 }, // Is B2B
+        3: { halign: 'center', cellWidth: 19 }, // Sale Value
+        4: { halign: 'center', cellWidth: 14 }, // CGST
+        5: { halign: 'center', cellWidth: 14 }, // SGST
+        6: { halign: 'center', cellWidth: 19 }, // Total Amount
+        7: { halign: 'center', cellWidth: 19 }, // Advance Paid
+        8: { halign: 'center', cellWidth: 20 }, // Balance Due
+        9: { halign: 'center', cellWidth: 19 }, // Employee
+        10: { halign: 'center', cellWidth: 19 }, // Payment Method
+        11: { halign: 'center', cellWidth: 22 }, // Loyalty Points Redeemed
+        12: { halign: 'center', cellWidth: 22 }, // Loyalty Points Added
+        13: { halign: 'center', cellWidth: 20 }, // Created At
+        14: { halign: 'center', cellWidth: 20 }, // Updated At
       };
     case 'work_orders':
       return {
@@ -85,6 +87,27 @@ const getColumnStyles = (reportType) => {
         7: { halign: 'center', cellWidth: 25 }, // Created At
         8: { halign: 'center', cellWidth: 25 }, // Updated At
       };
+    case 'consolidated':
+      return {
+        0: { halign: 'center', cellWidth: 20 }, // Sales Order ID
+        1: { halign: 'center', cellWidth: 20 }, // Work Order ID
+        2: { halign: 'center', cellWidth: 19 }, // MR Number
+        3: { halign: 'center', cellWidth: 14 }, // Is B2B
+        4: { halign: 'center', cellWidth: 19 }, // Sale Value
+        5: { halign: 'center', cellWidth: 14 }, // CGST (Sales)
+        6: { halign: 'center', cellWidth: 14 }, // SGST (Sales)
+        7: { halign: 'center', cellWidth: 19 }, // Total Sales Amount
+        8: { halign: 'center', cellWidth: 19 }, // Advance Paid (Sales)
+        9: { halign: 'center', cellWidth: 20 }, // Balance Due (Sales)
+        10: { halign: 'center', cellWidth: 20 }, // Due Date (Work Orders)
+        11: { halign: 'center', cellWidth: 20 }, // Advance Details (Work Orders)
+        12: { halign: 'center', cellWidth: 15 }, // CGST (Work Orders)
+        13: { halign: 'center', cellWidth: 15 }, // SGST (Work Orders)
+        14: { halign: 'center', cellWidth: 20 }, // Total Work Amount
+        15: { halign: 'center', cellWidth: 20 }, // Branch
+        16: { halign: 'center', cellWidth: 25 }, // Created At
+        17: { halign: 'center', cellWidth: 25 }, // Updated At
+      };
     default:
       return {};
   }
@@ -121,6 +144,8 @@ const addHeader = (doc, logoDataUrl, reportDetails) => {
     periodText = `Month: ${reportDetails.month}/${reportDetails.year}`;
   } else if (reportDetails.type === 'Date Range') {
     periodText = `From: ${reportDetails.fromDate} To: ${reportDetails.toDate}`;
+  } else if (reportDetails.type === 'Consolidated') {
+    periodText = `Period: ${reportDetails.fromDate} to ${reportDetails.toDate}`;
   }
   doc.text(periodText, doc.internal.pageSize.getWidth() / 2, 50, { align: 'center' });
 
@@ -147,7 +172,7 @@ const addFooter = (doc) => {
 const ReportGenerator = ({ isCollapsed }) => {
   // State Variables
   const { branch: userBranch, name: employeeName } = useAuth(); // Fetch branch and employee name from AuthContext
-  const [reportType, setReportType] = useState('sales_orders'); // 'sales_orders', 'work_orders', 'privilegecards', 'product_sales', 'modification_reports'
+  const [reportType, setReportType] = useState('sales_orders'); // 'sales_orders', 'work_orders', 'privilegecards', 'product_sales', 'modification_reports', 'consolidated'
   const [reportPeriod, setReportPeriod] = useState('daily'); // 'daily', 'monthly', 'range'
   const [date, setDate] = useState(''); // For daily reports
   const [monthYear, setMonthYear] = useState(''); // For monthly reports (format: YYYY-MM)
@@ -171,8 +196,6 @@ const ReportGenerator = ({ isCollapsed }) => {
   const toDateRef = useRef();
   const branchSelectionRef = useRef();
   const generateButtonRef = useRef();
-
-  const navigateRef = useRef();
 
   useEffect(() => {
     const convertImageToDataUrl = (image) => {
@@ -310,7 +333,7 @@ const ReportGenerator = ({ isCollapsed }) => {
         startDate = new Date(`${fromDate}T00:00:00Z`);
         endDate = new Date(`${toDate}T23:59:59Z`);
         reportDetails = {
-          type: 'Date Range',
+          type: reportType === 'consolidated' ? 'Consolidated' : 'Date Range',
           fromDate: convertUTCToIST(startDate.toISOString(), 'dd-MM-yyyy'),
           toDate: convertUTCToIST(endDate.toISOString(), 'dd-MM-yyyy'),
           identifier: `${fromDate}_to_${toDate}`,
@@ -331,7 +354,7 @@ const ReportGenerator = ({ isCollapsed }) => {
         case 'sales_orders': {
           const query = supabase
             .from('sales_orders')
-            .select('*')
+            .select('*') // Ensure 'balance_due' is included
             .gte('created_at', startDate.toISOString())
             .lte('created_at', endDate.toISOString());
 
@@ -440,7 +463,7 @@ const ReportGenerator = ({ isCollapsed }) => {
             'Rate': Number(item.rate).toFixed(2),
             'HSN Code': item.hsn_code,
             'Total Quantity Sold': item.total_quantity,
-            'Total Revenue': item.total_revenue.toFixed(2),
+            'Total Revenue': (item.mrp * item.total_quantity).toFixed(2),
             'Stock Created At': item.stock_created_at,
             'Stock Updated At': item.stock_updated_at,
           }));
@@ -460,6 +483,88 @@ const ReportGenerator = ({ isCollapsed }) => {
           ({ data, error } = await query);
           if (error) throw error;
           fetchedData = data;
+          break;
+        }
+        case 'consolidated': {
+          // Fetch sales_orders
+          const salesQuery = supabase
+            .from('sales_orders')
+            .select('*')
+            .gte('created_at', startDate.toISOString())
+            .lte('created_at', endDate.toISOString());
+
+          if (!isCombined) {
+            salesQuery.in('branch', branchesToReport);
+          }
+
+          const { data: salesData, error: salesError } = await salesQuery;
+          if (salesError) throw salesError;
+
+          // Fetch work_orders
+          const workQuery = supabase
+            .from('work_orders')
+            .select('*')
+            .gte('created_at', startDate.toISOString())
+            .lte('created_at', endDate.toISOString());
+
+          if (!isCombined) {
+            workQuery.in('branch', branchesToReport);
+          }
+
+          const { data: workData, error: workError } = await workQuery;
+          if (workError) throw workError;
+
+          // Consolidate data based on work_order_id
+          const consolidatedData = salesData.map(sale => {
+            const relatedWork = workData.find(work => work.work_order_id === sale.work_order_id) || {};
+            return {
+              sales_order_id: sale.sales_order_id || 'N/A',
+              work_order_id: sale.work_order_id || relatedWork.work_order_id || 'N/A',
+              mr_number: sale.mr_number || relatedWork.mr_number || 'N/A',
+              is_b2b: sale.is_b2b || relatedWork.is_b2b || false,
+              subtotal: sale.subtotal || 0,
+              cgst_sales: sale.cgst || 0,
+              sgst_sales: sale.sgst || 0,
+              total_amount_sales: sale.total_amount || 0,
+              advance_paid_sales: sale.advance_details || 0,
+              balance_due_sales: sale.final_amount || 0,
+              due_date: relatedWork.due_date ? convertUTCToIST(relatedWork.due_date, 'dd-MM-yyyy') : 'N/A',
+              advance_details_work: relatedWork.advance_details || 0,
+              cgst_work: relatedWork.cgst || 0,
+              sgst_work: relatedWork.sgst || 0,
+              total_amount_work: relatedWork.total_amount || 0,
+              branch: sale.branch || relatedWork.branch || 'N/A',
+              created_at: sale.created_at ? convertUTCToIST(sale.created_at, 'dd-MM-yyyy hh:mm a') : (relatedWork.created_at ? convertUTCToIST(relatedWork.created_at, 'dd-MM-yyyy hh:mm a') : 'N/A'),
+              updated_at: sale.updated_at ? convertUTCToIST(sale.updated_at, 'dd-MM-yyyy hh:mm a') : (relatedWork.updated_at ? convertUTCToIST(relatedWork.updated_at, 'dd-MM-yyyy hh:mm a') : 'N/A'),
+            };
+          });
+
+          // If there are work_orders without corresponding sales_orders
+          const additionalWorkOrders = workData.filter(work => !salesData.some(sale => sale.work_order_id === work.work_order_id));
+          additionalWorkOrders.forEach(work => {
+            consolidatedData.push({
+              sales_order_id: 'N/A',
+              work_order_id: work.work_order_id || 'N/A',
+              mr_number: work.mr_number || 'N/A',
+              is_b2b: work.is_b2b || false,
+              subtotal: 0,
+              cgst_sales: 0,
+              sgst_sales: 0,
+              total_amount_sales: 0,
+              advance_paid_sales: 0,
+              balance_due_sales: 0,
+              due_date: work.due_date ? convertUTCToIST(work.due_date, 'dd-MM-yyyy') : 'N/A',
+              advance_details_work: work.advance_details || 0,
+              cgst_work: work.cgst || 0,
+              sgst_work: work.sgst || 0,
+              total_amount_work: work.total_amount || 0,
+              branch: work.branch || 'N/A',
+              created_at: work.created_at ? convertUTCToIST(work.created_at, 'dd-MM-yyyy hh:mm a') : 'N/A',
+              updated_at: work.updated_at ? convertUTCToIST(work.updated_at, 'dd-MM-yyyy hh:mm a') : 'N/A',
+            });
+          });
+
+          fetchedData = consolidatedData;
           break;
         }
         default:
@@ -499,6 +604,8 @@ const ReportGenerator = ({ isCollapsed }) => {
         return 'Product Sales';
       case 'modification_reports':
         return 'Modification Reports';
+      case 'consolidated':
+        return 'Consolidated';
       default:
         return '';
     }
@@ -528,6 +635,8 @@ const ReportGenerator = ({ isCollapsed }) => {
           'CGST',
           'SGST',
           'Total Amount',
+          'Advance Paid',
+          'Balance Due',
           'Employee',
           'Payment Method',
           'Loyalty Points Redeemed',
@@ -593,6 +702,28 @@ const ReportGenerator = ({ isCollapsed }) => {
           'Updated At',
         ];
         break;
+      case 'consolidated':
+        tableColumn = [
+          'Sales Order ID',
+          'Work Order ID',
+          'MR Number',
+          'Is B2B',
+          'Sale Value',
+          'CGST (Sales)',
+          'SGST (Sales)',
+          'Total Sales Amount',
+          'Advance Paid (Sales)',
+          'Balance Due (Sales)',
+          'Due Date (Work Orders)',
+          'Advance Details (Work Orders)',
+          'CGST (Work Orders)',
+          'SGST (Work Orders)',
+          'Total Work Amount',
+          'Branch',
+          'Created At',
+          'Updated At',
+        ];
+        break;
       default:
         tableColumn = [];
     }
@@ -609,6 +740,10 @@ const ReportGenerator = ({ isCollapsed }) => {
           record.cgst ? Number(record.cgst).toFixed(2) : '0.00',
           record.sgst ? Number(record.sgst).toFixed(2) : '0.00',
           record.total_amount ? Number(record.total_amount).toFixed(2) : '0.00',
+          record.advance_details ? Number(record.advance_details).toFixed(2) : '0.00',
+          record.final_amount !== undefined
+            ? Number(record.final_amount).toFixed(2)
+            : '0.00', // Balance Due
           record.employee || 'N/A',
           record.payment_method || 'N/A',
           record.loyalty_points_redeemed !== undefined
@@ -631,7 +766,7 @@ const ReportGenerator = ({ isCollapsed }) => {
           record.advance_details
             ? Number(record.advance_details).toFixed(2)
             : '0.00',
-          record.due_date ? record.due_date : 'N/A',
+          record.due_date ? convertUTCToIST(record.due_date, 'dd-MM-yyyy') : 'N/A',
           record.mr_number || 'N/A',
           record.employee || 'N/A',
           record.payment_method || 'N/A',
@@ -700,6 +835,28 @@ const ReportGenerator = ({ isCollapsed }) => {
             : 'N/A',
         ]);
         break;
+      case 'consolidated':
+        tableRows = data.map((record) => [
+          record.sales_order_id || 'N/A',
+          record.work_order_id || 'N/A',
+          record.mr_number || 'N/A',
+          record.is_b2b ? 'Yes' : 'No',
+          record.subtotal ? Number(record.subtotal).toFixed(2) : '0.00',
+          record.cgst_sales ? Number(record.cgst_sales).toFixed(2) : '0.00',
+          record.sgst_sales ? Number(record.sgst_sales).toFixed(2) : '0.00',
+          record.total_amount_sales ? Number(record.total_amount_sales).toFixed(2) : '0.00',
+          record.advance_paid_sales ? Number(record.advance_paid_sales).toFixed(2) : '0.00',
+          record.balance_due_sales ? Number(record.balance_due_sales).toFixed(2) : '0.00',
+          record.due_date || 'N/A',
+          record.advance_details_work ? Number(record.advance_details_work).toFixed(2) : '0.00',
+          record.cgst_work ? Number(record.cgst_work).toFixed(2) : '0.00',
+          record.sgst_work ? Number(record.sgst_work).toFixed(2) : '0.00',
+          record.total_amount_work ? Number(record.total_amount_work).toFixed(2) : '0.00',
+          record.branch || 'N/A',
+          record.created_at || 'N/A',
+          record.updated_at || 'N/A',
+        ]);
+        break;
       default:
         tableRows = [];
     }
@@ -743,24 +900,30 @@ const ReportGenerator = ({ isCollapsed }) => {
 
     // Example summary data based on report type
     switch (reportType) {
-      case 'sales_orders':
+      case 'sales_orders': {
         const totalSales = data.reduce((acc, curr) => acc + (curr.total_amount || 0), 0);
+        const totalBalanceDue = data.reduce((acc, curr) => acc + (curr.final_amount || 0), 0);
         const totalCGST = data.reduce((acc, curr) => acc + (curr.cgst || 0), 0);
         const totalSGST = data.reduce((acc, curr) => acc + (curr.sgst || 0), 0);
         summaryTable = [
-          ['Total Sales Amount', totalSales.toFixed(2)],
+          ['Total Amount Overall (without Advances)', totalSales.toFixed(2)],
+          ['Total Sales Amount (Balance Collected)', totalBalanceDue.toFixed(2)], // Updated to use Balance Due
           ['Total CGST', totalCGST.toFixed(2)],
           ['Total SGST', totalSGST.toFixed(2)],
         ];
         break;
-      case 'work_orders':
+      }
+      case 'work_orders': {
         const totalWorkAmount = data.reduce((acc, curr) => acc + (curr.total_amount || 0), 0);
+        const totalAdvance = data.reduce((acc, curr) => acc + (curr.advance_details || 0), 0);
         summaryTable = [
           ['Total Work Orders', data.length],
+          ['Total Sales', totalAdvance.toFixed(2)], // Sum of Advance Details as Total Sales
           ['Total Amount', totalWorkAmount.toFixed(2)],
         ];
         break;
-      case 'privilegecards':
+      }
+      case 'privilegecards': {
         const totalCards = data.length;
         const totalLoyaltyPoints = data.reduce((acc, curr) => acc + (curr.loyalty_points || 0), 0);
         summaryTable = [
@@ -768,7 +931,8 @@ const ReportGenerator = ({ isCollapsed }) => {
           ['Total Loyalty Points', totalLoyaltyPoints],
         ];
         break;
-      case 'product_sales':
+      }
+      case 'product_sales': {
         const totalQuantity = formattedProductIdSummary.reduce((acc, curr) => acc + Number(curr['Total Quantity Sold']), 0);
         const totalRevenue = formattedProductIdSummary.reduce((acc, curr) => acc + Number(curr['Total Revenue']), 0);
         summaryTable = [
@@ -776,16 +940,41 @@ const ReportGenerator = ({ isCollapsed }) => {
           ['Total Revenue', totalRevenue.toFixed(2)],
         ];
         break;
-      case 'modification_reports':
+      }
+      case 'modification_reports': {
         const totalModifications = data.length;
         const approvedModifications = data.filter(record => record.status === 'approved').length;
+        const completedModifications = data.filter(record => record.status === 'completed').length;
         const pendingModifications = data.filter(record => record.status === 'pending').length;
         summaryTable = [
           ['Total Modification Requests', totalModifications],
           ['Approved', approvedModifications],
           ['Pending', pendingModifications],
+          ['Completed', completedModifications],
         ];
         break;
+      }
+      case 'consolidated': {
+        const totalSalesAmount = data.reduce((acc, curr) => acc + (curr.total_amount_sales || 0), 0);
+        const totalWorkAmount = data.reduce((acc, curr) => acc + (curr.total_amount_work || 0), 0);
+        const totalCombinedAmount = totalSalesAmount + totalWorkAmount;
+        const totalBalanceDue = data.reduce((acc, curr) => acc + (curr.balance_due_sales || 0), 0);
+        const totalCGSTSales = data.reduce((acc, curr) => acc + (curr.cgst_sales || 0), 0);
+        const totalSGSTSales = data.reduce((acc, curr) => acc + (curr.sgst_sales || 0), 0);
+        const totalCGSTWork = data.reduce((acc, curr) => acc + (curr.cgst_work || 0), 0);
+        const totalSGSTWork = data.reduce((acc, curr) => acc + (curr.sgst_work || 0), 0);
+        summaryTable = [
+          ['Total Sales Amount', totalSalesAmount.toFixed(2)],
+          ['Total Work Amount', totalWorkAmount.toFixed(2)],
+          ['Combined Total Amount', totalCombinedAmount.toFixed(2)],
+          ['Total Balance Due (Sales)', totalBalanceDue.toFixed(2)],
+          ['Total CGST (Sales)', totalCGSTSales.toFixed(2)],
+          ['Total SGST (Sales)', totalSGSTSales.toFixed(2)],
+          ['Total CGST (Work Orders)', totalCGSTWork.toFixed(2)],
+          ['Total SGST (Work Orders)', totalSGSTWork.toFixed(2)],
+        ];
+        break;
+      }
       default:
         summaryTable = [];
     }
@@ -807,88 +996,10 @@ const ReportGenerator = ({ isCollapsed }) => {
       margin: { left: 10, right: 10 },
       theme: 'striped',
       columnStyles: {
-        0: { halign: 'left', cellWidth: 60 },
-        1: { halign: 'center', cellWidth: 30 },
+        0: { halign: 'left', cellWidth: 80 }, // Increased width for metric names
+        1: { halign: 'center', cellWidth: 40 },
       },
     });
-
-    // If report type is 'product_sales', add detailed summary by Product ID
-    if (reportType === 'product_sales' && formattedProductIdSummary) {
-      const detailedSummaryStartY = doc.lastAutoTable.finalY + 10;
-      doc.setFontSize(10);
-      doc.text('Detailed Summary by Product ID', 10, detailedSummaryStartY);
-      doc.setFontSize(7); // Adjusted font size for detailed summary
-
-      // Generate the detailed summary table
-      doc.autoTable({
-        startY: detailedSummaryStartY + 5,
-        head: [['Product ID', 'Product Name', 'MRP', 'Rate', 'HSN Code', 'Total Quantity Sold', 'Total Revenue', 'Stock Created At', 'Stock Updated At']],
-        body: formattedProductIdSummary.map((item) => [
-          item['Product ID'],
-          item['Product Name'],
-          item['MRP'],
-          item['Rate'],
-          item['HSN Code'],
-          item['Total Quantity Sold'],
-          item['Total Revenue'],
-          item['Stock Created At'],
-          item['Stock Updated At'],
-        ]),
-        styles: {
-          fontSize: 7,
-          cellPadding: 2,
-          halign: 'center',
-          valign: 'middle',
-          overflow: 'linebreak',
-          cellWidth: 'wrap',
-        },
-        headStyles: { fillColor: [41, 128, 185], halign: 'center', textColor: 255 },
-        margin: { left: 10, right: 10 },
-        theme: 'grid',
-        columnStyles: getColumnStyles('product_sales'),
-      });
-    }
-
-    // If report type is 'modification_reports', add detailed summary
-    if (reportType === 'modification_reports') {
-      const detailedSummaryStartY = doc.lastAutoTable.finalY + 10;
-      doc.setFontSize(10);
-      doc.text('Detailed Modification Reports', 10, detailedSummaryStartY);
-      doc.setFontSize(7); // Adjusted font size for detailed summary
-
-      // Generate the detailed summary table
-      doc.autoTable({
-        startY: detailedSummaryStartY + 5,
-        head: [['Request ID', 'Order ID', 'Order Type', 'Employee Name', 'Modification Type', 'Modification Reason', 'Status', 'Created At', 'Updated At']],
-        body: data.map((record) => [
-          record.request_id || 'N/A',
-          record.order_id || 'N/A',
-          record.order_type || 'N/A',
-          record.employee_name || 'N/A',
-          record.modification_type || 'N/A',
-          record.modification_reason || 'N/A',
-          capitalizeFirstLetter(record.status) || 'N/A',
-          record.created_at
-            ? convertUTCToIST(record.created_at, 'dd-MM-yyyy hh:mm a')
-            : 'N/A',
-          record.updated_at
-            ? convertUTCToIST(record.updated_at, 'dd-MM-yyyy hh:mm a')
-            : 'N/A',
-        ]),
-        styles: {
-          fontSize: 7,
-          cellPadding: 2,
-          halign: 'center',
-          valign: 'middle',
-          overflow: 'linebreak',
-          cellWidth: 'wrap',
-        },
-        headStyles: { fillColor: [41, 128, 185], halign: 'center', textColor: 255 },
-        margin: { left: 10, right: 10 },
-        theme: 'grid',
-        columnStyles: getColumnStyles('modification_reports'),
-      });
-    }
 
     // Add Footer with page numbers
     addFooter(doc);
@@ -973,6 +1084,7 @@ const ReportGenerator = ({ isCollapsed }) => {
                 <option value="privilegecards">Privilege Cards</option>
                 <option value="product_sales">Product Sales</option>
                 <option value="modification_reports">Modification Reports</option>
+                <option value="consolidated">Consolidated</option> {/* New Report Type */}
               </select>
             </div>
 

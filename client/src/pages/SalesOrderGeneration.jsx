@@ -1,11 +1,6 @@
 // client/src/pages/SalesOrderGeneration.jsx
-import React, {
-  useState,
-  useEffect,
-  useRef,
-  useMemo,
-  memo,
-} from "react";
+
+import React, { useState, useEffect, useRef, useMemo, memo } from "react";
 import { PrinterIcon, TrashIcon } from "@heroicons/react/24/outline";
 import supabase from "../supabaseClient";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
@@ -13,6 +8,7 @@ import { useAuth } from "../context/AuthContext";
 import { deductStockForMultipleProducts } from "../services/authService.js";
 import EmployeeVerification from "../components/EmployeeVerification";
 import logo from "../assets/sreenethraenglishisolated.png";
+import dayjs from "dayjs"; // Ensure dayjs is imported
 
 // Utility Functions
 const mockOtp = "1234";
@@ -40,6 +36,35 @@ const fetchPrivilegeCardByPhone = async (phone) => {
   return data;
 };
 
+// Function to fetch customer by phone number
+const fetchCustomerByPhone = async (phone) => {
+  const { data, error } = await supabase
+    .from("customers")
+    .select("*")
+    .eq("phone_number", phone)
+    .single();
+
+  if (error) {
+    return null;
+  }
+  return data;
+};
+
+// Function to create a new customer
+const createCustomer = async (name, phone_number) => {
+  const { data, error } = await supabase
+    .from("customers")
+    .insert([{ name, phone_number }])
+    .single();
+
+  if (error) {
+    console.error("Error creating customer:", error);
+    return null;
+  }
+  return data;
+};
+
+// Function to calculate amounts
 function calculateAmounts(
   productEntries,
   advanceDetails,
@@ -47,7 +72,8 @@ function calculateAmounts(
   privilegeCardDetails,
   redeemPointsAmount,
   loyaltyPoints,
-  selectedWorkOrder
+  selectedWorkOrder,
+  discountPercentage
 ) {
   const subtotal = productEntries.reduce((acc, product) => {
     const price = parseFloat(product.price) || 0;
@@ -59,26 +85,34 @@ function calculateAmounts(
   const cgstAmount = subtotal * 0.06;
   const sgstAmount = subtotal * 0.06;
 
-  // Calculate remaining balance after advance
-  const remainingBalance = subtotal - (parseFloat(advanceDetails) || 0);
-
-  // Calculate discount if applicable
+  // Calculate discount based on percentage
   let discount = 0;
-  if (privilegeCard && privilegeCardDetails && redeemPointsAmount > 0) {
-    const redeemAmount = parseFloat(redeemPointsAmount) || 0;
-    discount = Math.min(redeemAmount, loyaltyPoints, remainingBalance);
+  if (discountPercentage > 0) {
+    discount = (subtotal * discountPercentage) / 100;
   }
 
-  // Calculate final amount payable
-  const finalAmount = Math.max(remainingBalance - discount, 0);
+  // Calculate remaining balance after advance and discount
+  let remainingBalance =
+    subtotal - (parseFloat(advanceDetails) || 0) - discount;
+
+  // Calculate privilege card discount if applicable
+  let privilegeDiscount = 0;
+  if (privilegeCard && privilegeCardDetails && redeemPointsAmount > 0) {
+    const redeemAmount = parseFloat(redeemPointsAmount) || 0;
+    privilegeDiscount = Math.min(redeemAmount, loyaltyPoints, remainingBalance);
+    remainingBalance -= privilegeDiscount;
+  }
+
+  // Ensure balance due is not negative
+  remainingBalance = Math.max(remainingBalance, 0);
 
   return {
     subtotal,
     cgstAmount, // For display only
     sgstAmount, // For display only
-    remainingBalance,
     discount,
-    finalAmount,
+    privilegeDiscount,
+    finalAmount: remainingBalance,
   };
 }
 
@@ -107,6 +141,40 @@ const calculateLoyaltyPoints = (
   return { updatedPoints, pointsToRedeem, pointsToAdd };
 };
 
+// Helper function to calculate differences between original and updated products
+const calculateProductDifferences = (original, updated) => {
+  const differences = [];
+
+  // Create a map for quick lookup
+  const originalMap = new Map();
+  original.forEach((prod) => {
+    originalMap.set(prod.id, parseInt(prod.quantity) || 0);
+  });
+
+  const updatedMap = new Map();
+  updated.forEach((prod) => {
+    updatedMap.set(prod.id, parseInt(prod.quantity) || 0);
+  });
+
+  // Check for removed or decreased quantities
+  originalMap.forEach((originalQty, productId) => {
+    const updatedQty = updatedMap.get(productId) || 0;
+    const diff = updatedQty - originalQty;
+    if (diff !== 0) {
+      differences.push({ productId, diff });
+    }
+  });
+
+  // Check for newly added products
+  updatedMap.forEach((updatedQty, productId) => {
+    if (!originalMap.has(productId)) {
+      differences.push({ productId, diff: updatedQty });
+    }
+  });
+
+  return differences;
+};
+
 // Main Component
 const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
   const { user, role, name, branch, loading: authLoading } = useAuth();
@@ -115,6 +183,11 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
   const [step, setStep] = useState(0); // Adjusted step numbering
   const [salesOrderId, setSalesOrderId] = useState("");
   const [productEntries, setProductEntries] = useState([
+    { id: "", name: "", price: "", quantity: "" },
+  ]);
+
+  // New state to store original products when editing
+  const [originalProductEntries, setOriginalProductEntries] = useState([
     { id: "", name: "", price: "", quantity: "" },
   ]);
 
@@ -149,6 +222,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [isGeneratingId, setIsGeneratingId] = useState(false);
   const [fetchTriggered, setFetchTriggered] = useState(false);
+  const [discountPercentage, setDiscountPercentage] = useState(0);
   // To handle loading state
 
   // Refs for input fields to control focus
@@ -156,6 +230,9 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
   const privilegePhoneRef = useRef(null);
   const otpRef = useRef(null);
   const employeeRef = useRef(null);
+
+  const customerNameRef = useRef(null);
+  const customerPhoneRef = useRef(null);
   const nextButtonRef = useRef(null);
   const paymentMethodRef = useRef(null);
   const redeemPointsAmountRef = useRef(null);
@@ -169,11 +246,14 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
   const fetchButtonRef = useRef(null);
   const productRefs = useRef([]);
   const [productSuggestions, setProductSuggestions] = useState([]);
+  const discountInputRef = useRef(null);
 
   const navigate = useNavigate();
   const location = useLocation();
   const { orderId } = useParams();
   const [isEditing, setIsEditing] = useState(false);
+
+  const [fetchMethod, setFetchMethod] = useState("work_order_id"); // 'work_order_id', 'mr_number', 'phone_number'
 
   const fetchEmployees = async () => {
     try {
@@ -379,6 +459,9 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
       setProductEntries(
         data.items || [{ id: "", name: "", price: "", quantity: "" }]
       );
+      setOriginalProductEntries(
+        data.items || [{ id: "", name: "", price: "", quantity: "" }]
+      ); // Store original entries
       setMrNumber(data.mr_number || "");
       setPhoneNumber(data.patient_phone || "");
       setAdvanceDetails(data.advance_details || 0);
@@ -451,8 +534,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     subtotal,
     cgstAmount,
     sgstAmount,
-    remainingBalance,
     discount,
+    privilegeDiscount,
     finalAmount,
   } = useMemo(
     () =>
@@ -463,7 +546,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         privilegeCardDetails,
         redeemPointsAmount,
         loyaltyPoints,
-        selectedWorkOrder
+        selectedWorkOrder,
+        discountPercentage
       ),
     [
       productEntries,
@@ -473,6 +557,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
       redeemPointsAmount,
       loyaltyPoints,
       selectedWorkOrder,
+      discountPercentage,
     ]
   );
 
@@ -483,6 +568,10 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
   const removeProductEntry = (index) => {
     const updatedEntries = productEntries.filter((_, i) => i !== index);
     setProductEntries(updatedEntries);
+    const updatedOriginalEntries = originalProductEntries.filter(
+      (_, i) => i !== index
+    );
+    setOriginalProductEntries(updatedOriginalEntries); // Update original entries accordingly
     const updatedSuggestions = [...productSuggestions];
     updatedSuggestions.splice(index, 1);
     setProductSuggestions(updatedSuggestions);
@@ -542,10 +631,31 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     try {
       let query = supabase.from("work_orders").select("*");
 
-      if (searchQuery.startsWith("WO(")) {
+      if (fetchMethod === "work_order_id") {
         query = query.eq("work_order_id", searchQuery);
-      } else {
+      } else if (fetchMethod === "mr_number") {
         query = query.eq("mr_number", searchQuery);
+      } else if (fetchMethod === "phone_number") {
+        // Fetch work orders associated with customers having the phone number
+        const { data: customers, error: customerError } = await supabase
+          .from("customers")
+          .select("id")
+          .eq("phone_number", searchQuery);
+
+        if (customerError) {
+          console.error("Error fetching customers:", customerError);
+          setErrorMessage("Failed to fetch customers.");
+          return;
+        }
+
+        if (customers.length === 0) {
+          setWorkOrders([]);
+          setErrorMessage("No customers found with this phone number.");
+          return;
+        }
+
+        const customerIds = customers.map((customer) => customer.id);
+        query = query.in("customer_id", customerIds);
       }
 
       // Exclude work orders that are already used
@@ -588,6 +698,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
 
     if (selectedWorkOrder.product_entries) {
       setProductEntries(selectedWorkOrder.product_entries);
+      setOriginalProductEntries(selectedWorkOrder.product_entries); // Update original entries
     }
 
     setShowWorkOrderModal(false);
@@ -648,6 +759,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           loyaltyPoints,
           discountAmount,
           privilegeCardNumber,
+          discountPercentage,
         },
       },
     });
@@ -657,10 +769,12 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     const locationState = location.state;
     if (locationState?.from === "privilege-generation") {
       setStep(locationState.step);
+      setIsEditing(true);
 
       const data = locationState.formData;
       if (data) {
         setProductEntries(data.productEntries);
+        setOriginalProductEntries(data.productEntries); // Set original entries
         setMrNumber(data.mrNumber);
         setPatientDetails(data.patientDetails);
         setPhoneNumber(data.phoneNumber);
@@ -674,6 +788,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         setRedeemPointsAmount(data.redeemPointsAmount);
         setLoyaltyPoints(data.loyaltyPoints);
         setPrivilegeCardNumber(data.privilegeCardNumber || "");
+        setDiscountPercentage(data.discountPercentage || 0);
 
         // If privilegeCardDetails are available, set them
         if (data.privilegeCardDetails) {
@@ -690,21 +805,6 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
 
     return () => clearTimeout(focusTimeout);
   }, [step, privilegeCard, redeemOption]);
-
-  const focusFirstFieldOfStep = () => {
-    if (step === 0) workOrderInputRef.current?.focus();
-    if (step === 1) document.getElementById(`productId-0`)?.focus();
-    if (step === 2) mrNumberRef.current?.focus();
-    if (step === 3 && privilegeCard) {
-      if (redeemOption === "barcode") {
-        privilegeCardRef.current?.focus();
-      } else if (redeemOption === "phone") {
-        privilegePhoneRef.current?.focus();
-      }
-    }
-    if (step === 4) employeeRef.current?.focus();
-    if (step === 5) paymentMethodRef.current?.focus();
-  };
 
   const handleEnterKey = (e, nextFieldRef, prevFieldRef) => {
     if (e.key === "Enter") {
@@ -783,14 +883,19 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
       if (!quantity) {
         errors[`productQuantity-${index}`] = "Quantity is required";
       } else if (quantity <= 0) {
-        errors[`productQuantity-${index}`] = "Quantity must be greater than zero";
+        errors[`productQuantity-${index}`] =
+          "Quantity must be greater than zero";
       } else if (quantity > productEntries[index].stock) {
-        errors[`productQuantity-${index}`] = `Quantity cannot exceed available stock (${productEntries[index].stock})`;
+        errors[
+          `productQuantity-${index}`
+        ] = `Quantity cannot exceed available stock (${productEntries[index].stock})`;
       } else {
         delete errors[`productQuantity-${index}`];
       }
     } else {
-      delete errors[`product${field.charAt(0).toUpperCase() + field.slice(1)}-${index}`];
+      delete errors[
+        `product${field.charAt(0).toUpperCase() + field.slice(1)}-${index}`
+      ];
     }
 
     setValidationErrors(errors);
@@ -802,9 +907,19 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     // Validate each step before proceeding
     if (step === 0) {
       if (!searchQuery.trim())
-        errors.searchQuery = "Work Order ID or MR Number is required";
+        errors.searchQuery =
+          "Work Order ID, MR Number, or Phone Number is required";
       // Removed branchCode validation as branch is fetched from context
     } else if (step === 1) {
+      // Check if any product has stock <=0
+      const stockIssues = productEntries.filter(
+        (product) => product.stock <= 0
+      );
+      if (stockIssues.length > 0) {
+        errors.stock =
+          "One or more products have zero or negative stock. Please adjust.";
+      }
+
       productEntries.forEach((product, index) => {
         if (!product.id)
           errors[`productId-${index}`] = "Product ID is required";
@@ -817,12 +932,27 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           if (isNaN(quantity) || quantity <= 0) {
             errors[`productQuantity-${index}`] = "Enter a valid quantity";
           } else if (quantity > product.stock) {
-            errors[`productQuantity-${index}`] = `Cannot exceed stock (${product.stock})`;
+            errors[
+              `productQuantity-${index}`
+            ] = `Cannot exceed stock (${product.stock})`;
           }
         }
       });
-    } else if (step === 2 && !mrNumber) {
-      errors.mrNumber = "MR number is required";
+    } else if (step === 2) {
+      if (hasMrNumber === "yes") {
+        if (!mrNumber) {
+          errors.mrNumber = "MR number is required";
+        }
+      } else if (hasMrNumber === "no") {
+        if (!customerName.trim()) {
+          errors.customerName = "Customer name is required";
+        }
+        if (!customerPhone.trim()) {
+          errors.customerPhone = "Customer phone number is required";
+        } else if (!/^\d{10}$/.test(customerPhone)) {
+          errors.customerPhone = "Please enter a valid 10-digit phone number";
+        }
+      }
     } else if (step === 3 && privilegeCard) {
       if (redeemOption === "phone") {
         if (!phoneNumber.trim())
@@ -836,6 +966,10 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           parseFloat(redeemPointsAmount) < 0)
       ) {
         errors.redeemPointsAmount = "Invalid redemption amount";
+      }
+      if (discountPercentage < 0 || discountPercentage > 100) {
+        errors.discountPercentage =
+          "Discount percentage must be between 0 and 100";
       }
     } else if (step === 4 && !employee) {
       errors.employee = "Employee selection is required";
@@ -879,8 +1013,108 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     if (location.state?.isFromApproval) {
       setStep(location.state.step || 1);
       setIsEditing(true);
+
+      const data = location.state.formData;
+      if (data) {
+        setProductEntries(data.productEntries);
+        setOriginalProductEntries(data.productEntries); // Set original entries
+        setMrNumber(data.mrNumber);
+        setPatientDetails(data.patientDetails);
+        setPhoneNumber(data.phoneNumber);
+        setOtp(data.otp);
+        setIsOtpVerified(data.isOtpVerified);
+        setEmployee(data.employee);
+        setPaymentMethod(data.paymentMethod);
+        setAdvanceDetails(data.advanceDetails);
+        setPrivilegeCard(data.privilegeCard);
+        setRedeemPoints(data.redeemPoints);
+        setRedeemPointsAmount(data.redeemPointsAmount);
+        setLoyaltyPoints(data.loyaltyPoints);
+        setPrivilegeCardNumber(data.privilegeCardNumber || "");
+        setDiscountPercentage(data.discountPercentage || 0);
+
+        // If privilegeCardDetails are available, set them
+        if (data.privilegeCardDetails) {
+          setPrivilegeCardDetails(data.privilegeCardDetails);
+        }
+      }
     }
   }, [location]);
+
+  useEffect(() => {
+    const focusTimeout = setTimeout(() => {
+      focusFirstFieldOfStep();
+    }, 100); // Add a slight delay to ensure the element is mounted
+
+    return () => clearTimeout(focusTimeout);
+  }, [step, privilegeCard, redeemOption]);
+
+  const focusFirstFieldOfStep = () => {
+    if (step === 0) workOrderInputRef.current?.focus();
+    if (step === 1) document.getElementById(`productId-0`)?.focus();
+    if (step === 2) {
+      // Focus on Yes button
+      document.getElementById("hasMrNumber-yes")?.focus();
+    }
+    if (step === 3 && privilegeCard) {
+      if (redeemOption === "barcode") {
+        privilegeCardRef.current?.focus();
+      } else if (redeemOption === "phone") {
+        privilegePhoneRef.current?.focus();
+      }
+    }
+    if (step === 4) employeeRef.current?.focus();
+    if (step === 5) discountInputRef.current?.focus(); // Updated to focus on discount field
+  };
+
+  // Function to fetch product details from Supabase
+
+  useEffect(() => {
+    if (step === 3 && !privilegeCard) {
+      // If the user doesn't have a privilege card, proceed to the next step
+      nextStep();
+    }
+  }, [privilegeCard, step]);
+
+  useEffect(() => {
+    if (location.state?.isFromApproval) {
+      setStep(location.state.step || 1);
+      setIsEditing(true);
+
+      const data = location.state.formData;
+      if (data) {
+        setProductEntries(data.productEntries);
+        setOriginalProductEntries(data.productEntries); // Set original entries
+        setMrNumber(data.mrNumber);
+        setPatientDetails(data.patientDetails);
+        setPhoneNumber(data.phoneNumber);
+        setOtp(data.otp);
+        setIsOtpVerified(data.isOtpVerified);
+        setEmployee(data.employee);
+        setPaymentMethod(data.paymentMethod);
+        setAdvanceDetails(data.advanceDetails);
+        setPrivilegeCard(data.privilegeCard);
+        setRedeemPoints(data.redeemPoints);
+        setRedeemPointsAmount(data.redeemPointsAmount);
+        setLoyaltyPoints(data.loyaltyPoints);
+        setPrivilegeCardNumber(data.privilegeCardNumber || "");
+        setDiscountPercentage(data.discountPercentage || 0);
+
+        // If privilegeCardDetails are available, set them
+        if (data.privilegeCardDetails) {
+          setPrivilegeCardDetails(data.privilegeCardDetails);
+        }
+      }
+    }
+  }, [location]);
+
+  useEffect(() => {
+    const focusTimeout = setTimeout(() => {
+      focusFirstFieldOfStep();
+    }, 100); // Add a slight delay to ensure the element is mounted
+
+    return () => clearTimeout(focusTimeout);
+  }, [step, privilegeCard, redeemOption]);
 
   const handleOrderCompletion = async () => {
     const currentUTCDateTime = getCurrentUTCDateTime();
@@ -921,13 +1155,71 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
 
       // Step 3: Handle Existing Sales Order Update
       if (isEditing) {
+        // a. Calculate Differences
+        const differences = calculateProductDifferences(
+          originalProductEntries,
+          productEntries
+        );
+
+        // b. Update Stock Levels
+        for (const { productId, diff } of differences) {
+          if (diff === 0) continue; // No change
+
+          // Fetch current stock
+          const { data: stockData, error: stockError } = await supabase
+            .from("stock")
+            .select("quantity")
+            .eq("product_id", productId)
+            .eq("branch_code", branch)
+            .single();
+
+          if (stockError || !stockData) {
+            console.error(
+              `Error fetching stock for product ${productId}:`,
+              stockError
+            );
+            setErrorMessage(
+              `Failed to fetch stock for product ID: ${productId}`
+            );
+            return;
+          }
+
+          const newStock = stockData.quantity - diff; // Deduct if diff > 0, add if diff < 0
+
+          if (newStock < 0) {
+            setErrorMessage(
+              `Insufficient stock for product ID: ${productId}. Cannot reduce stock below zero.`
+            );
+            return;
+          }
+
+          // Update stock
+          const { error: updateStockError } = await supabase
+            .from("stock")
+            .update({ quantity: newStock })
+            .eq("product_id", productId)
+            .eq("branch_code", branch);
+
+          if (updateStockError) {
+            console.error(
+              `Error updating stock for product ${productId}:`,
+              updateStockError
+            );
+            setErrorMessage(
+              `Failed to update stock for product ID: ${productId}`
+            );
+            return;
+          }
+        }
+
+        // c. Update Sales Order
         const { error: updateError } = await supabase
           .from("sales_orders")
           .update({
             items: productEntries,
             advance_details: parseFloat(advanceDetails),
-            mr_number: mrNumber,
-            patient_phone: phoneNumber,
+            mr_number: hasMrNumber === "yes" ? mrNumber : null,
+            patient_phone: hasMrNumber === "yes" ? phoneNumber : customerPhone,
             employee: employee,
             payment_method: paymentMethod,
             subtotal: subtotal,
@@ -935,6 +1227,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
             sgst: parseFloat(sgstAmount),
             total_amount: subtotal,
             discount: discountAmount,
+            privilege_discount: privilegeDiscount, // Updated field
             final_amount: finalAmount,
             loyalty_points_redeemed: sanitizedRedeemedPoints,
             loyalty_points_added: sanitizedPointsAdded,
@@ -946,6 +1239,18 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         if (updateError) {
           console.error("Error updating sales order:", updateError);
           setErrorMessage("Failed to update sales order.");
+          return;
+        }
+
+        // Update modification status to completed
+        const { error: modUpdateError } = await supabase
+          .from("modification_requests")
+          .update({ status: "completed" })
+          .eq("order_id", salesOrderId);
+
+        if (modUpdateError) {
+          console.error("Error updating modification status:", modUpdateError);
+          setErrorMessage("Failed to update modification status.");
           return;
         }
 
@@ -962,8 +1267,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
               : null,
             items: productEntries,
             advance_details: parseFloat(advanceDetails),
-            mr_number: mrNumber,
-            patient_phone: phoneNumber,
+            mr_number: hasMrNumber === "yes" ? mrNumber : null,
+            patient_phone: hasMrNumber === "yes" ? phoneNumber : customerPhone,
             employee: employee,
             payment_method: paymentMethod,
             subtotal: subtotal,
@@ -971,6 +1276,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
             sgst: parseFloat(sgstAmount),
             total_amount: subtotal,
             discount: discountAmount,
+            privilege_discount: privilegeDiscount, // Updated field
             final_amount: finalAmount,
             loyalty_points_redeemed: sanitizedRedeemedPoints,
             loyalty_points_added: sanitizedPointsAdded,
@@ -985,7 +1291,19 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           return;
         }
 
-        alert("Sales order created successfully!");
+        // Update modification status to completed
+        const { error: modInsertError } = await supabase
+          .from("modification_requests")
+          .update({ status: "completed" })
+          .eq("order_id", newSalesOrderId);
+
+        if (modInsertError) {
+          console.error("Error updating modification status:", modInsertError);
+          setErrorMessage("Failed to update modification status.");
+          return;
+        }
+
+        alert("Sales created successfully!");
 
         // Step 5: Mark Work Order as Used (if applicable)
         if (selectedWorkOrder) {
@@ -1037,11 +1355,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         await supabase
           .from("modification_requests")
           .update({ status: "completed" })
-          .eq("order_id", orderId);
-
-        // Trigger the callback to notify EmployeeActionRequired
-        console.log("Triggering onModificationSuccess with orderId:", orderId);
-        onModificationSuccess(orderId);
+          .eq("order_id", isEditing ? salesOrderId : newSalesOrderId);
       }
 
       setAllowPrint(true);
@@ -1061,6 +1375,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
   // Function to reset the form
   const resetForm = () => {
     setProductEntries([{ id: "", name: "", price: "", quantity: "" }]);
+    setOriginalProductEntries([{ id: "", name: "", price: "", quantity: "" }]); // Reset original entries
     setPatientDetails(null);
     setPrivilegeCard(true);
     setPhoneNumber("");
@@ -1086,6 +1401,9 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     setPrivilegeCardNumber("");
     setIsEditing(false); // Reset isEditing to false
     setProductSuggestions([]);
+    setFetchMethod("work_order_id");
+    setSearchQuery("");
+    setDiscountPercentage(0);
   };
 
   // Confirm and reset the form
@@ -1105,6 +1423,14 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     window.print(); // Simply call print without extra state changes
   };
 
+  // Conditional Fields for Step 2
+  const [hasMrNumber, setHasMrNumber] = useState(null); // 'yes' or 'no'
+  const [customerName, setCustomerName] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
+
+  // Function to fetch work orders by different methods
+  // Already handled in handleFetchWorkOrders
+
   return (
     <div
       className={`transition-all duration-300 ${
@@ -1120,7 +1446,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
             </h2>
             <div className="space-y-2">
               <p>
-                <strong>Work Order ID:</strong> {selectedWorkOrder.work_order_id}
+                <strong>Work Order ID:</strong>{" "}
+                {selectedWorkOrder.work_order_id}
               </p>
               <p>
                 <strong>Description:</strong> {selectedWorkOrder.description}
@@ -1160,10 +1487,18 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                         {selectedWorkOrder.product_entries.map(
                           (product, index) => (
                             <tr key={index} className="text-center">
-                              <td className="py-1 px-2 border-b">{product.id}</td>
-                              <td className="py-1 px-2 border-b">{product.name}</td>
-                              <td className="py-1 px-2 border-b">{product.price}</td>
-                              <td className="py-1 px-2 border-b">{product.quantity}</td>
+                              <td className="py-1 px-2 border-b">
+                                {product.id}
+                              </td>
+                              <td className="py-1 px-2 border-b">
+                                {product.name}
+                              </td>
+                              <td className="py-1 px-2 border-b">
+                                {product.price}
+                              </td>
+                              <td className="py-1 px-2 border-b">
+                                {product.quantity}
+                              </td>
                             </tr>
                           )
                         )}
@@ -1231,13 +1566,65 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                 Fetch Work Orders
               </h2>
 
-              {/* Enter Work Order ID or MR Number */}
+              {/* Select Fetch Method */}
+              <div className="mb-4">
+                <label className="block text-gray-700 font-medium mb-1">
+                  Fetch Work Orders By:
+                </label>
+                <div className="flex space-x-4">
+                  <button
+                    type="button" // Added type="button"
+                    onClick={() => setFetchMethod("work_order_id")}
+                    className={`px-4 py-2 rounded-lg ${
+                      fetchMethod === "work_order_id"
+                        ? "bg-green-500 text-white"
+                        : "bg-gray-200"
+                    }`}
+                  >
+                    Work Order ID
+                  </button>
+                  <button
+                    type="button" // Added type="button"
+                    onClick={() => setFetchMethod("mr_number")}
+                    className={`px-4 py-2 rounded-lg ${
+                      fetchMethod === "mr_number"
+                        ? "bg-green-500 text-white"
+                        : "bg-gray-200"
+                    }`}
+                  >
+                    MR Number
+                  </button>
+                  <button
+                    type="button" // Added type="button"
+                    onClick={() => setFetchMethod("phone_number")}
+                    className={`px-4 py-2 rounded-lg ${
+                      fetchMethod === "phone_number"
+                        ? "bg-green-500 text-white"
+                        : "bg-gray-200"
+                    }`}
+                  >
+                    Phone Number
+                  </button>
+                </div>
+              </div>
+
+              {/* Enter Work Order ID, MR Number, or Phone Number */}
               <label className="block text-gray-700 font-medium mb-1">
-                Enter Work Order ID or MR Number
+                {fetchMethod === "work_order_id"
+                  ? "Enter Work Order ID"
+                  : fetchMethod === "mr_number"
+                  ? "Enter MR Number"
+                  : "Enter Phone Number"}
               </label>
               <input
                 type="text"
-                placeholder="Work Order ID or MR Number"
+                placeholder={
+                  fetchMethod === "work_order_id"
+                    ? "Work Order ID"
+                    : fetchMethod === "mr_number"
+                    ? "MR Number"
+                    : "Phone Number"
+                }
                 value={searchQuery}
                 ref={workOrderInputRef}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -1255,6 +1642,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                   {validationErrors.searchQuery}
                 </p>
               )}
+
               <button
                 type="button" // Added type="button"
                 onClick={handleFetchWorkOrders}
@@ -1358,10 +1746,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                             const value = e.target.value.trim();
                             const updatedSuggestions = [...productSuggestions];
                             if (value) {
-                              updatedSuggestions[index] = await fetchProductSuggestions(
-                                value,
-                                "id"
-                              );
+                              updatedSuggestions[index] =
+                                await fetchProductSuggestions(value, "id");
                             } else {
                               updatedSuggestions[index] = [];
                             }
@@ -1375,7 +1761,9 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                             await handleProductInputChange(index, value); // Fetch product details
                           }}
                           onBlur={async () => {
-                            const selectedProduct = productSuggestions[index]?.find(
+                            const selectedProduct = productSuggestions[
+                              index
+                            ]?.find(
                               (prod) =>
                                 prod.product_id === productEntries[index].id
                             );
@@ -1452,7 +1840,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                       </div>
 
                       {/* Quantity Input */}
-                      <div className="relative w-1/4">
+                      <div className="relative w-2/4">
                         {product.stock === 0 ? (
                           <input
                             type="text"
@@ -1467,7 +1855,11 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                             placeholder="Quantity"
                             value={product.quantity}
                             onChange={(e) =>
-                              handleProductChange(index, "quantity", e.target.value)
+                              handleProductChange(
+                                index,
+                                "quantity",
+                                e.target.value
+                              )
                             }
                             className="border border-gray-300 px-4 py-3 rounded-lg w-full text-center"
                             min="1"
@@ -1480,9 +1872,26 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                                   e.preventDefault();
                                   setProductEntries([
                                     ...productEntries,
-                                    { id: "", name: "", price: "", quantity: "" },
+                                    {
+                                      id: "",
+                                      name: "",
+                                      price: "",
+                                      quantity: "",
+                                    },
                                   ]);
-                                  setProductSuggestions([...productSuggestions, []]);
+                                  setOriginalProductEntries([
+                                    ...originalProductEntries,
+                                    {
+                                      id: "",
+                                      name: "",
+                                      price: "",
+                                      quantity: "",
+                                    },
+                                  ]); // Update original entries
+                                  setProductSuggestions([
+                                    ...productSuggestions,
+                                    [],
+                                  ]);
                                   setTimeout(
                                     () =>
                                       document
@@ -1525,6 +1934,10 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                       ...productEntries,
                       { id: "", name: "", price: "", quantity: "" },
                     ]);
+                    setOriginalProductEntries([
+                      ...originalProductEntries,
+                      { id: "", name: "", price: "", quantity: "" },
+                    ]); // Update original entries
                     setProductSuggestions([...productSuggestions, []]);
                     setTimeout(
                       () =>
@@ -1543,11 +1956,17 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                         ...productEntries,
                         { id: "", name: "", price: "", quantity: "" },
                       ]);
+                      setOriginalProductEntries([
+                        ...originalProductEntries,
+                        { id: "", name: "", price: "", quantity: "" },
+                      ]); // Update original entries
                       setProductSuggestions([...productSuggestions, []]);
                       setTimeout(
                         () =>
                           document
-                            .getElementById(`productId-${productEntries.length}`)
+                            .getElementById(
+                              `productId-${productEntries.length}`
+                            )
                             ?.focus(),
                         0
                       );
@@ -1556,57 +1975,177 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                 >
                   Add Product
                 </button>
+                {/* Stock Validation Error */}
+                {validationErrors.stock && (
+                  <p className="text-red-500 text-xs mt-1">
+                    {validationErrors.stock}
+                  </p>
+                )}
               </div>
             </div>
           )}
 
-          {/* Step 2: Patient Details */}
+          {/* Step 2: Patient or Customer Details */}
           {step === 2 && (
             <div className="bg-gray-50 p-6 rounded-md shadow-inner space-y-4">
               <h2 className="text-lg font-semibold text-gray-700">
-                Patient Information
+                Patient or Customer Information
               </h2>
-              <label className="block text-gray-700 font-medium mb-1">
-                Enter MR Number
-              </label>
-              <input
-                type="text"
-                placeholder="Enter MR Number"
-                value={mrNumber}
-                onChange={(e) => setMrNumber(e.target.value)}
-                onKeyDown={(e) => handleEnterKey(e, fetchButtonRef)}
-                ref={mrNumberRef}
-                className="border border-gray-300 w-full px-4 py-3 rounded-lg"
-              />
 
-              {validationErrors.mrNumber && (
-                <p className="text-red-500 text-xs mt-1">
-                  {validationErrors.mrNumber}
-                </p>
+              <p className="font-semibold mb-2">Do you have an MR Number?</p>
+              <div className="flex space-x-4 mb-4">
+                <button
+                  type="button" // Added type="button"
+                  id="hasMrNumber-yes"
+                  onClick={() => setHasMrNumber("yes")}
+                  className={`px-4 py-2 rounded-lg ${
+                    hasMrNumber === "yes"
+                      ? "bg-green-500 text-white"
+                      : "bg-gray-200"
+                  }`}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      setHasMrNumber("yes");
+                      setTimeout(() => {
+                        mrNumberRef.current?.focus();
+                      }, 0);
+                    }
+                  }}
+                >
+                  Yes
+                </button>
+                <button
+                  type="button" // Added type="button"
+                  id="hasMrNumber-no"
+                  onClick={() => setHasMrNumber("no")}
+                  className={`px-4 py-2 rounded-lg ${
+                    hasMrNumber === "no"
+                      ? "bg-green-500 text-white"
+                      : "bg-gray-200"
+                  }`}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      setHasMrNumber("no");
+                      setTimeout(() => {
+                        customerNameRef.current?.focus();
+                      }, 0);
+                    }
+                  }}
+                >
+                  No
+                </button>
+              </div>
+
+              {/* Conditional Fields */}
+              {hasMrNumber === "yes" && (
+                <>
+                  <label className="block text-gray-700 font-medium mb-1">
+                    Enter MR Number
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Enter MR Number"
+                    value={mrNumber}
+                    onChange={(e) => setMrNumber(e.target.value)}
+                    onKeyDown={(e) => handleEnterKey(e, fetchButtonRef)}
+                    ref={mrNumberRef}
+                    className="border border-gray-300 w-full px-4 py-3 rounded-lg"
+                  />
+
+                  {validationErrors.mrNumber && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {validationErrors.mrNumber}
+                    </p>
+                  )}
+                  <button
+                    type="button" // Added type="button"
+                    onClick={() => {
+                      handleMRNumberSearch();
+                      // No need to focus next button here as focus is managed in handleMRNumberSearch
+                    }}
+                    ref={fetchButtonRef}
+                    className="mt-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleMRNumberSearch();
+                        setTimeout(() => {
+                          nextButtonRef.current?.focus();
+                        }, 0);
+                      }
+                    }}
+                  >
+                    Fetch Patient Details
+                  </button>
+                  {patientDetails && (
+                    <div className="mt-4 bg-gray-100 p-4 rounded border border-gray-200">
+                      <p>
+                        <strong>Name:</strong> {patientDetails.name}
+                      </p>
+                      <p>
+                        <strong>Age:</strong> {patientDetails.age}
+                      </p>
+                      <p>
+                        <strong>Condition:</strong> {patientDetails.condition}
+                      </p>
+                    </div>
+                  )}
+                </>
               )}
-              <button
-                type="button"
-                onClick={() => {
-                  handleMRNumberSearch();
-                  // No need to focus next button here as focus is managed in handleMRNumberSearch
-                }}
-                ref={fetchButtonRef}
-                className="mt-2 text-white px-4 py-2 rounded-lg bg-green-500 hover:bg-green-600 transition"
-              >
-                Fetch Patient Details
-              </button>
-              {patientDetails && (
-                <div className="mt-4 bg-gray-100 p-4 rounded border border-gray-200">
-                  <p>
-                    <strong>Name:</strong> {patientDetails.name}
-                  </p>
-                  <p>
-                    <strong>Age:</strong> {patientDetails.age}
-                  </p>
-                  <p>
-                    <strong>Condition:</strong> {patientDetails.condition}
-                  </p>
-                </div>
+
+              {hasMrNumber === "no" && (
+                <>
+                  <label className="block text-gray-700 font-medium mb-1">
+                    Enter Customer Name
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Enter Customer Name"
+                    value={customerName}
+                    onChange={(e) => setCustomerName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        customerPhoneRef.current?.focus();
+                      }
+                    }}
+                    ref={customerNameRef}
+                    className="border border-gray-300 w-full px-4 py-3 rounded-lg"
+                  />
+
+                  {validationErrors.customerName && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {validationErrors.customerName}
+                    </p>
+                  )}
+
+                  <label className="block text-gray-700 font-medium mb-1">
+                    Enter Customer Phone Number
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Enter Phone Number"
+                    value={customerPhone}
+                    onChange={(e) => setCustomerPhone(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        // Optionally, auto-create customer or proceed
+                        nextButtonRef.current?.focus();
+                      }
+                    }}
+                    ref={customerPhoneRef}
+                    className="border border-gray-300 w-full px-4 py-3 rounded-lg"
+                  />
+
+                  {validationErrors.customerPhone && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {validationErrors.customerPhone}
+                    </p>
+                  )}
+                </>
               )}
             </div>
           )}
@@ -1631,7 +2170,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                     setTimeout(() => {
                       if (redeemOption === "barcode") {
                         privilegeCardRef.current?.focus();
-                      } else {
+                      } else if (redeemOption === "phone") {
                         privilegePhoneRef.current?.focus();
                       }
                     }, 0);
@@ -1709,6 +2248,15 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                         type="button" // Added type="button"
                         onClick={handleFetchPrivilegeCardByNumber}
                         className="bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg w-full"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            handleFetchPrivilegeCardByNumber();
+                            setTimeout(() => {
+                              nextButtonRef.current?.focus();
+                            }, 0);
+                          }
+                        }}
                       >
                         Fetch Privilege Card
                       </button>
@@ -1740,6 +2288,15 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                           type="button" // Added type="button"
                           onClick={handleSendOtp}
                           className="mt-4 bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg w-full"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              handleSendOtp();
+                              setTimeout(() => {
+                                otpRef.current?.focus();
+                              }, 0);
+                            }
+                          }}
                         >
                           Send OTP
                         </button>
@@ -1773,6 +2330,15 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                             type="button" // Added type="button"
                             onClick={handleVerifyOtp}
                             className="bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg w-full"
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                handleVerifyOtp();
+                                setTimeout(() => {
+                                  nextButtonRef.current?.focus();
+                                }, 0);
+                              }
+                            }}
                           >
                             Verify OTP
                           </button>
@@ -1886,11 +2452,11 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                             />
                             {(parseFloat(redeemPointsAmount) > loyaltyPoints ||
                               parseFloat(redeemPointsAmount) < 0) && (
-                                <p className="text-red-500 text-xs mt-1">
-                                  Please enter a valid amount up to your available
-                                  points.
-                                </p>
-                              )}
+                              <p className="text-red-500 text-xs mt-1">
+                                Please enter a valid amount up to your available
+                                points.
+                              </p>
+                            )}
                           </div>
                         )}
                       </div>
@@ -1961,7 +2527,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
             </div>
           )}
 
-          {/* Step 5: Order Preview with Payment Method */}
+          {/* Step 5: Order Preview with Payment Method and Discount */}
           {step === 5 && (
             <div>
               {/* Printable Area */}
@@ -1986,25 +2552,43 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
 
                 {/* Invoice Details */}
                 <div className="grid grid-cols-2 gap-2 mt-20 mb-6">
-                  <h2 className="text-2xl font-semibold mt-2">
-                    Invoice Summary
-                  </h2>
+                  <h2 className="text-2xl font-semibold mt-2">Bill</h2>
                   <div>
                     <p>
                       <span className="font-semibold">Sales Order ID:</span>{" "}
                       {salesOrderId}
                     </p>
-                    {/* Description removed */}
-                    <p>
-                      <span className="font-semibold">Customer MR Number:</span>{" "}
-                      {mrNumber}
-                    </p>
-                    <p>
-                      <span className="font-semibold">Customer Name:</span>{" "}
-                      {patientDetails?.name ||
-                        privilegeCardDetails?.customer_name ||
-                        "N/A"}
-                    </p>
+                    {hasMrNumber === "yes" ? (
+                      <>
+                        <p>
+                          <span className="font-semibold">MR Number:</span>{" "}
+                          {mrNumber}
+                        </p>
+                        <p>
+                          <span className="font-semibold">Name:</span>{" "}
+                          {patientDetails?.name}
+                        </p>
+                        <p>
+                          <span className="font-semibold">Age:</span>{" "}
+                          {patientDetails?.age}
+                        </p>
+                        <p>
+                          <span className="font-semibold">Condition:</span>{" "}
+                          {patientDetails?.condition}
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p>
+                          <span className="font-semibold">Customer Name:</span>{" "}
+                          {customerName || "N/A"}
+                        </p>
+                        <p>
+                          <span className="font-semibold">Customer Phone:</span>{" "}
+                          {customerPhone || "N/A"}
+                        </p>
+                      </>
+                    )}
                     <p>
                       <span className="font-semibold">Billed by:</span>{" "}
                       {employee}
@@ -2065,6 +2649,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                   </table>
                 </div>
 
+                {/* Discount Section */}
+
                 {/* Financial Summary */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                   {/* Left Column */}
@@ -2082,16 +2668,24 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                   {/* Right Column */}
                   <div className="space-y-2">
                     <p>
-                      <span className="font-semibold">Total:</span> ₹
+                      <span className="font-semibold">Subtotal:</span> ₹
                       {subtotal.toFixed(2)}
+                    </p>
+                    <p>
+                      <span className="font-semibold">
+                        Discount ({discountPercentage}%):
+                      </span>{" "}
+                      ₹{discountAmount.toFixed(2)}
                     </p>
                     <p>
                       <span className="font-semibold">Advance Paid:</span> ₹
                       {parseFloat(advanceDetails).toFixed(2)}
                     </p>
                     <p>
-                      <span className="font-semibold">Discount Applied:</span> ₹
-                      {discountAmount.toFixed(2)}
+                      <span className="font-semibold">
+                        Privilege Card Discount:
+                      </span>{" "}
+                      ₹{privilegeDiscount.toFixed(2)}
                     </p>
                     <p>
                       <span className="font-semibold">Balance Due:</span> ₹
@@ -2120,8 +2714,42 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
 
                 {/* Payment Method and Advance Details */}
                 <div className="flex flex-col md:flex-row items-center justify-between my-6 space-x-4">
-                  {/* Payment Method */}
+                  {/* Discount Section */}
                   <div className="w-full md:w-1/2 mb-4 md:mb-0">
+                    <label className="block text-gray-700 font-medium mb-1">
+                      Apply Discount (%)
+                    </label>
+                    <input
+                      type="number"
+                      placeholder="Enter Discount Percentage"
+                      value={discountPercentage}
+                      onChange={(e) =>
+                        setDiscountPercentage(
+                          e.target.value === ""
+                            ? 0
+                            : Math.min(Math.max(Number(e.target.value), 0), 100)
+                        )
+                      }
+                      className="border border-gray-300 w-full px-4 py-3 rounded-lg"
+                      min="0"
+                      max="100"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          paymentMethodRef.current?.focus();
+                        }
+                      }}
+                      ref={discountInputRef} // Attach the ref here
+                    />
+                    {validationErrors.discountPercentage && (
+                      <p className="text-red-500 text-xs mt-1">
+                        {validationErrors.discountPercentage}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Payment Method */}
+                  <div className="w-full md:w-1/2">
                     <label
                       htmlFor="paymentMethod"
                       className="block font-semibold mb-1"
@@ -2170,7 +2798,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                   } w-full md:w-auto`}
                   disabled={!paymentMethod || isLoading}
                 >
-                  Submit Order{" "}
+                  {isEditing ? "Update Order" : "Submit Order"}{" "}
                   {privilegeCard && privilegeCardDetails
                     ? "& Update Loyalty Points"
                     : ""}

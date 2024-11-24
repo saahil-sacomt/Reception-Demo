@@ -27,9 +27,37 @@ import AdminActionRequired from "./pages/AdminActionRequired";
 import ModifyOrder from "./pages/ModifyOrder";
 import EmployeeActionRequired from "./pages/EmployeeActionRequired";
 import StockManagement from "./pages/StockManagement";
+import { supabase } from './supabaseClient'
 
 const App = () => {
   const location = useLocation();
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    // Fetch the current session
+    const fetchSession = async () => {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      if (error) {
+        console.error('Error fetching session:', error.message);
+      }
+      setUser(session?.user ?? null);
+    };
+
+    fetchSession();
+
+    // Listen for authentication state changes
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        setUser(session?.user ?? null);
+      }
+    );
+
+    // Cleanup the listener on unmount
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
+
   const hideHeaderAndSidebar = location.pathname === "/login";
 
   // Lift `isCollapsed` and `selectedTab` state to App component
@@ -81,6 +109,10 @@ const App = () => {
               <Route
                 path="/order-generation"
                 element={<OrderGenerationPage isCollapsed={isCollapsed} />}
+              />
+              <Route
+                path="/work-order/:orderId"
+                element={<WorkOrderGeneration isCollapsed={isCollapsed} />}
               />
               <Route
                 path="/work-order"
