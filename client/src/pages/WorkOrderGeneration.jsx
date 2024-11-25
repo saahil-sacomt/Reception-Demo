@@ -242,8 +242,8 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     const discountAmount = (subtotal * validDiscountPercentage) / 100;
     const discountedSubtotal = Math.max(subtotal - discountAmount, 0); // Prevent negative subtotal
 
-    const cgst = (subtotal * 6) / 100 || 0;
-    const sgst = (subtotal * 6) / 100 || 0;
+    const cgst = (discountedSubtotal * 6) / 100 || 0;
+    const sgst = (discountedSubtotal * 6) / 100 || 0;
 
     const totalAmount = Math.max(discountedSubtotal + cgst + sgst, 0); // Include CGST and SGST
 
