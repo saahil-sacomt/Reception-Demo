@@ -64,7 +64,6 @@ const createCustomer = async (name, phone_number) => {
   return data;
 };
 
-// Function to calculate amounts
 function calculateAmounts(
   productEntries,
   advanceDetails,
@@ -75,28 +74,22 @@ function calculateAmounts(
   selectedWorkOrder,
   discountPercentage
 ) {
-  const subtotal = productEntries.reduce((acc, product) => {
-    const price = parseFloat(product.price) || 0;
+  // Step 1: Adjust Prices and Calculate Adjusted Subtotal
+  const adjustedSubtotal = productEntries.reduce((acc, product) => {
+    const originalPrice = parseFloat(product.price) || 0;
+    const adjustedPrice = (originalPrice / 112) * 100; // Adjusted Price using formula
     const quantity = parseInt(product.quantity) || 0;
-    return acc + price * quantity;
+    return acc + adjustedPrice * quantity;
   }, 0);
 
-  // Calculate CGST and SGST for display only
-  const cgstAmount = subtotal * 0.06;
-  const sgstAmount = subtotal * 0.06;
-
-  // Calculate discount based on percentage
-  let discount = 0;
+  // Step 2: Calculate Discount based on Percentage
   const discountPercent = parseFloat(discountPercentage) || 0;
-  if (discountPercent > 0) {
-    discount = (subtotal * discountPercent) / 100;
-  }
+  const discount = discountPercent > 0 ? (adjustedSubtotal * discountPercent) / 100 : 0;
 
-  // Calculate remaining balance after advance and discount
-  let remainingBalance =
-    subtotal - (parseFloat(advanceDetails) || 0) - discount;
+  // Step 3: Calculate Remaining Balance after Discount and Advance
+  let remainingBalance = adjustedSubtotal - discount - (parseFloat(advanceDetails) || 0);
 
-  // Calculate privilege card discount if applicable
+  // Step 4: Calculate Privilege Card Discount if Applicable
   let privilegeDiscount = 0;
   if (privilegeCard && privilegeCardDetails && parseFloat(redeemPointsAmount) > 0) {
     const redeemAmount = parseFloat(redeemPointsAmount) || 0;
@@ -104,18 +97,29 @@ function calculateAmounts(
     remainingBalance -= privilegeDiscount;
   }
 
-  // Ensure balance due is not negative
-  remainingBalance = Math.max(remainingBalance, 0);
+  // Step 5: Calculate GST based on Remaining Balance
+  const cgstAmount = remainingBalance * 0.06;
+  const sgstAmount = remainingBalance * 0.06;
+
+  // Step 6: Calculate Final Amount Including GST
+  const finalAmount = remainingBalance + cgstAmount + sgstAmount;
+
+  // Step 7: Ensure Final Amount is Not Negative
+  const finalAmountAdjusted = Math.max(finalAmount, 0);
 
   return {
-    subtotal,
-    cgstAmount, // For display only
-    sgstAmount, // For display only
-    discount,
-    privilegeDiscount,
-    finalAmount: remainingBalance,
+    subtotal: adjustedSubtotal, // Adjusted Subtotal
+    discount, // Discount Amount
+    advance: parseFloat(advanceDetails) || 0, // Advance Paid
+    privilegeDiscount, // Privilege Card Discount
+    cgstAmount, // 6% CGST
+    sgstAmount, // 6% SGST
+    finalAmount: finalAmountAdjusted, // Final Amount Including GST
   };
 }
+
+
+
 
 // Function to calculate loyalty points
 const calculateLoyaltyPoints = (
@@ -230,6 +234,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
   const privilegePhoneRef = useRef(null);
   const otpRef = useRef(null);
   const employeeRef = useRef(null);
+  const billPrintRef = useRef(null);
 
   const customerNameRef = useRef(null);
   const customerPhoneRef = useRef(null);
@@ -537,6 +542,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     cgstAmount,
     sgstAmount,
     discount,
+    advance,
     privilegeDiscount,
     finalAmount,
   } = useMemo(
@@ -562,6 +568,23 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
       discountPercentage,
     ]
   );
+
+
+  // Function to fetch patient by MR number
+  const fetchPatientByMRNumber = async (mrNumber) => {
+    const { data, error } = await supabase
+      .from("patients")
+      .select("*")
+      .eq("mr_number", mrNumber)
+      .single();
+
+    if (error) {
+      console.error("Error fetching patient details:", error.message);
+      return null;
+    }
+    return data;
+  };
+
 
   // Calculate discountAmount
   const discountAmount = discount;
@@ -629,13 +652,14 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
   };
 
   // Handle fetching work orders
-  async function handleFetchWorkOrders() {
+  const handleFetchWorkOrders = async () => {
     try {
       let query = supabase.from("work_orders").select("*");
 
       if (fetchMethod === "work_order_id") {
         query = query.eq("work_order_id", searchQuery);
       } else if (fetchMethod === "mr_number") {
+        // Fetch work orders by MR Number directly
         query = query.eq("mr_number", searchQuery);
       } else if (fetchMethod === "phone_number") {
         // Fetch work orders associated with customers having the phone number
@@ -645,7 +669,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           .eq("phone_number", searchQuery);
 
         if (customerError) {
-          console.error("Error fetching customers:", customerError);
+          console.error("Error fetching customers:", customerError.message);
           setErrorMessage("Failed to fetch customers.");
           return;
         }
@@ -668,10 +692,13 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
       });
 
       if (error) {
-        console.error("Error fetching work orders:", error);
+        console.error("Error fetching work orders:", error.message);
         setErrorMessage("Failed to fetch work orders.");
       } else {
         setWorkOrders(data);
+
+        // Clear any previous error messages
+        setErrorMessage("");
 
         // Focus on the first work order button if found, otherwise on the proceed button
         setTimeout(() => {
@@ -686,17 +713,19 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
       console.error("Error fetching work orders:", error);
       setErrorMessage("Failed to fetch work orders.");
     }
-  }
+  };
+
 
   function handleSelectWorkOrder(workOrder) {
     setSelectedWorkOrder(workOrder);
     setShowWorkOrderModal(true);
   }
 
-  function confirmWorkOrderSelection() {
+  async function confirmWorkOrderSelection() {
     // Set relevant data from the work order
     setMrNumber(selectedWorkOrder.mr_number);
     setAdvanceDetails(selectedWorkOrder.advance_details || "");
+    setHasMrNumber("yes");
 
     if (selectedWorkOrder.product_entries) {
       setProductEntries(selectedWorkOrder.product_entries);
@@ -704,6 +733,28 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     }
 
     setShowWorkOrderModal(false);
+    // Automatically fetch patient details
+    if (selectedWorkOrder.mr_number) {
+      const patient = await fetchPatientByMRNumber(selectedWorkOrder.mr_number.trim());
+
+      if (patient) {
+        setPatientDetails({
+          name: patient.name,
+          age: patient.age,
+          condition: patient.condition || "N/A",
+          phone_number: patient.phone_number || "N/A",
+          gender: patient.gender || "N/A",
+          address: patient.address || "N/A",
+        });
+        setErrorMessage("");
+      } else {
+        setPatientDetails(null);
+        setErrorMessage("No patient found with the provided MR Number from Work Order.");
+      }
+    } else {
+      setPatientDetails(null);
+      setErrorMessage("Selected Work Order does not contain an MR Number.");
+    }
 
     // Move to the next step
     setStep(3); // Adjusted step numbering
@@ -1008,15 +1059,31 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     setStep((prevStep) => (prevStep > 0 ? prevStep - 1 : 0));
   };
 
-  const handleMRNumberSearch = () => {
-    // Simulate fetching patient details
-    setPatientDetails({
-      name: "John Doe",
-      age: 35,
-      condition: "Myopia",
-    });
-    nextButtonRef.current?.focus();
+  const handleMRNumberSearch = async () => {
+    if (!mrNumber.trim()) {
+      setErrorMessage("MR Number is required.");
+      return;
+    }
+
+    const patient = await fetchPatientByMRNumber(mrNumber.trim());
+
+    if (patient) {
+      setPatientDetails({
+        name: patient.name,
+        age: patient.age,
+        condition: patient.condition || "N/A",
+        phone_number: patient.phone_number || "N/A",
+        gender: patient.gender || "N/A",
+        address: patient.address || "N/A",
+      });
+      setErrorMessage("");
+      nextButtonRef.current?.focus();
+    } else {
+      setPatientDetails(null);
+      setErrorMessage("No patient found with the provided MR Number.");
+    }
   };
+
 
   const focusFirstFieldOfStep = () => {
     if (step === 0) workOrderInputRef.current?.focus();
@@ -1139,7 +1206,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           .from("sales_orders")
           .update({
             items: productEntries,
-            advance_details: parseFloat(advanceDetails) || 0,
+            advance_details: parseFloat(advance) || 0,
             mr_number: hasMrNumber === "yes" ? mrNumber : null,
             patient_phone: hasMrNumber === "yes" ? phoneNumber : customerPhone,
             employee: employee,
@@ -1147,8 +1214,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
             subtotal: subtotal,
             cgst: parseFloat(cgstAmount),
             sgst: parseFloat(sgstAmount),
-            total_amount: subtotal,
-            discount: discountAmount,
+            total_amount: finalAmount,
+            discount: discount,
             privilege_discount: privilegeDiscount, // Updated field
             final_amount: finalAmount,
             loyalty_points_redeemed: sanitizedRedeemedPoints,
@@ -1194,18 +1261,19 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
             employee: employee,
             payment_method: paymentMethod,
             subtotal: subtotal,
+            discount: discount,
+            advance_details: advance, // Assuming you have an 'advance_paid' field
+            privilege_discount: privilegeDiscount, // Updated field
             cgst: parseFloat(cgstAmount),
             sgst: parseFloat(sgstAmount),
-            total_amount: subtotal,
-            discount: discountAmount,
-            privilege_discount: privilegeDiscount, // Updated field
-            final_amount: finalAmount,
+            final_amount: finalAmount, // Correct final amount including GST
             loyalty_points_redeemed: sanitizedRedeemedPoints,
             loyalty_points_added: sanitizedPointsAdded,
-            created_at: currentUTCDateTime,
             updated_at: currentUTCDateTime,
             branch: branch,
-          });
+          })
+          .eq("sales_order_id", salesOrderId);
+
 
         if (insertError) {
           console.error("Error inserting sales:", insertError);
@@ -1345,6 +1413,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     window.print(); // Simply call print without extra state changes
   };
 
+
+
   // Conditional Fields for Step 2
   const [hasMrNumber, setHasMrNumber] = useState(null); // 'yes' or 'no'
   const [customerName, setCustomerName] = useState("");
@@ -1355,9 +1425,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
 
   return (
     <div
-      className={`transition-all duration-300 ${
-        isCollapsed ? "mx-20" : "mx-20 px-20"
-      } justify-center mt-16 p-4 mx-auto`}
+      className={`transition-all duration-300 ${isCollapsed ? "mx-20" : "mx-20 px-20"
+        } justify-center mt-16 p-4 mx-auto`}
     >
       {/* Print Styles */}
       <style>
@@ -1418,24 +1487,24 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                     <table className="w-full mt-2 border border-gray-300 rounded-md">
                       <thead>
                         <tr className="bg-gray-100">
-                          <th className="py-1 px-2 border-b">Product ID</th>
-                          <th className="py-1 px-2 border-b">Product Name</th>
-                          <th className="py-1 px-2 border-b">Price</th>
-                          <th className="py-1 px-2 border-b">Quantity</th>
+                          <th className="py-1 px-2">Product ID</th>
+                          <th className="py-1 px-2">Product Name</th>
+                          <th className="py-1 px-2">Price</th>
+                          <th className="py-1 px-2">Quantity</th>
                         </tr>
                       </thead>
                       <tbody>
                         {selectedWorkOrder.product_entries.map(
                           (product, index) => (
                             <tr key={index} className="text-center">
-                              <td className="py-1 px-2 border-b">{product.id}</td>
-                              <td className="py-1 px-2 border-b">
+                              <td className="py-1 px-2">{product.id}</td>
+                              <td className="py-1 px-2">
                                 {product.name}
                               </td>
-                              <td className="py-1 px-2 border-b">
+                              <td className="py-1 px-2">
                                 {product.price}
                               </td>
-                              <td className="py-1 px-2 border-b">
+                              <td className="py-1 px-2">
                                 {product.quantity}
                               </td>
                             </tr>
@@ -1466,6 +1535,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         </div>
       )}
 
+
       <h1 className="text-2xl font-semibold text-gray-700 text-center mb-8">
         Sales Generation
       </h1>
@@ -1482,9 +1552,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         {Array.from({ length: 6 }, (_, i) => (
           <div
             key={i}
-            className={`flex-1 h-2 rounded-xl mx-1 ${
-              step > i ? "bg-[#5db76d]" : "bg-gray-300"
-            } transition-all duration-300`}
+            className={`flex-1 h-2 rounded-xl mx-1 ${step > i ? "bg-[#5db76d]" : "bg-gray-300"
+              } transition-all duration-300`}
           />
         ))}
       </div>
@@ -1514,11 +1583,10 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                   <button
                     type="button" // Added type="button"
                     onClick={() => setFetchMethod("work_order_id")}
-                    className={`px-4 py-2 rounded-lg ${
-                      fetchMethod === "work_order_id"
-                        ? "bg-green-500 text-white"
-                        : "bg-gray-200"
-                    }`}
+                    className={`px-4 py-2 rounded-lg ${fetchMethod === "work_order_id"
+                      ? "bg-green-500 text-white"
+                      : "bg-gray-200"
+                      }`}
                     onKeyDown={(e) => {
                       if (e.key === "ArrowRight") {
                         e.preventDefault();
@@ -1532,11 +1600,10 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                     type="button" // Added type="button"
                     onClick={() => setFetchMethod("mr_number")}
                     id="fetchMethod-mr_number"
-                    className={`px-4 py-2 rounded-lg ${
-                      fetchMethod === "mr_number"
-                        ? "bg-green-500 text-white"
-                        : "bg-gray-200"
-                    }`}
+                    className={`px-4 py-2 rounded-lg ${fetchMethod === "mr_number"
+                      ? "bg-green-500 text-white"
+                      : "bg-gray-200"
+                      }`}
                     onKeyDown={(e) => {
                       if (e.key === "ArrowRight") {
                         e.preventDefault();
@@ -1553,11 +1620,10 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                     type="button" // Added type="button"
                     onClick={() => setFetchMethod("phone_number")}
                     id="fetchMethod-phone_number"
-                    className={`px-4 py-2 rounded-lg ${
-                      fetchMethod === "phone_number"
-                        ? "bg-green-500 text-white"
-                        : "bg-gray-200"
-                    }`}
+                    className={`px-4 py-2 rounded-lg ${fetchMethod === "phone_number"
+                      ? "bg-green-500 text-white"
+                      : "bg-gray-200"
+                      }`}
                     onKeyDown={(e) => {
                       if (e.key === "ArrowLeft") {
                         e.preventDefault();
@@ -1575,8 +1641,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                 {fetchMethod === "work_order_id"
                   ? "Enter Work Order ID"
                   : fetchMethod === "mr_number"
-                  ? "Enter MR Number"
-                  : "Enter Phone Number"}
+                    ? "Enter MR Number"
+                    : "Enter Phone Number"}
               </label>
               <input
                 type="text"
@@ -1584,8 +1650,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                   fetchMethod === "work_order_id"
                     ? "Work Order ID"
                     : fetchMethod === "mr_number"
-                    ? "MR Number"
-                    : "Phone Number"
+                      ? "MR Number"
+                      : "Phone Number"
                 }
                 value={searchQuery}
                 ref={workOrderInputRef}
@@ -1873,13 +1939,33 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                             max={product.stock} // Prevent ordering more than available stock
                             ref={(el) => (quantityRefs.current[index] = el)}
                             onKeyDown={(e) => {
-                              if (e.key === "ArrowRight") {
+                              if (e.key === "Enter") {
                                 e.preventDefault();
-                                // Move focus to Delete button
+                                if (e.shiftKey) {
+                                  // Shift + Enter: Add new product field and focus on first product ID
+                                  setProductEntries([
+                                    ...productEntries,
+                                    { id: "", name: "", price: "", quantity: "" },
+                                  ]);
+                                  setOriginalProductEntries([
+                                    ...originalProductEntries,
+                                    { id: "", name: "", price: "", quantity: "" },
+                                  ]);
+                                  setProductSuggestions([...productSuggestions, []]);
+                                  setTimeout(() => {
+                                    document.getElementById(`productId-${productEntries.length}`)?.focus();
+                                  }, 0);
+                                } else {
+                                  // Enter: Proceed to the next step
+                                  nextStep();
+                                }
+                              }
+                              // Existing Arrow Key Handling
+                              else if (e.key === "ArrowRight") {
+                                e.preventDefault();
                                 e.target.parentElement.nextSibling?.focus();
                               } else if (e.key === "ArrowLeft") {
                                 e.preventDefault();
-                                // Move focus to Price input
                                 document.getElementById(`productPrice-${index}`)?.focus();
                               }
                             }}
@@ -1978,11 +2064,10 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                   type="button" // Added type="button"
                   id="hasMrNumber-yes"
                   onClick={() => setHasMrNumber("yes")}
-                  className={`px-4 py-2 rounded-lg ${
-                    hasMrNumber === "yes"
-                      ? "bg-green-500 text-white"
-                      : "bg-gray-200"
-                  }`}
+                  className={`px-4 py-2 rounded-lg ${hasMrNumber === "yes"
+                    ? "bg-green-500 text-white"
+                    : "bg-gray-200"
+                    }`}
                   onKeyDown={(e) => {
                     if (e.key === "ArrowRight") {
                       e.preventDefault();
@@ -1996,11 +2081,10 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                   type="button" // Added type="button"
                   id="hasMrNumber-no"
                   onClick={() => setHasMrNumber("no")}
-                  className={`px-4 py-2 rounded-lg ${
-                    hasMrNumber === "no"
-                      ? "bg-green-500 text-white"
-                      : "bg-gray-200"
-                  }`}
+                  className={`px-4 py-2 rounded-lg ${hasMrNumber === "no"
+                    ? "bg-green-500 text-white"
+                    : "bg-gray-200"
+                    }`}
                   onKeyDown={(e) => {
                     if (e.key === "ArrowLeft") {
                       e.preventDefault();
@@ -2150,9 +2234,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                       }
                     }, 0);
                   }}
-                  className={`px-4 py-2 rounded-lg ${
-                    privilegeCard ? "bg-green-500 text-white" : "bg-gray-200"
-                  }`}
+                  className={`px-4 py-2 rounded-lg ${privilegeCard ? "bg-green-500 text-white" : "bg-gray-200"
+                    }`}
                   onKeyDown={(e) => {
                     if (e.key === "ArrowRight") {
                       e.preventDefault();
@@ -2171,9 +2254,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                     nextStep();
                   }}
                   id="privilegeCard-no"
-                  className={`px-4 py-2 rounded-lg ${
-                    !privilegeCard ? "bg-green-500 text-white" : "bg-gray-200"
-                  }`}
+                  className={`px-4 py-2 rounded-lg ${!privilegeCard ? "bg-green-500 text-white" : "bg-gray-200"
+                    }`}
                   onKeyDown={(e) => {
                     if (e.key === "ArrowLeft") {
                       e.preventDefault();
@@ -2194,11 +2276,10 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                     <button
                       type="button" // Added type="button"
                       onClick={() => setRedeemOption("barcode")}
-                      className={`px-4 py-2 rounded-lg ${
-                        redeemOption === "barcode"
-                          ? "bg-green-500 text-white"
-                          : "bg-gray-200"
-                      }`}
+                      className={`px-4 py-2 rounded-lg ${redeemOption === "barcode"
+                        ? "bg-green-500 text-white"
+                        : "bg-gray-200"
+                        }`}
                       onKeyDown={(e) => {
                         if (e.key === "ArrowRight") {
                           e.preventDefault();
@@ -2215,11 +2296,10 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                     <button
                       type="button" // Added type="button"
                       onClick={() => setRedeemOption("phone")}
-                      className={`px-4 py-2 rounded-lg ${
-                        redeemOption === "phone"
-                          ? "bg-green-500 text-white"
-                          : "bg-gray-200"
-                      }`}
+                      className={`px-4 py-2 rounded-lg ${redeemOption === "phone"
+                        ? "bg-green-500 text-white"
+                        : "bg-gray-200"
+                        }`}
                       onKeyDown={(e) => {
                         if (e.key === "ArrowLeft") {
                           e.preventDefault();
@@ -2392,11 +2472,10 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                               setRedeemPointsAmount(loyaltyPoints);
                               setRedeemPoints(true);
                             }}
-                            className={`px-4 py-2 mb-2 rounded-lg ${
-                              redeemOption === "full"
-                                ? "bg-green-500 text-white"
-                                : "bg-gray-200"
-                            }`}
+                            className={`px-4 py-2 mb-2 rounded-lg ${redeemOption === "full"
+                              ? "bg-green-500 text-white"
+                              : "bg-gray-200"
+                              }`}
                           >
                             Redeem Full Points
                           </button>
@@ -2411,11 +2490,10 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                                 0
                               ); // Focus on custom amount input
                             }}
-                            className={`px-4 py-2 mb-2 rounded-lg ${
-                              redeemOption === "custom"
-                                ? "bg-green-500 text-white"
-                                : "bg-gray-200"
-                            }`}
+                            className={`px-4 py-2 mb-2 rounded-lg ${redeemOption === "custom"
+                              ? "bg-green-500 text-white"
+                              : "bg-gray-200"
+                              }`}
                           >
                             Redeem Custom Amount
                           </button>
@@ -2448,9 +2526,9 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                                   e.target.value === ""
                                     ? ""
                                     : Math.min(
-                                        Number(e.target.value),
-                                        loyaltyPoints
-                                      )
+                                      Number(e.target.value),
+                                      loyaltyPoints
+                                    )
                                 )
                               }
                               className="border border-gray-300 w-full px-4 py-3 rounded-lg text-center my-2"
@@ -2464,11 +2542,11 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                             />
                             {(parseFloat(redeemPointsAmount) > loyaltyPoints ||
                               parseFloat(redeemPointsAmount) < 0) && (
-                              <p className="text-red-500 text-xs mt-1">
-                                Please enter a valid amount up to your available
-                                points.
-                              </p>
-                            )}
+                                <p className="text-red-500 text-xs mt-1">
+                                  Please enter a valid amount up to your available
+                                  points.
+                                </p>
+                              )}
                           </div>
                         )}
                       </div>
@@ -2539,101 +2617,150 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
             </div>
           )}
 
-          {/* Step 5: Order Preview with Payment Method and Discount */}
           {step === 5 && (
-            <div>
+            <>
+              {/* Embedded Print Styles */}
+              <style>
+                {`
+        @media print {
+          @page {
+            size: A5;
+            margin: 10mm;
+          }
+
+          body * {
+            visibility: hidden;
+          }
+
+          .printable-area, .printable-area * {
+            visibility: visible;
+          }
+
+          .printable-area {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            font-size: 10px; /* Adjust base font size */
+            padding: 5mm; /* Adjust padding to fit A5 */
+          }
+
+          .printable-area h2 {
+            font-size: 14px; /* Smaller heading */
+          }
+
+          .printable-area table {
+            font-size: 9px; /* Smaller table text */
+            table-layout: fixed;
+            width: 100%;
+            word-wrap: break-word;
+          }
+
+          .printable-area table th,
+          .printable-area table td {
+            padding: 3px; /* Reduce cell padding */
+          }
+
+          .financial-summary p,
+          .invoice-details p,
+          .loyalty-points p {
+            font-size: 10px; /* Consistent text size */
+          }
+
+          /* Hide action buttons during print */
+          .action-buttons {
+            display: none;
+          }
+
+          /* Ensure images (like logos) are scaled appropriately */
+          .printable-area img {
+            max-width: 100px; /* Adjust as needed */
+            height: auto;
+          }
+        }
+      `}
+              </style>
+
               {/* Printable Area */}
-              <div className="printable-area print:block print:absolute print:inset-0 print:w-full bg-white p-8 rounded-lg text-gray-800">
+              <div
+                className="printable-area bg-white rounded-lg text-gray-800"
+                ref={billPrintRef} // Attach the ref here
+              >
                 {/* Invoice Details */}
-                <div className="grid grid-cols-2 gap-2 mt-20 mb-6">
-                  <h2 className="text-2xl font-semibold mt-2">Bill</h2>
+                <div className="grid grid-cols-2 gap-2 mb-4">
+                  <h2 className="text-xl font-semibold mt-2">Bill</h2>
                   <div>
                     <p>
-                      <span className="font-semibold">Sales ID:</span>{" "}
-                      {salesOrderId}
+                      <span className="font-semibold">Sales ID:</span> {salesOrderId}
                     </p>
-                    {hasMrNumber === "yes" ? (
+                    {hasMrNumber === "yes" && patientDetails ? (
                       <>
                         <p>
-                          <span className="font-semibold">MR Number:</span>{" "}
-                          {mrNumber}
+                          <span className="font-semibold">MR Number:</span> {mrNumber}
                         </p>
                         <p>
-                          <span className="font-semibold">Name:</span>{" "}
-                          {patientDetails?.name}
+                          <span className="font-semibold">Name:</span> {patientDetails.name}
                         </p>
                         <p>
-                          <span className="font-semibold">Age:</span>{" "}
-                          {patientDetails?.age}
+                          <span className="font-semibold">Age:</span> {patientDetails.age}
                         </p>
                         <p>
-                          <span className="font-semibold">Condition:</span>{" "}
-                          {patientDetails?.condition}
+                          <span className="font-semibold">Phone Number:</span> {patientDetails.phone_number}
+                        </p>
+                        <p>
+                          <span className="font-semibold">Gender:</span> {patientDetails.gender}
+                        </p>
+                        <p>
+                          <span className="font-semibold">Address:</span> {patientDetails.address}
                         </p>
                       </>
                     ) : (
                       <>
                         <p>
-                          <span className="font-semibold">Customer Name:</span>{" "}
-                          {customerName || "N/A"}
+                          <span className="font-semibold">Customer Name:</span> {customerName || "N/A"}
                         </p>
                         <p>
-                          <span className="font-semibold">Customer Phone:</span>{" "}
-                          {customerPhone || "N/A"}
+                          <span className="font-semibold">Customer Phone:</span> {customerPhone || "N/A"}
                         </p>
                       </>
                     )}
                     <p>
-                      <span className="font-semibold">Billed by:</span>{" "}
-                      {employee}
+                      <span className="font-semibold">Billed by:</span> {employee}
                     </p>
                   </div>
                 </div>
 
                 {/* Product Table */}
-                <div className="overflow-x-auto mb-6">
-                  <table className="min-w-full border border-gray-300">
+                <div className="overflow-x-auto mb-4">
+                  <table className="min-w-full table-auto border border-gray-300">
                     <thead className="bg-gray-100">
                       <tr>
-                        <th className="py-2 px-4 border-b text-left">
-                          Product ID
-                        </th>
-                        <th className="py-2 px-4 border-b text-left">
-                          Product Name
-                        </th>
-                        <th className="py-2 px-4 border-b text-left">
-                          HSN Code
-                        </th>
-                        <th className="py-2 px-4 border-b text-right">
-                          Price (₹)
-                        </th>
-                        <th className="py-2 px-4 border-b text-right">
-                          Quantity
-                        </th>
-                        <th className="py-2 px-4 border-b text-right">
-                          Subtotal (₹)
-                        </th>
+                        <th className="py-1 px-2 border-b text-left text-sm">Product ID</th>
+                        <th className="py-1 px-2 border-b text-left text-sm">Product Name</th>
+                        <th className="py-1 px-2 border-b text-left text-sm">HSN Code</th>
+                        <th className="py-1 px-2 border-b text-right text-sm">Price (₹)</th>
+                        <th className="py-1 px-2 border-b text-right text-sm">Quantity</th>
+                        <th className="py-1 px-2 border-b text-right text-sm">Subtotal (₹)</th>
                       </tr>
                     </thead>
                     <tbody>
                       {productEntries.map((product, index) => {
-                        const productSubtotal =
-                          (parseFloat(product.price) || 0) *
-                          (parseInt(product.quantity) || 0);
+                        const adjustedPrice = (parseFloat(product.price) / 112) * 100 || 0;
+                        const productSubtotal = adjustedPrice * (parseInt(product.quantity) || 0);
                         return (
                           <tr key={index} className="hover:bg-gray-50">
-                            <td className="py-2 px-4 border-b">{product.id}</td>
-                            <td className="py-2 px-4 border-b">
-                              {product.name}
+                            <td className="py-1 px-2 border-b text-sm">{product.id}</td>
+                            <td className="py-1 px-2 border-b text-sm">
+                              <span className="whitespace-normal">{product.name}</span>
                             </td>
-                            <td className="py-2 px-4 border-b">9001</td>
-                            <td className="py-2 px-3 border-b text-right">
-                              {parseFloat(product.price).toFixed(2)}
+                            <td className="py-1 px-2 border-b text-sm">9001</td>
+                            <td className="py-1 px-2 border-b text-right text-sm">
+                              {adjustedPrice.toFixed(2)}
                             </td>
-                            <td className="py-2 px-4 border-b text-right">
+                            <td className="py-1 px-2 border-b text-right text-sm">
                               {product.quantity}
                             </td>
-                            <td className="py-2 px-4 border-b text-right">
+                            <td className="py-1 px-2 border-b text-right text-sm">
                               {productSubtotal.toFixed(2)}
                             </td>
                           </tr>
@@ -2643,76 +2770,56 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                   </table>
                 </div>
 
-                {/* Discount Section */}
-
                 {/* Financial Summary */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                  {/* Left Column */}
+                  {/* Left Column: Subtotal and GST */}
                   <div className="space-y-2">
                     <p>
-                      <span className="font-semibold">CGST (6%):</span> ₹
-                      {parseFloat(cgstAmount).toFixed(2)}
+                      <span className="font-semibold">Subtotal:</span> ₹{subtotal.toFixed(2)}
                     </p>
                     <p>
-                      <span className="font-semibold">SGST (6%):</span> ₹
-                      {parseFloat(sgstAmount).toFixed(2)}
+                      <span className="font-semibold">CGST (6%):</span> ₹{cgstAmount.toFixed(2)}
+                    </p>
+                    <p>
+                      <span className="font-semibold">SGST (6%):</span> ₹{sgstAmount.toFixed(2)}
                     </p>
                   </div>
 
-                  {/* Right Column */}
+                  {/* Right Column: Discounts, Advances, and Total */}
                   <div className="space-y-2">
                     <p>
-                      <span className="font-semibold">Subtotal:</span> ₹
-                      {subtotal.toFixed(2)}
+                      <span className="font-semibold">Discount ({discountPercentage}%):</span> ₹{discount.toFixed(2)}
                     </p>
                     <p>
-                      <span className="font-semibold">
-                        Discount ({discountPercentage}%):
-                      </span>{" "}
-                      ₹{discountAmount.toFixed(2)}
+                      <span className="font-semibold">Advance Paid:</span> ₹{advance.toFixed(2)}
                     </p>
                     <p>
-                      <span className="font-semibold">Advance Paid:</span> ₹
-                      {parseFloat(advanceDetails).toFixed(2)}
+                      <span className="font-semibold">Privilege Card Discount:</span> ₹{privilegeDiscount.toFixed(2)}
                     </p>
-                    <p>
-                      <span className="font-semibold">
-                        Privilege Card Discount:
-                      </span>{" "}
-                      ₹{privilegeDiscount.toFixed(2)}
-                    </p>
-                    <p>
-                      <span className="font-semibold">Balance Due:</span> ₹
-                      {finalAmount.toFixed(2)}
+                    <hr className="border-gray-400 my-2" />
+                    <p className="font-semibold">
+                      Total Amount Including GST: ₹{finalAmount.toFixed(2)}
                     </p>
                   </div>
                 </div>
 
                 {/* Loyalty Points Information */}
                 {privilegeCard && privilegeCardDetails && (
-                  <div className="mb-6">
+                  <div className="loyalty-points mb-6">
                     <p>
-                      <span className="font-semibold">
-                        Loyalty Points Redeemed:
-                      </span>{" "}
-                      ₹{redeemPointsAmount.toFixed(2)}
+                      <span className="font-semibold">Loyalty Points Redeemed:</span> ₹{redeemPointsAmount.toFixed(2)}
                     </p>
                     <p>
-                      <span className="font-semibold">
-                        Loyalty Points Gained:
-                      </span>{" "}
-                      {pointsToAdd}
+                      <span className="font-semibold">Loyalty Points Gained:</span> {pointsToAdd}
                     </p>
                   </div>
                 )}
 
-                {/* Payment Method and Advance Details */}
+                {/* Payment Method and Discount Details */}
                 <div className="flex flex-col md:flex-row items-center justify-between my-6 space-x-4">
                   {/* Discount Section */}
                   <div className="w-full md:w-1/2 mb-4 md:mb-0">
-                    <label className="block text-gray-700 font-medium mb-1">
-                      Apply Discount (%)
-                    </label>
+                    <label className="block text-gray-700 font-medium mb-1">Apply Discount (%)</label>
                     <input
                       type="number"
                       placeholder="Enter Discount Percentage"
@@ -2744,10 +2851,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
 
                   {/* Payment Method */}
                   <div className="w-full md:w-1/2">
-                    <label
-                      htmlFor="paymentMethod"
-                      className="block font-semibold mb-1"
-                    >
+                    <label htmlFor="paymentMethod" className="block font-semibold mb-1">
                       Payment Method:
                     </label>
                     <select
@@ -2775,9 +2879,9 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
               </div>
 
               {/* Action Buttons Outside Printable Area */}
-              <div className="flex flex-col md:flex-row justify-start mt-6 space-x-6 space-y-4 md:space-y-0">
+              <div className="action-buttons flex flex-col md:flex-row justify-start mt-6 space-x-6 space-y-4 md:space-y-0">
                 <button
-                  type="button" // Added type="button"
+                  type="button" // Ensure the type is set to "button"
                   onClick={handleOrderCompletion}
                   ref={saveOrderRef}
                   onKeyDown={async (e) => {
@@ -2787,9 +2891,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                       setTimeout(() => printButtonRef.current?.focus(), 100); // Move focus to Print button after saving
                     }
                   }}
-                  className={`bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg transition ${
-                    !paymentMethod ? "opacity-50 cursor-not-allowed" : ""
-                  } w-full md:w-auto`}
+                  className={`bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg transition ${!paymentMethod ? "opacity-50 cursor-not-allowed" : ""
+                    } w-full md:w-auto`}
                   disabled={!paymentMethod || isLoading}
                 >
                   {isEditing ? "Update Order" : "Submit Order"}{" "}
@@ -2799,7 +2902,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                 </button>
                 {allowPrint && (
                   <button
-                    type="button" // Added type="button"
+                    type="button" // Ensure the type is set to "button"
                     onClick={handlePrint}
                     ref={printButtonRef}
                     onKeyDown={(e) => {
@@ -2830,7 +2933,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                   </div>
                 )}
               </div>
-            </div>
+            </>
           )}
 
           {/* Navigation Buttons */}
@@ -2849,11 +2952,10 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                 type="button" // Added type="button"
                 ref={nextButtonRef}
                 onClick={nextStep}
-                className={`bg-green-500 hover:bg-green-600 text-white mx-2 px-4 py-2 rounded-lg ${
-                  step === 4 && !isPinVerified
-                    ? "opacity-50 cursor-not-allowed"
-                    : ""
-                }`}
+                className={`bg-green-500 hover:bg-green-600 text-white mx-2 px-4 py-2 rounded-lg ${step === 4 && !isPinVerified
+                  ? "opacity-50 cursor-not-allowed"
+                  : ""
+                  }`}
                 disabled={step === 4 && !isPinVerified}
               >
                 Next
