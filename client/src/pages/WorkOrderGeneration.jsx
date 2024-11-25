@@ -533,7 +533,6 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         product_entries: productEntries,
         advance_details: advance,
         due_date: dueDate,
-        discount_percentage: discount ? parseFloat(discount) : 0,
         mr_number: hasMrNumber ? mrNumber : null,
         patient_details: hasMrNumber
           ? {
@@ -548,7 +547,6 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         employee,
         payment_method: paymentMethod,
         subtotal,
-        discount_amount: discountAmount,
         discounted_subtotal: discountedSubtotal,
         cgst,
         sgst,
@@ -561,7 +559,6 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         customer_id: customerId,
         discount_percentage: discount ? parseFloat(discount) : 0,
         discount_amount: discountAmount,
-        discounted_subtotal: discountedSubtotal,
       };
 
       if (isEditing) {
@@ -750,7 +747,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         return;
       }
   
-      let newWorkOrderId = 1; // Default to 1 if no work orders exist
+      let newWorkOrderId = 3665; // Default to 1 if no work orders exist
       if (lastWorkOrders && lastWorkOrders.length > 0) {
         const lastWorkOrderId = parseInt(lastWorkOrders[0].work_order_id, 10);
         if (!isNaN(lastWorkOrderId)) {

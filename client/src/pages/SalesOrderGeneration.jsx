@@ -329,7 +329,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         return null;
       }
   
-      let lastSalesOrderId = 0;
+      let lastSalesOrderId = 4007;
       if (data && data.length > 0) {
         lastSalesOrderId = parseInt(data[0].sales_order_id, 10) || 0;
       }
@@ -1229,7 +1229,6 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
               ? selectedWorkOrder.work_order_id
               : null,
             items: productEntries,
-            advance_details: parseFloat(advanceDetails) || 0,
             mr_number: hasMrNumber === "yes" ? mrNumber : null,
             patient_phone: hasMrNumber === "yes" ? phoneNumber : customerPhone,
             employee: employee,
