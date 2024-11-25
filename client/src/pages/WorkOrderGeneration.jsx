@@ -741,12 +741,12 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         .select('work_order_id')
         .order('work_order_id', { ascending: false })
         .limit(1);
-  
+
       if (error) {
         console.error("Error fetching last work order:", error);
         return;
       }
-  
+
       let newWorkOrderId = 3665; // Default to 1 if no work orders exist
       if (lastWorkOrders && lastWorkOrders.length > 0) {
         const lastWorkOrderId = parseInt(lastWorkOrders[0].work_order_id, 10);
@@ -754,14 +754,14 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
           newWorkOrderId = lastWorkOrderId + 1;
         }
       }
-  
+
       setWorkOrderId(newWorkOrderId.toString());
       console.log("Generated Work Order ID:", newWorkOrderId);
     } catch (error) {
       console.error("Error generating Work Order ID:", error);
     }
   };
-  
+
 
   const fetchWorkOrderDetails = async () => {
     try {
@@ -1006,11 +1006,26 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                   {/* Product Price (Read-Only) */}
                   <div className="relative w-1/4">
                     <input
-                      type="text"
+                      type="number"
+                      id={`productPrice-${index}`}
+                      placeholder="Price"
                       value={product.price}
-                      readOnly
-                      className="border border-gray-300 px-4 py-3 rounded-lg w-full bg-gray-100"
+                      onChange={(e) => {
+                        const updatedPrice = e.target.value;
+                        setProductEntries((prevEntries) => {
+                          const updatedEntries = [...prevEntries];
+                          updatedEntries[index].price = updatedPrice; // Update the price
+                          return updatedEntries;
+                        });
+                      }}
+                      onBlur={() => handleBlur(index, "price")} // Validate on blur
+                      className={`border border-gray-300 px-4 py-3 rounded-lg w-full text-center ${validationErrors[`productPrice-${index}`] ? 'border-red-500' : ''}`}
                     />
+                    {validationErrors[`productPrice-${index}`] && (
+                      <p className="text-red-500 text-xs mt-1">
+                        {validationErrors[`productPrice-${index}`]}
+                      </p>
+                    )}
                   </div>
 
                   {/* Quantity Input */}
@@ -1437,8 +1452,8 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                 <tbody>
                   {productEntries.map((product, index) => {
                     const originalPrice = parseFloat(product.price) || 0;
-      const basePrice = originalPrice / 112 * 100; // Adjusted price
-      const productSubtotal = basePrice * (parseInt(product.quantity) || 0);
+                    const basePrice = originalPrice / 112 * 100; // Adjusted price
+                    const productSubtotal = basePrice * (parseInt(product.quantity) || 0);
                     return (
                       <tr key={index} className="text-center">
                         <td className="py-2 px-4 border-b">{product.id}</td>
@@ -1454,40 +1469,40 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
               </table>
 
               {/* Financial Summary */}
-<div className="financial-summary grid grid-cols-1 md:grid-cols-2 gap-4">
-  {/* Left Column */}
-  <div className="space-y-2">
-    <p>
-      <span className="font-semibold">Subtotal (Base Price):</span> ₹{subtotal.toFixed(2)}
-    </p>
-    <p>
-      <span className="font-semibold">Discount ({discount || 0}%):</span> ₹{discountAmount.toFixed(2)}
-    </p>
-    <p>
-      <span className="font-semibold">Discounted Subtotal:</span> ₹{discountedSubtotal.toFixed(2)}
-    </p>
-    <p>
-      <span className="font-semibold">CGST (6%):</span> ₹{cgst.toFixed(2)}
-    </p>
-    <p>
-      <span className="font-semibold">SGST (6%):</span> ₹{sgst.toFixed(2)}
-    </p>
-  </div>
+              <div className="financial-summary grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Left Column */}
+                <div className="space-y-2">
+                  <p>
+                    <span className="font-semibold">Subtotal (Base Price):</span> ₹{subtotal.toFixed(2)}
+                  </p>
+                  <p>
+                    <span className="font-semibold">Discount ({discount || 0}%):</span> ₹{discountAmount.toFixed(2)}
+                  </p>
+                  <p>
+                    <span className="font-semibold">Discounted Subtotal:</span> ₹{discountedSubtotal.toFixed(2)}
+                  </p>
+                  <p>
+                    <span className="font-semibold">CGST (6%):</span> ₹{cgst.toFixed(2)}
+                  </p>
+                  <p>
+                    <span className="font-semibold">SGST (6%):</span> ₹{sgst.toFixed(2)}
+                  </p>
+                </div>
 
-  {/* Right Column */}
-  <div className="space-y-2">
-    <p>
-      <span className="font-semibold">Total Amount (Including GST):</span> ₹{totalAmount.toFixed(2)}
-    </p>
+                {/* Right Column */}
+                <div className="space-y-2">
+                  <p>
+                    <span className="font-semibold">Total Amount (Including GST):</span> ₹{totalAmount.toFixed(2)}
+                  </p>
 
-    <p>
-      <span className="font-semibold">Advance Paid:</span> ₹{advance.toFixed(2)}
-    </p>
-    <p>
-      <span className="font-semibold">Balance Due:</span> ₹{balanceDue.toFixed(2)}
-    </p>
-  </div>
-</div>
+                  <p>
+                    <span className="font-semibold">Advance Paid:</span> ₹{advance.toFixed(2)}
+                  </p>
+                  <p>
+                    <span className="font-semibold">Balance Due:</span> ₹{balanceDue.toFixed(2)}
+                  </p>
+                </div>
+              </div>
 
 
 
