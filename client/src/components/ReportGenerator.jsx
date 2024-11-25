@@ -173,8 +173,8 @@ const addFooter = (doc) => {
 
 const ReportGenerator = ({ isCollapsed }) => {
   // State Variables
-  const { branch: userBranch, name: employeeName } = useAuth(); // Fetch branch and employee name from AuthContext
-  const [reportType, setReportType] = useState('sales_orders'); // 'sales_orders', 'work_orders', 'privilegecards', 'product_sales', 'modification_reports', 'consolidated'
+  const { branch: userBranch, name: employeeName, role } = useAuth(); // Fetch branch, employee name, and role from AuthContext
+  const [reportType, setReportType] = useState(role === 'employee' ? 'consolidated' : 'sales_orders'); // Default based on role
   const [reportPeriod, setReportPeriod] = useState('daily'); // 'daily', 'monthly', 'range'
   const [date, setDate] = useState(''); // For daily reports
   const [monthYear, setMonthYear] = useState(''); // For monthly reports (format: YYYY-MM)
@@ -1052,6 +1052,26 @@ const ReportGenerator = ({ isCollapsed }) => {
     }
   };
 
+  // Define report types based on role
+  const reportTypes = role === 'employee' ? [
+    { value: 'consolidated', label: 'Consolidated' }
+  ] : [
+    { value: 'sales_orders', label: 'Sales Orders' },
+    { value: 'work_orders', label: 'Work Orders' },
+    { value: 'privilegecards', label: 'Privilege Cards' },
+    { value: 'product_sales', label: 'Product Sales' },
+    { value: 'modification_reports', label: 'Modification Reports' },
+    { value: 'consolidated', label: 'Consolidated' }
+  ];
+
+  // Ensure reportType is valid for the current role
+  useEffect(() => {
+    if (!reportTypes.some(type => type.value === reportType)) {
+      setReportType(reportTypes[0].value);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [role]);
+
   return (
     <div
       className={`flex justify-center transition-all duration-300 ${isCollapsed ? 'ml-0' : 'ml-14'} my-20 px-4`}
@@ -1092,12 +1112,9 @@ const ReportGenerator = ({ isCollapsed }) => {
                 className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
                 aria-label="Select Report Type"
               >
-                <option value="sales_orders">Sales Orders</option>
-                <option value="work_orders">Work Orders</option>
-                <option value="privilegecards">Privilege Cards</option>
-                <option value="product_sales">Product Sales</option>
-                <option value="modification_reports">Modification Reports</option>
-                <option value="consolidated">Consolidated</option> {/* New Report Type */}
+                {reportTypes.map((type) => (
+                  <option key={type.value} value={type.value}>{type.label}</option>
+                ))}
               </select>
             </div>
 
@@ -1284,269 +1301,6 @@ const ReportGenerator = ({ isCollapsed }) => {
               }}
               className={`w-full sm:w-1/2 px-4 py-2 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-md flex items-center justify-center transition ${
                 loading || (!isCombined && selectedBranches.length === 0) ? 'opacity-50 cursor-not-allowed' : ''
-              }`}
-              disabled={loading || (!isCombined && selectedBranches.length === 0)}
-              aria-label="Generate Report"
-            >
-              {loading ? (
-                <>
-                  <svg
-                    className="animate-spin h-5 w-5 mr-3 border-t-2 border-b-2 border-white rounded-full"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path d="M4 12a8 8 0 018-8" stroke="currentColor" strokeWidth="4"></path>
-                  </svg>
-                  Generating Report...
-                </>
-              ) : (
-                'Generate Report'
-              )}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
-  
-
-  
-
-  return (
-    <div
-      className={`flex justify-center transition-all duration-300 ${isCollapsed ? 'ml-0' : 'ml-14'} my-20 px-4`}
-    >
-      <div className="w-full max-w-4xl">
-        <h1 className="text-3xl font-bold mb-6 text-center text-gray-800">Generate Stock Reports</h1>
-
-        {/* Notification */}
-        {error && (
-          <div className="flex items-center mb-6 p-4 rounded-lg bg-red-100 text-red-700">
-            <ExclamationCircleIcon className="w-6 h-6 mr-2" />
-            <span>{error}</span>
-          </div>
-        )}
-        {success && (
-          <div className="flex items-center mb-6 p-4 rounded-lg bg-green-100 text-green-700">
-            <CheckCircleIcon className="w-6 h-6 mr-2" />
-            <span>{success}</span>
-          </div>
-        )}
-
-        {/* Report Type and Period Selection */}
-        <div className="bg-white shadow-lg rounded-lg p-6 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Report Type Selection */}
-            <div>
-              <label htmlFor="reportType" className="block text-sm font-medium text-gray-700 mb-1">
-                Report Type
-              </label>
-              <select
-                id="reportType"
-                ref={reportTypeRef}
-                value={reportType}
-                onChange={(e) => setReportType(e.target.value)}
-                onKeyDown={(e) =>
-                  handleKeyDown(e, reportPeriodRef)
-                }
-                className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
-                aria-label="Select Report Type"
-              >
-                <option value="sales_orders">Sales Orders</option>
-                <option value="work_orders">Work Orders</option>
-                <option value="privilegecards">Privilege Cards</option>
-                <option value="product_sales">Product Sales</option>
-                <option value="modification_reports">Modification Reports</option>
-                <option value="consolidated">Consolidated</option> {/* New Report Type */}
-              </select>
-            </div>
-
-            {/* Report Period Selection */}
-            <div>
-              <label htmlFor="reportPeriod" className="block text-sm font-medium text-gray-700 mb-1">
-                Report Period
-              </label>
-              <select
-                id="reportPeriod"
-                value={reportPeriod}
-                ref={reportPeriodRef}
-                onChange={(e) => {
-                  setReportPeriod(e.target.value);
-                  // Reset date inputs when report period changes
-                  setDate('');
-                  setMonthYear('');
-                  setFromDate('');
-                  setToDate('');
-                }}
-                onKeyDown={(e) =>
-                  handleKeyDown(
-                    e,
-                    reportPeriod === 'daily'
-                      ? dateRef
-                      : reportPeriod === 'monthly'
-                      ? monthYearRef
-                      : fromDateRef
-                  )
-                }
-                className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
-                aria-label="Select Report Period"
-              >
-                <option value="daily">Daily</option>
-                <option value="monthly">Monthly</option>
-                <option value="range">Date Range</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Report Scope Selection */}
-          <div className="mt-6">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Report Scope
-            </label>
-            <div className="flex space-x-4">
-              {/* Branch-wise Button */}
-              <button
-                type="button"
-                onClick={() => toggleReportScope('branch')}
-                onKeyDown={(e) => handleKeyDown(e, isCombined ? generateButtonRef : branchSelectionRef)}
-                className={`px-4 py-2 rounded-md border ${
-                  !isCombined
-                    ? 'bg-green-500 text-white border-green-500'
-                    : 'bg-white text-gray-700 border-gray-300'
-                } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500`}
-                aria-label="Select Branch-wise Report Scope"
-              >
-                Branch-wise
-              </button>
-              {/* Combined Button */}
-              <button
-                type="button"
-                onClick={() => toggleReportScope('combined')}
-                onKeyDown={(e) => handleKeyDown(e, generateButtonRef)}
-                className={`px-4 py-2 rounded-md border ${
-                  isCombined
-                    ? 'bg-green-500 text-white border-green-500'
-                    : 'bg-white text-gray-700 border-gray-300'
-                } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500`}
-                aria-label="Select Combined Report Scope"
-              >
-                Combined (All Branches)
-              </button>
-            </div>
-          </div>
-
-          {/* Branch Selection */}
-          {!isCombined && (
-            <div className="mt-6">
-              <label htmlFor="branchSelection" className="block text-sm font-medium text-gray-700 mb-2">
-                Select Branches
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {allBranches.map((branch) => (
-                  <button
-                    key={branch.code}
-                    type="button"
-                    onClick={() => toggleBranch(branch.code)}
-                    onKeyDown={(e) => handleKeyDown(e, e.target.nextSibling || generateButtonRef)}
-                    className={`px-4 py-2 rounded-md border ${
-                      selectedBranches.includes(branch.code)
-                        ? 'bg-green-500 text-white border-green-500'
-                        : 'bg-white text-gray-700 border-gray-300'
-                    } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500`}
-                    aria-label={`Toggle branch ${branch.name}`}
-                  >
-                    {branch.name}
-                  </button>
-                ))}
-              </div>
-              {selectedBranches.length === 0 && (
-                <p className="text-sm text-red-500 mt-1">Please select at least one branch.</p>
-              )}
-            </div>
-          )}
-
-          {/* Date Selection */}
-          {reportPeriod === 'daily' ? (
-            <div className="mt-6">
-              <label htmlFor="selectDate" className="block text-sm font-medium text-gray-700 mb-1">Select Date</label>
-              <input
-                type="date"
-                id="selectDate"
-                ref={dateRef}
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                onKeyDown={(e) => handleKeyDown(e, isCombined ? generateButtonRef : branchSelectionRef)}
-                className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
-                required
-                aria-required="true"
-              />
-            </div>
-          ) : reportPeriod === 'monthly' ? (
-            <div className="mt-6">
-              <label htmlFor="selectMonthYear" className="block text-sm font-medium text-gray-700 mb-1">Select Month and Year</label>
-              <input
-                type="month"
-                id="selectMonthYear"
-                ref={monthYearRef}
-                value={monthYear}
-                onChange={(e) => setMonthYear(e.target.value)}
-                onKeyDown={(e) => handleKeyDown(e, isCombined ? generateButtonRef : branchSelectionRef)}
-                className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
-                required
-                aria-required="true"
-              />
-            </div>
-          ) : reportPeriod === 'range' ? (
-            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* From Date */}
-              <div>
-                <label htmlFor="fromDate" className="block text-sm font-medium text-gray-700 mb-1">From Date</label>
-                <input
-                  type="date"
-                  id="fromDate"
-                  value={fromDate}
-                  ref={fromDateRef}
-                  onChange={(e) => setFromDate(e.target.value)}
-                  onKeyDown={(e) => handleKeyDown(e, toDateRef)}
-                  className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
-                  required
-                  aria-required="true"
-                />
-              </div>
-              {/* To Date */}
-              <div>
-                <label htmlFor="toDate" className=" block text-sm font-medium text-gray-700 mb-1">To Date</label>
-                <input
-                  type="date"
-                  id="toDate"
-                  value={toDate}
-                  ref={toDateRef}
-                  onChange={(e) => setToDate(e.target.value)}
-                  onKeyDown={(e) => handleKeyDown(e, generateButtonRef)}
-                  className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
-                  required
-                  aria-required="true"
-                />
-              </div>
-            </div>
-          ) : null}
-
-          {/* Generate Report Button */}
-          <div className="mt-8 flex justify-center">
-            <button
-              ref={generateButtonRef}
-              onClick={handleGenerateReport}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  handleGenerateReport();
-                }
-              }}
-              className={`w-full sm:w-1/2 px-4 py-2 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-md flex items-center justify-center transition ${
-                loading ? 'opacity-50 cursor-not-allowed' : ''
               }`}
               disabled={loading || (!isCombined && selectedBranches.length === 0)}
               aria-label="Generate Report"

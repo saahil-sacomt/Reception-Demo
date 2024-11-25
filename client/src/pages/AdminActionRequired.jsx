@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import supabase from '../supabaseClient';
 import { useAuth } from '../context/AuthContext';
-import { CheckIcon, XMarkIcon, InformationCircleIcon } from "@heroicons/react/24/outline"; // Enhanced Icons
+import { CheckIcon, XMarkIcon } from "@heroicons/react/24/outline"; // Enhanced Icons
 import dayjs from 'dayjs'; // Import dayjs for date manipulation
 
 const AdminActionRequired = ({ isCollapsed }) => {
@@ -13,107 +13,77 @@ const AdminActionRequired = ({ isCollapsed }) => {
   const [actionLoading, setActionLoading] = useState(null); // To track action on specific request
   const [notification, setNotification] = useState({ type: '', message: '' });
 
-  // Function to handle auto-approval for eligible work orders
-  const handleAutoApprove = async (request, approvedRequests) => {
-    if (request.order_type !== 'work_order') return; // Only process work_order types
-
-    try {
-      // Fetch the related work_order's created_at
-      const { data: workOrder, error: workOrderError } = await supabase
-        .from('work_orders')
-        .select('created_at')
-        .eq('work_order_id', request.order_id)
-        .single();
-
-      if (workOrderError) {
-        console.error(`Error fetching work order for Request ID: ${request.request_id}:`, workOrderError);
-        return;
-      }
-
-      const workOrderCreatedAt = dayjs(workOrder.created_at);
-      const now = dayjs();
-      const diffHours = now.diff(workOrderCreatedAt, 'hour');
-
-      console.log(`Request ID: ${request.request_id}, Work Order Created At: ${workOrderCreatedAt.format()}, Now: ${now.format()}, Difference (hours): ${diffHours}`);
-
-      // Ensure the work order was created in the past and within 12 hours
-      if (diffHours >= 0 && diffHours <= 12) {
-        // Auto-approve the request
-        const { error: updateError } = await supabase
-          .from('modification_requests')
-          .update({ status: 'approved' })
-          .eq('request_id', request.request_id);
-
-        if (!updateError) {
-          approvedRequests.push(request.request_id);
-        } else {
-          console.error(`Error auto-approving Request ID: ${request.request_id}:`, updateError);
-          // Optionally, you can push to a separate array for failed auto-approvals
-        }
-      } else {
-        console.log(`Request ID: ${request.request_id} not eligible for auto-approval.`);
-      }
-    } catch (err) {
-      console.error(`Unexpected error in auto-approving Request ID: ${request.request_id}:`, err);
-    }
-  };
-  
-  
-
+  /**
+   * Fetches all pending modification requests and segregates them into sales and work orders.
+   * This function ensures that only pending requests are displayed to the admin.
+   */
   const fetchRequests = async () => {
     setLoading(true);
     setNotification({ type: '', message: '' });
 
-    const { data, error } = await supabase
-      .from('modification_requests')
-      .select('*')
-      .eq('status', 'pending');
+    try {
+      // Fetch pending modification requests
+      const { data, error } = await supabase
+        .from('modification_requests')
+        .select('*')
+        .eq('status', 'pending');
 
-    if (error) {
-      console.error("Error fetching requests:", error);
-      setNotification({ type: 'error', message: 'Failed to fetch requests. Please try again.' });
-    } else {
-      // Segregate based on order_type
-      const sales = data.filter(request => request.order_type === 'sales_order');
-      const work = data.filter(request => request.order_type === 'work_order');
+      if (error) {
+        console.error("Error fetching requests:", error);
+        setNotification({ type: 'error', message: 'Failed to fetch requests. Please try again.' });
+      } else {
+        // Segregate requests based on order_type
+        const sales = data.filter(request => request.order_type === 'sales_order');
+        const work = data.filter(request => request.order_type === 'work_order');
 
-      setSalesRequests(sales);
-      setWorkRequests(work);
-
-      // Handle auto-approval for eligible work orders
-      work.forEach(request => {
-        handleAutoApprove(request);
-      });
+        setSalesRequests(sales);
+        setWorkRequests(work);
+      }
+    } catch (err) {
+      console.error("Unexpected error fetching requests:", err);
+      setNotification({ type: 'error', message: 'An unexpected error occurred.' });
     }
+
     setLoading(false);
   };
 
-  useEffect(() => {
-    if (role === 'admin') {
-      fetchRequests();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [role]);
-
+  /**
+   * Approves a specific modification request.
+   * @param {string} requestId - The ID of the request to approve.
+   */
   const handleApproveRequest = async (requestId) => {
     if (!window.confirm('Are you sure you want to approve this request?')) return;
 
     setActionLoading(requestId);
-    const { error } = await supabase
-      .from('modification_requests')
-      .update({ status: 'approved' })
-      .eq('request_id', requestId);
+    setNotification({ type: '', message: '' });
 
-    if (!error) {
-      setNotification({ type: 'success', message: 'Request approved successfully.' });
-      fetchRequests(); // Refresh list
-    } else {
-      console.error("Error approving request:", error);
-      setNotification({ type: 'error', message: 'Failed to approve request.' });
+    try {
+      const { error } = await supabase
+        .from('modification_requests')
+        .update({ status: 'approved' })
+        .eq('request_id', requestId);
+
+      if (!error) {
+        setNotification({ type: 'success', message: 'Request approved successfully.' });
+        // Remove the approved request from local state without refetching
+        setSalesRequests(prev => prev.filter(request => request.request_id !== requestId));
+        setWorkRequests(prev => prev.filter(request => request.request_id !== requestId));
+      } else {
+        console.error("Error approving request:", error);
+        setNotification({ type: 'error', message: 'Failed to approve request.' });
+      }
+    } catch (err) {
+      console.error("Unexpected error approving request:", err);
+      setNotification({ type: 'error', message: 'An unexpected error occurred.' });
     }
+
     setActionLoading(null);
   };
 
+  /**
+   * Rejects a specific modification request with a provided reason.
+   * @param {string} requestId - The ID of the request to reject.
+   */
   const handleRejectRequest = async (requestId) => {
     const reason = prompt("Please provide a reason for rejecting this request:");
     if (!reason) {
@@ -124,22 +94,44 @@ const AdminActionRequired = ({ isCollapsed }) => {
     if (!window.confirm('Are you sure you want to reject this request?')) return;
 
     setActionLoading(requestId);
-    const { error } = await supabase
-      .from('modification_requests')
-      .update({ status: 'rejected', rejection_reason: reason }) // Ensure 'rejection_reason' column exists in your table
-      .eq('request_id', requestId);
+    setNotification({ type: '', message: '' });
 
-    if (!error) {
-      setNotification({ type: 'success', message: 'Request rejected successfully.' });
-      fetchRequests(); // Refresh list
-    } else {
-      console.error("Error rejecting request:", error);
-      setNotification({ type: 'error', message: 'Failed to reject request.' });
+    try {
+      const { error } = await supabase
+        .from('modification_requests')
+        .update({ status: 'rejected', rejection_reason: reason }) // Ensure 'rejection_reason' column exists in your table
+        .eq('request_id', requestId);
+
+      if (!error) {
+        setNotification({ type: 'success', message: 'Request rejected successfully.' });
+        // Remove the rejected request from local state without refetching
+        setSalesRequests(prev => prev.filter(request => request.request_id !== requestId));
+        setWorkRequests(prev => prev.filter(request => request.request_id !== requestId));
+      } else {
+        console.error("Error rejecting request:", error);
+        setNotification({ type: 'error', message: 'Failed to reject request.' });
+      }
+    } catch (err) {
+      console.error("Unexpected error rejecting request:", err);
+      setNotification({ type: 'error', message: 'An unexpected error occurred.' });
     }
+
     setActionLoading(null);
   };
 
-  // Auto-hide notifications after 5 seconds
+  /**
+   * Fetches the pending modification requests when the component mounts or when the role changes.
+   */
+  useEffect(() => {
+    if (role === 'admin') {
+      fetchRequests();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [role]);
+
+  /**
+   * Automatically hides notifications after 5 seconds.
+   */
   useEffect(() => {
     if (notification.message) {
       const timer = setTimeout(() => {
@@ -208,6 +200,7 @@ const AdminActionRequired = ({ isCollapsed }) => {
                                     actionLoading === request.request_id ? 'opacity-50 cursor-not-allowed' : ''
                                   }`}
                                   disabled={actionLoading === request.request_id}
+                                  aria-label={`Approve request ${request.request_id}`}
                                 >
                                   <CheckIcon className="w-5 h-5 mr-1" />
                                   Approve
@@ -218,6 +211,7 @@ const AdminActionRequired = ({ isCollapsed }) => {
                                     actionLoading === request.request_id ? 'opacity-50 cursor-not-allowed' : ''
                                   }`}
                                   disabled={actionLoading === request.request_id}
+                                  aria-label={`Reject request ${request.request_id}`}
                                 >
                                   <XMarkIcon className="w-5 h-5 mr-1" />
                                   Reject
@@ -264,6 +258,7 @@ const AdminActionRequired = ({ isCollapsed }) => {
                                     actionLoading === request.request_id ? 'opacity-50 cursor-not-allowed' : ''
                                   }`}
                                   disabled={actionLoading === request.request_id}
+                                  aria-label={`Approve request ${request.request_id}`}
                                 >
                                   <CheckIcon className="w-5 h-5 mr-1" />
                                   Approve
@@ -274,6 +269,7 @@ const AdminActionRequired = ({ isCollapsed }) => {
                                     actionLoading === request.request_id ? 'opacity-50 cursor-not-allowed' : ''
                                   }`}
                                   disabled={actionLoading === request.request_id}
+                                  aria-label={`Reject request ${request.request_id}`}
                                 >
                                   <XMarkIcon className="w-5 h-5 mr-1" />
                                   Reject

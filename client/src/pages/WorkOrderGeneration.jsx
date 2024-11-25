@@ -6,6 +6,8 @@ import { useAuth } from '../context/AuthContext';
 import EmployeeVerification from "../components/EmployeeVerification";
 import { useNavigate, useParams } from 'react-router-dom';
 import logo from '../assets/sreenethraenglishisolated.png';
+import { useReactToPrint } from 'react-to-print';
+import BillPrint from '../components/BillPrint';
 
 const WorkOrderGeneration = ({ isCollapsed }) => {
   const { branch, name, user } = useAuth();
@@ -40,6 +42,28 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [modificationRequestId, setModificationRequestId] = useState(null);
+
+  // Refs
+  const dueDateRef = useRef(null);
+  const mrNumberRef = useRef(null);
+  const employeeRef = useRef(null);
+  const paymentMethodRef = useRef(null);
+  const gstNumberRef = useRef(null);
+  const advanceDetailsRef = useRef(null);
+  const discountRef = useRef(null); // Ref for discount field
+  const printButtonRef = useRef(null);
+  const saveButtonRef = useRef(null);
+  const newWorkOrderButtonRef = useRef(null);
+  const nextButtonRef = useRef(null);
+  const fetchButtonRef = useRef(null);
+  const quantityRefs = useRef([]);
+  const yesButtonRef = useRef(null);
+  const noButtonRef = useRef(null);
+  const customerNameRef = useRef(null);
+  const customerPhoneRef = useRef(null);
+  const billPrintRef = useRef();
+
+  const navigate = useNavigate();
 
   // Fetch employees from the Supabase `employees` table
   const fetchEmployees = async () => {
@@ -77,8 +101,6 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       });
     }
   };
-
-  const navigate = useNavigate();
 
   // Utility function to get the current financial year
   const getFinancialYear = () => {
@@ -213,36 +235,22 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       const quantity = parseInt(product.quantity) || 0;
       return total + price * quantity;
     }, 0);
-  
+
     // Ensure discountPercentage is between 0 and 100
     const validDiscountPercentage = Math.min(Math.max(discountPercentage || 0, 0), 100);
     const discountAmount = (subtotal * validDiscountPercentage) / 100;
     const discountedSubtotal = Math.max(subtotal - discountAmount, 0); // Prevent negative subtotal
-  
+
     const cgst = (subtotal * 6) / 100 || 0;
     const sgst = (subtotal * 6) / 100 || 0;
-  
+
     // Exclude cgst and sgst from totalAmount
     const totalAmount = Math.max(discountedSubtotal, 0); // Prevent negative total
-  
+
     return { subtotal, discountAmount, discountedSubtotal, cgst, sgst, totalAmount };
   };
 
   // References for managing field focus
-  const dueDateRef = useRef(null);
-  const mrNumberRef = useRef(null);
-  const employeeRef = useRef(null);
-  const paymentMethodRef = useRef(null);
-  const gstNumberRef = useRef(null);
-  const advanceDetailsRef = useRef(null);
-  const discountRef = useRef(null); // Ref for discount field
-  const printButtonRef = useRef(null);
-  const saveButtonRef = useRef(null);
-  const newWorkOrderButtonRef = useRef(null);
-  const nextButtonRef = useRef(null);
-  const fetchButtonRef = useRef(null);
-  const quantityRefs = useRef([]);
-
   const getTodayDate = () => {
     const today = new Date();
     const year = today.getFullYear();
@@ -257,11 +265,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
 
   const focusFirstFieldOfStep = () => {
     if (step === 1) {
-      if (isEditing) {
-        document.getElementById(`productId-0`)?.focus();
-      } else {
-        document.getElementById(`productId-0`)?.focus();
-      }
+      document.getElementById(`productId-0`)?.focus();
     }
     if (step === 2) {
       dueDateRef.current?.focus();
@@ -280,21 +284,21 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   };
 
   // Updates in the Discount field handler
-const handleDiscountInput = (e) => {
-  let value = e.target.value.replace(/^0+/, ""); // Remove leading zeros
-  if (!value) value = ""; // Ensure empty string for invalid input
-  const numericValue = Math.min(Math.max(parseFloat(value) || 0, 0), 100); // Clamp value between 0 and 100
-  setDiscount(numericValue.toString()); // Set cleaned value
-};
+  const handleDiscountInput = (e) => {
+    let value = e.target.value.replace(/^0+/, ""); // Remove leading zeros
+    if (!value) value = ""; // Ensure empty string for invalid input
+    const numericValue = Math.min(Math.max(parseFloat(value) || 0, 0), 100); // Clamp value between 0 and 100
+    setDiscount(numericValue.toString()); // Set cleaned value
+  };
 
-// Add advance amount validation
-const validateAdvanceAmount = () => {
-  if (advance > totalAmount) {
-    alert("Advance amount cannot exceed the total amount.");
-    return false;
-  }
-  return true;
-};
+  // Add advance amount validation
+  const validateAdvanceAmount = () => {
+    if (parseFloat(advanceDetails) > totalAmount) {
+      alert("Advance amount cannot exceed the total amount.");
+      return false;
+    }
+    return true;
+  };
 
   const handleEnterKey = (e, nextFieldRef, action) => {
     if (e.key === "Enter") {
@@ -341,6 +345,17 @@ const validateAdvanceAmount = () => {
       setIsPrinted(false); // Reset printing state
     }
   };
+
+  // Print handler using react-to-print
+  const handlePrint = useReactToPrint({
+    content: () => billPrintRef.current,
+    documentTitle: `WorkOrder-${workOrderId}`,
+    onAfterPrint: () => {
+      setIsPrinted(true); // Mark as printed
+      resetForm();
+      navigate("/home");
+    },
+  });
 
   const addNewProductEntry = () => {
     setProductEntries((prevEntries) => {
@@ -413,57 +428,44 @@ const validateAdvanceAmount = () => {
 
   const saveWorkOrder = async () => {
     if (isSaving) {
-      alert('Please wait while the work order is being saved.');
+      alert("Please wait while the work order is being saved.");
       return;
     }
+
     setIsSaving(true);
 
+    // Validate advance amount
     if (!validateAdvanceAmount()) {
       setIsSaving(false);
       return;
     }
 
-    // Validate Employee Selection
-    if (!employee) {
-      setValidationErrors((prev) => ({ ...prev, employee: "Employee selection is required." }));
-      employeeRef.current?.focus();
-      setIsSaving(false);
-      return;
+    // Validation Checks
+    const validations = [
+      { condition: !employee, errorKey: "employee", message: "Employee selection is required.", ref: employeeRef },
+      { condition: isB2B && !gstNumber, errorKey: "gstNumber", message: "GST Number is required for B2B orders.", ref: gstNumberRef },
+      { condition: discount && (isNaN(discount) || discount < 0 || discount > 100), errorKey: "discount", message: "Enter a valid discount percentage (0-100).", ref: discountRef },
+      { condition: !paymentMethod, errorKey: "paymentMethod", message: "Payment method is required.", ref: paymentMethodRef },
+    ];
+
+    for (const validation of validations) {
+      if (validation.condition) {
+        setValidationErrors((prev) => ({ ...prev, [validation.errorKey]: validation.message }));
+        validation.ref?.current?.focus();
+        setIsSaving(false);
+        return;
+      }
     }
 
-    // Validate B2B GST Number
-    if (isB2B && !gstNumber) {
-      setValidationErrors((prev) => ({ ...prev, gstNumber: "GST Number is required for B2B orders." }));
-      gstNumberRef.current?.focus();
-      setIsSaving(false);
-      return;
-    }
-
-    // Validate Discount Field
-    if (discount && (isNaN(discount) || discount < 0 || discount > 100)) {
-      setValidationErrors((prev) => ({ ...prev, discount: "Enter a valid discount percentage (0-100)." }));
-      discountRef.current?.focus();
-      setIsSaving(false);
-      return;
-    }
-
-    // Validate Payment Method
-    if (!paymentMethod) {
-      setValidationErrors((prev) => ({ ...prev, paymentMethod: "Payment method is required." }));
-      paymentMethodRef.current?.focus();
-      setIsSaving(false);
-      return;
-    }
-
-    // Validate all product entries
-    let productErrors = {};
+    // Validate product entries
+    const productErrors = {};
     productEntries.forEach((product, index) => {
       if (!product.id) productErrors[`productId-${index}`] = "Product ID is required.";
       if (!product.price) productErrors[`productPrice-${index}`] = "Price is required.";
       if (!product.quantity) productErrors[`productQuantity-${index}`] = "Quantity is required.";
     });
 
-    // Validate Step 3 based on MR number presence
+    // Step 3 Validation for MR number or customer details
     if (step === 3) {
       if (hasMrNumber === null) {
         productErrors["hasMrNumber"] = "Please indicate if you have an MR Number.";
@@ -475,66 +477,93 @@ const validateAdvanceAmount = () => {
       }
     }
 
+    // Handle Product Validation Errors
     if (Object.keys(productErrors).length > 0) {
       setValidationErrors(productErrors);
-      // Focus on the first error field
       const firstErrorKey = Object.keys(productErrors)[0];
-      if (firstErrorKey.startsWith('productId') || firstErrorKey.startsWith('productPrice') || firstErrorKey.startsWith('productQuantity')) {
-        const index = firstErrorKey.split('-')[1];
-        document.getElementById(firstErrorKey)?.focus();
-      } else if (firstErrorKey === 'dueDate') {
-        dueDateRef.current?.focus();
-      } else if (firstErrorKey === 'mrNumber') {
-        mrNumberRef.current?.focus();
-      } else if (firstErrorKey === 'gstNumber') {
-        gstNumberRef.current?.focus();
-      } else if (firstErrorKey === 'employee') {
-        employeeRef.current?.focus();
-      } else if (firstErrorKey === 'paymentMethod') {
-        paymentMethodRef.current?.focus();
-      } else if (firstErrorKey === 'advanceDetails') {
-        advanceDetailsRef.current?.focus();
-      } else if (firstErrorKey === 'discount') {
-        discountRef.current?.focus();
-      } else if (firstErrorKey === 'hasMrNumber') {
-        yesButtonRef.current?.focus();
-      } else if (firstErrorKey === 'customerName') {
-        customerNameRef.current?.focus();
-      } else if (firstErrorKey === 'customerPhone') {
-        customerPhoneRef.current?.focus();
-      }
-      setIsSaving(false); // Prevent saving
+      document.getElementById(firstErrorKey)?.focus();
+      setIsSaving(false);
       return;
     }
 
-    // Clear errors and proceed to save
+    // Clear errors
     setValidationErrors({});
 
     try {
+      let customerId = null;
+
+      if (hasMrNumber) {
+        // Fetch existing customer by MR number
+        const { data: existingCustomer, error: customerError } = await supabase
+          .from("patients")
+          .select("id")
+          .eq("mr_number", mrNumber.trim())
+          .single();
+
+        if (customerError) {
+          alert("No valid patient found with the provided MR Number.");
+          setIsSaving(false);
+          return;
+        }
+
+        customerId = existingCustomer?.id;
+      } else {
+        // Create new customer
+        const { data: newCustomer, error: customerCreationError } = await supabase
+          .from("customers")
+          .insert({
+            name: customerName.trim(),
+            phone_number: customerPhone.trim(),
+          })
+          .select("id")
+          .single();
+
+        if (customerCreationError) {
+          alert("Failed to create a new customer.");
+          setIsSaving(false);
+          return;
+        }
+
+        customerId = newCustomer?.id;
+      }
+
+      // Prepare the payload
       let payload = {
         product_entries: productEntries,
         advance_details: advance,
         due_date: dueDate,
-        discount_percentage: discount ? parseFloat(discount) : 0, // New discount field
+        discount_percentage: discount ? parseFloat(discount) : 0,
         mr_number: hasMrNumber ? mrNumber : null,
-        patient_details: hasMrNumber ? { mr_number: mrNumber } : { name: customerName, phone_number: customerPhone },
+        patient_details: hasMrNumber
+          ? {
+              mr_number: mrNumber,
+              name: patientDetails?.name,
+              age: patientDetails?.age,
+              phone_number: patientDetails?.phoneNumber,
+              gender: patientDetails?.gender,
+              address: patientDetails?.address,
+            }
+          : { name: customerName, phone_number: customerPhone },
         employee,
         payment_method: paymentMethod,
         subtotal,
-        discount_amount: discountAmount, // New field for discount amount
-        discounted_subtotal: discountedSubtotal, // New field for discounted subtotal
+        discount_amount: discountAmount,
+        discounted_subtotal: discountedSubtotal,
         cgst,
         sgst,
-        total_amount: totalAmount, // Updated total amount with CGST and SGST
+        total_amount: totalAmount,
         hsn_code: HSN_CODE,
         is_b2b: isB2B,
         gst_number: isB2B ? gstNumber : null,
         updated_at: new Date().toISOString(),
         branch: branch,
+        customer_id: customerId,
+        discount_percentage: discount ? parseFloat(discount) : 0,
+        discount_amount: discountAmount,
+        discounted_subtotal: discountedSubtotal,
       };
 
       if (isEditing) {
-        // Update existing work order
         payload.work_order_id = workOrderId;
         const { error } = await supabase
           .from("work_orders")
@@ -542,134 +571,39 @@ const validateAdvanceAmount = () => {
           .eq("work_order_id", workOrderId);
 
         if (error) {
-          console.error("Error updating work order:", error);
           alert("Failed to update work order.");
         } else {
           alert("Work order updated successfully!");
-          if (modificationRequestId) {
-            const { error: modUpdateError } = await supabase
-              .from('modification_requests')
-              .update({ status: 'completed' })
-              .eq('request_id', modificationRequestId);
-
-            if (modUpdateError) {
-              console.error("Error updating modification request status:", modUpdateError);
-            }
-          }
           setAllowPrint(true);
-          // Move focus to Print button
-          setTimeout(() => {
-            printButtonRef.current?.focus();
-          }, 100); // Slight delay to ensure UI is updated
         }
       } else {
-        // Create new work order
+        // Ensure workOrderId is set before inserting
         if (!workOrderId) {
-          alert('Failed to generate Work Order ID.');
+          alert("Work Order ID is not generated yet. Please wait.");
           setIsSaving(false);
           return;
         }
-
         payload.work_order_id = workOrderId;
         payload.created_at = new Date().toISOString();
 
-        // Prepare payload for customer
-        let customerId = null;
-
-        if (hasMrNumber) {
-          // Fetch existing customer by MR number
-          const { data: existingCustomer, error: customerError } = await supabase
-            .from('customers')
-            .select('id')
-            .eq('mr_number', mrNumber)
-            .single();
-
-          if (customerError) {
-            if (customerError.code === 'PGRST116') { // No rows found
-              alert("No customer found with the provided MR Number.");
-            } else {
-              console.error("Error fetching customer by MR Number:", customerError.message);
-              alert("Failed to fetch customer by MR Number.");
-            }
-            setIsSaving(false);
-            return;
-          }
-
-          if (existingCustomer && existingCustomer.id) {
-            customerId = existingCustomer.id;
-          } else {
-            // This else block is redundant due to the above check, but added for safety
-            alert("No customer found with the provided MR Number.");
-            setIsSaving(false);
-            return;
-          }
-        } else {
-          // Create a new customer
-          if (!customerName.trim() || !customerPhone.trim()) {
-            alert("Customer Name and Phone Number are required.");
-            setIsSaving(false);
-            return;
-          }
-        
-          try {
-            const newCustomerPayload = {
-              name: customerName.trim(),
-              phone_number: customerPhone.trim(),
-              // Include `mr_number` only if it's valid (non-null and non-empty)
-              ...(mrNumber && mrNumber.trim() ? { mr_number: mrNumber.trim() } : {}),
-            };
-        
-            const { data: newCustomer, error: customerCreationError } = await supabase
-              .from('customers')
-              .insert(newCustomerPayload)
-              .select('id') // Select only the ID to reduce payload size
-              .single();
-        
-            if (customerCreationError) {
-              console.error("Error creating new customer:", customerCreationError.message);
-              alert(`Failed to create new customer. Error: ${customerCreationError.message}`);
-              setIsSaving(false);
-              return;
-            }
-        
-            if (newCustomer && newCustomer.id) {
-              customerId = newCustomer.id;
-            } else {
-              alert("Failed to create new customer.");
-              setIsSaving(false);
-              return;
-            }
-          } catch (err) {
-            console.error("Unexpected error creating new customer:", err);
-            alert("An unexpected error occurred while creating the customer.");
-            setIsSaving(false);
-            return;
-          }
-        }
-        payload.customer_id = customerId;
-
-        console.log('Payload being sent:', payload);
-
-        const { data, error } = await supabase
-          .from("work_orders")
-          .insert([payload]);
+        const { error } = await supabase.from("work_orders").insert(payload);
 
         if (error) {
-          console.error("Error saving work order:", error);
-          alert("Failed to save work order.");
+          if (error.status === 409) {
+            alert("Work Order ID already exists. Please try saving again.");
+            // Optionally, regenerate Work Order ID
+            generateNewWorkOrderId();
+          } else {
+            alert("Failed to save work order.");
+          }
         } else {
           alert("Work order saved successfully!");
           setAllowPrint(true);
-          // Move focus to Print button
-          setTimeout(() => {
-            printButtonRef.current?.focus();
-          }, 100); // Slight delay to ensure UI is updated
         }
       }
-
     } catch (err) {
-      console.error("Unexpected error saving work order:", err);
-      alert("An unexpected error occurred.");
+      console.error("Unexpected error:", err);
+      alert("An unexpected error occurred while saving the work order.");
     } finally {
       setIsSaving(false);
     }
@@ -757,15 +691,49 @@ const validateAdvanceAmount = () => {
 
   const prevStep = () => setStep((prevStep) => Math.max(prevStep - 1, 1));
 
-  const handleMRNumberSearch = () => {
-    // Simulate fetching patient details
-    setPatientDetails({
-      name: "John Doe",
-      age: 35,
-      condition: "Myopia",
-    });
-    setStep(4);
-    employeeRef.current?.focus();
+  const handleMRNumberSearch = async () => {
+    if (!mrNumber.trim()) {
+      alert("Please enter a valid MR Number.");
+      mrNumberRef.current?.focus();
+      return;
+    }
+    try {
+      const { data, error } = await supabase
+        .from('patients') // Correct table for MR number lookup
+        .select('id, age, mr_number, phone_number, name, gender, address') // Added 'condition'
+        .eq('mr_number', mrNumber.trim())
+        .single();
+
+      if (error) {
+        if (error.code === 'PGRST116') { // No data found
+          alert("No patient found with the provided MR Number.");
+        } else {
+          console.error("Error fetching patient details:", error.message);
+          alert("Failed to fetch patient details.");
+        }
+        setPatientDetails(null); // Clear previous details
+        return;
+      }
+
+      if (data) {
+        setPatientDetails({
+          name: data.name,
+          age: data.age,
+          phoneNumber: data.phone_number,
+          gender: data.gender,
+          address: data.address,
+          mr_number: data.mr_number, // Ensure 'condition' is fetched
+        });
+        // Move focus to the Next button
+      setTimeout(() => {
+        nextButtonRef.current?.focus();
+      }, 0);
+      }
+    } catch (err) {
+      console.error("Unexpected error fetching patient details:", err);
+      alert("An unexpected error occurred while fetching patient details.");
+      setPatientDetails(null);
+    }
   };
 
   const generateNewWorkOrderId = async () => {
@@ -791,13 +759,17 @@ const validateAdvanceAmount = () => {
       let lastCount = 0;
       if (lastWorkOrders && lastWorkOrders.length > 0) {
         const lastWorkOrderId = lastWorkOrders[0].work_order_id;
-        const countPart = lastWorkOrderId.split('-')[1];
-        lastCount = parseInt(countPart, 10);
+        const parts = lastWorkOrderId.split('-');
+        if (parts.length >= 3) {
+          const countPart = parts[1];
+          lastCount = parseInt(countPart, 10) || 0;
+        }
       }
 
       const newCount = lastCount + 1;
       const newWorkOrderId = `WO(${branch})-${newCount}-${financialYear}`;
       setWorkOrderId(newWorkOrderId);
+      console.log("Generated Work Order ID:", newWorkOrderId);
     } catch (error) {
       console.error("Error generating Work Order ID:", error);
     }
@@ -829,7 +801,31 @@ const validateAdvanceAmount = () => {
         setHasMrNumber(data.mr_number ? true : false);
         if (data.mr_number) {
           setMrNumber(data.mr_number);
-          // Optionally, fetch patient details based on MR number
+          // Fetch patient details based on MR number
+          try {
+            const { data: patientData, error: patientError } = await supabase
+              .from('patients')
+              .select('name, age, phone_number, gender, address') // Ensure 'condition' is fetched
+              .eq('mr_number', data.mr_number)
+              .single();
+
+            if (patientError) {
+              console.error("Error fetching patient details for existing work order:", patientError.message);
+              setPatientDetails(null);
+            } else {
+              setPatientDetails({
+                name: patientData.name,
+                age: patientData.age,
+                phoneNumber: patientData.phone_number,
+                gender: patientData.gender,
+                address: patientData.address,
+                mr_number: data.mr_number,
+              });
+            }
+          } catch (err) {
+            console.error("Unexpected error fetching patient details for existing work order:", err);
+            setPatientDetails(null);
+          }
         } else {
           setCustomerName(data.patient_details?.name || "");
           setCustomerPhone(data.patient_details?.phone_number || "");
@@ -889,11 +885,12 @@ const validateAdvanceAmount = () => {
     }
   }, [step]);
 
-  // References for new fields in Step 3
-  const yesButtonRef = useRef(null);
-  const noButtonRef = useRef(null);
-  const customerNameRef = useRef(null);
-  const customerPhoneRef = useRef(null);
+  // Initialize workOrderId when component mounts and branch is available
+  useEffect(() => {
+    if (!isEditing && branch && !workOrderId) {
+      generateNewWorkOrderId();
+    }
+  }, [branch, isEditing, workOrderId]);
 
   return (
     <div
@@ -1182,7 +1179,10 @@ const validateAdvanceAmount = () => {
                     type="text"
                     placeholder="Enter MR Number of Patient"
                     value={mrNumber}
-                    onChange={(e) => setMrNumber(e.target.value)}
+                    onChange={(e) => {
+                      setMrNumber(e.target.value);
+                      setPatientDetails(null); // Reset patient details when MR number changes
+                    }}
                     onKeyDown={(e) => handleEnterKey(e, fetchButtonRef)}
                     ref={mrNumberRef}
                     className={`border border-gray-300 w-full px-4 py-3 rounded-lg ${validationErrors.mrNumber ? 'border-red-500' : ''}`}
@@ -1200,6 +1200,7 @@ const validateAdvanceAmount = () => {
                     handleMRNumberSearch();
                     // No need to focus next button here as focus is managed in handleMRNumberSearch
                   }}
+                  
                   ref={fetchButtonRef}
                   className="mt-2 text-white px-4 py-2 rounded-lg bg-green-500 hover:bg-green-600 transition"
                 >
@@ -1209,14 +1210,21 @@ const validateAdvanceAmount = () => {
                 {patientDetails && (
                   <div className="mt-4 bg-gray-100 p-4 rounded border border-gray-200">
                     <p>
-                      <strong>Name:</strong> {patientDetails.name}
+                      <strong>Name:</strong> {patientDetails.name || 'N/A'}
                     </p>
                     <p>
-                      <strong>Age:</strong> {patientDetails.age}
+                      <strong>Age:</strong> {patientDetails.age || 'N/A'}
                     </p>
                     <p>
-                      <strong>Condition:</strong> {patientDetails.condition}
+                      <strong>Phone Number:</strong> {patientDetails.phoneNumber || 'N/A'}
                     </p>
+                    <p>
+                      <strong>Gender:</strong> {patientDetails.gender || 'N/A'}
+                    </p>
+                    <p>
+                      <strong>Address:</strong> {patientDetails.address || 'N/A'}
+                    </p>
+                    
                   </div>
                 )}
               </>
@@ -1361,15 +1369,16 @@ const validateAdvanceAmount = () => {
           </div>
         )}
 
+        
         {/* Step 5: Discount, Payment Method, Advance Details, Save and Print */}
         {step === 5 && (
           <>
             {/* Printable Area */}
-            <div className="printable-area print:block print:absolute print:inset-0 print:w-full bg-white p-8 rounded-lg text-gray-800">
+            <div className="printable-area print:block print:absolute print:inset-0 print:w-full bg-white p-8 pt-0 rounded-lg text-gray-800">
               
 
               {/* Invoice Details */}
-              <div className="invoice-details grid grid-cols-1 md:grid-cols-2 gap-4 mt-20 mb-6">
+              <div className="invoice-details grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                 <h2 className="text-2xl font-semibold mt-2">Bill</h2>
                 <div>
                   <p>
@@ -1379,10 +1388,31 @@ const validateAdvanceAmount = () => {
                     <span className="font-semibold">Due Date:</span> <span className="font-normal">{dueDate}</span>
                   </p>
                   {hasMrNumber ? (
-                    <p>
-                      <span className="font-semibold">Customer MR Number:</span> <span className="font-normal">{mrNumber || 'N/A'}</span>
-                    </p>
-                  ) : (
+        <>
+          <p>
+            <span className="font-semibold">Customer MR Number:</span> <span className="font-normal">{mrNumber || 'N/A'}</span>
+          </p>
+          {patientDetails && (
+            <>
+              <p>
+                <span className="font-semibold">Name:</span> <span className="font-normal">{patientDetails.name || 'N/A'}</span>
+              </p>
+              <p>
+                <span className="font-semibold">Age:</span> <span className="font-normal">{patientDetails.age || 'N/A'}</span>
+              </p>
+              <p>
+                <span className="font-semibold">Phone Number:</span> <span className="font-normal">{patientDetails.phoneNumber || 'N/A'}</span>
+              </p>
+              <p>
+                <span className="font-semibold">Gender:</span> <span className="font-normal">{patientDetails.gender || 'N/A'}</span>
+              </p>
+              <p>
+                <span className="font-semibold">Address:</span> <span className="font-normal">{patientDetails.address || 'N/A'}</span>
+              </p>
+            </>
+          )}
+        </>
+      ) : (
                     <>
                       <p>
                         <span className="font-semibold">Customer Name:</span> <span className="font-normal">{customerName || 'N/A'}</span>
@@ -1392,15 +1422,10 @@ const validateAdvanceAmount = () => {
                       </p>
                     </>
                   )}
-                  {patientDetails && hasMrNumber && (
-                    <p>
-                      <span className="font-semibold">Condition:</span> <span className="font-normal">{patientDetails.condition}</span>
-                    </p>
-                  )}
                 </div>
                 <div>
                   <p>
-                    <span className="font-semibold">Billed by Employee:</span> <span className="font-normal">{employee || 'N/A'}</span>
+                    <span className="font-semibold">Billed by:</span> <span className="font-normal">{employee || 'N/A'}</span>
                   </p>
 
                   {isB2B && (

@@ -3,13 +3,13 @@ import React, { useState, useEffect } from "react";
 import { useAuth } from '../context/AuthContext';
 import { XMarkIcon, CheckIcon } from "@heroicons/react/24/outline";
 import { useNavigate } from 'react-router-dom';
-import { useModificationContext } from "../context/ModificationContext";
 import supabase from '../supabaseClient';
 import dayjs from 'dayjs'; // Ensure dayjs is imported
 
 const EmployeeActionRequired = ({ isCollapsed }) => {
   const { user } = useAuth();
-  const { actionRequests, setActionRequests } = useModificationContext();
+  // Removed the useModificationContext import and usage
+  // const { actionRequests, setActionRequests } = useModificationContext();
   const [salesRequests, setSalesRequests] = useState([]);
   const [workRequests, setWorkRequests] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -129,29 +129,23 @@ const EmployeeActionRequired = ({ isCollapsed }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user.id]);
 
-  const acknowledgeRejection = async (requestId) => {
-    const reason = prompt("Please provide a reason for acknowledging this rejection:");
-    if (!reason) {
-      alert("Acknowledgment reason is required.");
-      return;
-    }
-
-    if (!window.confirm('Are you sure you want to acknowledge this rejection?')) return;
-
+  // Updated acknowledgeRejection function to accept orderType
+  const acknowledgeRejection = async (requestId, orderType) => { // Added orderType parameter
     setActionLoading(requestId);
     const { error } = await supabase
       .from('modification_requests')
-      .update({ status: 'rejected', acknowledgment_reason: reason }) // Ensure 'acknowledgment_reason' column exists in your table
+      .update({ status: 'acknowledged' }) // Ensure 'acknowledged' column exists in your table
       .eq('request_id', requestId);
 
     if (!error) {
       setNotification({ type: 'success', message: 'Rejection acknowledged successfully.' });
-      setActionRequests(prevRequests =>
-        prevRequests.filter(request => request.request_id !== requestId)
-      );
-      // Update local state
-      setSalesRequests(prev => prev.filter(request => request.request_id !== requestId));
-      setWorkRequests(prev => prev.filter(request => request.request_id !== requestId));
+      
+      // Remove from local state based on orderType
+      if (orderType === 'sales_order') {
+        setSalesRequests(prev => prev.filter(request => request.request_id !== requestId));
+      } else if (orderType === 'work_order') {
+        setWorkRequests(prev => prev.filter(request => request.request_id !== requestId));
+      }
     } else {
       console.error("Error acknowledging rejection:", error);
       setNotification({ type: 'error', message: 'Failed to acknowledge rejection.' });
@@ -227,7 +221,7 @@ const EmployeeActionRequired = ({ isCollapsed }) => {
                           </button>
                         ) : (
                           <button
-                            onClick={() => acknowledgeRejection(request.request_id)}
+                            onClick={() => acknowledgeRejection(request.request_id, request.order_type)} // Pass order_type
                             className={`flex items-center px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 transition ${
                               actionLoading === request.request_id ? 'opacity-50 cursor-not-allowed' : ''
                             }`}
@@ -270,7 +264,7 @@ const EmployeeActionRequired = ({ isCollapsed }) => {
                           </button>
                         ) : (
                           <button
-                            onClick={() => acknowledgeRejection(request.request_id)}
+                            onClick={() => acknowledgeRejection(request.request_id, request.order_type)} // Pass order_type
                             className={`flex items-center px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 transition ${
                               actionLoading === request.request_id ? 'opacity-50 cursor-not-allowed' : ''
                             }`}

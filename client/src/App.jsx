@@ -144,6 +144,10 @@ const App = () => {
                 path="/employee/action-required"
                 element={<EmployeeActionRequired isCollapsed={isCollapsed} />}
               />
+              <Route
+                path="/reportgenerator"
+                element={<ReportGenerator isCollapsed={isCollapsed} />}
+              />
 
               <Route
                 path="/loyaltypoints"
@@ -159,10 +163,7 @@ const App = () => {
             <Route
               element={<RequireAuth allowedRoles={["super_admin", "admin"]} />}
             >
-              <Route
-                path="/reportgenerator"
-                element={<ReportGenerator isCollapsed={isCollapsed} />}
-              />
+              
               <Route
                 path="/stock-manage"
                 element={<StockManagement isCollapsed={isCollapsed} />}
