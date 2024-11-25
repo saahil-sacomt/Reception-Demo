@@ -553,7 +553,7 @@ const Home = ({ isCollapsed }) => {
                   onClick={() => navigate('/reportgenerator')}
                 >
                   <ClipboardDocumentIcon className='h-36 w-36 text-green-500 mr-2' />
-                  <h2 className="text-xl text-gray-800 mt-4">Conolidated Report</h2>
+                  <h2 className="text-xl text-gray-800 mt-4">Consolidated Report</h2>
                 </div>
 
                 {/* Stock Management Container */}
