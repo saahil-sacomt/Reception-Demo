@@ -233,7 +233,8 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     const subtotal = entries.reduce((total, product) => {
       const price = parseFloat(product.price) || 0;
       const quantity = parseInt(product.quantity) || 0;
-      return total + price * quantity;
+      const basePrice = price / 112 * 100; // Adjusted price
+      return total + basePrice * quantity;
     }, 0);
 
     // Ensure discountPercentage is between 0 and 100
@@ -244,11 +245,11 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     const cgst = (subtotal * 6) / 100 || 0;
     const sgst = (subtotal * 6) / 100 || 0;
 
-    // Exclude cgst and sgst from totalAmount
-    const totalAmount = Math.max(discountedSubtotal, 0); // Prevent negative total
+    const totalAmount = Math.max(discountedSubtotal + cgst + sgst, 0); // Include CGST and SGST
 
     return { subtotal, discountAmount, discountedSubtotal, cgst, sgst, totalAmount };
   };
+
 
   // References for managing field focus
   const getTodayDate = () => {
@@ -536,13 +537,13 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         mr_number: hasMrNumber ? mrNumber : null,
         patient_details: hasMrNumber
           ? {
-              mr_number: mrNumber,
-              name: patientDetails?.name,
-              age: patientDetails?.age,
-              phone_number: patientDetails?.phoneNumber,
-              gender: patientDetails?.gender,
-              address: patientDetails?.address,
-            }
+            mr_number: mrNumber,
+            name: patientDetails?.name,
+            age: patientDetails?.age,
+            phone_number: patientDetails?.phoneNumber,
+            gender: patientDetails?.gender,
+            address: patientDetails?.address,
+          }
           : { name: customerName, phone_number: customerPhone },
         employee,
         payment_method: paymentMethod,
@@ -725,9 +726,9 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
           mr_number: data.mr_number, // Ensure 'condition' is fetched
         });
         // Move focus to the Next button
-      setTimeout(() => {
-        nextButtonRef.current?.focus();
-      }, 0);
+        setTimeout(() => {
+          nextButtonRef.current?.focus();
+        }, 0);
       }
     } catch (err) {
       console.error("Unexpected error fetching patient details:", err);
@@ -738,42 +739,32 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
 
   const generateNewWorkOrderId = async () => {
     try {
-      if (!branch) {
-        console.error("Branch not found for the user");
-        return;
-      }
-
-      const financialYear = getFinancialYear();
       const { data: lastWorkOrders, error } = await supabase
         .from('work_orders')
-        .select('work_order_id, created_at')
-        .ilike('work_order_id', `%(${branch})%`)
-        .order('created_at', { ascending: false })
+        .select('work_order_id')
+        .order('work_order_id', { ascending: false })
         .limit(1);
-
+  
       if (error) {
         console.error("Error fetching last work order:", error);
         return;
       }
-
-      let lastCount = 0;
+  
+      let newWorkOrderId = 1; // Default to 1 if no work orders exist
       if (lastWorkOrders && lastWorkOrders.length > 0) {
-        const lastWorkOrderId = lastWorkOrders[0].work_order_id;
-        const parts = lastWorkOrderId.split('-');
-        if (parts.length >= 3) {
-          const countPart = parts[1];
-          lastCount = parseInt(countPart, 10) || 0;
+        const lastWorkOrderId = parseInt(lastWorkOrders[0].work_order_id, 10);
+        if (!isNaN(lastWorkOrderId)) {
+          newWorkOrderId = lastWorkOrderId + 1;
         }
       }
-
-      const newCount = lastCount + 1;
-      const newWorkOrderId = `WO(${branch})-${newCount}-${financialYear}`;
-      setWorkOrderId(newWorkOrderId);
+  
+      setWorkOrderId(newWorkOrderId.toString());
       console.log("Generated Work Order ID:", newWorkOrderId);
     } catch (error) {
       console.error("Error generating Work Order ID:", error);
     }
   };
+  
 
   const fetchWorkOrderDetails = async () => {
     try {
@@ -1134,9 +1125,8 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                   }, 0);
                 }}
                 ref={yesButtonRef}
-                className={`px-4 py-2 rounded-lg focus:outline-none ${
-                  hasMrNumber === true ? "bg-green-600 text-white" : "bg-green-500 text-white hover:bg-green-600"
-                }`}
+                className={`px-4 py-2 rounded-lg focus:outline-none ${hasMrNumber === true ? "bg-green-600 text-white" : "bg-green-500 text-white hover:bg-green-600"
+                  }`}
               >
                 Yes
               </button>
@@ -1154,9 +1144,8 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                   }, 0);
                 }}
                 ref={noButtonRef}
-                className={`px-4 py-2 rounded-lg focus:outline-none ${
-                  hasMrNumber === false ? "bg-red-600 text-white" : "bg-red-500 text-white hover:bg-red-600"
-                }`}
+                className={`px-4 py-2 rounded-lg focus:outline-none ${hasMrNumber === false ? "bg-red-600 text-white" : "bg-red-500 text-white hover:bg-red-600"
+                  }`}
               >
                 No
               </button>
@@ -1200,7 +1189,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                     handleMRNumberSearch();
                     // No need to focus next button here as focus is managed in handleMRNumberSearch
                   }}
-                  
+
                   ref={fetchButtonRef}
                   className="mt-2 text-white px-4 py-2 rounded-lg bg-green-500 hover:bg-green-600 transition"
                 >
@@ -1224,7 +1213,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                     <p>
                       <strong>Address:</strong> {patientDetails.address || 'N/A'}
                     </p>
-                    
+
                   </div>
                 )}
               </>
@@ -1369,13 +1358,13 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
           </div>
         )}
 
-        
+
         {/* Step 5: Discount, Payment Method, Advance Details, Save and Print */}
         {step === 5 && (
           <>
             {/* Printable Area */}
             <div className="printable-area print:block print:absolute print:inset-0 print:w-full bg-white p-8 pt-0 rounded-lg text-gray-800">
-              
+
 
               {/* Invoice Details */}
               <div className="invoice-details grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
@@ -1388,31 +1377,31 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                     <span className="font-semibold">Due Date:</span> <span className="font-normal">{dueDate}</span>
                   </p>
                   {hasMrNumber ? (
-        <>
-          <p>
-            <span className="font-semibold">Customer MR Number:</span> <span className="font-normal">{mrNumber || 'N/A'}</span>
-          </p>
-          {patientDetails && (
-            <>
-              <p>
-                <span className="font-semibold">Name:</span> <span className="font-normal">{patientDetails.name || 'N/A'}</span>
-              </p>
-              <p>
-                <span className="font-semibold">Age:</span> <span className="font-normal">{patientDetails.age || 'N/A'}</span>
-              </p>
-              <p>
-                <span className="font-semibold">Phone Number:</span> <span className="font-normal">{patientDetails.phoneNumber || 'N/A'}</span>
-              </p>
-              <p>
-                <span className="font-semibold">Gender:</span> <span className="font-normal">{patientDetails.gender || 'N/A'}</span>
-              </p>
-              <p>
-                <span className="font-semibold">Address:</span> <span className="font-normal">{patientDetails.address || 'N/A'}</span>
-              </p>
-            </>
-          )}
-        </>
-      ) : (
+                    <>
+                      <p>
+                        <span className="font-semibold">Customer MR Number:</span> <span className="font-normal">{mrNumber || 'N/A'}</span>
+                      </p>
+                      {patientDetails && (
+                        <>
+                          <p>
+                            <span className="font-semibold">Name:</span> <span className="font-normal">{patientDetails.name || 'N/A'}</span>
+                          </p>
+                          <p>
+                            <span className="font-semibold">Age:</span> <span className="font-normal">{patientDetails.age || 'N/A'}</span>
+                          </p>
+                          <p>
+                            <span className="font-semibold">Phone Number:</span> <span className="font-normal">{patientDetails.phoneNumber || 'N/A'}</span>
+                          </p>
+                          <p>
+                            <span className="font-semibold">Gender:</span> <span className="font-normal">{patientDetails.gender || 'N/A'}</span>
+                          </p>
+                          <p>
+                            <span className="font-semibold">Address:</span> <span className="font-normal">{patientDetails.address || 'N/A'}</span>
+                          </p>
+                        </>
+                      )}
+                    </>
+                  ) : (
                     <>
                       <p>
                         <span className="font-semibold">Customer Name:</span> <span className="font-normal">{customerName || 'N/A'}</span>
@@ -1450,13 +1439,15 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                 </thead>
                 <tbody>
                   {productEntries.map((product, index) => {
-                    const productSubtotal = (parseFloat(product.price) || 0) * (parseInt(product.quantity) || 0);
+                    const originalPrice = parseFloat(product.price) || 0;
+      const basePrice = originalPrice / 112 * 100; // Adjusted price
+      const productSubtotal = basePrice * (parseInt(product.quantity) || 0);
                     return (
                       <tr key={index} className="text-center">
                         <td className="py-2 px-4 border-b">{product.id}</td>
                         <td className="py-2 px-4 border-b">{product.name}</td>
                         <td className="py-2 px-4 border-b">{HSN_CODE}</td>
-                        <td className="py-2 px-4 border-b">{parseFloat(product.price).toFixed(2)}</td>
+                        <td className="py-2 px-4 border-b">{basePrice.toFixed(2)}</td>
                         <td className="py-2 px-4 border-b">{product.quantity}</td>
                         <td className="py-2 px-4 border-b">{productSubtotal.toFixed(2)}</td>
                       </tr>
@@ -1466,40 +1457,42 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
               </table>
 
               {/* Financial Summary */}
-              <div className="financial-summary grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Left Column */}
-                <div className="space-y-2">
-                  <p>
-                    <span className="font-semibold">Subtotal:</span> ₹{subtotal.toFixed(2)}
-                  </p>
-                  <p>
-                    <span className="font-semibold">Discount ({discount || 0}%):</span> ₹{discountAmount.toFixed(2)}
-                  </p>
-                  <p>
-                    <span className="font-semibold">Discounted Subtotal:</span> ₹{discountedSubtotal.toFixed(2)}
-                  </p>
-                  <p>
-                    <span className="font-semibold">CGST (6%):</span> ₹{cgst.toFixed(2)}
-                  </p>
-                  <p>
-                    <span className="font-semibold">SGST (6%):</span> ₹{sgst.toFixed(2)}
-                  </p>
-                </div>
+<div className="financial-summary grid grid-cols-1 md:grid-cols-2 gap-4">
+  {/* Left Column */}
+  <div className="space-y-2">
+    <p>
+      <span className="font-semibold">Subtotal (Base Price):</span> ₹{subtotal.toFixed(2)}
+    </p>
+    <p>
+      <span className="font-semibold">Discount ({discount || 0}%):</span> ₹{discountAmount.toFixed(2)}
+    </p>
+    <p>
+      <span className="font-semibold">Discounted Subtotal:</span> ₹{discountedSubtotal.toFixed(2)}
+    </p>
+    <p>
+      <span className="font-semibold">CGST (6%):</span> ₹{cgst.toFixed(2)}
+    </p>
+    <p>
+      <span className="font-semibold">SGST (6%):</span> ₹{sgst.toFixed(2)}
+    </p>
+  </div>
 
-                {/* Right Column */}
-                <div className="space-y-2">
-                  <p>
-                    <span className="font-semibold">Total Amount:</span> ₹{totalAmount.toFixed(2)}
-                  </p>
+  {/* Right Column */}
+  <div className="space-y-2">
+    <p>
+      <span className="font-semibold">Total Amount (Including GST):</span> ₹{totalAmount.toFixed(2)}
+    </p>
 
-                  <p>
-                    <span className="font-semibold">Advance Paid:</span> ₹{advance.toFixed(2)}
-                  </p>
-                  <p>
-                    <span className="font-semibold">Balance Due:</span> ₹{balanceDue.toFixed(2)}
-                  </p>
-                </div>
-              </div>
+    <p>
+      <span className="font-semibold">Advance Paid:</span> ₹{advance.toFixed(2)}
+    </p>
+    <p>
+      <span className="font-semibold">Balance Due:</span> ₹{balanceDue.toFixed(2)}
+    </p>
+  </div>
+</div>
+
+
 
               {/* Payment Method and Advance Details on the Same Line */}
               <div className="flex flex-col md:flex-row items-center justify-between my-6 space-x-4">

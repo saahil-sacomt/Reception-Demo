@@ -316,60 +316,34 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
   };
 
   const generateSalesOrderId = async () => {
-    if (!branch) {
-      console.error("Branch information is missing.");
-      return null;
-    }
-
     try {
-      const financialYear = getFinancialYear();
-
-      // Define date range for the financial year
-      const today = new Date();
-      const currentYear = today.getFullYear();
-      const currentMonth = today.getMonth() + 1;
-
-      const financialYearStart =
-        currentMonth >= 4
-          ? new Date(currentYear, 3, 1) // April 1st of this year
-          : new Date(currentYear - 1, 3, 1); // April 1st of last year
-
-      const financialYearEnd =
-        currentMonth >= 4
-          ? new Date(currentYear + 1, 2, 31) // March 31st of next year
-          : new Date(currentYear, 2, 31); // March 31st of this year
-
-      // Fetch the last sales ID for the selected branch
-      const { data: lastSalesOrders, error } = await supabase
+      // Fetch the maximum sales_order_id
+      const { data, error } = await supabase
         .from("sales_orders")
         .select("sales_order_id")
-        .ilike("sales_order_id", `SO(${branch})%`)
-        .gte("created_at", financialYearStart.toISOString())
-        .lte("created_at", financialYearEnd.toISOString())
-        .order("created_at", { ascending: false })
+        .order("sales_order_id", { ascending: false })
         .limit(1);
-
+  
       if (error) {
-        throw error;
+        console.error("Error fetching last sales_order_id:", error);
+        return null;
       }
-
-      let lastCount = 0;
-      if (lastSalesOrders && lastSalesOrders.length > 0) {
-        const lastOrderId = lastSalesOrders[0].sales_order_id;
-        const parts = lastOrderId.split("-");
-        lastCount = parseInt(parts[1], 10);
+  
+      let lastSalesOrderId = 0;
+      if (data && data.length > 0) {
+        lastSalesOrderId = parseInt(data[0].sales_order_id, 10) || 0;
       }
-
-      // Increment the count for the new sales ID
-      const newCount = lastCount + 1;
-      const newSalesOrderId = `SO(${branch})-${newCount}-${financialYear}`;
-
-      return newSalesOrderId;
+  
+      // Increment the last sales_order_id by 1
+      const newSalesOrderId = lastSalesOrderId + 1;
+  
+      return newSalesOrderId.toString();
     } catch (error) {
-      console.error("Error generating sales ID:", error);
+      console.error("Error generating sales_order_id:", error);
       return null;
     }
   };
+  
 
   const fetchProductSuggestions = async (query, type) => {
     if (!query) return [];
