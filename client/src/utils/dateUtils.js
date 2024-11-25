@@ -39,12 +39,25 @@ export const formatDateToIST = (date, format = "dd-MM-yyyy hh:mm a") => {
 
 // Utility functions assumed to be defined in ../utils/dateUtils.js
 // Example implementations:
-export const convertUTCToIST = (utcDate) => {
+export const convertUTCToIST = (utcDate, format = 'dd-MM-yyyy') => {
   const date = new Date(utcDate);
-  // IST is UTC+5:30
-  const istDate = new Date(date.getTime() + 5.5 * 60 * 60 * 1000);
-  return istDate.toLocaleString("en-IN", { timeZone: "Asia/Kolkata" });
+  const offset = 330; // IST offset in minutes
+  const localTime = new Date(date.getTime() + offset * 60 * 1000);
+
+  if (format === 'dd-MM-yyyy') {
+    return `${localTime.getDate().toString().padStart(2, '0')}-${(localTime.getMonth() + 1)
+      .toString()
+      .padStart(2, '0')}-${localTime.getFullYear()}`;
+  }
+
+  // Default fallback for date and time
+  return `${localTime.getDate().toString().padStart(2, '0')}-${(localTime.getMonth() + 1)
+    .toString()
+    .padStart(2, '0')}-${localTime.getFullYear()} ${localTime
+    .toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`;
 };
+
+
 
 
 

@@ -141,14 +141,15 @@ const addHeader = (doc, logoDataUrl, reportDetails) => {
   doc.setFontSize(10);
   let periodText = '';
   if (reportDetails.type === 'Daily') {
-    periodText = `Date: ${reportDetails.date}`;
-  } else if (reportDetails.type === 'Monthly') {
+    periodText = `Date: ${reportDetails.date}`; // Use the raw date directly
+} else if (reportDetails.type === 'Monthly') {
     periodText = `Month: ${reportDetails.month}/${reportDetails.year}`;
-  } else if (reportDetails.type === 'Date Range') {
+} else if (reportDetails.type === 'Date Range') {
     periodText = `From: ${reportDetails.fromDate} To: ${reportDetails.toDate}`;
-  } else if (reportDetails.type === 'Consolidated') {
+} else if (reportDetails.type === 'Consolidated') {
     periodText = `Period: ${reportDetails.fromDate} to ${reportDetails.toDate}`;
-  }
+}
+
   doc.text(periodText, doc.internal.pageSize.getWidth() / 2, 50, { align: 'center' });
 
   // Add Branch Information
@@ -270,27 +271,28 @@ const ReportGenerator = ({ isCollapsed }) => {
 
       if (reportPeriod === 'daily') {
         if (!date) {
-          setError('Please select a date for the daily report.');
-          setLoading(false);
-          return;
+            setError('Please select a date for the daily report.');
+            setLoading(false);
+            return;
         }
-        const selectedDate = new Date(date);
+        const selectedDate = new Date(date); // Parse the date input
         if (isNaN(selectedDate.getTime())) {
-          setError('Invalid date selected.');
-          setLoading(false);
-          return;
+            setError('Invalid date selected.');
+            setLoading(false);
+            return;
         }
         startDate = new Date(`${date}T00:00:00Z`);
         endDate = new Date(`${date}T23:59:59Z`);
         reportDetails = {
-          type: 'Daily',
-          date: convertUTCToIST(startDate.toISOString(), 'dd-MM-yyyy'),
-          identifier: date,
-          reportTypeLabel: getReportTypeLabel(reportType),
-          branches: branchesToReport,
-          isCombined,
+            type: 'Daily',
+            date: date, // Pass the raw date string here
+            identifier: date,
+            reportTypeLabel: getReportTypeLabel(reportType),
+            branches: branchesToReport,
+            isCombined,
         };
-      } else if (reportPeriod === 'monthly') {
+    }
+     else if (reportPeriod === 'monthly') {
         if (!monthYear) {
           setError('Please select a month and year for the monthly report.');
           setLoading(false);
