@@ -1684,6 +1684,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     window.print();
     dispatch({ type: "SET_SALES_ORDER_FORM", payload: { isPrinted: true } });
     resetForm();
+    navigate("/home");
   }, []);
 
 

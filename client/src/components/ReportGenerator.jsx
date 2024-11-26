@@ -112,13 +112,13 @@ const getColumnStyles = (reportType) => {
       };
     case 'stock_report':
       return {
-        0: { halign: 'center', cellWidth: 20 }, // Product ID
-        1: { halign: 'center', cellWidth: 30 }, // Product Name
-        2: { halign: 'center', cellWidth: 15 }, // MRP
-        3: { halign: 'center', cellWidth: 15 }, // Rate
-        4: { halign: 'center', cellWidth: 20 }, // HSN Code
-        5: { halign: 'center', cellWidth: 20 }, // Total Sold
-        6: { halign: 'center', cellWidth: 20 }, // Current Stock
+        0: { halign: 'center', cellWidth: 30 }, // Product ID
+        1: { halign: 'center', cellWidth: 35 }, // Product Name
+        2: { halign: 'center', cellWidth: 30 }, // MRP
+        3: { halign: 'center', cellWidth: 30 }, // Rate
+        4: { halign: 'center', cellWidth: 30 }, // HSN Code
+        5: { halign: 'center', cellWidth: 30 }, // Total Sold
+        6: { halign: 'center', cellWidth: 30 }, // Current Stock
       };
     default:
       return {};
@@ -164,7 +164,7 @@ const addHeader = (doc, logoDataUrl, reportDetails) => {
 
   // Add Branch Information
   doc.setFontSize(10);
-  const branchesText = `Branches: ${reportDetails.isCombined ? 'All Branches' : reportDetails.branches.join(', ')}`;
+  const branchesText = `Branches: ${reportDetails.isCombined ? 'All Branches' : (reportDetails.branches && reportDetails.branches.length > 0 ? reportDetails.branches.join(', ') : 'N/A')}`;
   doc.text(branchesText, doc.internal.pageSize.getWidth() / 2, 55, { align: 'center' });
 };
 
@@ -191,7 +191,10 @@ const ReportGenerator = ({ isCollapsed }) => {
   const [monthYear, setMonthYear] = useState(''); // For monthly reports (format: YYYY-MM)
   const [fromDate, setFromDate] = useState(''); // Start date for range reports
   const [toDate, setToDate] = useState(''); // End date for range reports
-  const [selectedBranches, setSelectedBranches] = useState([userBranch]); // Initialize with user's branch code
+
+  // Initialize selectedBranches based on role
+  const [selectedBranches, setSelectedBranches] = useState(role === 'employee' ? [userBranch] : [userBranch]); // For employees, it's fixed to [userBranch]; admins can modify later
+
   const [allBranches, setAllBranches] = useState([]); // Fetch all branches from the database
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -209,6 +212,9 @@ const ReportGenerator = ({ isCollapsed }) => {
   const toDateRef = useRef();
   const branchSelectionRef = useRef();
   const generateButtonRef = useRef();
+
+  // Determine if the user is an employee
+  const isEmployee = role === 'employee';
 
   useEffect(() => {
     const convertImageToDataUrl = (image) => {
@@ -236,7 +242,7 @@ const ReportGenerator = ({ isCollapsed }) => {
       .catch((err) => console.error('Failed to load logo image:', err));
   }, []);
 
-  // Fetch all branches from the database
+  // Fetch all branches from the database (only if not employee)
   const fetchAllBranches = useCallback(async () => {
     const { data, error } = await supabase
       .from('branches') // Ensure you have a 'branches' table
@@ -252,12 +258,13 @@ const ReportGenerator = ({ isCollapsed }) => {
 
   useEffect(() => {
     const getBranches = async () => {
-      const branches = await fetchAllBranches();
-      setAllBranches(branches);
-      setSelectedBranches([userBranch]); // Default to user's branch code
+      if (!isEmployee) {
+        const branches = await fetchAllBranches();
+        setAllBranches(branches);
+      }
     };
     getBranches();
-  }, [fetchAllBranches, userBranch]);
+  }, [fetchAllBranches, isEmployee]);
 
   // Utility function to get the last day of a month
   const getLastDayOfMonth = (year, month) => {
@@ -278,6 +285,12 @@ const ReportGenerator = ({ isCollapsed }) => {
       let startDate, endDate;
       let reportTypeLabel = '';
       let branchesToReport = isCombined ? [] : selectedBranches;
+
+      // For employees, ensure branchesToReport is always [userBranch]
+      if (isEmployee) {
+        branchesToReport = [userBranch];
+        setIsCombined(false); // Ensure isCombined is false for employees
+      }
 
       if (reportPeriod === 'daily') {
         if (!date) {
@@ -684,7 +697,7 @@ const ReportGenerator = ({ isCollapsed }) => {
     } finally {
       setLoading(false);
     }
-  }, [reportType, reportPeriod, date, monthYear, fromDate, toDate, selectedBranches, isCombined]);
+  }, [reportType, reportPeriod, date, monthYear, fromDate, toDate, selectedBranches, isCombined, isEmployee, userBranch]);
 
   // Helper function to get report type label
   const getReportTypeLabel = (reportType) => {
@@ -1160,8 +1173,9 @@ const ReportGenerator = ({ isCollapsed }) => {
     }
   };
 
-  // Toggle selection for report scope
+  // Toggle selection for report scope (only for non-employees)
   const toggleReportScope = (scope) => {
+    if (isEmployee) return; // Do nothing if employee
     if (scope === 'combined') {
       setIsCombined(true);
     } else {
@@ -1169,8 +1183,9 @@ const ReportGenerator = ({ isCollapsed }) => {
     }
   };
 
-  // Toggle branch selection
+  // Toggle branch selection (only for non-employees)
   const toggleBranch = (branchCode) => {
+    if (isEmployee) return; // Do nothing if employee
     if (selectedBranches.includes(branchCode)) {
       setSelectedBranches(selectedBranches.filter(code => code !== branchCode));
     } else {
@@ -1179,7 +1194,7 @@ const ReportGenerator = ({ isCollapsed }) => {
   };
 
   // Define report types based on role
-  const reportTypes = role === 'employee' ? [
+  const reportTypes = isEmployee ? [
     { value: 'consolidated', label: 'Consolidated' },
     { value: 'stock_report', label: 'Stock Report' },
   ] : [
@@ -1205,7 +1220,7 @@ const ReportGenerator = ({ isCollapsed }) => {
       className={`flex justify-center transition-all duration-300 ${isCollapsed ? 'ml-0' : 'ml-14'} my-20 px-4`}
     >
       <div className="w-full max-w-4xl">
-        <h1 className="text-3xl font-bold mb-6 text-center text-gray-800">Generate Stock Reports</h1>
+        <h1 className="text-3xl font-bold mb-6 text-center text-gray-800">Generate {capitalizeFirstLetter(reportType)} Report</h1>
 
         {/* Notification */}
         {error && (
@@ -1283,45 +1298,47 @@ const ReportGenerator = ({ isCollapsed }) => {
             </div>
           </div>
 
-          {/* Report Scope Selection */}
-          <div className="mt-6">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Report Scope
-            </label>
-            <div className="flex space-x-4">
-              {/* Branch-wise Button */}
-              <button
-                type="button"
-                onClick={() => toggleReportScope('branch')}
-                onKeyDown={(e) => handleKeyDown(e, isCombined ? generateButtonRef : branchSelectionRef)}
-                className={`px-4 py-2 rounded-md border ${
-                  !isCombined
-                    ? 'bg-green-500 text-white border-green-500'
-                    : 'bg-white text-gray-700 border-gray-300'
-                } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500`}
-                aria-label="Select Branch-wise Report Scope"
-              >
-                Branch-wise
-              </button>
-              {/* Combined Button */}
-              <button
-                type="button"
-                onClick={() => toggleReportScope('combined')}
-                onKeyDown={(e) => handleKeyDown(e, generateButtonRef)}
-                className={`px-4 py-2 rounded-md border ${
-                  isCombined
-                    ? 'bg-green-500 text-white border-green-500'
-                    : 'bg-white text-gray-700 border-gray-300'
-                } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500`}
-                aria-label="Select Combined Report Scope"
-              >
-                Combined (All Branches)
-              </button>
+          {/* Report Scope Selection (Hidden for Employees) */}
+          {!isEmployee && (
+            <div className="mt-6">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Report Scope
+              </label>
+              <div className="flex space-x-4">
+                {/* Branch-wise Button */}
+                <button
+                  type="button"
+                  onClick={() => toggleReportScope('branch')}
+                  onKeyDown={(e) => handleKeyDown(e, isCombined ? generateButtonRef : branchSelectionRef)}
+                  className={`px-4 py-2 rounded-md border ${
+                    !isCombined
+                      ? 'bg-green-500 text-white border-green-500'
+                      : 'bg-white text-gray-700 border-gray-300'
+                  } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500`}
+                  aria-label="Select Branch-wise Report Scope"
+                >
+                  Branch-wise
+                </button>
+                {/* Combined Button */}
+                <button
+                  type="button"
+                  onClick={() => toggleReportScope('combined')}
+                  onKeyDown={(e) => handleKeyDown(e, generateButtonRef)}
+                  className={`px-4 py-2 rounded-md border ${
+                    isCombined
+                      ? 'bg-green-500 text-white border-green-500'
+                      : 'bg-white text-gray-700 border-gray-300'
+                  } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500`}
+                  aria-label="Select Combined Report Scope"
+                >
+                  Combined (All Branches)
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* Branch Selection */}
-          {!isCombined && (
+          {/* Branch Selection (Visible only for non-employees and branch-wise reports) */}
+          {!isEmployee && !isCombined && (
             <div className="mt-6">
               <label htmlFor="branchSelection" className="block text-sm font-medium text-gray-700 mb-2">
                 Select Branches
@@ -1344,7 +1361,7 @@ const ReportGenerator = ({ isCollapsed }) => {
                   </button>
                 ))}
               </div>
-              {selectedBranches.length === 0 && (
+              {!isEmployee && selectedBranches.length === 0 && (
                 <p className="text-sm text-red-500 mt-1">Please select at least one branch.</p>
               )}
             </div>
@@ -1360,7 +1377,7 @@ const ReportGenerator = ({ isCollapsed }) => {
                 ref={dateRef}
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                onKeyDown={(e) => handleKeyDown(e, isCombined ? generateButtonRef : branchSelectionRef)}
+                onKeyDown={(e) => handleKeyDown(e, isEmployee ? generateButtonRef : isCombined ? generateButtonRef : (reportPeriod === 'daily' ? generateButtonRef : branchSelectionRef))}
                 className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
                 required
                 aria-required="true"
@@ -1375,7 +1392,7 @@ const ReportGenerator = ({ isCollapsed }) => {
                 ref={monthYearRef}
                 value={monthYear}
                 onChange={(e) => setMonthYear(e.target.value)}
-                onKeyDown={(e) => handleKeyDown(e, isCombined ? generateButtonRef : branchSelectionRef)}
+                onKeyDown={(e) => handleKeyDown(e, isEmployee ? generateButtonRef : isCombined ? generateButtonRef : branchSelectionRef)}
                 className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
                 required
                 aria-required="true"
@@ -1428,9 +1445,9 @@ const ReportGenerator = ({ isCollapsed }) => {
                 }
               }}
               className={`w-full sm:w-1/2 px-4 py-2 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-md flex items-center justify-center transition ${
-                loading || (!isCombined && selectedBranches.length === 0) ? 'opacity-50 cursor-not-allowed' : ''
+                loading || (!isCombined && !isEmployee && selectedBranches.length === 0) ? 'opacity-50 cursor-not-allowed' : ''
               }`}
-              disabled={loading || (!isCombined && selectedBranches.length === 0)}
+              disabled={loading || (!isCombined && !isEmployee && selectedBranches.length === 0)}
               aria-label="Generate Report"
             >
               {loading ? (
