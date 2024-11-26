@@ -1,6 +1,11 @@
-// client/src/pages/SalesOrderGeneration.jsx
-
-import React, { useState, useEffect, useRef, useMemo, memo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useMemo,
+  memo,
+  useCallback,
+} from "react";
 import { PrinterIcon, TrashIcon } from "@heroicons/react/24/outline";
 import supabase from "../supabaseClient";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
@@ -9,6 +14,14 @@ import { deductStockForMultipleProducts } from "../services/authService.js";
 import EmployeeVerification from "../components/EmployeeVerification";
 import logo from "../assets/sreenethraenglishisolated.png";
 import dayjs from "dayjs"; // Ensure dayjs is imported
+import { useGlobalState } from "../context/GlobalStateContext"; // Updated import
+
+const today = new Date();
+const dd = String(today.getDate()).padStart(2, '0');
+const mm = String(today.getMonth() + 1).padStart(2, '0');
+const yyyy = today.getFullYear();
+
+const formattedDate = `${dd}/${mm}/${yyyy}`;
 
 // Utility Functions
 const mockOtp = "1234";
@@ -64,80 +77,69 @@ const createCustomer = async (name, phone_number) => {
   return data;
 };
 
-function calculateAmounts(
-  productEntries,
-  advanceDetails,
-  privilegeCard,
-  privilegeCardDetails,
-  redeemPointsAmount,
-  loyaltyPoints,
-  selectedWorkOrder,
-  discountPercentage
-) {
-  // Step 1: Adjust Prices and Calculate Adjusted Subtotal
-  const adjustedSubtotal = productEntries.reduce((acc, product) => {
-    const originalPrice = parseFloat(product.price) || 0;
-    const adjustedPrice = (originalPrice / 112) * 100; // Adjusted Price using formula
-    const quantity = parseInt(product.quantity) || 0;
-    return acc + adjustedPrice * quantity;
-  }, 0);
-
-  // Step 2: Calculate Discount based on Percentage
-  const discountPercent = parseFloat(discountPercentage) || 0;
-  const discount = discountPercent > 0 ? (adjustedSubtotal * discountPercent) / 100 : 0;
-
-  // Step 3: Calculate Remaining Balance after Discount and Advance
-  let remainingBalance = adjustedSubtotal - discount - (parseFloat(advanceDetails) || 0);
-
-  // Step 4: Calculate Privilege Card Discount if Applicable
-  let privilegeDiscount = 0;
-  if (privilegeCard && privilegeCardDetails && parseFloat(redeemPointsAmount) > 0) {
-    const redeemAmount = parseFloat(redeemPointsAmount) || 0;
-    privilegeDiscount = Math.min(redeemAmount, loyaltyPoints, remainingBalance);
-    remainingBalance -= privilegeDiscount;
+// Function to fetch product details from Supabase
+const fetchProductDetailsFromDatabase = async (productId, branch) => {
+  console.log(
+    "Fetching product details for productId:",
+    productId,
+    "and branch:",
+    branch
+  );
+  if (!branch) {
+    console.error("Branch code is undefined or missing.");
+    return null; // Prevent further execution
   }
 
-  // Step 5: Calculate GST based on Remaining Balance
-  const cgstAmount = remainingBalance * 0.06;
-  const sgstAmount = remainingBalance * 0.06;
+  try {
+    // Step 1: Fetch the product details
+    const { data: productData, error: productError } = await supabase
+      .from("products")
+      .select("*")
+      .eq("product_id", productId)
+      .single();
 
-  // Step 6: Calculate Final Amount Including GST
-  const finalAmount = remainingBalance + cgstAmount + sgstAmount;
+    if (productError || !productData) {
+      console.error("Error fetching product details:", productError);
+      return null;
+    }
 
-  // Step 7: Ensure Final Amount is Not Negative
-  const finalAmountAdjusted = Math.max(finalAmount, 0);
+    // Step 2: Fetch stock information
+    const { data: stockData, error: stockError } = await supabase
+      .from("stock")
+      .select("quantity")
+      .eq("product_id", productData.id) // Note: product_id here refers to products.id
+      .eq("branch_code", branch)
+      .single();
 
-  return {
-    subtotal: adjustedSubtotal, // Adjusted Subtotal
-    discount, // Discount Amount
-    advance: parseFloat(advanceDetails) || 0, // Advance Paid
-    privilegeDiscount, // Privilege Card Discount
-    cgstAmount, // 6% CGST
-    sgstAmount, // 6% SGST
-    finalAmount: finalAmountAdjusted, // Final Amount Including GST
-  };
-}
+    if (stockError || !stockData) {
+      console.error("Error fetching stock:", stockError);
+      return { ...productData, stock: 0 }; // Default stock to 0 if error occurs
+    }
 
+    return { ...productData, stock: stockData.quantity || 0 };
+  } catch (error) {
+    console.error("Unexpected error:", error);
+    return null;
+  }
+};
 
-
-
-// Function to calculate loyalty points
+// Helper function to calculate loyalty points
 const calculateLoyaltyPoints = (
   subtotal,
   redeemPointsAmount,
   privilegeCard,
   privilegeCardDetails,
-  currentLoyaltyPoints
+  LoyaltyPoints
 ) => {
   let pointsToRedeem = 0;
   if (privilegeCard && privilegeCardDetails) {
     pointsToRedeem = Math.min(
       parseFloat(redeemPointsAmount) || 0,
-      currentLoyaltyPoints
+      LoyaltyPoints
     );
   }
 
-  let updatedPoints = currentLoyaltyPoints - pointsToRedeem;
+  let updatedPoints = LoyaltyPoints - pointsToRedeem;
 
   const pointsToAdd = Math.floor(subtotal * 0.05);
 
@@ -180,86 +182,168 @@ const calculateProductDifferences = (original, updated) => {
   return differences;
 };
 
+// Function to calculate amounts
+function calculateAmounts(
+  productEntries,
+  advanceDetails,
+  privilegeCard,
+  privilegeCardDetails,
+  redeemPointsAmount,
+  loyaltyPoints,
+  selectedWorkOrder,
+  discountAmount
+) {
+  // Step 1: Adjust Prices and Calculate Adjusted Subtotal
+  const adjustedSubtotal = productEntries.reduce((acc, product) => {
+    const originalPrice = parseFloat(product.price) || 0;
+    const adjustedPrice = (originalPrice / 112) * 100; // Adjusted Price using formula
+    const quantity = parseInt(product.quantity) || 0;
+    return acc + adjustedPrice * quantity;
+  }, 0);
+
+  // Step 2: Calculate Remaining Balance After Advance Paid
+  const advancePaid = parseFloat(advanceDetails) || 0;
+  let remainingAfterAdvance = adjustedSubtotal - advancePaid;
+
+  // Step 3: Calculate Discount Based on Remaining Balance After Advance
+  const discount = parseFloat(discountAmount) || 0;
+  const validDiscount = Math.min(discount, remainingAfterAdvance);
+
+  // Step 4: Update Remaining Balance After Discount
+  let remainingBalance = remainingAfterAdvance - validDiscount;
+
+  // Step 5: Calculate Privilege Card Discount if Applicable
+  let privilegeDiscount = 0;
+  if (
+    privilegeCard &&
+    privilegeCardDetails &&
+    parseFloat(redeemPointsAmount) > 0 &&
+    remainingBalance > 0
+  ) {
+    const redeemAmount = parseFloat(redeemPointsAmount) || 0;
+    privilegeDiscount = Math.min(redeemAmount, loyaltyPoints, remainingBalance);
+    remainingBalance -= privilegeDiscount;
+  }
+
+  // Ensure that if discount makes the total zero or negative, no privilege discount
+  if (remainingBalance <= 0) {
+    privilegeDiscount = 0;
+    remainingBalance = Math.max(remainingBalance, 0);
+  }
+
+  // Step 6: Calculate GST Based on Remaining Balance
+  const cgstAmount = remainingBalance * 0.06;
+  const sgstAmount = remainingBalance * 0.06;
+
+  // Step 7: Calculate Final Amount Including GST
+  const finalAmount = remainingBalance + cgstAmount + sgstAmount;
+
+  // Step 8: Ensure Final Amount is Not Negative
+  const finalAmountAdjusted = Math.max(finalAmount, 0);
+
+  return {
+    subtotal: adjustedSubtotal, // Adjusted Subtotal
+    discount: validDiscount, // Discount Amount
+    advance: advancePaid, // Advance Paid
+    privilegeDiscount, // Privilege Card Discount
+    cgstAmount, // 6% CGST
+    sgstAmount, // 6% SGST
+    finalAmount: finalAmountAdjusted, // Final Amount Including GST
+  };
+}
+
+
 // Main Component
 const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
   const { user, role, name, branch, loading: authLoading } = useAuth();
   console.log("branch:", branch); // Destructure branch from AuthContext
 
-  const [step, setStep] = useState(0); // Adjusted step numbering
-  const [salesOrderId, setSalesOrderId] = useState("");
-  const [productEntries, setProductEntries] = useState([
-    { id: "", name: "", price: "", quantity: "" },
-  ]);
+  const { state, dispatch } = useGlobalState(); // Access global state
+  const { salesOrderForm: form } = state;
 
-  // New state to store original products when editing
+  const {
+    step,
+    salesOrderId,
+    isEditing,
+    isPrinted,
+    isOtpSent,
+    productEntries,
+    advanceDetails,
+    dueDate,
+    mrNumber,
+    isPinVerified,
+    patientDetails,
+    employee,
+    paymentMethod,
+    discount,
+    gstNumber,
+    isB2B,
+    hasMrNumber,
+    customerName,
+    customerPhone,
+    address,
+    age,
+    gender,
+    modificationRequestId,
+    isSaving,
+    allowPrint,
+    privilegeCard,
+    privilegeCardDetails,
+    loyaltyPoints,
+    pointsToAdd,
+    validationErrors,
+    redeemOption,
+    redeemPointsAmount,
+    fetchMethod,
+    searchQuery,
+    workOrders,
+    isFetchingWorkOrders,
+    isLoading
+  } = form;
+
+  // Local states
   const [originalProductEntries, setOriginalProductEntries] = useState([
     { id: "", name: "", price: "", quantity: "" },
   ]);
-
-  const [patientDetails, setPatientDetails] = useState(null);
-  const [privilegeCard, setPrivilegeCard] = useState(true);
-  const [isPinVerified, setIsPinVerified] = useState(false);
-  const [phoneNumber, setPhoneNumber] = useState("");
-  const [otp, setOtp] = useState("");
-  const [isOtpVerified, setIsOtpVerified] = useState(false);
-  const [employee, setEmployee] = useState("");
-  const [employees, setEmployees] = useState([]);
-  const [allowPrint, setAllowPrint] = useState(false);
-  const [advanceDetails, setAdvanceDetails] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState("");
-  const [validationErrors, setValidationErrors] = useState({});
-  const [errorMessage, setErrorMessage] = useState("");
-  const [privilegeCardNumber, setPrivilegeCardNumber] = useState("");
-  const privilegeCardRef = useRef(null);
-  const [isLoading, setIsLoading] = useState(false);
-
-  const [isOtpSent, setIsOtpSent] = useState(false);
-  const [privilegeCardDetails, setPrivilegeCardDetails] = useState(null);
-  const [redeemPoints, setRedeemPoints] = useState(false);
-  const [redeemPointsAmount, setRedeemPointsAmount] = useState(""); // New state for custom redemption amount
-  const [loyaltyPoints, setLoyaltyPoints] = useState(0);
-  const [mrNumber, setMrNumber] = useState("");
-  const [workOrders, setWorkOrders] = useState([]);
   const [selectedWorkOrder, setSelectedWorkOrder] = useState(null);
   const [showWorkOrderModal, setShowWorkOrderModal] = useState(false);
-  const [pointsToAdd, setPointsToAdd] = useState(0);
-  const [redeemOption, setRedeemOption] = useState(null); // 'barcode', 'phone', 'full', 'custom', or null
-  const [searchQuery, setSearchQuery] = useState("");
-  const [isGeneratingId, setIsGeneratingId] = useState(false);
-  const [fetchTriggered, setFetchTriggered] = useState(false);
-  const [discountPercentage, setDiscountPercentage] = useState(""); // Changed from 0 to ""
+  const [employees, setEmployees] = useState([]);
+  const [productSuggestions, setProductSuggestions] = useState([]);
 
   // Refs for input fields to control focus
-  const mrNumberRef = useRef(null);
-  const privilegePhoneRef = useRef(null);
-  const otpRef = useRef(null);
-  const employeeRef = useRef(null);
-  const billPrintRef = useRef(null);
-
-  const customerNameRef = useRef(null);
-  const customerPhoneRef = useRef(null);
-  const nextButtonRef = useRef(null);
-  const paymentMethodRef = useRef(null);
-  const redeemPointsAmountRef = useRef(null);
-  const proceedButtonRef = useRef(null);
-  const saveOrderRef = useRef(null);
-  const printButtonRef = useRef(null);
-  const newWorkOrderButtonRef = useRef(null);
-  const quantityRefs = useRef([]);
   const workOrderInputRef = useRef(null);
   const firstWorkOrderButtonRef = useRef(null);
   const fetchButtonRef = useRef(null);
-  const productRefs = useRef([]);
-  const [productSuggestions, setProductSuggestions] = useState([]);
+  const proceedButtonRef = useRef(null);
+  const nextButtonRef = useRef(null);
+  const employeeRef = useRef(null);
+  const privilegeCardRef = useRef(null);
+  const privilegePhoneRef = useRef(null);
+  const otpRef = useRef(null);
+  const customerNameRef = useRef(null);
+  const customerPhoneRef = useRef(null);
+  const addressRef = useRef(null);
+  const genderRef = useRef(null);
+  const ageRef = useRef(null);
+  const mrNumberRef = useRef(null);
+  const redeemPointsAmountRef = useRef(null);
+  const printButtonRef = useRef(null);
+  const paymentMethodRef = useRef(null);
+  const saveOrderRef = useRef(null);
   const discountInputRef = useRef(null);
+  const productRefs = useRef([]);
+  const quantityRefs = useRef([]);
 
   const navigate = useNavigate();
   const location = useLocation();
   const { orderId } = useParams();
-  const [isEditing, setIsEditing] = useState(false);
 
-  const [fetchMethod, setFetchMethod] = useState("work_order_id"); // 'work_order_id', 'mr_number', 'phone_number'
+  // Helper function to update global form state
+  const updateSalesOrderForm = (payload) => {
+    dispatch({ type: "SET_SALES_ORDER_FORM", payload });
+  };
 
+  // Fetch Employees based on branch
   const fetchEmployees = async () => {
     try {
       const { data, error } = await supabase
@@ -286,10 +370,19 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
   // Validation for Employee Dropdown
   const validateEmployeeSelection = () => {
     if (!employee) {
-      setValidationErrors({ employee: "Employee selection is required." });
+      updateSalesOrderForm({
+        validationErrors: {
+          ...validationErrors,
+          employee: "Employee selection is required.",
+        },
+      });
       employeeRef.current?.focus();
     } else {
-      setValidationErrors({});
+      const updatedErrors = { ...validationErrors };
+      delete updatedErrors.employee;
+      updateSalesOrderForm({
+        validationErrors: updatedErrors,
+      });
     }
   };
 
@@ -323,27 +416,27 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         .select("sales_order_id")
         .order("sales_order_id", { ascending: false })
         .limit(1);
-  
+
       if (error) {
         console.error("Error fetching last sales_order_id:", error);
         return null;
       }
-  
+
       let lastSalesOrderId = 4007;
       if (data && data.length > 0) {
         lastSalesOrderId = parseInt(data[0].sales_order_id, 10) || 0;
       }
-  
+
       // Increment the last sales_order_id by 1
       const newSalesOrderId = lastSalesOrderId + 1;
-  
+      updateSalesOrderForm({ salesOrderId: newSalesOrderId });
+
       return newSalesOrderId.toString();
     } catch (error) {
       console.error("Error generating sales_order_id:", error);
       return null;
     }
   };
-  
 
   const fetchProductSuggestions = async (query, type) => {
     if (!query) return [];
@@ -367,41 +460,35 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
   };
 
   const handleProductChange = (index, field, value) => {
-    setProductEntries((prevEntries) => {
-      const updatedEntries = [...prevEntries];
-      updatedEntries[index][field] = value;
-      return updatedEntries;
-    });
+    const updatedProductEntries = [...productEntries];
+    updatedProductEntries[index][field] = value;
+    updateSalesOrderForm({ productEntries: updatedProductEntries });
     validateField(index, field);
   };
 
   const handleProductInputChange = async (index, value) => {
     if (!branch) {
       console.error("Branch is undefined. Cannot fetch product details.");
-      setProductEntries((prevEntries) => {
-        const updatedEntries = [...prevEntries];
-        updatedEntries[index] = {
-          ...updatedEntries[index],
-          stock: 0, // Assume no stock if branch is missing
-        };
-        return updatedEntries;
-      });
+      const updatedEntries = [...productEntries];
+      updatedEntries[index] = {
+        ...updatedEntries[index],
+        stock: 0, // Assume no stock if branch is missing
+      };
+      updateSalesOrderForm({ productEntries: updatedEntries });
       return;
     }
 
     const productDetails = await fetchProductDetailsFromDatabase(value, branch);
     if (productDetails) {
-      setProductEntries((prevEntries) => {
-        const updatedEntries = [...prevEntries];
-        updatedEntries[index] = {
-          id: productDetails.product_id,
-          name: productDetails.product_name,
-          price: productDetails.mrp || "",
-          stock: productDetails.stock || 0,
-          quantity: prevEntries[index].quantity || "", // Preserve quantity
-        };
-        return updatedEntries;
-      });
+      const updatedEntries = [...productEntries];
+      updatedEntries[index] = {
+        id: productDetails.product_id,
+        name: productDetails.product_name,
+        price: productDetails.mrp || "",
+        stock: productDetails.stock || 0,
+        quantity: updatedEntries[index].quantity || "", // Preserve quantity
+      };
+      updateSalesOrderForm({ productEntries: updatedEntries });
 
       if (productDetails.stock > 0) {
         setTimeout(() => {
@@ -409,14 +496,12 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         }, 100);
       }
     } else {
-      setProductEntries((prevEntries) => {
-        const updatedEntries = [...prevEntries];
-        updatedEntries[index] = {
-          ...updatedEntries[index],
-          stock: 0, // Assume no stock if fetching fails
-        };
-        return updatedEntries;
-      });
+      const updatedEntries = [...productEntries];
+      updatedEntries[index] = {
+        ...updatedEntries[index],
+        stock: 0, // Assume no stock if fetching fails
+      };
+      updateSalesOrderForm({ productEntries: updatedEntries });
     }
   };
 
@@ -429,29 +514,37 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         .single();
 
       if (error || !data) {
-        setErrorMessage("Sales not found");
+        updateSalesOrderForm({
+          validationErrors: {
+            ...validationErrors,
+            generalError: "Sales Not Found.",
+          },
+        });
         return;
       }
 
       // Populate form fields with the fetched data
-      setSalesOrderId(data.sales_order_id);
-      setProductEntries(
-        data.items || [{ id: "", name: "", price: "", quantity: "" }]
-      );
+      updateSalesOrderForm({
+        productEntries: data.items || [
+          { id: "", name: "", price: "", quantity: "" },
+        ],
+        mrNumber: data.mr_number || "",
+        customerPhone: data.patient_phone || "",
+        advanceDetails: data.advance_details || "",
+        employee: data.employee || "",
+        paymentMethod: data.payment_method || "",
+        loyaltyPoints: data.loyalty_points_redeemed || 0,
+        hasMrNumber: data.hasMrNumber || "yes",
+        discount: data.discount || "",
+        privilegeCard: true,
+        privilegeCardNumber: data.pc_number || "",
+        isEditing: true, // Custom field to indicate editing mode
+        validationErrors: {}, // Clear validation errors
+      });
+
       setOriginalProductEntries(
         data.items || [{ id: "", name: "", price: "", quantity: "" }]
       ); // Store original entries
-      setMrNumber(data.mr_number || "");
-      setPhoneNumber(data.patient_phone || "");
-      setAdvanceDetails(data.advance_details || "");
-      setEmployee(data.employee || "");
-      setPaymentMethod(data.payment_method || "");
-      setLoyaltyPoints(data.loyalty_points_redeemed || 0);
-      setPrivilegeCard(true);
-      setPrivilegeCardNumber(data.pc_number || "");
-      setSelectedWorkOrder(
-        data.work_order_id ? { work_order_id: data.work_order_id } : null
-      );
 
       // Fetch privilege card details based on pc_number
       if (data.pc_number) {
@@ -462,26 +555,39 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           .single();
 
         if (privilegeData.error || !privilegeData.data) {
-          setPrivilegeCardDetails(null);
-          setErrorMessage("Privilege Card not found for the given PC Number.");
+          updateSalesOrderForm({ privilegeCardDetails: null });
+          updateSalesOrderForm({
+            validationErrors: {
+              ...validationErrors,
+              generalError: "Privilege Card not found for the given PC Number.",
+            },
+          });
         } else {
-          setPrivilegeCardDetails(privilegeData.data);
-          setLoyaltyPoints(privilegeData.data.loyalty_points || 0);
-          setIsOtpVerified(true); // Skip OTP verification when editing
+          updateSalesOrderForm({ privilegeCardDetails: privilegeData.data });
+          updateSalesOrderForm({ isPinVerified: true });
         }
       }
 
-      setStep(1); // Move to the Product Details step
-      setErrorMessage("");
+      updateSalesOrderForm({ step: 3 }); // Move to the Privilege Card step
+      updateSalesOrderForm({
+        validationErrors: {
+          ...validationErrors,
+          generalError: "",
+        },
+      });
     } catch (error) {
       console.error("Error fetching sales:", error);
-      setErrorMessage("Failed to fetch sales");
+      updateSalesOrderForm({
+        validationErrors: {
+          ...validationErrors,
+          generalError: "Failed to fetch sales",
+        },
+      });
     }
   };
 
   useEffect(() => {
     if (orderId) {
-      setIsEditing(true);
       fetchExistingSalesOrder(orderId);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -491,15 +597,23 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
   const fetchSalesOrderId = async () => {
     if (branch && !isEditing) {
       // Only generate ID if not editing
-      setIsGeneratingId(true);
       const newSalesOrderId = await generateSalesOrderId();
       if (newSalesOrderId) {
-        setSalesOrderId(newSalesOrderId);
-        setErrorMessage("");
+        updateSalesOrderForm({ salesOrderId: newSalesOrderId });
+        updateSalesOrderForm({
+          validationErrors: {
+            ...validationErrors,
+            generalError: "",
+          },
+        });
       } else {
-        setErrorMessage("Failed to generate sales ID.");
+        updateSalesOrderForm({
+          validationErrors: {
+            ...validationErrors,
+            generalError: "Failed to generate ID",
+          },
+        });
       }
-      setIsGeneratingId(false);
     }
   };
 
@@ -515,7 +629,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     subtotal,
     cgstAmount,
     sgstAmount,
-    discount,
+    discount: calculatedDiscount,
     advance,
     privilegeDiscount,
     finalAmount,
@@ -524,25 +638,24 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
       calculateAmounts(
         productEntries,
         advanceDetails,
-        privilegeCard,
+        form.privilegeCard,
         privilegeCardDetails,
         redeemPointsAmount,
         loyaltyPoints,
         selectedWorkOrder,
-        discountPercentage
+        discount
       ),
     [
       productEntries,
       advanceDetails,
-      privilegeCard,
+      form.privilegeCard,
       privilegeCardDetails,
       redeemPointsAmount,
       loyaltyPoints,
       selectedWorkOrder,
-      discountPercentage,
+      discount,
     ]
   );
-
 
   // Function to fetch patient by MR number
   const fetchPatientByMRNumber = async (mrNumber) => {
@@ -559,75 +672,108 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     return data;
   };
 
-
-  // Calculate discountAmount
-  const discountAmount = discount;
-
   // Function to remove a product entry
   const removeProductEntry = (index) => {
     const updatedEntries = productEntries.filter((_, i) => i !== index);
-    setProductEntries(updatedEntries);
+    updateSalesOrderForm({ productEntries: updatedEntries });
     const updatedOriginalEntries = originalProductEntries.filter(
       (_, i) => i !== index
     );
     setOriginalProductEntries(updatedOriginalEntries); // Update original entries accordingly
-    const updatedSuggestions = [...productSuggestions];
-    updatedSuggestions.splice(index, 1);
-    setProductSuggestions(updatedSuggestions);
   };
 
   // Function to fetch privilege card by pc_number
   const handleFetchPrivilegeCardByNumber = async () => {
     try {
-      // Validate pc_number format if necessary
-      if (!privilegeCardNumber.trim()) {
-        setErrorMessage("Privilege Card Number is required.");
+      const pcNumber = form.privilegeCardNumber?.trim();
+
+      if (!pcNumber) {
+        updateSalesOrderForm({
+          validationErrors: {
+            ...validationErrors,
+            privilegeCardNumber: "Privilege Card Number is required.",
+          },
+        });
+        privilegeCardRef.current?.focus();
         return;
       }
 
       const { data, error } = await supabase
         .from("privilegecards")
         .select("*")
-        .eq("pc_number", privilegeCardNumber)
+        .eq("pc_number", pcNumber)
         .single();
 
       if (error || !data) {
-        console.error("Error fetching privilege card:", error);
-        setErrorMessage("Privilege Card not found.");
+        updateSalesOrderForm({
+          privilegeCardDetails: null,
+          validationErrors: {
+            ...validationErrors,
+            privilegeCardNumber: "Privilege Card not found.",
+          },
+        });
       } else {
-        setPrivilegeCardDetails(data);
-        setLoyaltyPoints(data.loyalty_points || 0);
-        setIsOtpVerified(true); // Skip OTP verification when using barcode
-        setErrorMessage("");
-        setRedeemOption(null);
-        setTimeout(() => nextButtonRef.current?.focus(), 0);
+        updateSalesOrderForm({
+          privilegeCardDetails: data,
+          isOtpVerified: true, // Assuming successful fetch auto-verifies
+          validationErrors: {
+            ...validationErrors,
+            privilegeCardNumber: null,
+            redeemOption: null,
+          },
+        });
       }
     } catch (error) {
-      console.error("Error fetching privilege card:", error);
-      setErrorMessage("Failed to fetch privilege card details.");
+      console.error("Unexpected error fetching privilege card:", error);
+      updateSalesOrderForm({
+        validationErrors: {
+          ...validationErrors,
+          privilegeCardNumber: "An unexpected error occurred. Please try again.",
+        },
+      });
     }
   };
+
+  const prevStep = useCallback(() => {
+    updateSalesOrderForm({ step: Math.max(step - 1, 0) });
+  }, [step]);
 
   // Fetch privilege card details via phone number
   const handleFetchPrivilegeCard = async () => {
     try {
-      const card = await fetchPrivilegeCardByPhone(phoneNumber);
+      const card = await fetchPrivilegeCardByPhone(form.customerPhone);
       if (card) {
-        setPrivilegeCardDetails(card);
-        setLoyaltyPoints(card.loyalty_points || 0);
-        setErrorMessage("");
+        updateSalesOrderForm({ privilegeCardDetails: card });
+        updateSalesOrderForm({
+          validationErrors: {
+            ...validationErrors,
+            generalError: "",
+          },
+        });
       } else {
-        setErrorMessage("No Privilege Card associated with this phone number.");
+        updateSalesOrderForm({
+          validationErrors: {
+            ...validationErrors,
+            generalError: "No privilege card associated with this number",
+          },
+        });
       }
     } catch (error) {
       console.error("Error fetching privilege card:", error);
-      setErrorMessage("Failed to fetch privilege card details.");
+      updateSalesOrderForm({
+        validationErrors: {
+          ...validationErrors,
+          generalError: "Failed to fetch privilege card details",
+        },
+      });
     }
   };
 
   // Handle fetching work orders
   const handleFetchWorkOrders = async () => {
     try {
+      updateSalesOrderForm({ isFetchingWorkOrders: true });
+
       let query = supabase.from("work_orders").select("*");
 
       if (fetchMethod === "work_order_id") {
@@ -637,25 +783,38 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         query = query.eq("mr_number", searchQuery);
       } else if (fetchMethod === "phone_number") {
         // Fetch work orders associated with customers having the phone number
-        const { data: customers, error: customerError } = await supabase
+        const { data: customer, error: customerError } = await supabase
           .from("customers")
           .select("id")
-          .eq("phone_number", searchQuery);
+          .eq("phone_number", searchQuery)
+          .single();
 
         if (customerError) {
           console.error("Error fetching customers:", customerError.message);
-          setErrorMessage("Failed to fetch customers.");
+          updateSalesOrderForm({
+            validationErrors: {
+              ...validationErrors,
+              generalError: "Failed to fetch customers",
+            },
+          });
+          updateSalesOrderForm({ isFetchingWorkOrders: false });
           return;
         }
 
-        if (customers.length === 0) {
-          setWorkOrders([]);
-          setErrorMessage("No customers found with this phone number.");
+        if (!customer) {
+          updateSalesOrderForm({ workOrders: [] });
+          updateSalesOrderForm({
+            validationErrors: {
+              ...validationErrors,
+              generalError: "No customers found with this number",
+            },
+          });
+          updateSalesOrderForm({ isFetchingWorkOrders: false });
           return;
         }
 
-        const customerIds = customers.map((customer) => customer.id);
-        query = query.in("customer_id", customerIds);
+        const customerId = customer.id;
+        query = query.eq("customer_id", customerId);
       }
 
       // Exclude work orders that are already used
@@ -667,12 +826,22 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
 
       if (error) {
         console.error("Error fetching work orders:", error.message);
-        setErrorMessage("Failed to fetch work orders.");
+        updateSalesOrderForm({
+          validationErrors: {
+            ...validationErrors,
+            generalError: "Failed to fetch work orders",
+          },
+        });
       } else {
-        setWorkOrders(data);
+        updateSalesOrderForm({ workOrders: data });
 
         // Clear any previous error messages
-        setErrorMessage("");
+        updateSalesOrderForm({
+          validationErrors: {
+            ...validationErrors,
+            generalError: "",
+          },
+        });
 
         // Focus on the first work order button if found, otherwise on the proceed button
         setTimeout(() => {
@@ -683,12 +852,19 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           }
         }, 0);
       }
+
+      updateSalesOrderForm({ isFetchingWorkOrders: false });
     } catch (error) {
       console.error("Error fetching work orders:", error);
-      setErrorMessage("Failed to fetch work orders.");
+      updateSalesOrderForm({
+        validationErrors: {
+          ...validationErrors,
+          generalError: "Failed to fetch work orders",
+        },
+      });
+      updateSalesOrderForm({ isFetchingWorkOrders: false });
     }
   };
-
 
   function handleSelectWorkOrder(workOrder) {
     setSelectedWorkOrder(workOrder);
@@ -697,71 +873,127 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
 
   async function confirmWorkOrderSelection() {
     // Set relevant data from the work order
-    setMrNumber(selectedWorkOrder.mr_number);
-    setAdvanceDetails(selectedWorkOrder.advance_details || "");
-    setHasMrNumber("yes");
+    updateSalesOrderForm({
+      mrNumber: selectedWorkOrder.mr_number,
+      advanceDetails: selectedWorkOrder.advance_details || "",
+      hasMrNumber: selectedWorkOrder.mr_number ? "yes" : "no",
+      productEntries: selectedWorkOrder.product_entries || [
+        { id: "", name: "", price: "", quantity: "" },
+      ],
+    });
 
-    if (selectedWorkOrder.product_entries) {
-      setProductEntries(selectedWorkOrder.product_entries);
-      setOriginalProductEntries(selectedWorkOrder.product_entries); // Update original entries
-    }
+    setOriginalProductEntries(
+      selectedWorkOrder.product_entries || [
+        { id: "", name: "", price: "", quantity: "" },
+      ]
+    ); // Update original entries
 
     setShowWorkOrderModal(false);
+
     // Automatically fetch patient details
     if (selectedWorkOrder.mr_number) {
-      const patient = await fetchPatientByMRNumber(selectedWorkOrder.mr_number.trim());
+      const patient = await fetchPatientByMRNumber(
+        selectedWorkOrder.mr_number.trim()
+      );
 
       if (patient) {
-        setPatientDetails({
-          name: patient.name,
-          age: patient.age,
-          condition: patient.condition || "N/A",
-          phone_number: patient.phone_number || "N/A",
-          gender: patient.gender || "N/A",
-          address: patient.address || "N/A",
+        updateSalesOrderForm({
+          patientDetails: {
+            name: patient.name,
+            age: patient.age,
+            condition: patient.condition || "N/A",
+            phone_number: patient.phone_number || "N/A",
+            gender: patient.gender || "N/A",
+            address: patient.address || "N/A",
+          },
         });
-        setErrorMessage("");
+        updateSalesOrderForm({
+          validationErrors: {
+            ...validationErrors,
+            generalError: "",
+          },
+        });
       } else {
-        setPatientDetails(null);
-        setErrorMessage("No patient found with the provided MR Number from Work Order.");
+        updateSalesOrderForm({ patientDetails: null });
+        updateSalesOrderForm({
+          validationErrors: {
+            ...validationErrors,
+            generalError: "No patient found with the provided work order.",
+          },
+        });
       }
     } else {
-      setPatientDetails(null);
-      setErrorMessage("Selected Work Order does not contain an MR Number.");
+      updateSalesOrderForm({ patientDetails: null });
+      updateSalesOrderForm({
+        validationErrors: {
+          ...validationErrors,
+          generalError: "Selected work order doesn't contain an MR number.",
+        },
+      });
     }
 
     // Move to the next step
-    setStep(3); // Adjusted step numbering
+    updateSalesOrderForm({ step: 3 }); // Adjust step numbering as needed
   }
 
   // Function to send OTP
   const handleSendOtp = () => {
-    if (phoneNumber.length === 10 && /^\d+$/.test(phoneNumber)) {
-      setIsOtpSent(true);
-      setErrorMessage("");
-      alert(`Mock OTP for testing purposes: ${mockOtp}`); // For testing, remove in production
+    console.log("handleSendOtp called");
+    const phoneNumber = customerPhone?.trim(); // Changed to 'customerPhone'
+    console.log("Entered Phone Number:", phoneNumber);
 
-      // Focus on OTP input after state updates
-      setTimeout(() => {
-        otpRef.current?.focus();
-      }, 100);
-    } else {
-      setErrorMessage("Please enter a valid 10-digit phone number.");
+    if (
+      !phoneNumber ||
+      phoneNumber.length !== 10 ||
+      !/^\d+$/.test(phoneNumber)
+    ) {
+      updateSalesOrderForm({
+        validationErrors: {
+          ...validationErrors,
+          customerPhone: "Please enter a valid 10-digit phone number.", // Changed to 'customerPhone'
+        },
+      });
+      privilegePhoneRef.current?.focus(); // Changed to 'privilegePhoneRef'
+      return;
     }
+
+    updateSalesOrderForm({
+      isOtpSent: true,
+      validationErrors: {
+        ...validationErrors,
+        customerPhone: null, // Changed to 'customerPhone'
+      },
+    });
+
+    // Mock OTP alert for testing
+    alert(`Mock OTP for testing purposes: ${mockOtp}`);
+    setTimeout(() => {
+      otpRef.current?.focus();
+    }, 100);
   };
 
   const handleVerifyOtp = async () => {
-    if (otp === mockOtp) {
-      setIsOtpVerified(true);
-      setErrorMessage("");
+    if (form.otp === mockOtp) {
+      updateSalesOrderForm({ isPinVerified: true });
+      updateSalesOrderForm({
+        validationErrors: {
+          ...validationErrors,
+          generalError: "", // Clear general errors
+        },
+      });
       await handleFetchPrivilegeCard();
       setTimeout(() => {
-        if (!errorMessage) {
+        if (!validationErrors.generalError) {
           nextButtonRef.current?.focus();
         }
       }, 0); // Focus on the next button if no errors
     } else {
-      setErrorMessage("Incorrect OTP. Please try again.");
+      updateSalesOrderForm({
+        validationErrors: {
+          ...validationErrors,
+          generalError: "Incorrect OTP. Please try again.",
+        },
+      });
     }
   };
 
@@ -774,19 +1006,21 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           productEntries,
           mrNumber,
           patientDetails,
-          phoneNumber,
-          otp,
-          isOtpVerified,
+          customerName,
+          customerPhone,
+          address,
+          age,
+          gender,
           employee,
           paymentMethod,
           advanceDetails,
-          privilegeCard,
-          redeemPoints,
-          redeemPointsAmount,
+          privilegeCard: form.privilegeCard,
+          redeemPoints: form.redeemPoints,
+          redeemPointsAmount: form.redeemPointsAmount,
           loyaltyPoints,
-          discountAmount,
-          privilegeCardNumber,
-          discountPercentage,
+          discount,
+          privilegeCardNumber: form.privilegeCardNumber,
+          // Add any other necessary fields
         },
       },
     });
@@ -795,31 +1029,36 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
   useEffect(() => {
     const locationState = location.state;
     if (locationState?.from === "privilege-generation") {
-      setStep(locationState.step);
-      setIsEditing(true);
+      updateSalesOrderForm({ isEditing: true });
 
       const data = locationState.formData;
       if (data) {
-        setProductEntries(data.productEntries);
-        setOriginalProductEntries(data.productEntries); // Set original entries
-        setMrNumber(data.mrNumber);
-        setPatientDetails(data.patientDetails);
-        setPhoneNumber(data.phoneNumber);
-        setOtp(data.otp);
-        setIsOtpVerified(data.isOtpVerified);
-        setEmployee(data.employee);
-        setPaymentMethod(data.paymentMethod);
-        setAdvanceDetails(data.advanceDetails);
-        setPrivilegeCard(data.privilegeCard);
-        setRedeemPoints(data.redeemPoints);
-        setRedeemPointsAmount(data.redeemPointsAmount);
-        setLoyaltyPoints(data.loyaltyPoints);
-        setPrivilegeCardNumber(data.privilegeCardNumber || "");
-        setDiscountPercentage(data.discountPercentage || "");
+        updateSalesOrderForm({
+          productEntries: data.productEntries,
+          mrNumber: data.mrNumber,
+          patientDetails: data.patientDetails,
+          customerName: data.customerName,
+          customerPhone: data.customerPhone,
+          address: data.address,
+          age: data.age,
+          gender: data.gender,
+          employee: data.employee,
+          paymentMethod: data.paymentMethod,
+          advanceDetails: data.advanceDetails,
+          privilegeCard: data.privilegeCard,
+          redeemPoints: data.redeemPoints,
+          redeemPointsAmount: data.redeemPointsAmount,
+          loyaltyPoints: data.loyaltyPoints,
+          privilegeCardNumber: data.privilegeCardNumber || "",
+          discount: data.discount || "",
+          // Add any other necessary fields
+        });
 
         // If privilegeCardDetails are available, set them
         if (data.privilegeCardDetails) {
-          setPrivilegeCardDetails(data.privilegeCardDetails);
+          updateSalesOrderForm({
+            privilegeCardDetails: data.privilegeCardDetails,
+          });
         }
       }
     }
@@ -833,7 +1072,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
 
     return () => clearTimeout(focusTimeout);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, privilegeCard, redeemOption]);
+  }, [step, form.privilegeCard, form.redeemOption]);
 
   const handleEnterKey = (e, nextFieldRef, prevFieldRef) => {
     if (e.key === "Enter") {
@@ -866,52 +1105,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     }
   };
 
-  // Function to fetch product details from Supabase
-  const fetchProductDetailsFromDatabase = async (productId, branch) => {
-    console.log(
-      "Fetching product details for productId:",
-      productId,
-      "and branch:",
-      branch
-    );
-    if (!branch) {
-      console.error("Branch code is undefined or missing.");
-      return null; // Prevent further execution
-    }
-
-    try {
-      // Step 1: Fetch the product details
-      const { data: productData, error: productError } = await supabase
-        .from("products")
-        .select("*")
-        .eq("product_id", productId)
-        .single();
-
-      if (productError || !productData) {
-        console.error("Error fetching product details:", productError);
-        return null;
-      }
-
-      // Step 2: Fetch stock information
-      const { data: stockData, error: stockError } = await supabase
-        .from("stock")
-        .select("quantity")
-        .eq("product_id", productData.id) // Note: product_id here refers to products.id
-        .eq("branch_code", branch)
-        .single();
-
-      if (stockError || !stockData) {
-        console.error("Error fetching stock:", stockError);
-        return { ...productData, stock: 0 }; // Default stock to 0 if error occurs
-      }
-
-      return { ...productData, stock: stockData.quantity || 0 };
-    } catch (error) {
-      console.error("Unexpected error:", error);
-      return null;
-    }
-  };
-
+  // Function to validate individual fields
   const validateField = (index, field) => {
     const errors = { ...validationErrors };
 
@@ -924,22 +1118,21 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
       if (!quantity) {
         errors[`productQuantity-${index}`] = "Quantity is required";
       } else if (quantity <= 0) {
-        errors[`productQuantity-${index}`] =
-          "Quantity must be greater than zero";
+        errors[`productQuantity-${index}`] = "Quantity must be greater than zero";
       } else if (quantity > productEntries[index].stock) {
-        errors[
-          `productQuantity-${index}`
-        ] = `Quantity cannot exceed available stock (${productEntries[index].stock})`;
+        errors[`productQuantity-${index}`] = `Quantity cannot exceed stock (${productEntries[index].stock})`;
       } else {
         delete errors[`productQuantity-${index}`];
       }
     } else {
-      delete errors[
-        `product${field.charAt(0).toUpperCase() + field.slice(1)}-${index}`
-      ];
+      delete errors[`product${field.charAt(0).toUpperCase() + field.slice(1)}-${index}`];
     }
 
-    setValidationErrors(errors);
+    updateSalesOrderForm({
+      validationErrors: {
+        ...errors,
+      },
+    });
   };
 
   const nextStep = async () => {
@@ -950,7 +1143,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
       if (!searchQuery.trim())
         errors.searchQuery =
           "Work Order ID, MR Number, or Phone Number is required";
-      // Removed branchCode validation as branch is fetched from context
+      // No need to validate branchCode as branch is fetched from context
     } else if (step === 1) {
       // Check if any product has stock <=0
       const stockIssues = productEntries.filter(
@@ -973,9 +1166,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           if (isNaN(quantity) || quantity <= 0) {
             errors[`productQuantity-${index}`] = "Enter a valid quantity";
           } else if (quantity > product.stock) {
-            errors[
-              `productQuantity-${index}`
-            ] = `Cannot exceed stock (${product.stock})`;
+            errors[`productQuantity-${index}`] = `Cannot exceed stock (${product.stock})`;
           }
         }
       });
@@ -993,24 +1184,31 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         } else if (!/^\d{10}$/.test(customerPhone)) {
           errors.customerPhone = "Please enter a valid 10-digit phone number";
         }
+        if (!address.trim())
+          errors["address"] = "Customer address is required.";
+        if (!age)
+          errors["customerAge"] = "Customer age is required.";
+        if (age && parseInt(age) < 0)
+          errors["customerAge"] = "Age cannot be negative.";
+        if (!gender)
+          errors["customerGender"] = "Customer gender is required.";
       }
     } else if (step === 3 && privilegeCard) {
       if (redeemOption === "phone") {
-        if (!phoneNumber.trim())
-          errors.phoneNumber = "Phone number is required";
-        if (!otp.trim()) errors.otp = "OTP is required";
-        if (!isOtpVerified) errors.otp = "Please verify the OTP";
+        if (!customerPhone.trim())
+          errors.customerPhone = "Phone number is required";
+        if (!form.otp.trim()) errors.otp = "OTP is required";
+        if (!isPinVerified) errors.otp = "Please verify the OTP";
       }
       if (
-        redeemPoints &&
+        redeemPointsAmount &&
         (parseFloat(redeemPointsAmount) > loyaltyPoints ||
           parseFloat(redeemPointsAmount) < 0)
       ) {
         errors.redeemPointsAmount = "Invalid redemption amount";
       }
-      if (discountPercentage !== "" && (parseFloat(discountPercentage) < 0 || parseFloat(discountPercentage) > 100)) {
-        errors.discountPercentage =
-          "Discount percentage must be between 0 and 100";
+      if (discount !== "" && (parseFloat(discount) < 0 || parseFloat(discount) > 100)) {
+        errors.discount = "Discount percentage must be between 0 and 100";
       }
     } else if (step === 4 && !employee) {
       errors.employee = "Employee selection is required";
@@ -1018,79 +1216,111 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
       errors.paymentMethod = "Payment method is required";
     }
 
-    setValidationErrors(errors);
+    // Dispatch validation errors
+    updateSalesOrderForm({ validationErrors: errors });
 
     if (Object.keys(errors).length === 0) {
       if (step < 5) {
-        setStep((prevStep) => prevStep + 1);
+        updateSalesOrderForm({ step: step + 1 });
       }
     }
   };
 
-  const prevStep = () => {
-    setValidationErrors({});
-    setIsPinVerified(false); // Reset PIN verification if going back
-    setStep((prevStep) => (prevStep > 0 ? prevStep - 1 : 0));
-  };
-
   const handleMRNumberSearch = async () => {
     if (!mrNumber.trim()) {
-      setErrorMessage("MR Number is required.");
+      updateSalesOrderForm({
+        validationErrors: {
+          ...validationErrors,
+          mrNumber: "MR number is required",
+        },
+      });
+      mrNumberRef.current?.focus();
       return;
     }
 
     const patient = await fetchPatientByMRNumber(mrNumber.trim());
 
     if (patient) {
-      setPatientDetails({
-        name: patient.name,
-        age: patient.age,
-        condition: patient.condition || "N/A",
-        phone_number: patient.phone_number || "N/A",
-        gender: patient.gender || "N/A",
-        address: patient.address || "N/A",
+      updateSalesOrderForm({
+        patientDetails: {
+          name: patient.name,
+          age: patient.age,
+          condition: patient.condition || "N/A",
+          phone_number: patient.phone_number || "N/A",
+          gender: patient.gender || "N/A",
+          address: patient.address || "N/A",
+        },
+        validationErrors: { ...validationErrors, mrNumber: null },
       });
-      setErrorMessage("");
+      updateSalesOrderForm({
+        validationErrors: {
+          ...validationErrors,
+          generalError: "",
+        },
+      });
       nextButtonRef.current?.focus();
     } else {
-      setPatientDetails(null);
-      setErrorMessage("No patient found with the provided MR Number.");
+      updateSalesOrderForm({ patientDetails: null });
+      updateSalesOrderForm({
+        validationErrors: {
+          ...validationErrors,
+          generalError: "No patient found with the provided work order",
+        },
+      });
     }
   };
 
-
   const focusFirstFieldOfStep = () => {
-    if (step === 0) workOrderInputRef.current?.focus();
-    if (step === 1) document.getElementById(`productId-0`)?.focus();
-    if (step === 2) {
-      // Focus on Yes button
-      document.getElementById("hasMrNumber-yes")?.focus();
+    if (step === 1) workOrderInputRef.current?.focus();
+    if (step === 2) document.getElementById(`productId-0`)?.focus();
+    if (step === 3) {
+      if (hasMrNumber === "yes") {
+        mrNumberRef.current?.focus();
+      } else if (hasMrNumber === "no") {
+        customerNameRef.current?.focus();
+      }
     }
-    if (step === 3 && privilegeCard) {
-      if (redeemOption === "barcode") {
+    if (step === 4 && form.privilegeCard) {
+      if (form.redeemOption === "barcode") {
         privilegeCardRef.current?.focus();
-      } else if (redeemOption === "phone") {
+      } else if (form.redeemOption === "phone") {
         privilegePhoneRef.current?.focus();
       }
     }
-    if (step === 4) employeeRef.current?.focus();
-    if (step === 5) discountInputRef.current?.focus(); // Updated to focus on discount field
+    if (step === 5) employeeRef.current?.focus();
   };
 
-  // Function to fetch product details from Supabase
+  const setSearchQuery = (query) => {
+    dispatch({
+      type: "SET_SALES_ORDER_FORM",
+      payload: { searchQuery: query },
+    });
+  };
+
+
+  const handleSearchQueryChange = (e) => {
+    setSearchQuery(e.target.value);
+  };
+
 
   const handleOrderCompletion = async () => {
     const currentUTCDateTime = getCurrentUTCDateTime();
-    setIsLoading(true);
+    updateSalesOrderForm({ isSaving: true });
+    updateSalesOrderForm({
+      validationErrors: {
+        ...validationErrors,
+        generalError: "",
+      },
+    });
 
     try {
       // Step 1: Handle Loyalty Points Update (if applicable)
-      if (privilegeCard && privilegeCardDetails) {
+      if (form.privilegeCard && privilegeCardDetails) {
         const { updatedPoints, pointsToRedeem, pointsToAdd } =
           calculateLoyaltyPoints(
             subtotal,
             redeemPointsAmount,
-            privilegeCard,
+            form.privilegeCard,
             privilegeCardDetails,
             loyaltyPoints
           );
@@ -1098,23 +1328,38 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         const { error: loyaltyError } = await supabase
           .from("privilegecards")
           .update({ loyalty_points: updatedPoints })
-          .eq("pc_number", privilegeCardNumber);
+          .eq("pc_number", form.privilegeCardNumber);
 
         if (loyaltyError) {
           console.error("Error updating loyalty points:", loyaltyError);
-          setErrorMessage("Failed to update loyalty points.");
+          dispatch({
+            type: "SET_SALES_ORDER_FORM",
+            payload: {
+              validationErrors: {
+                ...validationErrors,
+                generalError: "Failed to update loyalty points",
+              },
+            },
+          });
           return;
         }
 
-        setLoyaltyPoints(updatedPoints);
-        setPointsToAdd(pointsToAdd);
+        dispatch({
+          type: "SET_SALES_ORDER_FORM",
+          payload: {
+            loyaltyPoints: updatedPoints,
+            pointsToAdd: pointsToAdd,
+            // If pointsToAdd is also part of global state
+          },
+        });
+
       }
 
       // Step 2: Prepare Variables for sales Data
-      const sanitizedRedeemedPoints = privilegeCard
-        ? parseInt(redeemPointsAmount) || 0
+      const sanitizedRedeemedPoints = form.privilegeCard
+        ? parseInt(form.redeemPointsAmount) || 0
         : 0;
-      const sanitizedPointsAdded = privilegeCard ? pointsToAdd || 0 : 0;
+      const sanitizedPointsAdded = form.privilegeCard ? pointsToAdd || 0 : 0;
 
       // Step 3: Handle Existing sales Update
       if (isEditing) {
@@ -1141,18 +1386,30 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
               `Error fetching stock for product ${productId}:`,
               stockError
             );
-            setErrorMessage(
-              `Failed to fetch stock for product ID: ${productId}`
-            );
+            dispatch({
+              type: "SET_SALES_ORDER_FORM",
+              payload: {
+                validationErrors: {
+                  ...validationErrors,
+                  generalError: `Failed to fetch stock for product ID: ${productId}`,
+                },
+              },
+            });
             return;
           }
 
           const newStock = stockData.quantity - diff; // Deduct if diff > 0, add if diff < 0
 
           if (newStock < 0) {
-            setErrorMessage(
-              `Insufficient stock for product ID: ${productId}. Cannot reduce stock below zero.`
-            );
+            dispatch({
+              type: "SET_SALES_ORDER_FORM",
+              payload: {
+                validationErrors: {
+                  ...validationErrors,
+                  generalError: `Insufficient stock for product ID: ${productId}. Cannot reduce stock below zero.`,
+                },
+              },
+            });
             return;
           }
 
@@ -1168,9 +1425,15 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
               `Error updating stock for product ${productId}:`,
               updateStockError
             );
-            setErrorMessage(
-              `Failed to update stock for product ID: ${productId}`
-            );
+            dispatch({
+              type: "SET_SALES_ORDER_FORM",
+              payload: {
+                validationErrors: {
+                  ...validationErrors,
+                  generalError: `Failed to fetch stock for product ID: ${productId}`,
+                },
+              },
+            });
             return;
           }
         }
@@ -1182,14 +1445,14 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
             items: productEntries,
             advance_details: parseFloat(advance) || 0,
             mr_number: hasMrNumber === "yes" ? mrNumber : null,
-            patient_phone: hasMrNumber === "yes" ? phoneNumber : customerPhone,
+            patient_phone: hasMrNumber === "yes" ? customerPhone : null,
             employee: employee,
             payment_method: paymentMethod,
             subtotal: subtotal,
             cgst: parseFloat(cgstAmount),
             sgst: parseFloat(sgstAmount),
             total_amount: finalAmount,
-            discount: discount,
+            discount: calculatedDiscount,
             privilege_discount: privilegeDiscount, // Updated field
             final_amount: finalAmount,
             loyalty_points_redeemed: sanitizedRedeemedPoints,
@@ -1201,7 +1464,15 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
 
         if (updateError) {
           console.error("Error updating sales:", updateError);
-          setErrorMessage("Failed to update sales.");
+          dispatch({
+            type: "SET_SALES_ORDER_FORM",
+            payload: {
+              validationErrors: {
+                ...validationErrors,
+                generalError: "failed to update sales",
+              },
+            },
+          });
           return;
         }
 
@@ -1213,7 +1484,15 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
 
         if (modUpdateError) {
           console.error("Error updating modification status:", modUpdateError);
-          setErrorMessage("Failed to update modification status.");
+          dispatch({
+            type: "SET_SALES_ORDER_FORM",
+            payload: {
+              validationErrors: {
+                ...validationErrors,
+                generalError: "failed to update modification status",
+              },
+            },
+          });
           return;
         }
 
@@ -1230,11 +1509,11 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
               : null,
             items: productEntries,
             mr_number: hasMrNumber === "yes" ? mrNumber : null,
-            patient_phone: hasMrNumber === "yes" ? phoneNumber : customerPhone,
+            patient_phone: hasMrNumber === "yes" ? customerPhone : null,
             employee: employee,
             payment_method: paymentMethod,
             subtotal: subtotal,
-            discount: discount,
+            discount: calculatedDiscount,
             advance_details: advance, // Assuming you have an 'advance_paid' field
             privilege_discount: privilegeDiscount, // Updated field
             cgst: parseFloat(cgstAmount),
@@ -1247,26 +1526,21 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           })
           .eq("sales_order_id", salesOrderId);
 
-
         if (insertError) {
           console.error("Error inserting sales:", insertError);
-          setErrorMessage("Failed to create sales.");
+          dispatch({
+            type: "SET_SALES_ORDER_FORM",
+            payload: {
+              validationErrors: {
+                ...validationErrors,
+                generalError: "failed to update work order status",
+              },
+            },
+          });
           return;
         }
 
-        // Update modification status to completed
-        const { error: modInsertError } = await supabase
-          .from("modification_requests")
-          .update({ status: "completed" })
-          .eq("order_id", newSalesOrderId);
 
-        if (modInsertError) {
-          console.error("Error updating modification status:", modInsertError);
-          setErrorMessage("Failed to update modification status.");
-          return;
-        }
-
-        alert("Sales created successfully!");
 
         // Step 5: Mark Work Order as Used (if applicable)
         if (selectedWorkOrder) {
@@ -1277,7 +1551,15 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
 
           if (workOrderError) {
             console.error("Error marking work order as used:", workOrderError);
-            setErrorMessage("Failed to update work order status.");
+            dispatch({
+              type: "SET_SALES_ORDER_FORM",
+              payload: {
+                validationErrors: {
+                  ...validationErrors,
+                  generalError: "failed to update work order status",
+                },
+              },
+            });
             return;
           }
         }
@@ -1288,8 +1570,19 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
 
         if (!validProducts || validProducts.length === 0) {
           console.error("No valid products to process");
-          setErrorMessage("No valid products to deduct stock.");
-          setIsLoading(false); // Ensure loading state is turned off
+          dispatch({
+            type: "SET_SALES_ORDER_FORM",
+            payload: {
+              validationErrors: {
+                ...validationErrors,
+                generalError: "no valid products to deduct stock",
+              },
+            },
+          });
+          dispatch({
+            type: "SET_SALES_ORDER_FORM",
+            payload: { isLoading: false },
+          }); // Ensure loading state is turned off
           return;
         }
 
@@ -1308,7 +1601,15 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         );
         if (!deductResponse.success) {
           console.error("Stock deduction failed:", deductResponse.error);
-          setErrorMessage(`Failed to deduct stocks: ${deductResponse.error}`);
+          dispatch({
+            type: "SET_SALES_ORDER_FORM",
+            payload: {
+              validationErrors: {
+                ...validationErrors,
+                generalError: `Failed to deduct stocks: ${deductResponse.error}`,
+              },
+            },
+          });
           return;
         }
       }
@@ -1321,7 +1622,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           .eq("order_id", isEditing ? salesOrderId : newSalesOrderId);
       }
 
-      setAllowPrint(true);
+      updateSalesOrderForm({ allowPrint: true });
 
       alert("Order processed successfully!");
       setTimeout(() => {
@@ -1329,44 +1630,41 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
       }, 100);
     } catch (error) {
       console.error("Error completing the order:", error);
-      setErrorMessage("Failed to complete the order.");
+      dispatch({
+        type: "SET_SALES_ORDER_FORM",
+        payload: {
+          validationErrors: {
+            ...validationErrors,
+            generalError: "failed to complete the order",
+          },
+        },
+      });
     } finally {
-      setIsLoading(false);
+      dispatch({
+        type: "SET_SALES_ORDER_FORM",
+        payload: { isLoading: false },
+      });
     }
   };
 
   // Function to reset the form
   const resetForm = () => {
-    setProductEntries([{ id: "", name: "", price: "", quantity: "" }]);
-    setOriginalProductEntries([{ id: "", name: "", price: "", quantity: "" }]); // Reset original entries
-    setPatientDetails(null);
-    setPrivilegeCard(true);
-    setPhoneNumber("");
-    setOtp("");
-    setIsOtpVerified(false);
-    setEmployee("");
-    setAllowPrint(false);
-    setAdvanceDetails("");
-    setPaymentMethod("");
-    setValidationErrors({});
-    setErrorMessage("");
-    setIsOtpSent(false);
-    setPrivilegeCardDetails(null);
-    setRedeemPoints(false);
-    setRedeemPointsAmount("");
-    setLoyaltyPoints(0);
-    setMrNumber("");
-    setWorkOrders([]);
+    dispatch({ type: "RESET_SALES_ORDER_FORM" });
+    setOriginalProductEntries([{ id: "", name: "", price: "", quantity: "" }]);
+    dispatch({
+      type: "SET_SALES_ORDER_FORM",
+      payload: {
+        validationErrors: {
+          ...validationErrors,
+          generalError: "",
+        },
+      },
+    });
     setSelectedWorkOrder(null);
     setShowWorkOrderModal(false);
-    setPointsToAdd(0);
-    setRedeemOption(null);
-    setPrivilegeCardNumber("");
-    setIsEditing(false); // Reset isEditing to false
+
     setProductSuggestions([]);
-    setFetchMethod("work_order_id");
-    setSearchQuery("");
-    setDiscountPercentage("");
+    setIsGeneratingId(false);
   };
 
   // Confirm and reset the form
@@ -1381,46 +1679,18 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     }
   };
 
-  const handlePrint = () => {
-    setAllowPrint(true);
-    window.print(); // Simply call print without extra state changes
-  };
+  const handlePrint = useCallback(() => {
+    window.print();
+    dispatch({ type: "SET_SALES_ORDER_FORM", payload: { isPrinted: true } });
+    resetForm();
+  }, []);
 
-
-
-  // Conditional Fields for Step 2
-  const [hasMrNumber, setHasMrNumber] = useState(null); // 'yes' or 'no'
-  const [customerName, setCustomerName] = useState("");
-  const [customerPhone, setCustomerPhone] = useState("");
-
-  // Function to fetch work orders by different methods
-  // Already handled in handleFetchWorkOrders
 
   return (
     <div
       className={`transition-all duration-300 ${isCollapsed ? "mx-20" : "mx-20 px-20"
         } justify-center mt-16 p-4 mx-auto`}
     >
-      {/* Print Styles */}
-      <style>
-        {`
-          @media print {
-            body * {
-              visibility: hidden;
-            }
-            .printable-area, .printable-area * {
-              visibility: visible;
-            }
-            .printable-area {
-              position: absolute;
-              left: 0;
-              top: 0;
-              width: 100%;
-            }
-          }
-        `}
-      </style>
-
       {/* Modal for Work Order Details */}
       {showWorkOrderModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
@@ -1430,7 +1700,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
             </h2>
             <div className="space-y-2">
               <p>
-                <strong>Work Order ID:</strong> {selectedWorkOrder.work_order_id}
+                <strong>Work Order ID:</strong>{" "}
+                {selectedWorkOrder.work_order_id}
               </p>
               <p>
                 <strong>Description:</strong> {selectedWorkOrder.description}
@@ -1471,15 +1742,9 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                           (product, index) => (
                             <tr key={index} className="text-center">
                               <td className="py-1 px-2">{product.id}</td>
-                              <td className="py-1 px-2">
-                                {product.name}
-                              </td>
-                              <td className="py-1 px-2">
-                                {product.price}
-                              </td>
-                              <td className="py-1 px-2">
-                                {product.quantity}
-                              </td>
+                              <td className="py-1 px-2">{product.name}</td>
+                              <td className="py-1 px-2">{product.price}</td>
+                              <td className="py-1 px-2">{product.quantity}</td>
                             </tr>
                           )
                         )}
@@ -1508,7 +1773,6 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         </div>
       )}
 
-
       <h1 className="text-2xl font-semibold text-gray-700 text-center mb-8">
         Sales Generation
       </h1>
@@ -1516,7 +1780,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
       {/* Editing Indicator */}
       {isEditing && (
         <div className="bg-yellow-100 text-yellow-800 p-4 rounded-lg mb-6">
-          <p>You are editing an existing sales (ID: {salesOrderId}).</p>
+          <p>You are editing an existing sales order (ID: {salesOrderId}).</p>
         </div>
       )}
 
@@ -1540,8 +1804,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           className="space-y-8 bg-white p-6 rounded-lg max-w-3xl mx-auto"
           onSubmit={(e) => e.preventDefault()}
         >
-          {/* Step 0: Fetch Work Orders */}
-          {step === 0 && (
+          {/* Step 1: Fetch Work Orders */}
+          {state.salesOrderForm.step === 0 && (
             <div className="bg-gray-50 p-6 rounded-md shadow-inner space-y-4">
               <h2 className="text-lg font-semibold text-gray-700">
                 Fetch Work Orders
@@ -1555,15 +1819,18 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                 <div className="flex space-x-4">
                   <button
                     type="button" // Added type="button"
-                    onClick={() => setFetchMethod("work_order_id")}
-                    className={`px-4 py-2 rounded-lg ${fetchMethod === "work_order_id"
+                    onClick={() =>
+                      updateSalesOrderForm({ fetchMethod: "work_order_id" })
+                    }
+                    className={`px-4 py-2 rounded-lg ${form.fetchMethod === "work_order_id"
                       ? "bg-green-500 text-white"
                       : "bg-gray-200"
                       }`}
                     onKeyDown={(e) => {
                       if (e.key === "ArrowRight") {
                         e.preventDefault();
-                        document.getElementById("fetchMethod-mr_number")?.focus();
+                        document
+                          .getElementById("fetchMethod-mr_number")?.focus();
                       }
                     }}
                   >
@@ -1571,19 +1838,25 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                   </button>
                   <button
                     type="button" // Added type="button"
-                    onClick={() => setFetchMethod("mr_number")}
+                    onClick={() =>
+                      updateSalesOrderForm({ fetchMethod: "mr_number" })
+                    }
                     id="fetchMethod-mr_number"
-                    className={`px-4 py-2 rounded-lg ${fetchMethod === "mr_number"
+                    className={`px-4 py-2 rounded-lg ${form.fetchMethod === "mr_number"
                       ? "bg-green-500 text-white"
                       : "bg-gray-200"
                       }`}
                     onKeyDown={(e) => {
                       if (e.key === "ArrowRight") {
                         e.preventDefault();
-                        document.getElementById("fetchMethod-phone_number")?.focus();
+                        document
+                          .getElementById("fetchMethod-phone_number")
+                          ?.focus();
                       } else if (e.key === "ArrowLeft") {
                         e.preventDefault();
-                        document.getElementById("fetchMethod-work_order_id")?.focus();
+                        document
+                          .getElementById("fetchMethod-work_order_id")
+                          ?.focus();
                       }
                     }}
                   >
@@ -1591,16 +1864,20 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                   </button>
                   <button
                     type="button" // Added type="button"
-                    onClick={() => setFetchMethod("phone_number")}
+                    onClick={() =>
+                      updateSalesOrderForm({ fetchMethod: "phone_number" })
+                    }
                     id="fetchMethod-phone_number"
-                    className={`px-4 py-2 rounded-lg ${fetchMethod === "phone_number"
+                    className={`px-4 py-2 rounded-lg ${form.fetchMethod === "phone_number"
                       ? "bg-green-500 text-white"
                       : "bg-gray-200"
                       }`}
                     onKeyDown={(e) => {
                       if (e.key === "ArrowLeft") {
                         e.preventDefault();
-                        document.getElementById("fetchMethod-mr_number")?.focus();
+                        document
+                          .getElementById("fetchMethod-mr_number")
+                          ?.focus();
                       }
                     }}
                   >
@@ -1626,9 +1903,9 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                       ? "MR Number"
                       : "Phone Number"
                 }
-                value={searchQuery}
+                value={state.salesOrderForm.searchQuery}
                 ref={workOrderInputRef}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={handleSearchQueryChange}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     e.preventDefault();
@@ -1647,6 +1924,10 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                 <p className="text-red-500 text-xs mt-1">
                   {validationErrors.searchQuery}
                 </p>
+              )}
+
+              {validationErrors.generalError && (
+                <p className="text-red-500 text-xs mt-1">{validationErrors.generalError}</p>
               )}
 
               <button
@@ -1682,8 +1963,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                               {workOrder.work_order_id}
                             </p>
                             <p>
-                              <strong>Description:</strong>{" "}
-                              {workOrder.description}
+                              <strong>Due Date:</strong>{" "}
+                              {workOrder.due_date}
                             </p>
                             <p>
                               <strong>Advance Paid:</strong> ₹
@@ -1705,18 +1986,20 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                                 e.preventDefault();
                                 if (index < workOrders.length - 1) {
                                   document
-                                    .getElementById(`workOrderButton-${index + 1}`)
+                                    .getElementById(
+                                      `workOrderButton-${index + 1}`
+                                    )
                                     ?.focus();
                                 } else {
                                   proceedButtonRef.current?.focus();
                                 }
                               } else if (e.key === "ArrowLeft") {
                                 e.preventDefault();
-                                if (index > 0) {
-                                  document
-                                    .getElementById(`workOrderButton-${index - 1}`)
-                                    ?.focus();
-                                }
+                                document
+                                  .getElementById(
+                                    `workOrderButton-${index - 1}`
+                                  )
+                                  ?.focus();
                               }
                             }}
                           >
@@ -1732,7 +2015,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                   <p>No work orders found for this search.</p>
                   <button
                     type="button" // Added type="button"
-                    onClick={() => setStep(1)}
+                    onClick={() => updateSalesOrderForm({ step: 1 })}
                     ref={proceedButtonRef}
                     className="mt-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition"
                     onKeyDown={(e) => {
@@ -1749,8 +2032,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
             </div>
           )}
 
-          {/* Step 1: Product Details */}
-          {step === 1 && (
+          {/* Step 2: Product Details */}
+          {state.salesOrderForm.step === 1 && (
             <div className="w-full bg-gray-50 p-6 rounded-md shadow-inner space-y-6">
               <h2 className="text-lg font-semibold text-gray-700 text-center">
                 Product Information
@@ -1790,11 +2073,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                             }
                             setProductSuggestions(updatedSuggestions);
 
-                            setProductEntries((prevEntries) => {
-                              const updatedEntries = [...prevEntries];
-                              updatedEntries[index].id = value; // Update ID field
-                              return updatedEntries;
-                            });
+                            handleProductChange(index, "id", value); // Update ID field
                             await handleProductInputChange(index, value); // Fetch product details
                           }}
                           onBlur={async () => {
@@ -1812,17 +2091,26 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                                   branch
                                 );
                               if (productDetails) {
-                                setProductEntries((prevEntries) => {
-                                  const updatedEntries = [...prevEntries];
-                                  updatedEntries[index] = {
-                                    id: productDetails.product_id,
-                                    name: productDetails.product_name,
-                                    price: productDetails.mrp || "",
-                                    stock: productDetails.stock || 0,
-                                    quantity: prevEntries[index].quantity || "", // Preserve quantity
-                                  };
-                                  return updatedEntries;
-                                });
+                                handleProductChange(
+                                  index,
+                                  "id",
+                                  productDetails.product_id
+                                );
+                                handleProductChange(
+                                  index,
+                                  "name",
+                                  productDetails.product_name
+                                );
+                                handleProductChange(
+                                  index,
+                                  "price",
+                                  productDetails.mrp || ""
+                                );
+                                handleProductChange(
+                                  index,
+                                  "stock",
+                                  productDetails.stock || 0
+                                );
                                 if (productDetails.stock > 0) {
                                   setTimeout(() => {
                                     quantityRefs.current[index]?.focus();
@@ -1836,7 +2124,9 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                           onKeyDown={(e) => {
                             if (e.key === "ArrowDown") {
                               e.preventDefault();
-                              document.getElementById(`productQuantity-${index}`)?.focus();
+                              document
+                                .getElementById(`productQuantity-${index}`)
+                                ?.focus();
                             }
                           }}
                         />
@@ -1916,30 +2206,53 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                                 e.preventDefault();
                                 if (e.shiftKey) {
                                   // Shift + Enter: Add new product field and focus on first product ID
-                                  setProductEntries([
-                                    ...productEntries,
-                                    { id: "", name: "", price: "", quantity: "" },
-                                  ]);
+                                  updateSalesOrderForm({
+                                    productEntries: [
+                                      ...productEntries,
+                                      {
+                                        id: "",
+                                        name: "",
+                                        price: "",
+                                        quantity: "",
+                                      },
+                                    ],
+                                  });
                                   setOriginalProductEntries([
                                     ...originalProductEntries,
-                                    { id: "", name: "", price: "", quantity: "" },
+                                    {
+                                      id: "",
+                                      name: "",
+                                      price: "",
+                                      quantity: "",
+                                    },
+                                  ]); // Update original entries
+                                  setProductSuggestions([
+                                    ...productSuggestions,
+                                    [],
                                   ]);
-                                  setProductSuggestions([...productSuggestions, []]);
-                                  setTimeout(() => {
-                                    document.getElementById(`productId-${productEntries.length}`)?.focus();
-                                  }, 0);
+                                  setTimeout(
+                                    () =>
+                                      document
+                                        .getElementById(
+                                          `productId-${productEntries.length}`
+                                        )
+                                        ?.focus(),
+                                    0
+                                  );
                                 } else {
                                   // Enter: Proceed to the next step
                                   nextStep();
                                 }
                               }
-                              // Existing Arrow Key Handling
+                              // Handle Arrow Keys for navigation
                               else if (e.key === "ArrowRight") {
                                 e.preventDefault();
                                 e.target.parentElement.nextSibling?.focus();
                               } else if (e.key === "ArrowLeft") {
                                 e.preventDefault();
-                                document.getElementById(`productPrice-${index}`)?.focus();
+                                document
+                                  .getElementById(`productPrice-${index}`)
+                                  ?.focus();
                               }
                             }}
                           />
@@ -1959,7 +2272,9 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                         onKeyDown={(e) => {
                           if (e.key === "ArrowLeft") {
                             e.preventDefault();
-                            document.getElementById(`productQuantity-${index}`)?.focus();
+                            document
+                              .getElementById(`productQuantity-${index}`)
+                              ?.focus();
                           }
                         }}
                       >
@@ -1970,10 +2285,12 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                 <button
                   type="button" // Added type="button"
                   onClick={() => {
-                    setProductEntries([
-                      ...productEntries,
-                      { id: "", name: "", price: "", quantity: "" },
-                    ]);
+                    updateSalesOrderForm({
+                      productEntries: [
+                        ...productEntries,
+                        { id: "", name: "", price: "", quantity: "" },
+                      ],
+                    });
                     setOriginalProductEntries([
                       ...originalProductEntries,
                       { id: "", name: "", price: "", quantity: "" },
@@ -1991,24 +2308,9 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                   onKeyDown={(e) => {
                     if (e.key === "ArrowDown") {
                       e.preventDefault();
-                      setProductEntries([
-                        ...productEntries,
-                        { id: "", name: "", price: "", quantity: "" },
-                      ]);
-                      setOriginalProductEntries([
-                        ...originalProductEntries,
-                        { id: "", name: "", price: "", quantity: "" },
-                      ]); // Update original entries
-                      setProductSuggestions([...productSuggestions, []]);
-                      setTimeout(
-                        () =>
-                          document
-                            .getElementById(
-                              `productId-${productEntries.length}`
-                            )
-                            ?.focus(),
-                        0
-                      );
+                      document
+                        .getElementById(`productId-${productEntries.length}`)
+                        ?.focus();
                     }
                   }}
                 >
@@ -2024,8 +2326,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
             </div>
           )}
 
-          {/* Step 2: Patient or Customer Details */}
-          {step === 2 && (
+          {/* Step 3: Patient or Customer Details */}
+          {state.salesOrderForm.step === 2 && (
             <div className="bg-gray-50 p-6 rounded-md shadow-inner space-y-4">
               <h2 className="text-lg font-semibold text-gray-700">
                 Patient or Customer Information
@@ -2036,7 +2338,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                 <button
                   type="button" // Added type="button"
                   id="hasMrNumber-yes"
-                  onClick={() => setHasMrNumber("yes")}
+                  onClick={() => updateSalesOrderForm({ hasMrNumber: "yes" })}
                   className={`px-4 py-2 rounded-lg ${hasMrNumber === "yes"
                     ? "bg-green-500 text-white"
                     : "bg-gray-200"
@@ -2053,7 +2355,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                 <button
                   type="button" // Added type="button"
                   id="hasMrNumber-no"
-                  onClick={() => setHasMrNumber("no")}
+                  onClick={() => updateSalesOrderForm({ hasMrNumber: "no" })}
                   className={`px-4 py-2 rounded-lg ${hasMrNumber === "no"
                     ? "bg-green-500 text-white"
                     : "bg-gray-200"
@@ -2079,7 +2381,9 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                     type="text"
                     placeholder="Enter MR Number"
                     value={mrNumber}
-                    onChange={(e) => setMrNumber(e.target.value)}
+                    onChange={(e) =>
+                      updateSalesOrderForm({ mrNumber: e.target.value })
+                    }
                     onKeyDown={(e) => handleEnterKey(e, fetchButtonRef, null)}
                     ref={mrNumberRef}
                     className="border border-gray-300 w-full px-4 py-3 rounded-lg"
@@ -2116,7 +2420,13 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                         <strong>Age:</strong> {patientDetails.age}
                       </p>
                       <p>
-                        <strong>Condition:</strong> {patientDetails.condition}
+                        <strong>Gender:</strong> {patientDetails.gender}
+                      </p>
+                      <p>
+                        <strong>Address:</strong> {patientDetails.address}
+                      </p>
+                      <p>
+                        <strong>Phone number:</strong> {patientDetails.phone_number}
                       </p>
                     </div>
                   )}
@@ -2132,7 +2442,9 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                     type="text"
                     placeholder="Enter Customer Name"
                     value={customerName}
-                    onChange={(e) => setCustomerName(e.target.value)}
+                    onChange={(e) =>
+                      updateSalesOrderForm({ customerName: e.target.value })
+                    }
                     onKeyDown={(e) => {
                       if (e.key === "ArrowDown") {
                         e.preventDefault();
@@ -2156,7 +2468,9 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                     type="text"
                     placeholder="Enter Phone Number"
                     value={customerPhone}
-                    onChange={(e) => setCustomerPhone(e.target.value)}
+                    onChange={(e) =>
+                      updateSalesOrderForm({ customerPhone: e.target.value })
+                    }
                     onKeyDown={(e) => {
                       if (e.key === "ArrowUp") {
                         e.preventDefault();
@@ -2177,13 +2491,111 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                       {validationErrors.customerPhone}
                     </p>
                   )}
+
+                  {/* Additional Fields: Address, Gender, Age */}
+                  <label className="block text-gray-700 font-medium mb-1">
+                    Enter Address
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Enter Address"
+                    value={address}
+                    onChange={(e) =>
+                      updateSalesOrderForm({ address: e.target.value })
+                    }
+                    onKeyDown={(e) => {
+                      if (e.key === "ArrowDown") {
+                        e.preventDefault();
+                        genderRef.current?.focus();
+                      }
+                      if (e.key === "ArrowUp") {
+                        e.preventDefault();
+                        customerPhoneRef.current?.focus();
+                      }
+                    }}
+                    ref={addressRef}
+                    className="border border-gray-300 w-full px-4 py-3 rounded-lg"
+                  />
+
+                  {validationErrors.address && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {validationErrors.address}
+                    </p>
+                  )}
+
+                  <label className="block text-gray-700 font-medium mb-1">
+                    Select Gender
+                  </label>
+                  <select
+                    value={gender}
+                    onChange={(e) =>
+                      updateSalesOrderForm({ gender: e.target.value })
+                    }
+                    onKeyDown={(e) => {
+                      if (e.key === "ArrowDown") {
+                        e.preventDefault();
+                        ageRef.current?.focus();
+                      }
+                      if (e.key === "ArrowUp") {
+                        e.preventDefault();
+                        addressRef.current?.focus();
+                      }
+                    }}
+                    ref={genderRef}
+                    className="border border-gray-300 w-full px-4 py-3 rounded-lg"
+                  >
+                    <option value="" disabled>
+                      Select Gender
+                    </option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Other">Other</option>
+                  </select>
+
+                  {validationErrors.gender && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {validationErrors.gender}
+                    </p>
+                  )}
+
+                  <label className="block text-gray-700 font-medium mb-1">
+                    Enter Age
+                  </label>
+                  <input
+                    type="number"
+                    placeholder="Enter Age"
+                    value={age}
+                    onChange={(e) =>
+                      updateSalesOrderForm({ age: e.target.value })
+                    }
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        nextButtonRef.current?.focus();
+                      }
+                      if (e.key === "ArrowUp") {
+                        e.preventDefault();
+                        genderRef.current?.focus();
+                      }
+                    }}
+                    ref={ageRef}
+                    className="border border-gray-300 w-full px-4 py-3 rounded-lg"
+                    min="0"
+                  />
+
+                  {validationErrors.age && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {validationErrors.age}
+                    </p>
+                  )}
                 </>
               )}
             </div>
           )}
 
+          {/* Step 4: Privilege Card */}
           {/* Step 3: Privilege Card */}
-          {step === 3 && (
+          {state.salesOrderForm.step === 3 && (
             <div className="bg-gray-50 p-6 rounded-md shadow-inner space-y-4">
               <h2 className="text-lg font-semibold text-gray-700">
                 Privilege Card
@@ -2194,20 +2606,32 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
               </p>
               <div className="flex space-x-4 mb-4">
                 <button
-                  type="button" // Added type="button"
+                  type="button"
                   onClick={() => {
-                    setPrivilegeCard(true);
-                    setRedeemOption(null); // Reset redeem option
-                    setErrorMessage(""); // Clear previous errors
+                    dispatch({
+                      type: "SET_SALES_ORDER_FORM",
+                      payload: { privilegeCard: true, redeemOption: null },
+                    }); // Reset redeemOption
+                    dispatch({
+                      type: "SET_SALES_ORDER_FORM",
+                      payload: {
+                        validationErrors: {
+                          ...state.salesOrderForm.validationErrors,
+                          generalError: "",
+                        },
+                      },
+                    }); // Clear previous errors
                     setTimeout(() => {
-                      if (redeemOption === "barcode") {
+                      if (form.redeemOption === "barcode") {
                         privilegeCardRef.current?.focus();
-                      } else if (redeemOption === "phone") {
+                      } else if (form.redeemOption === "phone") {
                         privilegePhoneRef.current?.focus();
                       }
                     }, 0);
                   }}
-                  className={`px-4 py-2 rounded-lg ${privilegeCard ? "bg-green-500 text-white" : "bg-gray-200"
+                  className={`px-4 py-2 rounded-lg ${state.salesOrderForm.privilegeCard
+                    ? "bg-green-500 text-white"
+                    : "bg-gray-200"
                     }`}
                   onKeyDown={(e) => {
                     if (e.key === "ArrowRight") {
@@ -2219,15 +2643,33 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                   Yes
                 </button>
                 <button
-                  type="button" // Added type="button"
+                  type="button"
                   onClick={() => {
-                    setPrivilegeCard(false);
-                    setRedeemOption(null); // Reset redeem option
-                    setErrorMessage(""); // Clear previous errors
-                    nextStep();
+                    dispatch({
+                      type: "SET_SALES_ORDER_FORM",
+                      payload: { privilegeCard: false, redeemOption: null },
+                    }); // Reset redeemOption
+                    dispatch({
+                      type: "SET_SALES_ORDER_FORM",
+                      payload: {
+                        validationErrors: {
+                          ...state.salesOrderForm.validationErrors,
+                          generalError: "",
+                        },
+                      },
+                    }); // Clear previous errors
+                    setTimeout(() => {
+                      if (form.redeemOption === "barcode") {
+                        privilegeCardRef.current?.focus();
+                      } else if (form.redeemOption === "phone") {
+                        privilegePhoneRef.current?.focus();
+                      }
+                    }, 0);
                   }}
                   id="privilegeCard-no"
-                  className={`px-4 py-2 rounded-lg ${!privilegeCard ? "bg-green-500 text-white" : "bg-gray-200"
+                  className={`px-4 py-2 rounded-lg ${!state.salesOrderForm.privilegeCard
+                    ? "bg-green-500 text-white"
+                    : "bg-gray-200"
                     }`}
                   onKeyDown={(e) => {
                     if (e.key === "ArrowLeft") {
@@ -2240,26 +2682,35 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                 </button>
               </div>
 
-              {privilegeCard && (
+              {state.salesOrderForm.privilegeCard && (
                 <>
                   <p className="font-semibold mb-2">
                     How would you like to fetch your Privilege Card?
                   </p>
                   <div className="flex space-x-4 mb-4">
                     <button
-                      type="button" // Added type="button"
-                      onClick={() => setRedeemOption("barcode")}
-                      className={`px-4 py-2 rounded-lg ${redeemOption === "barcode"
+                      type="button"
+                      onClick={() =>
+                        dispatch({
+                          type: "SET_SALES_ORDER_FORM",
+                          payload: { redeemOption: "barcode" },
+                        })
+                      }
+                      className={`px-4 py-2 rounded-lg ${state.salesOrderForm.redeemOption === "barcode"
                         ? "bg-green-500 text-white"
                         : "bg-gray-200"
                         }`}
                       onKeyDown={(e) => {
                         if (e.key === "ArrowRight") {
                           e.preventDefault();
-                          document.getElementById("redeemOption-phone")?.focus();
+                          document
+                            .getElementById("redeemOption-phone")
+                            ?.focus();
                         } else if (e.key === "ArrowLeft") {
                           e.preventDefault();
-                          document.getElementById("redeemOption-barcode")?.focus();
+                          document
+                            .getElementById("redeemOption-barcode")
+                            ?.focus();
                         }
                       }}
                       id="redeemOption-barcode"
@@ -2267,16 +2718,23 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                       Scan Barcode
                     </button>
                     <button
-                      type="button" // Added type="button"
-                      onClick={() => setRedeemOption("phone")}
-                      className={`px-4 py-2 rounded-lg ${redeemOption === "phone"
+                      type="button"
+                      onClick={() =>
+                        dispatch({
+                          type: "SET_SALES_ORDER_FORM",
+                          payload: { redeemOption: "phone" },
+                        })
+                      }
+                      className={`px-4 py-2 rounded-lg ${state.salesOrderForm.redeemOption === "phone"
                         ? "bg-green-500 text-white"
                         : "bg-gray-200"
                         }`}
                       onKeyDown={(e) => {
                         if (e.key === "ArrowLeft") {
                           e.preventDefault();
-                          document.getElementById("redeemOption-barcode")?.focus();
+                          document
+                            .getElementById("redeemOption-barcode")
+                            ?.focus();
                         }
                       }}
                       id="redeemOption-phone"
@@ -2286,13 +2744,18 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                   </div>
 
                   {/* Barcode Scan Option */}
-                  {redeemOption === "barcode" && (
+                  {state.salesOrderForm.redeemOption === "barcode" && (
                     <>
                       <input
                         type="text"
                         placeholder="Enter Privilege Card Number (pc_number)"
-                        value={privilegeCardNumber}
-                        onChange={(e) => setPrivilegeCardNumber(e.target.value)}
+                        value={state.salesOrderForm.privilegeCardNumber}
+                        onChange={(e) =>
+                          dispatch({
+                            type: "SET_SALES_ORDER_FORM",
+                            payload: { privilegeCardNumber: e.target.value },
+                          })
+                        }
                         className="border border-gray-300 w-full px-4 py-3 rounded-lg text-center mb-2"
                         ref={privilegeCardRef}
                         onKeyDown={(e) => {
@@ -2303,30 +2766,44 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                         }}
                       />
                       <button
-                        type="button" // Added type="button"
+                        type="button"
                         onClick={handleFetchPrivilegeCardByNumber}
                         className="bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg w-full"
                         onKeyDown={(e) => {
                           if (e.key === "ArrowLeft") {
                             e.preventDefault();
-                            document.getElementById("redeemOption-barcode")?.focus();
+                            privilegeCardRef.current?.focus();
                           }
                         }}
                       >
                         Fetch Privilege Card
                       </button>
+                      {state.salesOrderForm.validationErrors
+                        ?.privilegeCardNumber && (
+                          <p className="text-red-500 text-xs mt-1">
+                            {
+                              state.salesOrderForm.validationErrors
+                                .privilegeCardNumber
+                            }
+                          </p>
+                        )}
                     </>
                   )}
 
                   {/* Phone Number and OTP Option */}
-                  {redeemOption === "phone" && (
+                  {state.salesOrderForm.redeemOption === "phone" && (
                     <>
                       {/* Phone Number Input */}
                       <input
                         type="text"
                         placeholder="Enter Phone Number"
-                        value={phoneNumber}
-                        onChange={(e) => setPhoneNumber(e.target.value)}
+                        value={state.salesOrderForm.phoneNumber}
+                        onChange={(e) =>
+                          dispatch({
+                            type: "SET_SALES_ORDER_FORM",
+                            payload: { phoneNumber: e.target.value },
+                          })
+                        }
                         className="border border-gray-300 w-full px-4 py-3 rounded-lg text-center mb-2"
                         ref={privilegePhoneRef}
                         onKeyDown={(e) => {
@@ -2341,15 +2818,17 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                           }
                           if (e.key === "ArrowLeft") {
                             e.preventDefault();
-                            document.getElementById("redeemOption-phone")?.focus();
+                            document
+                              .getElementById("redeemOption-phone")
+                              ?.focus();
                           }
                         }}
                       />
 
                       {/* Send OTP Button */}
-                      {!isOtpSent && (
+                      {!state.salesOrderForm.isOtpSent && (
                         <button
-                          type="button" // Added type="button"
+                          type="button"
                           onClick={handleSendOtp}
                           className="mt-4 bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg w-full"
                           onKeyDown={(e) => {
@@ -2363,14 +2842,19 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                         </button>
                       )}
 
-                      {isOtpSent && (
+                      {state.salesOrderForm.isOtpSent && (
                         <>
                           {/* OTP Input */}
                           <input
                             type="text"
                             placeholder="Enter OTP"
-                            value={otp}
-                            onChange={(e) => setOtp(e.target.value)}
+                            value={state.salesOrderForm.otp}
+                            onChange={(e) =>
+                              dispatch({
+                                type: "SET_SALES_ORDER_FORM",
+                                payload: { otp: e.target.value },
+                              })
+                            }
                             className="border border-gray-300 w-full px-4 py-3 rounded-lg text-center mb-2"
                             ref={otpRef}
                             onKeyDown={(e) => {
@@ -2380,7 +2864,9 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                               }
                               if (e.key === "ArrowLeft") {
                                 e.preventDefault();
-                                document.getElementById("redeemOption-phone")?.focus();
+                                document
+                                  .getElementById("redeemOption-phone")
+                                  ?.focus();
                               }
                             }}
                           />
@@ -2392,7 +2878,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
 
                           {/* Verify OTP Button */}
                           <button
-                            type="button" // Added type="button"
+                            type="button"
                             onClick={handleVerifyOtp}
                             className="bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg w-full"
                             onKeyDown={(e) => {
@@ -2409,9 +2895,9 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                           </button>
 
                           {/* Display Error Messages */}
-                          {errorMessage && (
+                          {validationErrors.generalError && (
                             <p className="text-red-600 text-center mt-2">
-                              {errorMessage}
+                              {validationErrors.generalError}
                             </p>
                           )}
                         </>
@@ -2420,144 +2906,182 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                   )}
 
                   {/* Show privilege card details if found */}
-                  {isOtpVerified && privilegeCardDetails && (
-                    <div className="mt-6 bg-gray-100 p-4 rounded border">
-                      <p>
-                        <strong>Customer Name:</strong>{" "}
-                        {privilegeCardDetails.customer_name}
-                      </p>
-                      <p>
-                        <strong>PC Number:</strong>{" "}
-                        {privilegeCardDetails.pc_number}
-                      </p>
-                      <p>
-                        <strong>Loyalty Points:</strong> {loyaltyPoints}
-                      </p>
+                  {state.salesOrderForm.isOtpVerified &&
+                    state.salesOrderForm.privilegeCardDetails && (
+                      <div className="mt-6 bg-gray-100 p-4 rounded border">
+                        <p>
+                          <strong>Customer Name:</strong>{" "}
+                          {
+                            state.salesOrderForm.privilegeCardDetails
+                              .customer_name
+                          }
+                        </p>
+                        <p>
+                          <strong>PC Number:</strong>{" "}
+                          {privilegeCardDetails.pc_number}
+                        </p>
+                        <p>
+                          <strong>Loyalty Points:</strong>{" "}
+                          {loyaltyPoints}
+                        </p>
 
-                      {/* Redeem Points Section */}
-                      <div className="mt-4">
-                        <p className="font-semibold">Redeem Loyalty Points:</p>
-                        <div className="flex space-x-4 mt-2">
-                          <button
-                            type="button" // Added type="button"
-                            onClick={() => {
-                              setRedeemOption("full");
-                              setRedeemPointsAmount(loyaltyPoints);
-                              setRedeemPoints(true);
-                            }}
-                            className={`px-4 py-2 mb-2 rounded-lg ${redeemOption === "full"
-                              ? "bg-green-500 text-white"
-                              : "bg-gray-200"
-                              }`}
-                          >
-                            Redeem Full Points
-                          </button>
-                          <button
-                            type="button" // Added type="button"
-                            onClick={() => {
-                              setRedeemOption("custom");
-                              setRedeemPointsAmount("");
-                              setRedeemPoints(true);
-                              setTimeout(
-                                () => redeemPointsAmountRef.current?.focus(),
-                                0
-                              ); // Focus on custom amount input
-                            }}
-                            className={`px-4 py-2 mb-2 rounded-lg ${redeemOption === "custom"
-                              ? "bg-green-500 text-white"
-                              : "bg-gray-200"
-                              }`}
-                          >
-                            Redeem Custom Amount
-                          </button>
-                        </div>
-
-                        {/* When 'Redeem Full' is selected */}
-                        {redeemOption === "full" && (
-                          <div className="mt-2">
-                            <input
-                              type="number"
-                              value={loyaltyPoints}
-                              readOnly
-                              className="border border-gray-300 w-full px-4 py-3 rounded-lg text-center my-2 bg-gray-100"
-                            />
-                            <p className="text-center">
-                              You are redeeming your full loyalty points.
-                            </p>
-                          </div>
-                        )}
-
-                        {/* When 'Redeem Custom' is selected */}
-                        {redeemOption === "custom" && (
-                          <div className="mt-2">
-                            <input
-                              type="number"
-                              placeholder={`Enter amount to redeem (Max: ₹${loyaltyPoints})`}
-                              value={redeemPointsAmount}
-                              onChange={(e) =>
-                                setRedeemPointsAmount(
-                                  e.target.value === ""
-                                    ? ""
-                                    : Math.min(
-                                      Number(e.target.value),
-                                      loyaltyPoints
-                                    )
-                                )
-                              }
-                              className="border border-gray-300 w-full px-4 py-3 rounded-lg text-center my-2"
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                  e.preventDefault();
-                                  nextButtonRef.current?.focus();
-                                }
+                        {/* Redeem Points Section */}
+                        <div className="mt-4">
+                          <p className="font-semibold">
+                            Redeem Loyalty Points:
+                          </p>
+                          <div className="flex space-x-4 mt-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                dispatch({
+                                  type: "SET_SALES_ORDER_FORM",
+                                  payload: {
+                                    redeemOption: "full",
+                                    redeemPointsAmount:
+                                      loyaltyPoints,
+                                  },
+                                });
+                                dispatch({
+                                  type: "SET_SALES_ORDER_FORM",
+                                  payload: { redeemPoints: true },
+                                });
                               }}
-                              ref={redeemPointsAmountRef}
-                            />
-                            {(parseFloat(redeemPointsAmount) > loyaltyPoints ||
-                              parseFloat(redeemPointsAmount) < 0) && (
-                                <p className="text-red-500 text-xs mt-1">
-                                  Please enter a valid amount up to your available
-                                  points.
-                                </p>
-                              )}
+                              className={`px-4 py-2 mb-2 rounded-lg ${state.salesOrderForm.redeemOption === "full"
+                                ? "bg-green-500 text-white"
+                                : "bg-gray-200"
+                                }`}
+                            >
+                              Redeem Full Points
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                dispatch({
+                                  type: "SET_SALES_ORDER_FORM",
+                                  payload: {
+                                    redeemOption: "custom",
+                                    redeemPointsAmount: "",
+                                  },
+                                });
+                                dispatch({
+                                  type: "SET_SALES_ORDER_FORM",
+                                  payload: { redeemPoints: true },
+                                });
+                                setTimeout(
+                                  () => redeemPointsAmountRef.current?.focus(),
+                                  0
+                                ); // Focus on custom amount input
+                              }}
+                              className={`px-4 py-2 mb-2 rounded-lg ${state.salesOrderForm.redeemOption === "custom"
+                                ? "bg-green-500 text-white"
+                                : "bg-gray-200"
+                                }`}
+                            >
+                              Redeem Custom Amount
+                            </button>
                           </div>
-                        )}
+
+                          {/* When 'Redeem Full' is selected */}
+                          {redeemOption === "full" && (
+                            <div className="mt-2">
+                              <input
+                                type="number"
+                                value={loyaltyPoints}
+                                readOnly
+                                className="border border-gray-300 w-full px-4 py-3 rounded-lg text-center my-2 bg-gray-100"
+                              />
+                              <p className="text-center">
+                                You are redeeming your full loyalty points.
+                              </p>
+                            </div>
+                          )}
+
+                          {/* When 'Redeem Custom' is selected */}
+                          {state.salesOrderForm.redeemOption === "custom" && (
+                            <div className="mt-2">
+                              <input
+                                type="number"
+                                placeholder={`Enter amount to redeem (Max: ₹${loyaltyPoints})`}
+                                value={state.salesOrderForm.redeemPointsAmount}
+                                onChange={(e) =>
+                                  dispatch({
+                                    type: "SET_SALES_ORDER_FORM",
+                                    payload: {
+                                      redeemPointsAmount:
+                                        e.target.value === ""
+                                          ? ""
+                                          : Math.min(
+                                            Number(e.target.value),
+                                            loyaltyPoints
+                                          ),
+                                    },
+                                  })
+                                }
+                                className="border border-gray-300 w-full px-4 py-3 rounded-lg text-center my-2"
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    nextButtonRef.current?.focus();
+                                  }
+                                }}
+                                ref={redeemPointsAmountRef}
+                              />
+                              {(parseFloat(
+                                state.salesOrderForm.redeemPointsAmount
+                              ) > loyaltyPoints ||
+                                parseFloat(
+                                  redeemPointsAmount
+                                ) < 0) && (
+                                  <p className="text-red-500 text-xs mt-1">
+                                    Please enter a valid amount up to your
+                                    available points.
+                                  </p>
+                                )}
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
 
                   {/* Prompt to create a new privilege card if not found */}
-                  {isOtpVerified && !privilegeCardDetails && (
-                    <div className="mt-6 bg-green-50 p-4 rounded">
-                      <p className="text-center text-red-500">
-                        No Privilege Card found for this{" "}
-                        {redeemOption === "phone"
-                          ? "phone number."
-                          : "PC Number."}
-                      </p>
-                      <button
-                        type="button" // Added type="button"
-                        onClick={handleNewPrivilegeCard}
-                        className="mt-4 bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg w-full"
-                      >
-                        Create New Privilege Card
-                      </button>
-                    </div>
-                  )}
+                  {state.salesOrderForm.isOtpVerified &&
+                    !state.salesOrderForm.privilegeCardDetails && (
+                      <div className="mt-6 bg-green-50 p-4 rounded">
+                        <p className="text-center text-red-500">
+                          No Privilege Card found for this{" "}
+                          {state.salesOrderForm.redeemOption === "phone"
+                            ? "phone number."
+                            : "PC Number."}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={handleNewPrivilegeCard}
+                          className="mt-4 bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg w-full"
+                        >
+                          Create New Privilege Card
+                        </button>
+                      </div>
+                    )}
                 </>
               )}
             </div>
           )}
 
           {/* Step 4: Employee Selection */}
-          {step === 4 && (
+          {state.salesOrderForm.step === 4 && (
             <div className="bg-gray-50 p-6 rounded-md shadow-inner space-y-4">
               <h2 className="text-lg font-semibold text-gray-700">
                 Order Created by Employee Details
               </h2>
               <select
-                value={employee}
-                onChange={(e) => setEmployee(e.target.value)}
+                value={state.salesOrderForm.employee}
+                onChange={(e) =>
+                  dispatch({
+                    type: "SET_SALES_ORDER_FORM",
+                    payload: { employee: e.target.value },
+                  })
+                }
                 ref={employeeRef}
                 onBlur={validateEmployeeSelection}
                 className="border border-gray-300 w-full px-4 py-3 rounded-lg focus:outline-none focus:border-green-500"
@@ -2571,11 +3095,15 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                   </option>
                 ))}
               </select>
-              {employee && (
+              {state.salesOrderForm.employee && (
                 <EmployeeVerification
-                  employee={employee}
+                  employee={state.salesOrderForm.employee}
                   onVerify={(isVerified) => {
-                    setIsPinVerified(isVerified);
+                    dispatch({
+                      type: "SET_SALES_ORDER_FORM",
+                      payload: { isPinVerified: true },
+                    });
+
                     if (isVerified) {
                       setTimeout(() => nextButtonRef.current?.focus(), 100);
                     }
@@ -2590,292 +3118,248 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
             </div>
           )}
 
+          {/* Step 5: Discount, Payment Method, Advance Details, Save and Print */}
           {step === 5 && (
             <>
-              {/* Embedded Print Styles */}
-              <style>
-                {`
-        @media print {
-          @page {
-            size: A5;
-            margin: 10mm;
-          }
-
-          body * {
-            visibility: hidden;
-          }
-
-          .printable-area, .printable-area * {
-            visibility: visible;
-          }
-
-          .printable-area {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-            font-size: 10px; /* Adjust base font size */
-            padding: 5mm; /* Adjust padding to fit A5 */
-          }
-
-          .printable-area h2 {
-            font-size: 14px; /* Smaller heading */
-          }
-
-          .printable-area table {
-            font-size: 9px; /* Smaller table text */
-            table-layout: fixed;
-            width: 100%;
-            word-wrap: break-word;
-          }
-
-          .printable-area table th,
-          .printable-area table td {
-            padding: 3px; /* Reduce cell padding */
-          }
-
-          .financial-summary p,
-          .invoice-details p,
-          .loyalty-points p {
-            font-size: 10px; /* Consistent text size */
-          }
-
-          /* Hide action buttons during print */
-          .action-buttons {
-            display: none;
-          }
-
-          /* Ensure images (like logos) are scaled appropriately */
-          .printable-area img {
-            max-width: 100px; /* Adjust as needed */
-            height: auto;
-          }
-        }
-      `}
-              </style>
-
               {/* Printable Area */}
               <div
-                className="printable-area bg-white rounded-lg text-gray-800"
-                ref={billPrintRef} // Attach the ref here
+                className="bg-white rounded-lg text-gray-800"
+              /* Attach the ref here */
               >
-                {/* Invoice Details */}
-                <div className="grid grid-cols-2 gap-2 mb-4">
-                  <h2 className="text-xl font-semibold mt-2">Bill</h2>
-                  <div>
-                    <p>
-                      <span className="font-semibold">Sales ID:</span> {salesOrderId}
-                    </p>
-                    {hasMrNumber === "yes" && patientDetails ? (
-                      <>
-                        <p>
-                          <span className="font-semibold">MR Number:</span> {mrNumber}
-                        </p>
-                        <p>
-                          <span className="font-semibold">Name:</span> {patientDetails.name}
-                        </p>
-                        <p>
-                          <span className="font-semibold">Age:</span> {patientDetails.age}
-                        </p>
-                        <p>
-                          <span className="font-semibold">Phone Number:</span> {patientDetails.phone_number}
-                        </p>
-                        <p>
-                          <span className="font-semibold">Gender:</span> {patientDetails.gender}
-                        </p>
-                        <p>
-                          <span className="font-semibold">Address:</span> {patientDetails.address}
-                        </p>
-                      </>
-                    ) : (
-                      <>
-                        <p>
-                          <span className="font-semibold">Customer Name:</span> {customerName || "N/A"}
-                        </p>
-                        <p>
-                          <span className="font-semibold">Customer Phone:</span> {customerPhone || "N/A"}
-                        </p>
-                      </>
-                    )}
-                    <p>
-                      <span className="font-semibold">Billed by:</span> {employee}
-                    </p>
+                <div
+                  className="printable-area print:mt-20 print:block print:absolute print:inset-0 print:w-full bg-white p-4 print:m-0 print:p-0 w-full"
+                >
+                  <div className=" flex justify-between items-center mb-6">
+                    <div className="flex items-center">
+                      <h2 className="text-3xl font-bold">Bill</h2>
+                    </div>
+                    <div className="text-right">
+                      <p><strong>Sales ID:</strong> {salesOrderId}</p>
+                      <p><strong>Date: {formattedDate}</strong></p>
+                      {hasMrNumber && (
+                        <>
+                          <p><strong>MR Number:</strong> {mrNumber}</p>
+                        </>
+                      )}
+                    </div>
                   </div>
-                </div>
+                  {/* Customer Details */}
+                  <div className="mb-6">
+                    {/* <p><strong>Work Order ID:</strong> {selectedWorkOrder}</p> */}
+                    <p><strong>Customer Name:</strong> {hasMrNumber ? patientDetails?.name + " | " + patientDetails?.age + " | " + patientDetails?.gender : customerName + " | " + parseInt(age) + " | " + gender}</p>
+                    <p><strong>Address:</strong> {hasMrNumber ? patientDetails?.address : address}</p>
+                    <p><strong>Phone Number:</strong> {hasMrNumber ? patientDetails?.phone_number : customerPhone}</p>
 
-                {/* Product Table */}
-                <div className="overflow-x-auto mb-4">
-                  <table className="min-w-full table-auto border border-gray-300">
-                    <thead className="bg-gray-100">
+                  </div>
+
+                  {/* Product Table */}
+                  <table className="w-full border-collapse mb-6">
+                    <thead>
                       <tr>
-                        <th className="py-1 px-2 border-b text-left text-sm">Product ID</th>
-                        <th className="py-1 px-2 border-b text-left text-sm">Product Name</th>
-                        <th className="py-1 px-2 border-b text-left text-sm">HSN Code</th>
-                        <th className="py-1 px-2 border-b text-right text-sm">Price (₹)</th>
-                        <th className="py-1 px-2 border-b text-right text-sm">Quantity</th>
-                        <th className="py-1 px-2 border-b text-right text-sm">Subtotal (₹)</th>
+                        <th className="border px-4 py-2">#</th>
+                        <th className="border px-4 py-2">Product ID</th>
+                        <th className="border px-4 py-2">Product Name</th>
+                        <th className="border px-4 py-2">HSN Code</th>
+                        <th className="border px-4 py-2">Price</th>
+                        <th className="border px-4 py-2">Quantity</th>
+                        <th className="border px-4 py-2">Subtotal</th>
                       </tr>
                     </thead>
                     <tbody>
                       {productEntries.map((product, index) => {
-                        const adjustedPrice = (parseFloat(product.price) / 112) * 100 || 0;
-                        const productSubtotal = adjustedPrice * (parseInt(product.quantity) || 0);
+                        const adjustedPrice =
+                          (parseFloat(product.price) / 112) * 100 || 0;
+                        const productSubtotal =
+                          adjustedPrice * (parseInt(product.quantity) || 0);
                         return (
-                          <tr key={index} className="hover:bg-gray-50">
-                            <td className="py-1 px-2 border-b text-sm">{product.id}</td>
-                            <td className="py-1 px-2 border-b text-sm">
-                              <span className="whitespace-normal">{product.name}</span>
-                            </td>
-                            <td className="py-1 px-2 border-b text-sm">9001</td>
-                            <td className="py-1 px-2 border-b text-right text-sm">
-                              {adjustedPrice.toFixed(2)}
-                            </td>
-                            <td className="py-1 px-2 border-b text-right text-sm">
-                              {product.quantity}
-                            </td>
-                            <td className="py-1 px-2 border-b text-right text-sm">
-                              {productSubtotal.toFixed(2)}
-                            </td>
+                          <tr key={index}>
+                            <td className="border px-4 py-2 text-center">{index + 1}</td>
+                            <td className="border px-4 py-2 text-center">{product.id}</td>
+                            <td className="border px-4 py-2">{product.name}</td>
+                            <td className="border px-4 py-2 text-center">9001</td>
+                            <td className="border px-4 py-2 text-center">₹{adjustedPrice.toFixed(2)}</td>
+                            <td className="border px-4 py-2 text-center">{product.quantity}</td>
+                            <td className="border px-4 py-2 text-center">₹{productSubtotal.toFixed(2)}</td>
                           </tr>
                         );
                       })}
                     </tbody>
                   </table>
-                </div>
 
-                {/* Financial Summary */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                  {/* Left Column: Subtotal and GST */}
-                  <div className="space-y-2">
-                    <p>
-                      <span className="font-semibold">Subtotal:</span> ₹{subtotal.toFixed(2)}
-                    </p>
-                    <p>
-                      <span className="font-semibold">CGST (6%):</span> ₹{cgstAmount.toFixed(2)}
-                    </p>
-                    <p>
-                      <span className="font-semibold">SGST (6%):</span> ₹{sgstAmount.toFixed(2)}
-                    </p>
+                  {/* Financial Summary */}
+                  <div className="flex justify-between mb-6 space-x-8">
+                    <div>
+                      <p><strong>Subtotal:</strong> ₹{subtotal.toFixed(2)}</p><p><strong>CGST (6%):</strong> ₹{cgstAmount.toFixed(2)}</p>
+                      <p><strong>SGST (6%):</strong> ₹{sgstAmount.toFixed(2)}</p>
+                      <div className=" mt-10 space-x-8">
+                        <p><strong>Payment Method:</strong> {paymentMethod.charAt(0).toUpperCase() + paymentMethod.slice(1)}</p>
+                      </div>
+                      {privilegeCard && privilegeCardDetails && (
+                        <p><strong>Loyalty Points Redeemed:</strong> ₹{pointsToAdd.toFixed(2)}</p>
+                      )}
+                      {privilegeCard && privilegeCardDetails && (
+                        <p><strong>Loyalty Points Gained:</strong> {pointsToAdd}</p>
+                      )}
+                    </div>
+                    <div>
+
+                      <p><strong>Advance Paid:</strong> ₹{advance.toFixed(2)}</p>
+                      <p><strong>Discount Amount:</strong> ₹{calculatedDiscount.toFixed(2)}</p>
+                      <p><strong>Discounted Subtotal:</strong> ₹{(Math.max(subtotal - calculatedDiscount, 0)).toFixed(2)}</p>
+                      {privilegeCard && privilegeCardDetails && (
+                        <p><strong>Privilege Card Discount:</strong> ₹₹{privilegeDiscount.toFixed(2)}</p>
+                      )}
+                      <p><strong>Total Amount:</strong> ₹{finalAmount.toFixed(2)}</p>
+                      <div className=" mt-10 space-x-8">
+                        <p><strong>Billed by:</strong> {employee}</p>
+                      </div>
+                    </div>
+
                   </div>
 
-                  {/* Right Column: Discounts, Advances, and Total */}
-                  <div className="space-y-2">
-                    <p>
-                      <span className="font-semibold">Discount ({discountPercentage}%):</span> ₹{discount.toFixed(2)}
-                    </p>
-                    <p>
-                      <span className="font-semibold">Advance Paid:</span> ₹{advance.toFixed(2)}
-                    </p>
-                    <p>
-                      <span className="font-semibold">Privilege Card Discount:</span> ₹{privilegeDiscount.toFixed(2)}
-                    </p>
-                    <hr className="border-gray-400 my-2" />
-                    <p className="font-semibold">
-                      Total Amount Including GST: ₹{finalAmount.toFixed(2)}
-                    </p>
-                  </div>
-                </div>
 
-                {/* Loyalty Points Information */}
-                {privilegeCard && privilegeCardDetails && (
-                  <div className="loyalty-points mb-6">
-                    <p>
-                      <span className="font-semibold">Loyalty Points Redeemed:</span> ₹{redeemPointsAmount.toFixed(2)}
-                    </p>
-                    <p>
-                      <span className="font-semibold">Loyalty Points Gained:</span> {pointsToAdd}
-                    </p>
-                  </div>
-                )}
 
-                {/* Payment Method and Discount Details */}
-                <div className="flex flex-col md:flex-row items-center justify-between my-6 space-x-4">
-                  {/* Discount Section */}
-                  <div className="w-full md:w-1/2 mb-4 md:mb-0">
-                    <label className="block text-gray-700 font-medium mb-1">Apply Discount (%)</label>
-                    <input
-                      type="number"
-                      placeholder="Enter Discount Percentage"
-                      value={discountPercentage}
-                      onChange={(e) =>
-                        setDiscountPercentage(
-                          e.target.value === ""
-                            ? ""
-                            : Math.min(Math.max(Number(e.target.value), 0), 100)
-                        )
-                      }
-                      className="border border-gray-300 w-full px-4 py-3 rounded-lg"
-                      min="0"
-                      max="100"
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          paymentMethodRef.current?.focus();
+                  {/* Loyalty Points Information */}
+                  {privilegeCard && privilegeCardDetails && (
+                    <div className="loyalty-points mb-6">
+                      <p>
+                        <span className="font-semibold">Loyalty Points Redeemed:</span> ₹{redeemPointsAmount.toFixed(2)}
+                      </p>
+                      <p>
+                        <span className="font-semibold">Loyalty Points Gained:</span> {pointsToAdd}
+                      </p>
+
+                    </div>
+                  )}
+
+                  {/* Payment Method and Discount Details */}
+                  <div className="print:hidden flex flex-col md:flex-row items-center justify-between my-6 space-x-4">
+                    {/* Discount Section */}
+                    <div className="w-full md:w-1/2 mb-4 md:mb-0">
+                      <label className="block text-gray-700 font-medium mb-1">
+                        Apply Discount (₹)
+                      </label>
+                      <input
+                        type="number"
+                        placeholder="Enter Discount Amount"
+                        value={state.salesOrderForm.discount}
+                        onChange={(e) => {
+                          const discountValue =
+                            e.target.value === "" ? "" : Math.min(
+                              Math.max(Number(e.target.value), 0),
+                              Math.max(subtotal - (Number(state.salesOrderForm.advanceDetails) || 0), 0)
+                            );
+
+                          dispatch({
+                            type: "SET_SALES_ORDER_FORM",
+                            payload: { discount: discountValue },
+                          });
+                        }}
+                        className="border border-gray-300 w-full px-4 py-3 rounded-lg"
+                        min="0"
+                        max={subtotal}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            paymentMethodRef.current?.focus();
+                          }
+                        }}
+                      />
+                      {validationErrors.discount && (
+                        <p className="text-red-500 text-xs mt-1">
+                          {validationErrors.discount}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Payment Method */}
+                    <div className="w-full md:w-1/2">
+                      <label
+                        htmlFor="paymentMethod"
+                        className="block font-semibold mb-1"
+                      >
+                        Payment Method:
+                      </label>
+                      <select
+                        id="paymentMethod"
+                        value={paymentMethod}
+                        onChange={(e) =>
+                          dispatch({
+                            type: "SET_SALES_ORDER_FORM",
+                            payload: { paymentMethod: e.target.value },
+                          })
                         }
-                      }}
-                      ref={discountInputRef} // Attach the ref here
-                    />
-                    {validationErrors.discountPercentage && (
-                      <p className="text-red-500 text-xs mt-1">
-                        {validationErrors.discountPercentage}
-                      </p>
-                    )}
+
+                        ref={paymentMethodRef}
+                        onKeyDown={(e) => handleEnterKey(e, saveOrderRef)}
+                        className="border border-gray-300 w-full px-4 py-3 rounded-lg"
+                      >
+                        <option value="" disabled>
+                          Select Payment Method
+                        </option>
+                        <option value="cash">Cash</option>
+                        <option value="credit">Card</option>
+                        <option value="online">UPI (Paytm/PhonePe/GPay)</option>
+                      </select>
+                      {validationErrors.paymentMethod && (
+                        <p className="text-red-500 text-xs ml-1">
+                          {validationErrors.paymentMethod}
+                        </p>
+                      )}
+                    </div>
                   </div>
 
-                  {/* Payment Method */}
-                  <div className="w-full md:w-1/2">
-                    <label htmlFor="paymentMethod" className="block font-semibold mb-1">
-                      Payment Method:
-                    </label>
-                    <select
-                      id="paymentMethod"
-                      value={paymentMethod}
-                      onChange={(e) => setPaymentMethod(e.target.value)}
-                      ref={paymentMethodRef}
-                      onKeyDown={(e) => handleEnterKey(e, saveOrderRef)}
-                      className="border border-gray-300 w-full px-4 py-3 rounded-lg"
-                    >
-                      <option value="" disabled>
-                        Select Payment Method
-                      </option>
-                      <option value="cash">Cash</option>
-                      <option value="credit">Card</option>
-                      <option value="online">UPI (Paytm/PhonePe/GPay)</option>
-                    </select>
-                    {validationErrors.paymentMethod && (
-                      <p className="text-red-500 text-xs ml-1">
-                        {validationErrors.paymentMethod}
-                      </p>
-                    )}
+                  {/* Footer Section */}
+                  <div className="flex-col justify-start mx-auto items-start text-left text-md">
+
+                    <p className="mt-2 text-xs">
+                      Terms and Conditions:
+                      <ol className="list-decimal list-inside">
+                        <li>Work order valid only for two months.</li>
+                        <li>Branded Frames/Lenses – 12 Months warranty for manufacturing defects/peeling off.</li>
+                      </ol>
+                    </p>
                   </div>
                 </div>
+
               </div>
 
               {/* Action Buttons Outside Printable Area */}
               <div className="action-buttons flex flex-col md:flex-row justify-start mt-6 space-x-6 space-y-4 md:space-y-0">
                 <button
-                  type="button" // Ensure the type is set to "button"
+                  type="button" /* Ensure the type is set to "button" */
                   onClick={handleOrderCompletion}
                   ref={saveOrderRef}
                   onKeyDown={async (e) => {
                     if (e.key === "Enter") {
                       e.preventDefault();
                       await handleOrderCompletion();
-                      setTimeout(() => printButtonRef.current?.focus(), 100); // Move focus to Print button after saving
+                      setTimeout(
+                        () => printButtonRef.current?.focus(),
+                        100
+                      ); /* Move focus to Print button after saving */
                     }
                   }}
-                  className={`bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg transition ${!paymentMethod ? "opacity-50 cursor-not-allowed" : ""
+                  className={`bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg transition ${!paymentMethod ||
+                    parseFloat(state.salesOrderForm.discount) > subtotal
+                    ? "opacity-50 cursor-not-allowed"
+                    : ""
                     } w-full md:w-auto`}
-                  disabled={!paymentMethod || isLoading}
+                  disabled={
+                    !paymentMethod ||
+                    isLoading ||
+                    parseFloat(state.salesOrderForm.discount) > subtotal
+                  }
                 >
                   {isEditing ? "Update Order" : "Submit Order"}{" "}
                   {privilegeCard && privilegeCardDetails
                     ? "& Update Loyalty Points"
                     : ""}
                 </button>
+
                 {allowPrint && (
                   <button
-                    type="button" // Ensure the type is set to "button"
+                    type="button" /* Ensure the type is set to "button" */
                     onClick={handlePrint}
                     ref={printButtonRef}
                     onKeyDown={(e) => {
@@ -2885,7 +3369,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                         setTimeout(
                           () => newWorkOrderButtonRef.current?.focus(),
                           100
-                        ); // Move focus to Create New after printing
+                        ); /* Move focus to Create New after printing */
                       }
                     }}
                     className="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-lg transition flex items-center justify-center w-full md:w-auto"
@@ -2894,10 +3378,12 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                     Print
                   </button>
                 )}
+
                 {/* Exit Button */}
                 {allowPrint && (
                   <div className="flex justify-center text-center mt-6">
                     <button
+                      type="button" /* Ensure the type is set to "button" */
                       onClick={handleExit}
                       className="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg flex items-center justify-center w-fit"
                     >
@@ -2925,11 +3411,13 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                 type="button" // Added type="button"
                 ref={nextButtonRef}
                 onClick={nextStep}
-                className={`bg-green-500 hover:bg-green-600 text-white mx-2 px-4 py-2 rounded-lg ${step === 4 && !isPinVerified
+                className={`bg-green-500 hover:bg-green-600 text-white mx-2 px-4 py-2 rounded-lg ${step === 4 && !form.isPinVerified
                   ? "opacity-50 cursor-not-allowed"
                   : ""
                   }`}
-                disabled={step === 4 && !isPinVerified}
+
+
+                disabled={step === 4 && !form.isPinVerified}
               >
                 Next
               </button>

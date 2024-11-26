@@ -16,6 +16,7 @@ const capitalizeFirstLetter = (string) => {
 // Define column styles outside the component for better reusability
 const getColumnStyles = (reportType) => {
   switch (reportType) {
+    
     case 'sales_orders':
       return {
         0: { halign: 'center', cellWidth: 24 }, // Sales Order ID
@@ -110,8 +111,18 @@ const getColumnStyles = (reportType) => {
         16: { halign: 'center', cellWidth: 25 }, // Created At
         17: { halign: 'center', cellWidth: 25 }, // Updated At
       };
-    default:
-      return {};
+      case 'stock_report':
+        return {
+          0: { halign: 'center', cellWidth: 20 }, // Product ID
+          1: { halign: 'center', cellWidth: 30 }, // Product Name
+          2: { halign: 'center', cellWidth: 15 }, // MRP
+          3: { halign: 'center', cellWidth: 15 }, // Rate
+          4: { halign: 'center', cellWidth: 20 }, // HSN Code
+          5: { halign: 'center', cellWidth: 20 }, // Total Sold
+          6: { halign: 'center', cellWidth: 20 }, // Current Stock
+        };
+      default:
+        return {};
   }
 };
 
@@ -128,7 +139,7 @@ const addHeader = (doc, logoDataUrl, reportDetails) => {
   }
 
   doc.setFontSize(10);
-  doc.text('GSTIN: 32AAUCS7002H1ZV', doc.internal.pageSize.getWidth() / 2, 35, { align: 'center' });
+  doc.text('GSTIN: 32AAUCS7002H1ZB', doc.internal.pageSize.getWidth() / 2, 35, { align: 'center' });
 
   // Add Report Title
   doc.setFontSize(14);
@@ -574,6 +585,84 @@ const ReportGenerator = ({ isCollapsed }) => {
           fetchedData = consolidatedData;
           break;
         }
+        case 'stock_report': {
+          // Fetch products
+          const { data: productsData, error: productsError } = await supabase
+            .from('products')
+            .select('*');
+
+          if (productsError) throw productsError;
+
+          // Fetch current stock
+          const stockQuery = supabase
+            .from('stock')
+            .select('*');
+
+          if (!isCombined) {
+            stockQuery.in('branch_code', branchesToReport);
+          }
+
+          const { data: stockData, error: stockError } = await stockQuery;
+
+          if (stockError) throw stockError;
+
+          // Fetch sales data
+          const salesQuery = supabase
+            .from('sales_orders')
+            .select('product_entries')
+            .gte('created_at', startDate.toISOString())
+            .lte('created_at', endDate.toISOString());
+
+          if (!isCombined) {
+            salesQuery.in('branch', branchesToReport);
+          }
+
+          const { data: salesData, error: salesError } = await salesQuery;
+
+          if (salesError) throw salesError;
+
+          // Aggregate sales data to get total quantity sold per product
+          const productSales = {};
+
+          salesData.forEach(sale => {
+            const entries = sale.product_entries || [];
+            entries.forEach(product => {
+              const pid = product.id;
+              const quantity = parseInt(product.quantity) || 0;
+              if (!productSales[pid]) {
+                productSales[pid] = 0;
+              }
+              productSales[pid] += quantity;
+            });
+          });
+
+          // Create a combined data structure
+          const combinedData = productsData.map(product => {
+            const pid = product.product_id;
+            const stockItems = stockData.filter(stock => stock.product_id === product.id);
+            let currentStock = 0;
+            if (stockItems && stockItems.length > 0) {
+              // Sum the stock quantities across branches
+              currentStock = stockItems.reduce((acc, stock) => acc + (stock.quantity || 0), 0);
+            }
+            const totalSold = productSales[pid] || 0;
+            return {
+              product_id: pid,
+              product_name: product.product_name,
+              mrp: product.mrp,
+              rate: product.rate,
+              hsn_code: product.hsn_code,
+              total_sold: totalSold,
+              current_stock: currentStock,
+            };
+          });
+
+          // Sort by product name
+          combinedData.sort((a, b) => a.product_name.localeCompare(b.product_name));
+
+          fetchedData = combinedData;
+          break;
+        }
         default:
           setError('Invalid report type selected.');
           setLoading(false);
@@ -733,6 +822,18 @@ const ReportGenerator = ({ isCollapsed }) => {
           'Updated At',
         ];
         break;
+        case 'stock_report':
+        tableColumn = [
+          'Product ID',
+          'Product Name',
+          'MRP',
+          'Rate',
+          'HSN Code',
+          'Total Sold',
+          'Current Stock',
+        ];
+        break;
+
       default:
         tableColumn = [];
     }
@@ -868,6 +969,17 @@ const ReportGenerator = ({ isCollapsed }) => {
           record.updated_at || 'N/A',
         ]);
         break;
+        case 'stock_report':
+        tableRows = data.map((item) => [
+          item.product_id || 'N/A',
+          item.product_name || 'N/A',
+          item.mrp ? Number(item.mrp).toFixed(2) : '0.00',
+          item.rate ? Number(item.rate).toFixed(2) : '0.00',
+          item.hsn_code || 'N/A',
+          item.total_sold || 0,
+          item.current_stock || 0,
+        ]);
+        break;
       default:
         tableRows = [];
     }
@@ -990,6 +1102,17 @@ const ReportGenerator = ({ isCollapsed }) => {
         ];
         break;
       }
+      case 'stock_report': {
+        const totalProducts = data.length;
+        const totalQuantitySold = data.reduce((acc, curr) => acc + (curr.total_sold || 0), 0);
+        const totalCurrentStock = data.reduce((acc, curr) => acc + (curr.current_stock || 0), 0);
+        summaryTable = [
+          ['Total Products', totalProducts],
+          ['Total Quantity Sold', totalQuantitySold],
+          ['Total Current Stock', totalCurrentStock],
+        ];
+        break;
+      }
       default:
         summaryTable = [];
     }
@@ -1056,14 +1179,16 @@ const ReportGenerator = ({ isCollapsed }) => {
 
   // Define report types based on role
   const reportTypes = role === 'employee' ? [
-    { value: 'consolidated', label: 'Consolidated' }
+    { value: 'consolidated', label: 'Consolidated' },
+    { value: 'stock_report', label: 'Stock Report' },
   ] : [
     { value: 'sales_orders', label: 'Sales Orders' },
     { value: 'work_orders', label: 'Work Orders' },
     { value: 'privilegecards', label: 'Privilege Cards' },
     { value: 'product_sales', label: 'Product Sales' },
     { value: 'modification_reports', label: 'Modification Reports' },
-    { value: 'consolidated', label: 'Consolidated' }
+    { value: 'consolidated', label: 'Consolidated' },
+    { value: 'stock_report', label: 'Stock Report' },
   ];
 
   // Ensure reportType is valid for the current role

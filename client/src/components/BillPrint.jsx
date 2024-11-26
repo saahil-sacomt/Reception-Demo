@@ -1,33 +1,32 @@
-// client/src/components/BillPrint.jsx
-import React from 'react';
+import React, { forwardRef } from 'react';
 
-const BillPrint = React.forwardRef(
-  (
-    {
-      workOrderId,
-      productEntries,
-      subtotal,
-      discountAmount,
-      discountedSubtotal,
-      cgst,
-      sgst,
-      totalAmount,
-      advance,
-      balanceDue,
-      patientDetails,
-      employee,
-      gstNumber,
-      hasMrNumber,
-      customerName,
-      customerPhone,
-      dueDate,
-      isB2B,HSN_CODE
-    },
-    ref
-  ) => (
+const BillPrint = forwardRef((props, ref) => {
+  const {
+    workOrderId = '',
+    dueDate = '',
+    productEntries = [],
+    customerDetails = {}, // Default to an empty object
+    employee = '',
+    isB2B = false,
+    gstNumber = '',
+    subtotal = 0,
+    discountAmount = 0,
+    discountedSubtotal = 0,
+    cgst = 0,
+    sgst = 0,
+    totalAmount = 0,
+    advance = 0,
+    balanceDue = 0,
+  } = props;
+
+  const HSN_CODE = '9001'; // Define your HSN Code or pass it as a prop if dynamic
+
+  // Ensure customerDetails is a valid object
+  const hasMrNumber = customerDetails?.mr_number;
+
+  return (
     <div ref={ref} className="bg-white text-black p-6 text-sm" style={{ width: '148mm', height: '210mm' }}>
       <header className="text-center">
-        {/* <img src={logo} alt="Company Logo" className="mx-auto mb-4" style={{ width: '100px' }} /> */}
         <h1 className="text-xl font-bold">Company Name</h1>
         <p className="text-sm">Address Line 1, Address Line 2, City</p>
         <p className="text-sm">Phone: 1234567890 | Email: info@company.com</p>
@@ -37,32 +36,32 @@ const BillPrint = React.forwardRef(
       <div className="flex justify-between mb-4">
         <div>
           <p>
-            <strong>Work Order ID:</strong> {workOrderId}
+            <strong>Work Order ID:</strong> {workOrderId || 'N/A'}
           </p>
           <p>
-            <strong>Due Date:</strong> {dueDate}
+            <strong>Due Date:</strong> {dueDate || 'N/A'}
           </p>
           {hasMrNumber ? (
             <>
               <p>
-                <strong>Customer MR Number:</strong> {patientDetails?.mr_number || 'N/A'}
+                <strong>Customer MR Number:</strong> {customerDetails.mr_number || 'N/A'}
               </p>
-              {patientDetails && (
+              {customerDetails && (
                 <>
                   <p>
-                    <strong>Name:</strong> {patientDetails.name || 'N/A'}
+                    <strong>Name:</strong> {customerDetails.name || 'N/A'}
                   </p>
                   <p>
-                    <strong>Age:</strong> {patientDetails.age || 'N/A'}
+                    <strong>Age:</strong> {customerDetails.age || 'N/A'}
                   </p>
                   <p>
-                    <strong>Phone Number:</strong> {patientDetails.phoneNumber || 'N/A'}
+                    <strong>Phone Number:</strong> {customerDetails.phoneNumber || 'N/A'}
                   </p>
                   <p>
-                    <strong>Gender:</strong> {patientDetails.gender || 'N/A'}
+                    <strong>Gender:</strong> {customerDetails.gender || 'N/A'}
                   </p>
                   <p>
-                    <strong>Address:</strong> {patientDetails.address || 'N/A'}
+                    <strong>Address:</strong> {customerDetails.address || 'N/A'}
                   </p>
                 </>
               )}
@@ -70,10 +69,19 @@ const BillPrint = React.forwardRef(
           ) : (
             <>
               <p>
-                <strong>Customer Name:</strong> {customerName || 'N/A'}
+                <strong>Customer Name:</strong> {customerDetails?.name || 'N/A'}
               </p>
               <p>
-                <strong>Customer Phone Number:</strong> {customerPhone || 'N/A'}
+                <strong>Customer Phone Number:</strong> {customerDetails?.phoneNumber || 'N/A'}
+              </p>
+              <p>
+                <strong>Customer Address:</strong> {customerDetails?.address || 'N/A'}
+              </p>
+              <p>
+                <strong>Customer Age:</strong> {customerDetails?.age || 'N/A'}
+              </p>
+              <p>
+                <strong>Customer Gender:</strong> {customerDetails?.gender || 'N/A'}
               </p>
             </>
           )}
@@ -85,7 +93,7 @@ const BillPrint = React.forwardRef(
 
           {isB2B && (
             <p>
-              <strong>B2B GST Number:</strong> {gstNumber}
+              <strong>B2B GST Number:</strong> {gstNumber || 'N/A'}
             </p>
           )}
         </div>
@@ -104,19 +112,27 @@ const BillPrint = React.forwardRef(
           </tr>
         </thead>
         <tbody>
-          {productEntries.map((product, index) => {
-            const productSubtotal = parseFloat(product.price || 0) * parseInt(product.quantity || 0);
-            return (
-              <tr key={index}>
-                <td className="border px-2 py-1">{product.id}</td>
-                <td className="border px-2 py-1">{product.name}</td>
-                <td className="border px-2 py-1">{HSN_CODE}</td>
-                <td className="border px-2 py-1">₹{parseFloat(product.price).toFixed(2)}</td>
-                <td className="border px-2 py-1">{product.quantity}</td>
-                <td className="border px-2 py-1">₹{productSubtotal.toFixed(2)}</td>
-              </tr>
-            );
-          })}
+          {Array.isArray(productEntries) && productEntries.length > 0 ? (
+            productEntries.map((product, index) => {
+              const productSubtotal = (parseFloat(product.price) || 0) * (parseInt(product.quantity) || 0);
+              return (
+                <tr key={index}>
+                  <td className="border px-2 py-1">{product.id || 'N/A'}</td>
+                  <td className="border px-2 py-1">{product.name || 'N/A'}</td>
+                  <td className="border px-2 py-1">{HSN_CODE}</td>
+                  <td className="border px-2 py-1">₹{(parseFloat(product.price) || 0).toFixed(2)}</td>
+                  <td className="border px-2 py-1">{product.quantity || 'N/A'}</td>
+                  <td className="border px-2 py-1">₹{productSubtotal.toFixed(2)}</td>
+                </tr>
+              );
+            })
+          ) : (
+            <tr>
+              <td colSpan="6" className="border px-2 py-1 text-center">
+                No products available.
+              </td>
+            </tr>
+          )}
         </tbody>
       </table>
 
@@ -124,10 +140,10 @@ const BillPrint = React.forwardRef(
       <div className="flex justify-between">
         <div>
           <p>
-            <strong>Subtotal:</strong> ₹{subtotal.toFixed(2)}
+            <strong>Subtotal (Base Price):</strong> ₹{subtotal.toFixed(2)}
           </p>
           <p>
-            <strong>Discount:</strong> ₹{discountAmount.toFixed(2)}
+            <strong>Discount Amount:</strong> ₹{discountAmount.toFixed(2)}
           </p>
           <p>
             <strong>Discounted Subtotal:</strong> ₹{discountedSubtotal.toFixed(2)}
@@ -142,7 +158,7 @@ const BillPrint = React.forwardRef(
 
         <div>
           <p>
-            <strong>Total Amount:</strong> ₹{totalAmount.toFixed(2)}
+            <strong>Total Amount (Including GST):</strong> ₹{totalAmount.toFixed(2)}
           </p>
 
           <p>
@@ -154,7 +170,7 @@ const BillPrint = React.forwardRef(
         </div>
       </div>
     </div>
-  )
-);
+  );
+});
 
 export default BillPrint;

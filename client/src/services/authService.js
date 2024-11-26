@@ -158,7 +158,7 @@ export const bulkUploadStock = async (file, format, branchCode) => {
     // Step 6: Bulk upsert products (insert new and update existing)
     const { data: upsertedProducts, error: upsertProductsError } = await supabase
       .from("products")
-      .upsert(productsToUpsert, { onConflict: "product_id" })
+      .upsert(productsToUpsert, { onConflict: ["product_id"] })
       .select();
 
     if (upsertProductsError) throw upsertProductsError;
@@ -344,7 +344,9 @@ export const addNewProduct = async (productData) => {
           hsn_code: hsn_code || "9001",
           purchase_from, // Include the new purchase_from field
         },
-      ])
+      ],
+        
+      )
       .select("id"); // Select the inserted product's ID
 
     if (error) {

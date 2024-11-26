@@ -1,3 +1,4 @@
+
 // client/src/pages/EmployeeStockManagement.jsx
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
@@ -117,94 +118,100 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
         e.preventDefault();
         setError("");
         setSuccess("");
-
+    
+        // Log input values for debugging
+        console.log({
+            newProductName,
+            newProductId,
+            newRate,
+            newMrp,
+            newQuantity,
+            newPurchaseFrom,
+        });
+    
+        // Trim string values to avoid validation failures due to extra spaces
+        const trimmedProductName = newProductName.trim();
+        const trimmedProductId = newProductId.trim();
+        const trimmedPurchaseFrom = newPurchaseFrom.trim();
+    
         // Validate inputs
         if (
-            !newProductName ||
-            !newProductId ||
+            !trimmedProductName ||
+            !trimmedProductId ||
             !newRate ||
             !newMrp ||
             !newQuantity ||
-            !newPurchaseFrom.trim()
+            !trimmedPurchaseFrom
         ) {
             setError("Please fill in all required fields.");
             return;
         }
-
+    
         const quantity = parseInt(newQuantity, 10);
         const rate = parseFloat(newRate);
         const mrp = parseFloat(newMrp);
-
+    
         if (isNaN(quantity) || quantity <= 0) {
             setError("Please enter a valid quantity greater than 0.");
             return;
         }
-
+    
         if (isNaN(rate) || rate <= 0) {
             setError("Please enter a valid rate greater than 0.");
             return;
         }
-
+    
         if (isNaN(mrp) || mrp <= 0) {
             setError("Please enter a valid MRP greater than 0.");
             return;
         }
-
-        // Log branch to verify it's not null
+    
+        // Log branch to verify
         console.log("Adding product with branch:", branch);
         if (!branch) {
             setError("Branch is not set. Cannot proceed.");
             return;
         }
-
+    
         setIsLoading(true);
-        isUploadingRef.current = true; // Indicate that an upload is in progress
-
+        isUploadingRef.current = true;
+    
         try {
             // Add New Product
             const addProductResponse = await addNewProduct({
-                product_name: newProductName,
-                product_id: newProductId,
+                product_name: trimmedProductName,
+                product_id: trimmedProductId,
                 rate,
                 mrp,
-                hsn_code: "9001", // Default HSN code or make it dynamic if needed
-                purchase_from: newPurchaseFrom.trim(), // Include purchase_from
+                hsn_code: "9001", // Default HSN code
+                purchase_from: trimmedPurchaseFrom,
             });
-
+    
             if (!addProductResponse.success) {
                 setError(addProductResponse.error);
                 setIsLoading(false);
                 isUploadingRef.current = false;
                 return;
             }
-
+    
             console.log("New product added with ID:", addProductResponse.data.id);
-
+    
             // Update Stock for the Branch
             const updateStockResponse = await addOrUpdateStock(
-                addProductResponse.data.id, // Assuming the inserted product's ID is returned
-                branch, // Replaced 'branchCode' with 'branch'
+                addProductResponse.data.id,
+                branch,
                 quantity,
                 rate,
                 mrp,
-                newPurchaseFrom // Pass purchase_from if needed
+                trimmedPurchaseFrom
             );
-
+    
             setIsLoading(false);
             isUploadingRef.current = false;
-
+    
             if (updateStockResponse.success) {
                 setSuccess("New product added and stock updated successfully.");
-
-                // Append the new product to productSuggestions
-                setProductSuggestions((prevSuggestions) => [
-                    ...prevSuggestions,
-                    {
-                        id: addProductResponse.data.id,
-                        product_name: newProductName,
-                        product_id: newProductId,
-                    },
-                ]);
+    
                 // Reset form
                 setNewProductName("");
                 setNewProductId("");
@@ -222,6 +229,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
             isUploadingRef.current = false;
         }
     };
+    
 
     // Handler for Update Existing Product Form Submission
     const handleUpdateExistingProduct = async (e) => {
@@ -229,17 +237,17 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
         setError("");
         setSuccess("");
 
-        // Validate inputs
-        if (
-            !selectedProduct ||
-            !updateQuantity ||
-            !updateRate ||
-            !updateMrp ||
-            !updatePurchaseFrom.trim()
-        ) {
+        if (!selectedProduct) {
+            setError("No product selected. Please search and select a product to update.");
+            return;
+          }
+        
+          const trimmedPurchaseFrom = updatePurchaseFrom.trim();
+        
+          if (!updateQuantity || !updateRate || !updateMrp || !trimmedPurchaseFrom) {
             setError("Please fill in all required fields.");
             return;
-        }
+          }
 
         const quantity = parseInt(updateQuantity, 10);
         const rate = parseFloat(updateRate);
@@ -278,7 +286,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
                 quantity,
                 rate,
                 mrp,
-                updatePurchaseFrom.trim() // Pass purchase_from if needed
+                trimmedPurchaseFrom // Pass purchase_from if needed
             );
 
             setIsLoading(false);
@@ -290,7 +298,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
             setProductSuggestions((prevSuggestions) => [
                 ...prevSuggestions,
                 {
-                    id: addProductResponse.data.id,
+                    id: selectedProduct.id,
                     product_name: newProductName,
                     product_id: newProductId,
                 },
@@ -316,10 +324,10 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
 
     // Handler for Update Existing Product Search Input Change
     const handleUpdateSearchInputChange = (e) => {
-        const query = e.target.value;
+        const query = e.target.value.trim();
         setUpdateSearchQuery(query);
 
-        if (query.length > 1) {
+        if (query.length > 2) {
             debouncedFetchSuggestions(query); // Use the debounced function
         } else {
             setProductSuggestions([]);
@@ -336,9 +344,10 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
     // Handler for Selecting a Product from Suggestions
     const handleSelectProduct = (product) => {
         setSelectedProduct(product);
+    
         setUpdateSearchQuery(`${product.product_name} (${product.product_id})`);
         setProductSuggestions([]); // Clear suggestions dropdown
-
+    
         // Populate fields with the selected product's details
         setUpdateRate(product.rate !== null ? product.rate.toString() : ""); // Populate rate
         setUpdateMrp(product.mrp !== null ? product.mrp.toString() : "");   // Populate MRP
@@ -536,14 +545,14 @@ const allFilteredStocks = useMemo(() => {
 
                         {/* Rate */}
                         <div>
-                            <label htmlFor="updateRate" className="block mb-2 font-medium">
+                            <label htmlFor="newRate" className="block mb-2 font-medium">
                                 Rate
                             </label>
                             <input
                                 type="number"
-                                id="updateRate"
-                                value={updateRate}
-                                onChange={(e) => setUpdateRate(e.target.value)}
+                                id="newRate"
+                                value={newRate}
+                                onChange={(e) => setNewRate(e.target.value)}
                                 className="w-full p-2 border rounded"
                                 min="0.01"
                                 step="0.01"
@@ -553,14 +562,14 @@ const allFilteredStocks = useMemo(() => {
 
                         {/* MRP */}
                         <div>
-                            <label htmlFor="updateMrp" className="block mb-2 font-medium">
+                            <label htmlFor="newMrp" className="block mb-2 font-medium">
                                 MRP
                             </label>
                             <input
                                 type="number"
-                                id="updateMrp"
-                                value={updateMrp}
-                                onChange={(e) => setUpdateMrp(e.target.value)}
+                                id="newMrp"
+                                value={newMrp}
+                                onChange={(e) => setNewMrp(e.target.value)}
                                 className="w-full p-2 border rounded"
                                 min="0.01"
                                 step="0.01"
@@ -801,78 +810,7 @@ const allFilteredStocks = useMemo(() => {
                         </table>
                     </div>
 
-                    {/* Pagination Controls */}
-                    {totalPages > 1 && (
-                        <div className="flex flex-wrap justify-center items-center mt-4 gap-2">
-                            {/* Previous Button */}
-                            <button
-                                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-                                disabled={currentPage === 1}
-                                className={`px-3 py-1 rounded ${currentPage === 1
-                                        ? "bg-gray-300 cursor-not-allowed"
-                                        : "bg-blue-500 text-white hover:bg-blue-600"
-                                    }`}
-                            >
-                                Previous
-                            </button>
-
-                            {/* Page Numbers */}
-                            {Array.from({ length: totalPages }, (_, index) => index + 1).map((number) => (
-                                <button
-                                    key={number}
-                                    onClick={() => setCurrentPage(number)}
-                                    className={`px-3 py-1 rounded ${currentPage === number
-                                            ? "bg-green-500 text-white"
-                                            : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                                        }`}
-                                >
-                                    {number}
-                                </button>
-                            ))}
-
-                            {/* Next Button */}
-                            <button
-                                onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-                                disabled={currentPage === totalPages}
-                                className={`px-3 py-1 rounded ${currentPage === totalPages
-                                        ? "bg-gray-300 cursor-not-allowed"
-                                        : "bg-blue-500 text-white hover:bg-blue-600"
-                                    }`}
-                            >
-                                Next
-                            </button>
-
-                            {/* Page Jump Input */}
-                            <div className="flex items-center">
-                                <input
-                                    type="number"
-                                    min="1"
-                                    max={totalPages}
-                                    value={pageInput}
-                                    onChange={(e) => setPageInput(e.target.value)}
-                                    placeholder="Page #"
-                                    className="w-20 p-1 border rounded mr-2"
-                                />
-                                <button
-                                    onClick={() => {
-                                        const pageNumber = Number(pageInput);
-                                        if (pageNumber >= 1 && pageNumber <= totalPages) {
-                                            setCurrentPage(pageNumber);
-                                            setPageInput("");
-                                        }
-                                    }}
-                                    className="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600"
-                                >
-                                    Go
-                                </button>
-                            </div>
-
-                            {/* Display Current Page Information */}
-                            <span className="mx-2">
-                                Page {currentPage} of {totalPages}
-                            </span>
-                        </div>
-                    )}
+                    
                 </div>
             )}
         </div>

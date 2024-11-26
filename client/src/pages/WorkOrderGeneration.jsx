@@ -1,47 +1,83 @@
 // client/src/pages/WorkOrderGeneration.jsx
-import React, { useState, useEffect, useRef, useMemo } from "react";
-import { CalendarIcon, PrinterIcon, TrashIcon, XMarkIcon } from "@heroicons/react/24/outline";
-import supabase from '../supabaseClient';
-import { useAuth } from '../context/AuthContext';
+
+import React, {
+  useEffect,
+  useRef,
+  useMemo,
+  useState,
+  useCallback,
+} from "react";
+import {
+  CalendarIcon,
+  PrinterIcon,
+  TrashIcon,
+  XMarkIcon,
+} from "@heroicons/react/24/outline";
+import supabase from "../supabaseClient";
+import { useAuth } from "../context/AuthContext";
 import EmployeeVerification from "../components/EmployeeVerification";
-import { useNavigate, useParams } from 'react-router-dom';
-import logo from '../assets/sreenethraenglishisolated.png';
-import { useReactToPrint } from 'react-to-print';
-import BillPrint from '../components/BillPrint';
+import { useNavigate, useParams } from "react-router-dom";
+import logo from "../assets/sreenethraenglishisolated.png";
+import { useGlobalState } from "../context/GlobalStateContext";
+
+const today = new Date();
+const dd = String(today.getDate()).padStart(2, '0');
+const mm = String(today.getMonth() + 1).padStart(2, '0');
+const yyyy = today.getFullYear();
+
+const formattedDate = `${dd}/${mm}/${yyyy}`;
 
 const WorkOrderGeneration = ({ isCollapsed }) => {
-  const { branch, name, user } = useAuth();
+  const { branch } = useAuth();
   const { orderId } = useParams(); // Get orderId from route params
   const isEditing = Boolean(orderId);
 
-  const [step, setStep] = useState(1);
-  const [workOrderId, setWorkOrderId] = useState("");
-  const [isPrinted, setIsPrinted] = useState(false);
+  const { state, dispatch } = useGlobalState();
+  const { workOrderForm } = state;
 
-  const [productEntries, setProductEntries] = useState([
-    { id: "", name: "", price: "", quantity: "" },
-  ]);
-  const [advanceDetails, setAdvanceDetails] = useState("");
-  const [dueDate, setDueDate] = useState("");
-  const [mrNumber, setMrNumber] = useState("");
-  const [isPinVerified, setIsPinVerified] = useState(false);
-  const [patientDetails, setPatientDetails] = useState(null);
-  const [employee, setEmployee] = useState("");
-  const [employees, setEmployees] = useState([]);
-  const [allowPrint, setAllowPrint] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState("");
-  const [discount, setDiscount] = useState(""); // New state for discount
+  const {
+    step,
+    workOrderId,
+    isPrinted,
+    productEntries,
+    advanceDetails,
+    dueDate,
+    mrNumber,
+    isPinVerified,
+    patientDetails,
+    employee,
+    paymentMethod,
+    discount,
+    gstNumber,
+    isB2B,
+    hasMrNumber,
+    customerName,
+    customerPhone,
+    customerAddress,
+    customerAge,
+    customerGender,
+    modificationRequestId,
+    isSaving,
+    allowPrint,
+    employees,
+  } = workOrderForm;
+
+  const navigate = useNavigate();
+  const setSearchQuery = (query) => {
+    dispatch({
+      type: "SET_SALES_ORDER_FORM",
+      payload: { searchQuery: query },
+    });
+  };
+
+  const handleSearchQueryChange = (e) => {
+    setSearchQuery(e.target.value);
+  };
+  
+
+  // Initialize productSuggestions as an object for per-product index suggestions
+  const [productSuggestions, setProductSuggestions] = useState({});
   const [validationErrors, setValidationErrors] = useState({});
-  const [isB2B, setIsB2B] = useState(false);
-  const [gstNumber, setGstNumber] = useState("");
-  const [isSaving, setIsSaving] = useState(false);
-  const [productSuggestions, setProductSuggestions] = useState([]);
-  const [hasMrNumber, setHasMrNumber] = useState(null); // New state to track MR number presence
-
-  // Customer details if MR number is not provided
-  const [customerName, setCustomerName] = useState("");
-  const [customerPhone, setCustomerPhone] = useState("");
-  const [modificationRequestId, setModificationRequestId] = useState(null);
 
   // Refs
   const dueDateRef = useRef(null);
@@ -53,7 +89,6 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   const discountRef = useRef(null); // Ref for discount field
   const printButtonRef = useRef(null);
   const saveButtonRef = useRef(null);
-  const newWorkOrderButtonRef = useRef(null);
   const nextButtonRef = useRef(null);
   const fetchButtonRef = useRef(null);
   const quantityRefs = useRef([]);
@@ -61,12 +96,45 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   const noButtonRef = useRef(null);
   const customerNameRef = useRef(null);
   const customerPhoneRef = useRef(null);
-  const billPrintRef = useRef();
+  const customerAddressRef = useRef(null);
+  const customerAgeRef = useRef(null);
+  const customerGenderRef = useRef(null);
+  // Removed billPrintRef
 
-  const navigate = useNavigate();
+  // Generate a new Work Order ID
+  const generateNewWorkOrderId = useCallback(async () => {
+    try {
+      const { data: lastWorkOrders, error } = await supabase
+        .from("work_orders")
+        .select("work_order_id")
+        .order("work_order_id", { ascending: false })
+        .limit(1);
+
+      if (error) {
+        console.error("Error fetching last work order:", error);
+        return;
+      }
+
+      let newWorkOrderId = 3665; // Default to 3665 if no work orders exist
+      if (lastWorkOrders && lastWorkOrders.length > 0) {
+        const lastWorkOrderId = parseInt(lastWorkOrders[0].work_order_id, 10);
+        if (!isNaN(lastWorkOrderId)) {
+          newWorkOrderId = lastWorkOrderId + 1;
+        }
+      }
+
+      dispatch({
+        type: "SET_WORK_ORDER_FORM",
+        payload: { workOrderId: newWorkOrderId.toString() },
+      });
+      console.log("Generated Work Order ID:", newWorkOrderId);
+    } catch (error) {
+      console.error("Error generating Work Order ID:", error);
+    }
+  }, [dispatch]);
 
   // Fetch employees from the Supabase `employees` table
-  const fetchEmployees = async () => {
+  const fetchEmployees = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from("employees")
@@ -76,23 +144,29 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       if (error) {
         console.error("Error fetching employees:", error.message);
       } else {
-        setEmployees(data.map((emp) => emp.name)); // Extract only names
+        dispatch({
+          type: "SET_WORK_ORDER_FORM",
+          payload: { employees: data.map((emp) => emp.name) },
+        });
       }
     } catch (err) {
       console.error("Unexpected error fetching employees:", err);
     }
-  };
+  }, [branch, dispatch]);
 
   useEffect(() => {
     if (branch) {
       fetchEmployees(); // Fetch employees when `branch` is available
     }
-  }, [branch]);
+  }, [branch, fetchEmployees]);
 
   // Validation for Employee Dropdown
-  const validateEmployeeSelection = () => {
+  const validateEmployeeSelection = useCallback(() => {
     if (!employee) {
-      setValidationErrors((prev) => ({ ...prev, employee: "Employee selection is required." }));
+      setValidationErrors((prev) => ({
+        ...prev,
+        employee: "Employee selection is required.",
+      }));
       employeeRef.current?.focus();
     } else {
       setValidationErrors((prev) => {
@@ -100,10 +174,10 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         return rest;
       });
     }
-  };
+  }, [employee]);
 
   // Utility function to get the current financial year
-  const getFinancialYear = () => {
+  const getFinancialYear = useCallback(() => {
     const today = new Date();
     const currentYear = today.getFullYear();
     const currentMonth = today.getMonth() + 1; // Months are zero-based
@@ -120,116 +194,168 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     }
 
     return `${financialYearStart}-${financialYearEnd}`;
-  };
+  }, []);
 
   // Fetch product suggestions from Supabase based on user input
-  const fetchProductSuggestions = async (query, type) => {
-    if (!query) return [];
-    try {
-      const column = type === "id" ? "product_id" : "product_name";
-      const { data, error } = await supabase
-        .from("products")
-        .select(`product_id, product_name, mrp`)
-        .ilike(column, `%${query}%`)
-        .limit(10);
+  const fetchProductSuggestions = useCallback(
+    async (query, type, index) => {
+      if (!query) return [];
 
-      if (error) {
-        console.error(`Error fetching ${type} suggestions:`, error.message);
+      try {
+        const column = type === "id" ? "product_id" : "product_name";
+        const { data, error } = await supabase
+          .from("products")
+          .select(`product_id, product_name, mrp`)
+          .ilike(column, `%${query}%`)
+          .limit(10);
+
+        if (error) {
+          console.error(`Error fetching ${type} suggestions:`, error.message);
+          return [];
+        }
+        return data || [];
+      } catch (err) {
+        console.error(`Unexpected error fetching ${type} suggestions:`, err);
         return [];
       }
-      return data || [];
-    } catch (err) {
-      console.error(`Unexpected error fetching ${type} suggestions:`, err);
-      return [];
-    }
-  };
+    },
+    []
+  );
 
-  const handleProductInput = async (index, value) => {
-    setProductEntries((prevEntries) => {
-      const updatedEntries = [...prevEntries];
-      updatedEntries[index].id = value; // Update the input value
-      return updatedEntries;
-    });
+  // Fetch product details from Supabase
+  const fetchProductDetailsFromSupabase = useCallback(
+    async (value, type) => {
+      try {
+        const column = type === "id" ? "product_id" : "product_name";
+        const { data, error } = await supabase
+          .from("products")
+          .select("product_id, product_name, mrp")
+          .eq(column, value);
 
-    if (value) {
-      const suggestions = await fetchProductSuggestions(value, "id");
-      setProductSuggestions(suggestions);
-    } else {
-      setProductSuggestions([]); // Clear suggestions when input is empty
-    }
-  };
+        if (error) {
+          console.error(`Error fetching product details by ${type}:`, error.message);
+          return null;
+        }
 
-  const validateField = (index, field) => {
-    const errors = { ...validationErrors };
-
-    if (field === "id" && !productEntries[index].id) {
-      errors[`productId-${index}`] = "Product ID is required";
-    } else if (field === "price" && !productEntries[index].price) {
-      errors[`productPrice-${index}`] = "Price is required";
-    } else if (field === "quantity" && !productEntries[index].quantity) {
-      errors[`productQuantity-${index}`] = "Quantity is required";
-    } else if (field === "discount" && discount && (isNaN(discount) || discount < 0 || discount > 100)) {
-      errors[`discount`] = "Enter a valid discount percentage (0-100)";
-    } else {
-      delete errors[`${field}-${index}`];
-    }
-
-    setValidationErrors(errors);
-  };
-
-  const handleProductSelection = async (index, productId) => {
-    try {
-      const productDetails = await fetchProductDetailsFromSupabase(productId, "id");
-      if (productDetails) {
-        setProductEntries((prevEntries) => {
-          const updatedEntries = [...prevEntries];
-          updatedEntries[index] = {
-            id: productDetails.product_id,
-            name: productDetails.product_name,
-            price: productDetails.mrp || "",
-            quantity: prevEntries[index].quantity || "", // Preserve quantity
-          };
-          return updatedEntries;
-        });
-
-        // Automatically move focus to the Quantity field
-        setTimeout(() => {
-          quantityRefs.current[index]?.focus();
-        }, 100);
+        return data && data.length > 0 ? data[0] : null;
+      } catch (err) {
+        console.error(`Unexpected error fetching product details by ${type}:`, err);
+        return null;
       }
-    } catch (error) {
-      console.error("Error fetching product details:", error);
-    }
-  };
+    },
+    []
+  );
 
-  const resetForm = () => {
-    setProductEntries([{ id: "", name: "", price: "", quantity: "" }]);
-    setAdvanceDetails("");
-    setDueDate("");
-    setMrNumber("");
-    setPatientDetails(null);
-    setEmployee("");
-    setPaymentMethod("");
-    setDiscount(""); // Reset discount
-    setGstNumber("");
+  // Handle product selection and fetch details
+  const handleProductSelection = useCallback(
+    async (index, productId) => {
+      try {
+        const productDetails = await fetchProductDetailsFromSupabase(
+          productId,
+          "id"
+        );
+        if (productDetails) {
+          dispatch({
+            type: "SET_WORK_ORDER_FORM",
+            payload: {
+              productEntries: productEntries.map((entry, i) =>
+                i === index
+                  ? {
+                    id: productDetails.product_id,
+                    name: productDetails.product_name,
+                    price: productDetails.mrp || "",
+                    quantity: entry.quantity || "",
+                  }
+                  : entry
+              ),
+            },
+          });
+
+          // Automatically move focus to the Quantity field
+          setTimeout(() => {
+            quantityRefs.current[index]?.focus();
+          }, 100);
+        }
+      } catch (error) {
+        console.error("Error fetching product details:", error);
+      }
+    },
+    [dispatch, productEntries, fetchProductDetailsFromSupabase]
+  );
+
+  // Handle product input
+  const handleProductInput = useCallback(
+    async (index, value) => {
+      dispatch({
+        type: "SET_WORK_ORDER_FORM",
+        payload: {
+          productEntries: productEntries.map((entry, i) =>
+            i === index ? { ...entry, id: value } : entry
+          ),
+        },
+      });
+
+      if (value) {
+        const suggestions = await fetchProductSuggestions(value, "id", index);
+        setProductSuggestions((prev) => ({
+          ...prev,
+          [index]: suggestions,
+        }));
+
+        // Automatically fetch details and focus quantity if exact match
+        if (suggestions.length === 1 && suggestions[0].product_id === value) {
+          await handleProductSelection(index, suggestions[0].product_id);
+        }
+      } else {
+        setProductSuggestions((prev) => ({
+          ...prev,
+          [index]: [],
+        }));
+      }
+    },
+    [dispatch, productEntries, fetchProductSuggestions, handleProductSelection]
+  );
+
+  // Validation handler for product fields
+  const validateField = useCallback(
+    (index, field) => {
+      const errors = { ...validationErrors };
+
+      if (field === "id" && !productEntries[index].id) {
+        errors[`productId-${index}`] = "Product ID is required";
+      } else if (field === "price" && !productEntries[index].price) {
+        errors[`productPrice-${index}`] = "Price is required";
+      } else if (field === "quantity" && !productEntries[index].quantity) {
+        errors[`productQuantity-${index}`] = "Quantity is required";
+      } else if (
+        field === "discount" &&
+        (isNaN(discount) || discount < 0)
+      ) {
+        errors[`discount`] =
+          "Enter a valid discount amount (cannot be negative)";
+      } else {
+        delete errors[`${field}-${index}`];
+      }
+
+      setValidationErrors(errors);
+    },
+    [validationErrors, productEntries, discount]
+  );
+
+  // Function to reset the form
+  const resetForm = useCallback(() => {
+    dispatch({ type: "RESET_WORK_ORDER_FORM" });
+    setProductSuggestions({});
     setValidationErrors({});
-    setIsB2B(false);
-    setAllowPrint(false);
-    if (!isEditing) {
-      setWorkOrderId("");
-      generateNewWorkOrderId();
-    }
-    setHasMrNumber(null); // Reset MR number presence
-    setCustomerName("");
-    setCustomerPhone("");
-  };
+    navigate("/home");
+  }, [dispatch, navigate]);
 
-  // GST Rate
+  // GST Rate and HSN Code
   const GST_RATE = 12; // Total GST is 12% (6% CGST + 6% SGST)
-  const HSN_CODE = "9001"; // Dummy HSN Code
+   // Dummy HSN Code
 
   // Calculate totals
-  const calculateTotals = (entries, discountPercentage) => {
+  const calculateTotals = useCallback((entries, discountAmt) => {
     const subtotal = entries.reduce((total, product) => {
       const price = parseFloat(product.price) || 0;
       const quantity = parseInt(product.quantity) || 0;
@@ -237,34 +363,27 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       return total + basePrice * quantity;
     }, 0);
 
-    // Ensure discountPercentage is between 0 and 100
-    const validDiscountPercentage = Math.min(Math.max(discountPercentage || 0, 0), 100);
-    const discountAmount = (subtotal * validDiscountPercentage) / 100;
-    const discountedSubtotal = Math.max(subtotal - discountAmount, 0); // Prevent negative subtotal
+    const validDiscountAmount = Math.min(discountAmt || 0, subtotal);
+    const discountedSubtotal = Math.max(subtotal - validDiscountAmount, 0); // Prevent negative subtotal
 
     const cgst = (discountedSubtotal * 6) / 100 || 0;
     const sgst = (discountedSubtotal * 6) / 100 || 0;
 
     const totalAmount = Math.max(discountedSubtotal + cgst + sgst, 0); // Include CGST and SGST
 
-    return { subtotal, discountAmount, discountedSubtotal, cgst, sgst, totalAmount };
-  };
+    return { subtotal, discountAmount: validDiscountAmount, discountedSubtotal, cgst, sgst, totalAmount };
+  }, []);
 
-
-  // References for managing field focus
-  const getTodayDate = () => {
+  // Utility function to get today's date in YYYY-MM-DD format
+  const getTodayDate = useCallback(() => {
     const today = new Date();
     const year = today.getFullYear();
     const month = String(today.getMonth() + 1).padStart(2, "0"); // Months are zero-based
     const day = String(today.getDate()).padStart(2, "0");
     return `${year}-${month}-${day}`;
-  };
+  }, []);
 
-  useEffect(() => {
-    focusFirstFieldOfStep();
-  }, [step, isB2B, isEditing]);
-
-  const focusFirstFieldOfStep = () => {
+  const focusFirstFieldOfStep = useCallback(() => {
     if (step === 1) {
       document.getElementById(`productId-0`)?.focus();
     }
@@ -280,180 +399,301 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       else employeeRef.current?.focus();
     }
     if (step === 5) {
-      discountRef.current?.focus(); // Start with discount field
+      discountRef.current?.focus(); // Start with discount amount field
     }
-  };
+  }, [step, isB2B]);
 
-  // Updates in the Discount field handler
-  const handleDiscountInput = (e) => {
-    let value = e.target.value.replace(/^0+/, ""); // Remove leading zeros
-    if (!value) value = ""; // Ensure empty string for invalid input
-    const numericValue = Math.min(Math.max(parseFloat(value) || 0, 0), 100); // Clamp value between 0 and 100
-    setDiscount(numericValue.toString()); // Set cleaned value
-  };
+  // Focus management based on the current step
+  useEffect(() => {
+    focusFirstFieldOfStep();
+  }, [step, isB2B, isEditing, focusFirstFieldOfStep]);
 
-  // Add advance amount validation
-  const validateAdvanceAmount = () => {
-    if (parseFloat(advanceDetails) > totalAmount) {
-      alert("Advance amount cannot exceed the total amount.");
-      return false;
-    }
-    return true;
-  };
-
-  const handleEnterKey = (e, nextFieldRef, action) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      if (nextFieldRef) {
-        nextFieldRef.current?.focus();
-      } else if (action) {
-        action();
-      } else {
-        nextStep();
-      }
-    }
-  };
-
-  const fetchProductDetailsFromSupabase = async (value, type) => {
-    try {
-      const column = type === "id" ? "product_id" : "product_name";
-      const { data, error } = await supabase
-        .from("products")
-        .select("product_id, product_name, mrp")
-        .eq(column, value);
-
-      if (error) {
-        console.error(`Error fetching product details by ${type}:`, error.message);
-        return null;
-      }
-
-      return data && data.length > 0 ? data[0] : null;
-    } catch (err) {
-      console.error(`Unexpected error fetching product details by ${type}:`, err);
-      return null;
-    }
-  };
-
-  // Function to handle Exit button functionality
-  const handleExit = () => {
+  // Handle Exit button functionality
+  const handleExit = useCallback(() => {
     const confirmExit = window.confirm(
-      isPrinted ? "Form has been printed. Do you want to exit?" : "Are you sure you want to exit without saving or printing?"
+      isPrinted
+        ? "Form has been printed. Do you want to exit?"
+        : "Are you sure you want to exit without saving or printing?"
     );
     if (confirmExit) {
       resetForm();
-      navigate("/home");
     } else {
-      setIsPrinted(false); // Reset printing state
+      dispatch({ type: "SET_WORK_ORDER_FORM", payload: { isPrinted: false } });
     }
-  };
+  }, [isPrinted, resetForm, dispatch]);
 
-  // Print handler using react-to-print
-  const handlePrint = useReactToPrint({
-    content: () => billPrintRef.current,
-    documentTitle: `WorkOrder-${workOrderId}`,
-    onAfterPrint: () => {
-      setIsPrinted(true); // Mark as printed
+  // Removed react-to-print and handlePrint using useReactToPrint
+
+  // Implement handlePrint using window.print()
+  const handlePrint = useCallback(() => {
+    window.print();
+    dispatch({ type: "SET_WORK_ORDER_FORM", payload: { isPrinted: true } });
       resetForm();
-      navigate("/home");
-    },
-  });
+  }, []);
 
-  const addNewProductEntry = () => {
-    setProductEntries((prevEntries) => {
-      const updatedEntries = [
-        ...prevEntries,
-        { id: "", name: "", price: "", quantity: "" },
-      ];
-      // Focus on the new product id field
-      setTimeout(() => {
-        document
-          .getElementById(`productId-${updatedEntries.length - 1}`)
-          ?.focus();
-      }, 0);
-      return updatedEntries;
+  // Add a new product entry
+  const addNewProductEntry = useCallback(() => {
+    dispatch({
+      type: "SET_WORK_ORDER_FORM",
+      payload: {
+        productEntries: [
+          ...productEntries,
+          { id: "", name: "", price: "", quantity: "" },
+        ],
+      },
     });
-  };
+    setTimeout(() => {
+      document
+        .getElementById(`productId-${productEntries.length}`)
+        ?.focus();
+    }, 0);
+  }, [dispatch, productEntries]);
 
-  const removeProductEntry = (index) => {
-    const updatedEntries = productEntries.filter((_, i) => i !== index);
-    setProductEntries(updatedEntries);
-  };
+  // Remove a product entry
+  const removeProductEntry = useCallback(
+    (index) => {
+      const updatedEntries = productEntries.filter((_, i) => i !== index);
+      dispatch({
+        type: "SET_WORK_ORDER_FORM",
+        payload: { productEntries: updatedEntries },
+      });
 
-  const handleProductEntryShiftEnter = async (e, index, field) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
+      // Remove corresponding suggestions
+      setProductSuggestions((prev) => {
+        const updatedSuggestions = { ...prev };
+        delete updatedSuggestions[index];
+        return updatedSuggestions;
+      });
+    },
+    [dispatch, productEntries]
+  );
 
-      if (field === "id" || field === "name") {
-        // Fetch product details and move focus
-        const value = productEntries[index][field];
-        const productDetails = await fetchProductDetailsFromSupabase(value, field);
+  // Removed duplicated useMemo for subtotal
 
-        if (productDetails) {
-          setProductEntries((prevEntries) => {
-            const updatedEntries = [...prevEntries];
-            updatedEntries[index] = {
-              id: productDetails.product_id,
-              name: productDetails.product_name,
-              price: productDetails.mrp || "",
-              quantity: prevEntries[index].quantity || "", // Preserve quantity
-            };
-            return updatedEntries;
-          });
-
-          // Move focus to Quantity field
-          setTimeout(() => {
-            quantityRefs.current[index]?.focus();
-          }, 100);
-        }
-      } else if (field === "quantity") {
-        // Validate the current field and proceed to the next step
-        validateField(index, "quantity");
-        nextStep();
-      }
-    }
-  };
-
-  const handleBlur = (index, field) => {
-    validateField(index, field);
-  };
-
-  // Memoize calculated values
-  const { subtotal = 0, discountAmount = 0, discountedSubtotal = 0, cgst = 0, sgst = 0, totalAmount = 0 } = useMemo(
+  // Memoize calculated values (ensure it's declared only once)
+  const {
+    subtotal = 0,
+    discountAmount: validDiscountAmount = 0,
+    discountedSubtotal = 0,
+    cgst = 0,
+    sgst = 0,
+    totalAmount = 0,
+  } = useMemo(
     () => calculateTotals(productEntries, parseFloat(discount)),
-    [productEntries, discount]
+    [productEntries, discount, calculateTotals]
   );
 
   // Balance calculations
   const advance = parseFloat(advanceDetails) || 0;
   const balanceDue = totalAmount - advance;
 
-  const saveWorkOrder = async () => {
+  // Advance amount validation
+  const validateAdvanceAmount = useCallback(() => {
+    if (parseFloat(advanceDetails) > totalAmount) {
+      alert("Advance amount cannot exceed the total amount.");
+      return false;
+    }
+    return true;
+  }, [advanceDetails, totalAmount]);
+
+  // Navigate to the next step with validations
+  const nextStep = useCallback(() => {
+    let errors = {};
+
+    if (step === 1) {
+      // Validate Step 1: Product Entries
+      productEntries.forEach((product, index) => {
+        if (!product.id)
+          errors[`productId-${index}`] = "Product ID is required.";
+        if (!product.price)
+          errors[`productPrice-${index}`] = "Price is required.";
+        if (!product.quantity)
+          errors[`productQuantity-${index}`] = "Quantity is required.";
+      });
+    } else if (step === 2) {
+      // Validate Step 2: Due Date
+      if (!dueDate) errors.dueDate = "Due date is required.";
+    } else if (step === 3) {
+      // Validate Step 3: MR Number or customer details
+      if (hasMrNumber === null) {
+        errors.hasMrNumber = "Please indicate if you have an MR Number.";
+      } else if (hasMrNumber) {
+        if (!mrNumber) errors.mrNumber = "MR Number is required.";
+      } else {
+        if (!customerName)
+          errors.customerName = "Customer name is required.";
+        if (!customerPhone)
+          errors.customerPhone = "Customer phone number is required.";
+        if (!customerAddress)
+          errors.customerAddress = "Customer address is required.";
+        if (!customerAge)
+          errors.customerAge = "Customer age is required.";
+        if (customerAge && parseInt(customerAge) < 0)
+          errors.customerAge = "Age cannot be negative.";
+        if (!customerGender)
+          errors.customerGender = "Customer gender is required.";
+      }
+    } else if (step === 4) {
+      if (!employee) {
+        errors.employee = "Employee selection is required.";
+      } else if (!isPinVerified) {
+        errors.employeeVerification =
+          "Employee must be verified to proceed.";
+      }
+      if (isB2B && !gstNumber) {
+        errors.gstNumber = "GST Number is required for B2B orders.";
+      }
+    } else if (step === 5) {
+      // Validate Step 5: Discount Amount, Payment Method, and Advance Details
+      if (
+        discount &&
+        (isNaN(discount) || discount < 0 || parseFloat(discount) > subtotal)
+      ) {
+        errors.discountAmount =
+          "Enter a valid discount amount that does not exceed the subtotal.";
+      }
+      if (discount === subtotal && advanceDetails !== "0" && advanceDetails !== "") {
+        errors.advanceDetails =
+          "Advance cannot be collected when discount equals the total amount.";
+      }
+      if (!paymentMethod) errors.paymentMethod = "Payment method is required.";
+      if (!advanceDetails && discount !== subtotal)
+        errors.advanceDetails = "Advance details are required.";
+      if (step === 5 && !validateAdvanceAmount()) {
+        return; // Prevent proceeding if advance amount validation fails
+      }
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors);
+      // Focus on the first error field
+      const firstErrorKey = Object.keys(errors)[0];
+      if (
+        firstErrorKey.startsWith("productId") ||
+        firstErrorKey.startsWith("productPrice") ||
+        firstErrorKey.startsWith("productQuantity")
+      ) {
+        const index = firstErrorKey.split("-")[1];
+        document.getElementById(firstErrorKey)?.focus();
+      } else if (firstErrorKey === "dueDate") {
+        dueDateRef.current?.focus();
+      } else if (firstErrorKey === "mrNumber") {
+        mrNumberRef.current?.focus();
+      } else if (firstErrorKey === "gstNumber") {
+        gstNumberRef.current?.focus();
+      } else if (firstErrorKey === "employee") {
+        employeeRef.current?.focus();
+      } else if (firstErrorKey === "paymentMethod") {
+        paymentMethodRef.current?.focus();
+      } else if (firstErrorKey === "advanceDetails") {
+        advanceDetailsRef.current?.focus();
+      } else if (firstErrorKey === "discountAmount") {
+        discountRef.current?.focus();
+      } else if (firstErrorKey === "hasMrNumber") {
+        yesButtonRef.current?.focus();
+      } else if (firstErrorKey === "customerName") {
+        customerNameRef.current?.focus();
+      } else if (firstErrorKey === "customerPhone") {
+        customerPhoneRef.current?.focus();
+      } else if (firstErrorKey === "customerAddress") {
+        customerAddressRef.current?.focus();
+      } else if (firstErrorKey === "customerAge") {
+        customerAgeRef.current?.focus();
+      } else if (firstErrorKey === "customerGender") {
+        customerGenderRef.current?.focus();
+      }
+      return;
+    }
+
+    // Clear errors and proceed to the next step
+    setValidationErrors({});
+    if (step < 5)
+      dispatch({ type: "SET_WORK_ORDER_FORM", payload: { step: step + 1 } });
+  }, [
+    step,
+    productEntries,
+    dueDate,
+    hasMrNumber,
+    mrNumber,
+    customerName,
+    customerPhone,
+    customerAddress,
+    customerAge,
+    customerGender,
+    employee,
+    isPinVerified,
+    isB2B,
+    gstNumber,
+    discount,
+    subtotal,
+    advanceDetails,
+    paymentMethod,
+    validateAdvanceAmount,
+    dispatch,
+  ]);
+
+  // Save Work Order handler
+  const saveWorkOrder = useCallback(async () => {
     if (isSaving) {
       alert("Please wait while the work order is being saved.");
       return;
     }
 
-    setIsSaving(true);
+    dispatch({ type: "SET_WORK_ORDER_FORM", payload: { isSaving: true } });
 
     // Validate advance amount
     if (!validateAdvanceAmount()) {
-      setIsSaving(false);
+      dispatch({ type: "SET_WORK_ORDER_FORM", payload: { isSaving: false } });
       return;
     }
 
     // Validation Checks
     const validations = [
-      { condition: !employee, errorKey: "employee", message: "Employee selection is required.", ref: employeeRef },
-      { condition: isB2B && !gstNumber, errorKey: "gstNumber", message: "GST Number is required for B2B orders.", ref: gstNumberRef },
-      { condition: discount && (isNaN(discount) || discount < 0 || discount > 100), errorKey: "discount", message: "Enter a valid discount percentage (0-100).", ref: discountRef },
-      { condition: !paymentMethod, errorKey: "paymentMethod", message: "Payment method is required.", ref: paymentMethodRef },
+      {
+        condition: !employee,
+        errorKey: "employee",
+        message: "Employee selection is required.",
+        ref: employeeRef,
+      },
+      {
+        condition: isB2B && !gstNumber,
+        errorKey: "gstNumber",
+        message: "GST Number is required for B2B orders.",
+        ref: gstNumberRef,
+      },
+      {
+        condition:
+          discount &&
+          (isNaN(discount) || discount < 0 || parseFloat(discount) > subtotal),
+        errorKey: "discountAmount",
+        message:
+          "Enter a valid discount amount that does not exceed the subtotal.",
+        ref: discountRef,
+      },
+      {
+        condition:
+          discount === subtotal && advanceDetails !== "0" && advanceDetails !== "",
+        errorKey: "advanceDetails",
+        message:
+          "Advance cannot be collected when discount equals the total amount.",
+        ref: advanceDetailsRef,
+      },
+      {
+        condition: !paymentMethod,
+        errorKey: "paymentMethod",
+        message: "Payment method is required.",
+        ref: paymentMethodRef,
+      },
     ];
 
     for (const validation of validations) {
       if (validation.condition) {
-        setValidationErrors((prev) => ({ ...prev, [validation.errorKey]: validation.message }));
+        setValidationErrors((prev) => ({
+          ...prev,
+          [validation.errorKey]: validation.message,
+        }));
         validation.ref?.current?.focus();
-        setIsSaving(false);
+        dispatch({ type: "SET_WORK_ORDER_FORM", payload: { isSaving: false } });
         return;
       }
     }
@@ -461,9 +701,12 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     // Validate product entries
     const productErrors = {};
     productEntries.forEach((product, index) => {
-      if (!product.id) productErrors[`productId-${index}`] = "Product ID is required.";
-      if (!product.price) productErrors[`productPrice-${index}`] = "Price is required.";
-      if (!product.quantity) productErrors[`productQuantity-${index}`] = "Quantity is required.";
+      if (!product.id)
+        productErrors[`productId-${index}`] = "Product ID is required.";
+      if (!product.price)
+        productErrors[`productPrice-${index}`] = "Price is required.";
+      if (!product.quantity)
+        productErrors[`productQuantity-${index}`] = "Quantity is required.";
     });
 
     // Step 3 Validation for MR number or customer details
@@ -471,10 +714,21 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       if (hasMrNumber === null) {
         productErrors["hasMrNumber"] = "Please indicate if you have an MR Number.";
       } else if (hasMrNumber) {
-        if (!mrNumber) productErrors["mrNumber"] = "MR Number is required.";
+        if (!mrNumber)
+          productErrors["mrNumber"] = "MR Number is required.";
       } else {
-        if (!customerName) productErrors["customerName"] = "Customer name is required.";
-        if (!customerPhone) productErrors["customerPhone"] = "Customer phone number is required.";
+        if (!customerName)
+          productErrors["customerName"] = "Customer name is required.";
+        if (!customerPhone)
+          productErrors["customerPhone"] = "Customer phone number is required.";
+        if (!customerAddress)
+          productErrors["customerAddress"] = "Customer address is required.";
+        if (!customerAge)
+          productErrors["customerAge"] = "Customer age is required.";
+        if (customerAge && parseInt(customerAge) < 0)
+          productErrors["customerAge"] = "Age cannot be negative.";
+        if (!customerGender)
+          productErrors["customerGender"] = "Customer gender is required.";
       }
     }
 
@@ -482,8 +736,41 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     if (Object.keys(productErrors).length > 0) {
       setValidationErrors(productErrors);
       const firstErrorKey = Object.keys(productErrors)[0];
-      document.getElementById(firstErrorKey)?.focus();
-      setIsSaving(false);
+      if (
+        firstErrorKey.startsWith("productId") ||
+        firstErrorKey.startsWith("productPrice") ||
+        firstErrorKey.startsWith("productQuantity")
+      ) {
+        const index = firstErrorKey.split("-")[1];
+        document.getElementById(firstErrorKey)?.focus();
+      } else if (firstErrorKey === "dueDate") {
+        dueDateRef.current?.focus();
+      } else if (firstErrorKey === "mrNumber") {
+        mrNumberRef.current?.focus();
+      } else if (firstErrorKey === "gstNumber") {
+        gstNumberRef.current?.focus();
+      } else if (firstErrorKey === "employee") {
+        employeeRef.current?.focus();
+      } else if (firstErrorKey === "paymentMethod") {
+        paymentMethodRef.current?.focus();
+      } else if (firstErrorKey === "advanceDetails") {
+        advanceDetailsRef.current?.focus();
+      } else if (firstErrorKey === "discountAmount") {
+        discountRef.current?.focus();
+      } else if (firstErrorKey === "hasMrNumber") {
+        yesButtonRef.current?.focus();
+      } else if (firstErrorKey === "customerName") {
+        customerNameRef.current?.focus();
+      } else if (firstErrorKey === "customerPhone") {
+        customerPhoneRef.current?.focus();
+      } else if (firstErrorKey === "customerAddress") {
+        customerAddressRef.current?.focus();
+      } else if (firstErrorKey === "customerAge") {
+        customerAgeRef.current?.focus();
+      } else if (firstErrorKey === "customerGender") {
+        customerGenderRef.current?.focus();
+      }
+      dispatch({ type: "SET_WORK_ORDER_FORM", payload: { isSaving: false } });
       return;
     }
 
@@ -502,26 +789,30 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
           .single();
 
         if (customerError) {
-          alert("No valid patient found with the provided MR Number.");
-          setIsSaving(false);
+          alert("No valid customer found with the provided MR Number.");
+          dispatch({ type: "SET_WORK_ORDER_FORM", payload: { isSaving: false } });
           return;
         }
 
         customerId = existingCustomer?.id;
       } else {
         // Create new customer
-        const { data: newCustomer, error: customerCreationError } = await supabase
-          .from("customers")
-          .insert({
-            name: customerName.trim(),
-            phone_number: customerPhone.trim(),
-          })
-          .select("id")
-          .single();
+        const { data: newCustomer, error: customerCreationError } =
+          await supabase
+            .from("customers")
+            .insert({
+              name: customerName.trim(),
+              phone_number: customerPhone.trim(),
+              address: customerAddress.trim(),
+              age: parseInt(customerAge),
+              gender: customerGender,
+            })
+            .select("id")
+            .single();
 
         if (customerCreationError) {
           alert("Failed to create a new customer.");
-          setIsSaving(false);
+          dispatch({ type: "SET_WORK_ORDER_FORM", payload: { isSaving: false } });
           return;
         }
 
@@ -543,10 +834,17 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
             gender: patientDetails?.gender,
             address: patientDetails?.address,
           }
-          : { name: customerName, phone_number: customerPhone },
+          : {
+            name: customerName,
+            phone_number: customerPhone,
+            address: customerAddress,
+            age: parseInt(customerAge),
+            gender: customerGender,
+          },
         employee,
         payment_method: paymentMethod,
         subtotal,
+        discount_amount: validDiscountAmount,
         discounted_subtotal: discountedSubtotal,
         cgst,
         sgst,
@@ -557,8 +855,6 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         updated_at: new Date().toISOString(),
         branch: branch,
         customer_id: customerId,
-        discount_percentage: discount ? parseFloat(discount) : 0,
-        discount_amount: discountAmount,
       };
 
       if (isEditing) {
@@ -572,13 +868,16 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
           alert("Failed to update work order.");
         } else {
           alert("Work order updated successfully!");
-          setAllowPrint(true);
+          dispatch({
+            type: "SET_WORK_ORDER_FORM",
+            payload: { allowPrint: true },
+          });
         }
       } else {
         // Ensure workOrderId is set before inserting
         if (!workOrderId) {
           alert("Work Order ID is not generated yet. Please wait.");
-          setIsSaving(false);
+          dispatch({ type: "SET_WORK_ORDER_FORM", payload: { isSaving: false } });
           return;
         }
         payload.work_order_id = workOrderId;
@@ -596,100 +895,58 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
           }
         } else {
           alert("Work order saved successfully!");
-          setAllowPrint(true);
+          dispatch({
+            type: "SET_WORK_ORDER_FORM",
+            payload: { allowPrint: true },
+          });
         }
       }
     } catch (err) {
       console.error("Unexpected error:", err);
       alert("An unexpected error occurred while saving the work order.");
     } finally {
-      setIsSaving(false);
+      dispatch({ type: "SET_WORK_ORDER_FORM", payload: { isSaving: false } });
     }
-  };
+  }, [
+    isSaving,
+    dispatch,
+    validateAdvanceAmount,
+    employee,
+    isB2B,
+    gstNumber,
+    discount,
+    subtotal,
+    advanceDetails,
+    paymentMethod,
+    customerName,
+    customerPhone,
+    customerAddress,
+    customerAge,
+    customerGender,
+    hasMrNumber,
+    mrNumber,
+    patientDetails,
+    productEntries,
+    validDiscountAmount,
+    discountedSubtotal,
+    cgst,
+    sgst,
+    totalAmount,
+    workOrderId,
+    isEditing,
+    generateNewWorkOrderId,
+  ]);
 
-  const nextStep = () => {
-    let errors = {};
+  // Navigate to the previous step
+  const prevStep = useCallback(() => {
+    dispatch({
+      type: "SET_WORK_ORDER_FORM",
+      payload: { step: Math.max(step - 1, 1) },
+    });
+  }, [dispatch, step]);
 
-    if (step === 1) {
-      // Validate Step 1: Product Entries
-      productEntries.forEach((product, index) => {
-        if (!product.id) errors[`productId-${index}`] = "Product ID is required.";
-        if (!product.price) errors[`productPrice-${index}`] = "Price is required.";
-        if (!product.quantity) errors[`productQuantity-${index}`] = "Quantity is required.";
-      });
-    } else if (step === 2) {
-      // Validate Step 2: Due Date
-      if (!dueDate) errors.dueDate = "Due date is required.";
-    } else if (step === 3) {
-      // Validate Step 3: MR Number or Customer Details
-      if (hasMrNumber === null) {
-        errors.hasMrNumber = "Please indicate if you have an MR Number.";
-      } else if (hasMrNumber) {
-        if (!mrNumber) errors.mrNumber = "MR Number is required.";
-      } else {
-        if (!customerName) errors.customerName = "Customer name is required.";
-        if (!customerPhone) errors.customerPhone = "Customer phone number is required.";
-      }
-    } else if (step === 4) {
-      if (!employee) {
-        errors.employee = "Employee selection is required.";
-      } else if (!isPinVerified) {
-        errors.employeeVerification = "Employee must be verified to proceed.";
-      }
-      if (isB2B && !gstNumber) {
-        errors.gstNumber = "GST Number is required for B2B orders.";
-      }
-    } else if (step === 5) {
-      // Validate Step 5: Discount, Payment Method, and Advance Details
-      if (discount && (isNaN(discount) || discount < 0 || discount > 100)) {
-        errors.discount = "Enter a valid discount percentage (0-100).";
-      }
-      if (!paymentMethod) errors.paymentMethod = "Payment method is required.";
-      if (!advanceDetails) errors.advanceDetails = "Advance details are required.";
-      if (step === 5 && !validateAdvanceAmount()) {
-        return; // Prevent proceeding if advance amount validation fails
-      }
-    }
-
-    if (Object.keys(errors).length > 0) {
-      setValidationErrors(errors);
-      // Focus on the first error field
-      const firstErrorKey = Object.keys(errors)[0];
-      if (firstErrorKey.startsWith('productId') || firstErrorKey.startsWith('productPrice') || firstErrorKey.startsWith('productQuantity')) {
-        const index = firstErrorKey.split('-')[1];
-        document.getElementById(firstErrorKey)?.focus();
-      } else if (firstErrorKey === 'dueDate') {
-        dueDateRef.current?.focus();
-      } else if (firstErrorKey === 'mrNumber') {
-        mrNumberRef.current?.focus();
-      } else if (firstErrorKey === 'gstNumber') {
-        gstNumberRef.current?.focus();
-      } else if (firstErrorKey === 'employee') {
-        employeeRef.current?.focus();
-      } else if (firstErrorKey === 'paymentMethod') {
-        paymentMethodRef.current?.focus();
-      } else if (firstErrorKey === 'advanceDetails') {
-        advanceDetailsRef.current?.focus();
-      } else if (firstErrorKey === 'discount') {
-        discountRef.current?.focus();
-      } else if (firstErrorKey === 'hasMrNumber') {
-        yesButtonRef.current?.focus();
-      } else if (firstErrorKey === 'customerName') {
-        customerNameRef.current?.focus();
-      } else if (firstErrorKey === 'customerPhone') {
-        customerPhoneRef.current?.focus();
-      }
-      return;
-    }
-
-    // Clear errors and proceed to the next step
-    setValidationErrors({});
-    if (step < 5) setStep((prevStep) => prevStep + 1);
-  };
-
-  const prevStep = () => setStep((prevStep) => Math.max(prevStep - 1, 1));
-
-  const handleMRNumberSearch = async () => {
+  // Handle MR Number search
+  const handleMRNumberSearch = useCallback(async () => {
     if (!mrNumber.trim()) {
       alert("Please enter a valid MR Number.");
       mrNumberRef.current?.focus();
@@ -697,30 +954,44 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     }
     try {
       const { data, error } = await supabase
-        .from('patients') // Correct table for MR number lookup
-        .select('id, age, mr_number, phone_number, name, gender, address') // Added 'condition'
-        .eq('mr_number', mrNumber.trim())
+        .from("patients") // Correct table for MR number lookup
+        .select(
+          "id, age, mr_number, phone_number, name, gender, address"
+        ) // Added 'address'
+        .eq("mr_number", mrNumber.trim())
         .single();
 
       if (error) {
-        if (error.code === 'PGRST116') { // No data found
+        if (error.code === "PGRST116") {
+          // No data found
           alert("No patient found with the provided MR Number.");
         } else {
-          console.error("Error fetching patient details:", error.message);
+          console.error(
+            "Error fetching patient details:",
+            error.message
+          );
           alert("Failed to fetch patient details.");
         }
-        setPatientDetails(null); // Clear previous details
+        dispatch({
+          type: "SET_WORK_ORDER_FORM",
+          payload: { patientDetails: null },
+        }); // Clear previous details
         return;
       }
 
       if (data) {
-        setPatientDetails({
-          name: data.name,
-          age: data.age,
-          phoneNumber: data.phone_number,
-          gender: data.gender,
-          address: data.address,
-          mr_number: data.mr_number, // Ensure 'condition' is fetched
+        dispatch({
+          type: "SET_WORK_ORDER_FORM",
+          payload: {
+            patientDetails: {
+              name: data.name,
+              age: data.age,
+              phoneNumber: data.phone_number,
+              gender: data.gender,
+              address: data.address,
+              mr_number: data.mr_number, // Ensure 'mr_number' is fetched
+            },
+          },
         });
         // Move focus to the Next button
         setTimeout(() => {
@@ -728,47 +999,58 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         }, 0);
       }
     } catch (err) {
-      console.error("Unexpected error fetching patient details:", err);
-      alert("An unexpected error occurred while fetching patient details.");
-      setPatientDetails(null);
+      console.error(
+        "Unexpected error fetching patient details:",
+        err
+      );
+      alert(
+        "An unexpected error occurred while fetching patient details."
+      );
+      dispatch({
+        type: "SET_WORK_ORDER_FORM",
+        payload: { patientDetails: null },
+      });
     }
-  };
+  }, [mrNumber, dispatch]);
 
-  const generateNewWorkOrderId = async () => {
-    try {
-      const { data: lastWorkOrders, error } = await supabase
-        .from('work_orders')
-        .select('work_order_id')
-        .order('work_order_id', { ascending: false })
-        .limit(1);
+  // Discount field handler
+  const handleDiscountInput = useCallback(
+    (e) => {
+      let value = e.target.value.replace(/^0+/, ""); // Remove leading zeros
+      if (!value) value = ""; // Ensure empty string for invalid input
+      const numericValue = Math.min(Math.max(parseFloat(value) || 0, 0), subtotal); // Clamp value between 0 and subtotal
+      dispatch({
+        type: "SET_WORK_ORDER_FORM",
+        payload: { discount: numericValue.toString() },
+      });
+    },
+    [dispatch, subtotal]
+  );
 
-      if (error) {
-        console.error("Error fetching last work order:", error);
-        return;
-      }
-
-      let newWorkOrderId = 3665; // Default to 1 if no work orders exist
-      if (lastWorkOrders && lastWorkOrders.length > 0) {
-        const lastWorkOrderId = parseInt(lastWorkOrders[0].work_order_id, 10);
-        if (!isNaN(lastWorkOrderId)) {
-          newWorkOrderId = lastWorkOrderId + 1;
+  // Handle Enter key for navigation
+  const handleEnterKey = useCallback(
+    (e, nextFieldRef, action) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        if (nextFieldRef) {
+          nextFieldRef.current?.focus();
+        } else if (action) {
+          action();
+        } else {
+          nextStep();
         }
       }
+    },
+    [nextStep]
+  );
 
-      setWorkOrderId(newWorkOrderId.toString());
-      console.log("Generated Work Order ID:", newWorkOrderId);
-    } catch (error) {
-      console.error("Error generating Work Order ID:", error);
-    }
-  };
-
-
-  const fetchWorkOrderDetails = async () => {
+  // Fetch existing Work Order details for editing
+  const fetchWorkOrderDetails = useCallback(async () => {
     try {
       const { data, error } = await supabase
-        .from('work_orders')
-        .select('*')
-        .eq('work_order_id', orderId)
+        .from("work_orders")
+        .select("*")
+        .eq("work_order_id", orderId)
         .single();
 
       if (error) {
@@ -777,59 +1059,101 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         navigate("/home");
       } else {
         // Populate the form with existing data
-        setWorkOrderId(data.work_order_id);
-        setProductEntries(data.product_entries || [{ id: "", name: "", price: "", quantity: "" }]);
-        setAdvanceDetails(data.advance_details || "");
-        setDueDate(data.due_date || "");
-        setDiscount(data.discount_percentage || "");
-        setPaymentMethod(data.payment_method || "");
-        setIsB2B(data.is_b2b || false);
-        setGstNumber(data.gst_number || "");
-        setEmployee(data.employee || "");
-        setHasMrNumber(data.mr_number ? true : false);
+        dispatch({
+          type: "SET_WORK_ORDER_FORM",
+          payload: {
+            workOrderId: data.work_order_id,
+            productEntries: data.product_entries || [
+              { id: "", name: "", price: "", quantity: "" },
+            ],
+            advanceDetails: data.advance_details || "",
+            dueDate: data.due_date || "",
+            discount: data.discount_amount || "",
+            paymentMethod: data.payment_method || "",
+            isB2B: data.is_b2b || false,
+            gstNumber: data.gst_number || "",
+            employee: data.employee || "",
+            hasMrNumber: data.mr_number ? true : false,
+          },
+        });
+
         if (data.mr_number) {
-          setMrNumber(data.mr_number);
+          dispatch({
+            type: "SET_WORK_ORDER_FORM",
+            payload: { mrNumber: data.mr_number },
+          });
           // Fetch patient details based on MR number
           try {
             const { data: patientData, error: patientError } = await supabase
-              .from('patients')
-              .select('name, age, phone_number, gender, address') // Ensure 'condition' is fetched
-              .eq('mr_number', data.mr_number)
+              .from("patients")
+              .select(
+                "name, age, phone_number, gender, address"
+              ) // Ensure 'address' is fetched
+              .eq("mr_number", data.mr_number)
               .single();
 
             if (patientError) {
-              console.error("Error fetching patient details for existing work order:", patientError.message);
-              setPatientDetails(null);
+              console.error(
+                "Error fetching patient details for existing work order:",
+                patientError.message
+              );
+              dispatch({
+                type: "SET_WORK_ORDER_FORM",
+                payload: { patientDetails: null },
+              });
             } else {
-              setPatientDetails({
-                name: patientData.name,
-                age: patientData.age,
-                phoneNumber: patientData.phone_number,
-                gender: patientData.gender,
-                address: patientData.address,
-                mr_number: data.mr_number,
+              dispatch({
+                type: "SET_WORK_ORDER_FORM",
+                payload: {
+                  patientDetails: {
+                    name: patientData.name,
+                    age: patientData.age,
+                    phoneNumber: patientData.phone_number,
+                    gender: patientData.gender,
+                    address: patientData.address,
+                    mr_number: data.mr_number,
+                  },
+                },
               });
             }
           } catch (err) {
-            console.error("Unexpected error fetching patient details for existing work order:", err);
-            setPatientDetails(null);
+            console.error(
+              "Unexpected error fetching patient details for existing work order:",
+              err
+            );
+            dispatch({
+              type: "SET_WORK_ORDER_FORM",
+              payload: { patientDetails: null },
+            });
           }
         } else {
-          setCustomerName(data.patient_details?.name || "");
-          setCustomerPhone(data.patient_details?.phone_number || "");
+          dispatch({
+            type: "SET_WORK_ORDER_FORM",
+            payload: {
+              customerName: data.patient_details?.name || "",
+              customerPhone: data.patient_details?.phone_number || "",
+              customerAddress: data.patient_details?.address || "",
+              customerAge: data.patient_details?.age || "",
+              customerGender: data.patient_details?.gender || "",
+            },
+          });
         }
+
         // Fetch the corresponding modification request
         const { data: modData, error: modError } = await supabase
-          .from('modification_requests')
-          .select('*')
-          .eq('order_id', orderId)
-          .eq('status', 'approved') // Assuming the status was 'approved'
+          .from("modification_requests")
+          .select("*")
+          .eq("order_id", orderId)
+          .eq("status", "approved") // Assuming the status was 'approved'
           .single();
 
         if (modError) {
           console.error("Error fetching modification request:", modError);
         } else {
-          setModificationRequestId(modData.request_id);
+          dispatch({
+            type: "SET_WORK_ORDER_FORM",
+            payload: { modificationRequestId: modData.request_id },
+          });
         }
       }
     } catch (err) {
@@ -837,20 +1161,65 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       alert("An unexpected error occurred while fetching work order details.");
       navigate("/home");
     }
-  };
+  }, [dispatch, navigate, orderId]);
+
+  // Handle Shift + Enter and Enter key for product entries
+  const handleProductEntryShiftEnter = useCallback(
+    async (e, index, field) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+
+        if (field === "id" || field === "name") {
+          // Fetch product details and move focus
+          const value = productEntries[index][field];
+          const productDetails = await fetchProductDetailsFromSupabase(
+            value,
+            field
+          );
+
+          if (productDetails) {
+            dispatch({
+              type: "SET_WORK_ORDER_FORM",
+              payload: {
+                productEntries: productEntries.map((entry, i) =>
+                  i === index
+                    ? {
+                      id: productDetails.product_id,
+                      name: productDetails.product_name,
+                      price: productDetails.mrp || "",
+                      quantity: entry.quantity || "",
+                    }
+                    : entry
+                ),
+              },
+            });
+
+            // Move focus to Quantity field
+            setTimeout(() => {
+              quantityRefs.current[index]?.focus();
+            }, 100);
+          }
+        } else if (field === "quantity") {
+          // Validate the current field and proceed to the next step
+          validateField(index, "quantity");
+          nextStep();
+        }
+      }
+    },
+    [productEntries, fetchProductDetailsFromSupabase, dispatch, validateField, nextStep]
+  );
 
   useEffect(() => {
     if (isEditing && orderId) {
       fetchWorkOrderDetails();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isEditing, orderId]);
+  }, [isEditing, orderId, fetchWorkOrderDetails]);
 
+  // Handle after print event
   useEffect(() => {
     const handleAfterPrint = () => {
       if (isPrinted) {
         resetForm();
-        navigate("/home");
       }
     };
 
@@ -859,41 +1228,33 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     return () => {
       window.onafterprint = null; // Cleanup the event listener
     };
-  }, [isPrinted, navigate, isEditing]);
+  }, [isPrinted, resetForm]);
 
-  useEffect(() => {
-    if (!isEditing && branch) {
-      generateNewWorkOrderId();
-    }
-  }, [branch, isEditing]);
-
-  useEffect(() => {
-    if (step === 4) {
-      setIsPinVerified(false);
-    }
-  }, [step]);
-
-  // Initialize workOrderId when component mounts and branch is available
+  // Generate Work Order ID when not editing
   useEffect(() => {
     if (!isEditing && branch && !workOrderId) {
       generateNewWorkOrderId();
     }
-  }, [branch, isEditing, workOrderId]);
+  }, [branch, isEditing, workOrderId, generateNewWorkOrderId]);
 
   return (
+
     <div
-      className={`transition-all duration-300 ${isCollapsed ? "mx-20" : "mx-20 px-20"} justify-center mt-16 p-4 mx-auto`}
+      className={`transition-all duration-300 ${isCollapsed ? "mx-20" : "mx-20 px-20"
+        } justify-center mt-16 p-4 mx-auto`}
     >
+
       <h1 className="text-2xl font-semibold text-gray-700 text-center mb-8">
         {isEditing ? "Edit Work Order" : "Work Order Generation"}
       </h1>
 
       {/* Progress Tracker */}
-      <div className="flex items-center mb-8 w-2/3 mx-auto">
+      <div className=" flex items-center mb-8 w-2/3 mx-auto">
         {Array.from({ length: 5 }, (_, i) => (
           <div
             key={i}
-            className={`flex-1 h-2 rounded-xl mx-1 ${step > i + 1 ? "bg-[#5db76d]" : "bg-gray-300"} transition-all duration-300`}
+            className={`flex-1 h-2 rounded-xl mx-1 ${step > i + 1 ? "bg-[#5db76d]" : "bg-gray-300"
+              } transition-all duration-300`}
           />
         ))}
       </div>
@@ -919,7 +1280,9 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
             </div>
 
             {/* Product Details */}
-            <label className="block text-gray-700 font-medium mb-4">Product Details</label>
+            <label className="block text-gray-700 font-medium mb-4">
+              Product Details
+            </label>
             <div className="space-y-6">
               {productEntries.map((product, index) => (
                 <div key={index} className="flex space-x-2 items-center">
@@ -929,25 +1292,10 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                       type="text"
                       id={`productId-${index}`}
                       placeholder="Enter Product ID or Scan Barcode"
-                      value={productEntries[index].id}
+                      value={product.id}
                       onChange={async (e) => {
                         const value = e.target.value;
-
-                        // Update the product ID dynamically
-                        setProductEntries((prevEntries) => {
-                          const updatedEntries = [...prevEntries];
-                          updatedEntries[index].id = value;
-                          return updatedEntries;
-                        });
-
-                        // Fetch product suggestions dynamically
-                        const suggestions = await fetchProductSuggestions(value, "id");
-                        setProductSuggestions(suggestions);
-
-                        // Automatically fetch details and focus quantity if exact match
-                        if (suggestions.length === 1 && suggestions[0].product_id === value) {
-                          await handleProductSelection(index, suggestions[0].product_id);
-                        }
+                        await handleProductInput(index, value);
                       }}
                       onKeyDown={async (e) => {
                         if (e.key === "Enter" && e.shiftKey) {
@@ -956,34 +1304,49 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                         } else if (e.key === "Enter") {
                           e.preventDefault();
 
-                          const selectedProduct = productSuggestions.find(
-                            (prod) => prod.product_id === productEntries[index].id
+                          const selectedProduct = productSuggestions[index]?.find(
+                            (prod) => prod.product_id === product.id
                           );
 
                           // Fetch product details if a valid ID is entered or selected
                           if (selectedProduct) {
-                            await handleProductSelection(index, selectedProduct.product_id);
-                          } else if (productEntries[index].id) {
-                            await handleProductSelection(index, productEntries[index].id);
+                            await handleProductSelection(
+                              index,
+                              selectedProduct.product_id
+                            );
+                          } else if (product.id) {
+                            await handleProductSelection(
+                              index,
+                              product.id
+                            );
                           }
                         }
                       }}
                       onBlur={async () => {
-                        const selectedProduct = productSuggestions.find(
-                          (prod) => prod.product_id === productEntries[index].id
+                        const selectedProduct = productSuggestions[index]?.find(
+                          (prod) => prod.product_id === product.id
                         );
 
                         // Fetch product details on blur if a valid ID exists
-                        if (selectedProduct || productEntries[index].id) {
-                          await handleProductSelection(index, productEntries[index].id);
+                        if (selectedProduct || product.id) {
+                          await handleProductSelection(
+                            index,
+                            product.id
+                          );
                         }
                       }}
                       list={`productIdSuggestions-${index}`}
-                      className={`border border-gray-300 px-4 py-3 rounded-lg w-full ${validationErrors[`productId-${index}`] ? 'border-red-500' : ''}`}
+                      className={`border border-gray-300 px-4 py-3 rounded-lg w-full ${validationErrors[`productId-${index}`]
+                        ? "border-red-500"
+                        : ""
+                        }`}
                     />
                     <datalist id={`productIdSuggestions-${index}`}>
-                      {productSuggestions.map((suggestion) => (
-                        <option key={suggestion.product_id} value={suggestion.product_id} />
+                      {productSuggestions[index]?.map((suggestion) => (
+                        <option
+                          key={suggestion.product_id}
+                          value={suggestion.product_id}
+                        />
                       ))}
                     </datalist>
                     {validationErrors[`productId-${index}`] && (
@@ -1012,14 +1375,22 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                       value={product.price}
                       onChange={(e) => {
                         const updatedPrice = e.target.value;
-                        setProductEntries((prevEntries) => {
-                          const updatedEntries = [...prevEntries];
-                          updatedEntries[index].price = updatedPrice; // Update the price
-                          return updatedEntries;
+                        dispatch({
+                          type: "SET_WORK_ORDER_FORM",
+                          payload: {
+                            productEntries: productEntries.map((entry, i) =>
+                              i === index
+                                ? { ...entry, price: updatedPrice }
+                                : entry
+                            ),
+                          },
                         });
                       }}
                       onBlur={() => handleBlur(index, "price")} // Validate on blur
-                      className={`border border-gray-300 px-4 py-3 rounded-lg w-full text-center ${validationErrors[`productPrice-${index}`] ? 'border-red-500' : ''}`}
+                      className={`border border-gray-300 px-4 py-3 rounded-lg w-full text-center ${validationErrors[`productPrice-${index}`]
+                        ? "border-red-500"
+                        : ""
+                        }`}
                     />
                     {validationErrors[`productPrice-${index}`] && (
                       <p className="text-red-500 text-xs mt-1">
@@ -1037,10 +1408,15 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                       value={product.quantity}
                       ref={(el) => (quantityRefs.current[index] = el)}
                       onChange={(e) =>
-                        setProductEntries((prevEntries) => {
-                          const updatedEntries = [...prevEntries];
-                          updatedEntries[index].quantity = e.target.value;
-                          return updatedEntries;
+                        dispatch({
+                          type: "SET_WORK_ORDER_FORM",
+                          payload: {
+                            productEntries: productEntries.map((entry, i) =>
+                              i === index
+                                ? { ...entry, quantity: e.target.value }
+                                : entry
+                            ),
+                          },
                         })
                       }
                       onKeyDown={(e) => {
@@ -1053,7 +1429,10 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                           }
                         }
                       }}
-                      className={`border border-gray-300 px-4 py-3 rounded-lg w-full text-center ${validationErrors[`productQuantity-${index}`] ? 'border-red-500' : ''}`}
+                      className={`border border-gray-300 px-4 py-3 rounded-lg w-full text-center ${validationErrors[`productQuantity-${index}`]
+                        ? "border-red-500"
+                        : ""
+                        }`}
                       onBlur={() => handleBlur(index, "quantity")}
                     />
                     {validationErrors[`productQuantity-${index}`] && (
@@ -1100,11 +1479,17 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
               <input
                 type="date"
                 value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
+                onChange={(e) =>
+                  dispatch({
+                    type: "SET_WORK_ORDER_FORM",
+                    payload: { dueDate: e.target.value },
+                  })
+                }
                 onKeyDown={(e) => handleEnterKey(e, nextButtonRef)}
                 ref={dueDateRef}
                 min={getTodayDate()} // Set minimum date to today
-                className={`border border-gray-300 w-full px-10 py-3 rounded-lg text-center appearance-none ${validationErrors.dueDate ? 'border-red-500' : ''}`}
+                className={`border border-gray-300 w-full px-10 py-3 rounded-lg text-center appearance-none ${validationErrors.dueDate ? "border-red-500" : ""
+                  }`}
               />
               {validationErrors.dueDate && (
                 <p className="text-red-500 text-xs mt-1">
@@ -1118,15 +1503,22 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         {/* Step 3: MR Number or Customer Details */}
         {step === 3 && (
           <div className="bg-gray-50 p-6 rounded-md shadow-inner space-y-6">
-            <h2 className="text-lg font-semibold text-gray-700">Customer Details</h2>
+            <h2 className="text-lg font-semibold text-gray-700">
+              Customer Details
+            </h2>
 
             {/* Prompt for MR Number */}
             <div className="flex items-center space-x-4">
-              <span className="font-medium text-gray-700">Do you have an MR Number?</span>
+              <span className="font-medium text-gray-700">
+                Do you have an MR Number?
+              </span>
               <button
                 type="button"
                 onClick={() => {
-                  setHasMrNumber(true);
+                  dispatch({
+                    type: "SET_WORK_ORDER_FORM",
+                    payload: { hasMrNumber: true },
+                  });
                   setValidationErrors((prev) => {
                     const { hasMrNumber, ...rest } = prev;
                     return rest;
@@ -1137,7 +1529,9 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                   }, 0);
                 }}
                 ref={yesButtonRef}
-                className={`px-4 py-2 rounded-lg focus:outline-none ${hasMrNumber === true ? "bg-green-600 text-white" : "bg-green-500 text-white hover:bg-green-600"
+                className={`px-4 py-2 rounded-lg focus:outline-none ${hasMrNumber === true
+                  ? "bg-green-600 text-white"
+                  : "bg-green-500 text-white hover:bg-green-600"
                   }`}
               >
                 Yes
@@ -1145,7 +1539,10 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
               <button
                 type="button"
                 onClick={() => {
-                  setHasMrNumber(false);
+                  dispatch({
+                    type: "SET_WORK_ORDER_FORM",
+                    payload: { hasMrNumber: false },
+                  });
                   setValidationErrors((prev) => {
                     const { hasMrNumber, ...rest } = prev;
                     return rest;
@@ -1156,7 +1553,9 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                   }, 0);
                 }}
                 ref={noButtonRef}
-                className={`px-4 py-2 rounded-lg focus:outline-none ${hasMrNumber === false ? "bg-red-600 text-white" : "bg-red-500 text-white hover:bg-red-600"
+                className={`px-4 py-2 rounded-lg focus:outline-none ${hasMrNumber === false
+                  ? "bg-red-600 text-white"
+                  : "bg-red-500 text-white hover:bg-red-600"
                   }`}
               >
                 No
@@ -1178,15 +1577,18 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                   </label>
                   <input
                     type="text"
-                    placeholder="Enter MR Number of Patient"
+                    placeholder="Enter MR Number of Customer"
                     value={mrNumber}
-                    onChange={(e) => {
-                      setMrNumber(e.target.value);
-                      setPatientDetails(null); // Reset patient details when MR number changes
-                    }}
+                    onChange={(e) =>
+                      dispatch({
+                        type: "SET_WORK_ORDER_FORM",
+                        payload: { mrNumber: e.target.value, patientDetails: null },
+                      })
+                    }
                     onKeyDown={(e) => handleEnterKey(e, fetchButtonRef)}
                     ref={mrNumberRef}
-                    className={`border border-gray-300 w-full px-4 py-3 rounded-lg ${validationErrors.mrNumber ? 'border-red-500' : ''}`}
+                    className={`border border-gray-300 w-full px-4 py-3 rounded-lg ${validationErrors.mrNumber ? "border-red-500" : ""
+                      }`}
                   />
                   {validationErrors.mrNumber && (
                     <p className="text-red-500 text-xs mt-1">
@@ -1199,33 +1601,35 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                   type="button"
                   onClick={() => {
                     handleMRNumberSearch();
-                    // No need to focus next button here as focus is managed in handleMRNumberSearch
                   }}
-
                   ref={fetchButtonRef}
                   className="mt-2 text-white px-4 py-2 rounded-lg bg-green-500 hover:bg-green-600 transition"
                 >
-                  Fetch Patient Details
+                  Fetch Customer Details
                 </button>
-                {/* Display Patient Details */}
+                {/* Display Customer Details */}
                 {patientDetails && (
                   <div className="mt-4 bg-gray-100 p-4 rounded border border-gray-200">
                     <p>
-                      <strong>Name:</strong> {patientDetails.name || 'N/A'}
+                      <strong>Name:</strong>{" "}
+                      {patientDetails.name || "N/A"}
                     </p>
                     <p>
-                      <strong>Age:</strong> {patientDetails.age || 'N/A'}
+                      <strong>Age:</strong>{" "}
+                      {patientDetails.age || "N/A"}
                     </p>
                     <p>
-                      <strong>Phone Number:</strong> {patientDetails.phoneNumber || 'N/A'}
+                      <strong>Phone Number:</strong>{" "}
+                      {patientDetails.phoneNumber || "N/A"}
                     </p>
                     <p>
-                      <strong>Gender:</strong> {patientDetails.gender || 'N/A'}
+                      <strong>Gender:</strong>{" "}
+                      {patientDetails.gender || "N/A"}
                     </p>
                     <p>
-                      <strong>Address:</strong> {patientDetails.address || 'N/A'}
+                      <strong>Address:</strong>{" "}
+                      {patientDetails.address || "N/A"}
                     </p>
-
                   </div>
                 )}
               </>
@@ -1240,10 +1644,18 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                     type="text"
                     placeholder="Enter Customer Name"
                     value={customerName}
-                    onChange={(e) => setCustomerName(e.target.value)}
+                    onChange={(e) =>
+                      dispatch({
+                        type: "SET_WORK_ORDER_FORM",
+                        payload: { customerName: e.target.value },
+                      })
+                    }
                     onKeyDown={(e) => handleEnterKey(e, customerPhoneRef)}
                     ref={customerNameRef}
-                    className={`border border-gray-300 w-full px-4 py-3 rounded-lg ${validationErrors.customerName ? 'border-red-500' : ''}`}
+                    className={`border border-gray-300 w-full px-4 py-3 rounded-lg ${validationErrors.customerName
+                      ? "border-red-500"
+                      : ""
+                      }`}
                   />
                   {validationErrors.customerName && (
                     <p className="text-red-500 text-xs mt-1">
@@ -1260,14 +1672,117 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                     type="text"
                     placeholder="Enter Customer Phone Number"
                     value={customerPhone}
-                    onChange={(e) => setCustomerPhone(e.target.value)}
-                    onKeyDown={(e) => handleEnterKey(e, nextButtonRef)}
+                    onChange={(e) =>
+                      dispatch({
+                        type: "SET_WORK_ORDER_FORM",
+                        payload: { customerPhone: e.target.value },
+                      })
+                    }
+                    onKeyDown={(e) =>
+                      handleEnterKey(e, customerAddressRef)
+                    }
                     ref={customerPhoneRef}
-                    className={`border border-gray-300 w-full px-4 py-3 rounded-lg ${validationErrors.customerPhone ? 'border-red-500' : ''}`}
+                    className={`border border-gray-300 w-full px-4 py-3 rounded-lg ${validationErrors.customerPhone
+                      ? "border-red-500"
+                      : ""
+                      }`}
                   />
                   {validationErrors.customerPhone && (
                     <p className="text-red-500 text-xs mt-1">
                       {validationErrors.customerPhone}
+                    </p>
+                  )}
+                </div>
+                {/* Customer Address Input */}
+                <div>
+                  <label className="block text-gray-700 font-medium mb-1">
+                    Customer Address
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Enter Customer Address"
+                    value={customerAddress}
+                    onChange={(e) =>
+                      dispatch({
+                        type: "SET_WORK_ORDER_FORM",
+                        payload: { customerAddress: e.target.value },
+                      })
+                    }
+                    onKeyDown={(e) =>
+                      handleEnterKey(e, customerAgeRef)
+                    }
+                    ref={customerAddressRef}
+                    className={`border border-gray-300 w-full px-4 py-3 rounded-lg ${validationErrors.customerAddress
+                      ? "border-red-500"
+                      : ""
+                      }`}
+                  />
+                  {validationErrors.customerAddress && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {validationErrors.customerAddress}
+                    </p>
+                  )}
+                </div>
+                {/* Customer Age Input */}
+                <div>
+                  <label className="block text-gray-700 font-medium mb-1">
+                    Customer Age
+                  </label>
+                  <input
+                    type="number"
+                    placeholder="Enter Customer Age"
+                    value={customerAge}
+                    onChange={(e) =>
+                      dispatch({
+                        type: "SET_WORK_ORDER_FORM",
+                        payload: { customerAge: e.target.value },
+                      })
+                    }
+                    onKeyDown={(e) =>
+                      handleEnterKey(e, customerGenderRef)
+                    }
+                    ref={customerAgeRef}
+                    className={`border border-gray-300 w-full px-4 py-3 rounded-lg ${validationErrors.customerAge
+                      ? "border-red-500"
+                      : ""
+                      }`}
+                  />
+                  {validationErrors.customerAge && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {validationErrors.customerAge}
+                    </p>
+                  )}
+                </div>
+                {/* Customer Gender Input */}
+                <div>
+                  <label className="block text-gray-700 font-medium mb-1">
+                    Customer Gender
+                  </label>
+                  <select
+                    value={customerGender}
+                    onChange={(e) =>
+                      dispatch({
+                        type: "SET_WORK_ORDER_FORM",
+                        payload: { customerGender: e.target.value },
+                      })
+                    }
+                    onKeyDown={(e) => handleEnterKey(e, nextButtonRef)}
+                    ref={customerGenderRef}
+                    className={`border border-gray-300 w-full px-4 py-3 rounded-lg ${validationErrors.customerGender
+                      ? "border-red-500"
+                      : ""
+                      }`}
+                  >
+                    <option value="" disabled>
+                      Select Gender
+                    </option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Other">Other</option>
+                  </select>
+                  {validationErrors.customerGender && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {validationErrors.customerGender}
                     </p>
                   )}
                 </div>
@@ -1285,19 +1800,26 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
             {/* Employee Dropdown - Always Visible */}
             <select
               value={employee}
-              onChange={(e) => setEmployee(e.target.value)}
+              onChange={(e) =>
+                dispatch({
+                  type: "SET_WORK_ORDER_FORM",
+                  payload: { employee: e.target.value },
+                })
+              }
               ref={employeeRef}
               onBlur={validateEmployeeSelection}
-              className={`border border-gray-300 w-full px-4 py-3 rounded-lg focus:outline-none focus:border-green-500 ${validationErrors.employee ? 'border-red-500' : ''}`}
+              className={`border border-gray-300 w-full px-4 py-3 rounded-lg focus:outline-none focus:border-green-500 ${validationErrors.employee ? "border-red-500" : ""
+                }`}
             >
               <option value="" disabled>
                 Select Employee
               </option>
-              {employees.map((emp, index) => (
-                <option key={index} value={emp}>
-                  {emp}
-                </option>
-              ))}
+              {employees &&
+                employees.map((emp, index) => (
+                  <option key={index} value={emp}>
+                    {emp}
+                  </option>
+                ))}
             </select>
             {validationErrors.employee && (
               <p className="text-red-500 text-xs mt-1">
@@ -1309,7 +1831,10 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
               <EmployeeVerification
                 employee={employee}
                 onVerify={(isVerified) => {
-                  setIsPinVerified(isVerified);
+                  dispatch({
+                    type: "SET_WORK_ORDER_FORM",
+                    payload: { isPinVerified: isVerified },
+                  });
                   if (isVerified) {
                     setTimeout(() => nextButtonRef.current?.focus(), 100);
                   }
@@ -1329,17 +1854,26 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                     id="b2b-toggle"
                     checked={isB2B}
                     onChange={(e) => {
-                      setIsB2B(e.target.checked);
+                      dispatch({
+                        type: "SET_WORK_ORDER_FORM",
+                        payload: { isB2B: e.target.checked },
+                      });
                       // Reset GST Number when toggling off B2B
-                      if (!e.target.checked) setGstNumber("");
+                      if (!e.target.checked)
+                        dispatch({
+                          type: "SET_WORK_ORDER_FORM",
+                          payload: { gstNumber: "" },
+                        });
                     }}
                     className="sr-only"
                   />
                   <div
-                    className={`w-11 h-6 rounded-full transition-colors duration-300 ${isB2B ? "bg-green-500" : "bg-gray-300"}`}
+                    className={`w-11 h-6 rounded-full transition-colors duration-300 ${isB2B ? "bg-green-500" : "bg-gray-300"
+                      }`}
                   ></div>
                   <div
-                    className={`absolute w-5 h-5 bg-white rounded-full top-0.5 left-0.5 transform transition-transform duration-300 ${isB2B ? "translate-x-5" : "translate-x-0"}`}
+                    className={`absolute w-5 h-5 bg-white rounded-full top-0.5 left-0.5 transform transition-transform duration-300 ${isB2B ? "translate-x-5" : "translate-x-0"
+                      }`}
                   ></div>
                 </div>
               </label>
@@ -1355,10 +1889,16 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                   type="text"
                   placeholder="Enter GST Number"
                   value={gstNumber}
-                  onChange={(e) => setGstNumber(e.target.value)}
+                  onChange={(e) =>
+                    dispatch({
+                      type: "SET_WORK_ORDER_FORM",
+                      payload: { gstNumber: e.target.value },
+                    })
+                  }
                   onKeyDown={(e) => handleEnterKey(e, nextButtonRef)}
                   ref={gstNumberRef}
-                  className={`border border-gray-300 w-full px-4 py-3 rounded-lg ${validationErrors.gstNumber ? 'border-red-500' : ''}`}
+                  className={`border border-gray-300 w-full px-4 py-3 rounded-lg ${validationErrors.gstNumber ? "border-red-500" : ""
+                    }`}
                 />
                 {validationErrors.gstNumber && (
                   <p className="text-red-500 text-xs mt-1">
@@ -1371,231 +1911,235 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         )}
 
 
+
         {/* Step 5: Discount, Payment Method, Advance Details, Save and Print */}
         {step === 5 && (
           <>
             {/* Printable Area */}
-            <div className="printable-area print:block print:absolute print:inset-0 print:w-full bg-white p-8 pt-0 rounded-lg text-gray-800">
+            <div
+              className=" bg-white p-8 pt-0 rounded-lg text-gray-800"
 
 
-              {/* Invoice Details */}
-              <div className="invoice-details grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                <h2 className="text-2xl font-semibold mt-2">Bill</h2>
-                <div>
-                  <p>
-                    <span className="font-semibold">Work Order ID:</span> <span className="font-normal">{workOrderId}</span>
-                  </p>
-                  <p>
-                    <span className="font-semibold">Due Date:</span> <span className="font-normal">{dueDate}</span>
-                  </p>
-                  {hasMrNumber ? (
+            >
+              <div
+                className="printable-area print:mt-20 print:block print:absolute print:inset-0 print:w-full bg-white p-4 print:m-0 print:p-0 w-full"
+              >
+                {/* Header Information */}
+                <div className=" flex justify-between items-center mb-6">
+                  <div className="flex items-center">
+                    <h2 className="text-3xl font-bold">Bill</h2>
+                  </div>
+                  <div className="text-right">
+                    <p><strong>Work Order ID:</strong> {workOrderId}</p>
+                    <p><strong>Date: {formattedDate}</strong></p>
+                    {hasMrNumber && (
                     <>
-                      <p>
-                        <span className="font-semibold">Customer MR Number:</span> <span className="font-normal">{mrNumber || 'N/A'}</span>
-                      </p>
-                      {patientDetails && (
-                        <>
-                          <p>
-                            <span className="font-semibold">Name:</span> <span className="font-normal">{patientDetails.name || 'N/A'}</span>
-                          </p>
-                          <p>
-                            <span className="font-semibold">Age:</span> <span className="font-normal">{patientDetails.age || 'N/A'}</span>
-                          </p>
-                          <p>
-                            <span className="font-semibold">Phone Number:</span> <span className="font-normal">{patientDetails.phoneNumber || 'N/A'}</span>
-                          </p>
-                          <p>
-                            <span className="font-semibold">Gender:</span> <span className="font-normal">{patientDetails.gender || 'N/A'}</span>
-                          </p>
-                          <p>
-                            <span className="font-semibold">Address:</span> <span className="font-normal">{patientDetails.address || 'N/A'}</span>
-                          </p>
-                        </>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      <p>
-                        <span className="font-semibold">Customer Name:</span> <span className="font-normal">{customerName || 'N/A'}</span>
-                      </p>
-                      <p>
-                        <span className="font-semibold">Customer Phone Number:</span> <span className="font-normal">{customerPhone || 'N/A'}</span>
-                      </p>
+                    <p><strong>MR Number:</strong> {mrNumber}</p>
                     </>
                   )}
+                  </div>
                 </div>
-                <div>
-                  <p>
-                    <span className="font-semibold">Billed by:</span> <span className="font-normal">{employee || 'N/A'}</span>
-                  </p>
 
+                {/* Customer Details */}
+                <div className="mb-6">
+                  <p><strong>Customer Name:</strong> {hasMrNumber ? patientDetails?.name + " | " + patientDetails?.age + " | " + patientDetails?.gender: customerName + " | " + parseInt(customerAge) + " | " + customerGender}</p>
+                  <p><strong>Address:</strong> {hasMrNumber ? patientDetails?.address : customerAddress}</p>
+                  <p><strong>Phone Number:</strong> {hasMrNumber ? patientDetails?.phoneNumber : customerPhone}</p>
+                  
+                </div>
+
+                {/* Product Table */}
+                <table className="w-full border-collapse mb-6">
+                  <thead>
+                    <tr>
+                      <th className="border px-4 py-2">#</th>
+                      <th className="border px-4 py-2">Product ID</th>
+                      <th className="border px-4 py-2">Product Name</th>
+                      <th className="border px-4 py-2">HSN Code</th>
+                      <th className="border px-4 py-2">Price</th>
+                      <th className="border px-4 py-2">Quantity</th>
+                      <th className="border px-4 py-2">Subtotal</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {productEntries.map((product, index) => {
+                      const adjustedPrice = parseFloat(product.price) || 0;
+                      const adjustedSubtotal = adjustedPrice * (parseInt(product.quantity) || 0);
+                      return (
+                        <tr key={index}>
+                          <td className="border px-4 py-2 text-center">{index + 1}</td>
+                          <td className="border px-4 py-2 text-center">{product.id}</td>
+                          <td className="border px-4 py-2">{product.name}</td>
+                          <td className="border px-4 py-2 text-center">{HSN_CODE}</td>
+                          <td className="border px-4 py-2 text-center">₹{adjustedPrice.toFixed(2)}</td>
+                          <td className="border px-4 py-2 text-center">{product.quantity}</td>
+                          <td className="border px-4 py-2 text-center">₹{adjustedSubtotal.toFixed(2)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+
+
+                {/* Financial Summary */}
+                <div className="flex justify-between mb-6 space-x-8">
+                  <div>
+                    <p><strong>Subtotal:</strong> ₹{subtotal.toFixed(2)}</p>
+                    <p><strong>Discount Amount:</strong> ₹{validDiscountAmount.toFixed(2)}</p>
+                    <p><strong>Discounted Subtotal:</strong> ₹{discountedSubtotal.toFixed(2)}</p>
+                    <p><strong>CGST (6%):</strong> ₹{cgst.toFixed(2)}</p>
+                    <p><strong>SGST (6%):</strong> ₹{sgst.toFixed(2)}</p>                   
+                  <p><strong>Payment Method:</strong> {paymentMethod.charAt(0).toUpperCase() + paymentMethod.slice(1)}</p>
+                  <p><strong>Advance Paying:</strong> ₹{advance.toFixed(2)}</p>
+                
+                  </div>
+                  <div>
+                    <p><strong>Total Amount:</strong> ₹{totalAmount.toFixed(2)}</p>
+                    <p><strong>Advance Paid:</strong> ₹{advance.toFixed(2)}</p>
+                    <p><strong>Balance Due:</strong> ₹{balanceDue.toFixed(2)}</p>
+                    <div className=" mt-10 space-x-8">
+                    <p><strong>Billed by:</strong> {employee}</p>
+                    </div>
+                  </div>
+                  
+                </div>
+
+                {/* Payment Method and Advance Details as Text for Print */}
+                
+                {/* Payment Method and Advance Details on the Same Line */}
+                <div className="print:hidden flex flex-col md:flex-row items-center justify-between my-6 space-x-4">
+                  {/* Discount Input Field */}
+                  <div className="w-full print:w-1/3 mb-4 md:mb-0">
+                    <label htmlFor="discount" className="block font-semibold mb-1">
+                      Discount:
+                    </label>
+                    <input
+                      type="number"
+                      id="discount"
+                      placeholder="Enter discount percentage"
+                      value={discount}
+                      onChange={handleDiscountInput}
+                      onKeyDown={(e) => handleEnterKey(e, paymentMethodRef)}
+                      ref={discountRef}
+                      className={`border border-gray-300 w-full px-4 py-3 rounded-lg ${validationErrors.discount ? 'border-red-500' : ''}`}
+                    />
+                    {validationErrors.discount && (
+                      <p className="text-red-500 text-xs mt-1">
+                        {validationErrors.discount}
+                      </p>
+                    )}
+                  </div>
+
+
+                  {/* Payment Method */}
+                  <div className="w-full print:w-1/3 mb-4 md:mb-0">
+                    <label htmlFor="paymentMethod" className="block font-semibold mb-1">
+                      Payment Method:
+                    </label>
+                    <select
+                      id="paymentMethod"
+                      value={paymentMethod}
+                      onChange={(e) =>
+                        dispatch({
+                          type: "SET_WORK_ORDER_FORM",
+                          payload: { paymentMethod: e.target.value },
+                        })
+                      }
+                      ref={paymentMethodRef}
+                      onKeyDown={(e) => handleEnterKey(e, advanceDetailsRef)}
+                      className={`border border-gray-300 w-full px-4 py-3 rounded-lg ${validationErrors.paymentMethod ? "border-red-500" : ""
+                        }`}
+                    >
+                      <option value="" disabled>
+                        Select Payment Method
+                      </option>
+                      <option value="cash">Cash</option>
+                      <option value="credit">Card</option>
+                      <option value="online">UPI (Paytm/PhonePe/GPay)</option>
+                    </select>
+
+                    {validationErrors.paymentMethod && (
+                      <p className="text-red-500 text-xs mt-1">
+                        {validationErrors.paymentMethod}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Advance Details */}
+                  <div className="w-full print:w-1/3 mb-4 md:mb-0">
+                    <label htmlFor="advanceDetails" className="block font-semibold mb-1">
+                      Advance Paying:
+                    </label>
+                    <input
+                      type="number"
+                      id="advanceDetails"
+                      placeholder="Enter amount paid in advance"
+                      value={advanceDetails}
+                      onChange={(e) =>
+                        dispatch({
+                          type: "SET_WORK_ORDER_FORM",
+                          payload: { advanceDetails: e.target.value },
+                        })
+                      }
+                      onKeyDown={(e) => handleEnterKey(e, saveButtonRef)}
+                      ref={advanceDetailsRef}
+                      className={`border border-gray-300 w-full px-4 py-3 rounded-lg ${validationErrors.advanceDetails ? "border-red-500" : ""
+                        }`}
+                    />
+
+                    {validationErrors.advanceDetails && (
+                      <p className="text-red-500 text-xs mt-1">
+                        {validationErrors.advanceDetails}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Footer Section */}
+                {/* Footer Section */}
+                <div className="flex-col justify-start mx-auto items-start text-left text-md">
+                  <p className="mt-2 text-md">
+                    <strong>Delivery On:</strong> {dueDate}
+                  </p>
+                  
                   {isB2B && (
-                    <p>
-                      <span className="font-semibold">B2B GST Number:</span> <span className="font-normal">{gstNumber}</span>
-                    </p>
+                    <p><strong>GST Number of work assigning:</strong> {gstNumber}</p>
                   )}
-                </div>
-              </div>
-
-              {/* Product Table */}
-              <table className="w-full border border-gray-300 rounded-md mb-6">
-                <thead>
-                  <tr className="bg-gray-100">
-                    <th className="py-2 px-4 border-b">Product ID</th>
-                    <th className="py-2 px-4 border-b">Product Name</th>
-                    <th className="py-2 px-4 border-b">HSN Code</th>
-                    <th className="py-2 px-4 border-b">Price</th>
-                    <th className="py-2 px-4 border-b">Quantity</th>
-                    <th className="py-2 px-4 border-b">Subtotal</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {productEntries.map((product, index) => {
-                    const originalPrice = parseFloat(product.price) || 0;
-                    const basePrice = originalPrice / 112 * 100; // Adjusted price
-                    const productSubtotal = basePrice * (parseInt(product.quantity) || 0);
-                    return (
-                      <tr key={index} className="text-center">
-                        <td className="py-2 px-4 border-b">{product.id}</td>
-                        <td className="py-2 px-4 border-b">{product.name}</td>
-                        <td className="py-2 px-4 border-b">{HSN_CODE}</td>
-                        <td className="py-2 px-4 border-b">{basePrice.toFixed(2)}</td>
-                        <td className="py-2 px-4 border-b">{product.quantity}</td>
-                        <td className="py-2 px-4 border-b">{productSubtotal.toFixed(2)}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-
-              {/* Financial Summary */}
-              <div className="financial-summary grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Left Column */}
-                <div className="space-y-2">
-                  <p>
-                    <span className="font-semibold">Subtotal (Base Price):</span> ₹{subtotal.toFixed(2)}
-                  </p>
-                  <p>
-                    <span className="font-semibold">Discount ({discount || 0}%):</span> ₹{discountAmount.toFixed(2)}
-                  </p>
-                  <p>
-                    <span className="font-semibold">Discounted Subtotal:</span> ₹{discountedSubtotal.toFixed(2)}
-                  </p>
-                  <p>
-                    <span className="font-semibold">CGST (6%):</span> ₹{cgst.toFixed(2)}
-                  </p>
-                  <p>
-                    <span className="font-semibold">SGST (6%):</span> ₹{sgst.toFixed(2)}
+                  <p className="mt-2 text-xs">
+                    Terms and Conditions:
+                    <ol className="list-decimal list-inside">
+                      <li>Work order valid only for two months.</li>
+                      <li>Branded Frames/Lenses – 12 Months warranty for manufacturing defects/peeling off.</li>
+                    </ol>
                   </p>
                 </div>
 
-                {/* Right Column */}
-                <div className="space-y-2">
-                  <p>
-                    <span className="font-semibold">Total Amount (Including GST):</span> ₹{totalAmount.toFixed(2)}
-                  </p>
-
-                  <p>
-                    <span className="font-semibold">Advance Paid:</span> ₹{advance.toFixed(2)}
-                  </p>
-                  <p>
-                    <span className="font-semibold">Balance Due:</span> ₹{balanceDue.toFixed(2)}
-                  </p>
-                </div>
-              </div>
-
-
-
-              {/* Payment Method and Advance Details on the Same Line */}
-              <div className="flex flex-col md:flex-row items-center justify-between my-6 space-x-4">
-                {/* Discount Input Field */}
-                <div className="w-full md:w-1/3 mb-4 md:mb-0">
-                  <label htmlFor="discount" className="block font-semibold mb-1">
-                    Discount (%):
-                  </label>
-                  <input
-                    type="number"
-                    id="discount"
-                    placeholder="Enter discount percentage"
-                    value={discount}
-                    onChange={handleDiscountInput}
-                    onKeyDown={(e) => handleEnterKey(e, paymentMethodRef)}
-                    ref={discountRef}
-                    className={`border border-gray-300 w-full px-4 py-3 rounded-lg ${validationErrors.discount ? 'border-red-500' : ''}`}
-                  />
-                  {validationErrors.discount && (
-                    <p className="text-red-500 text-xs mt-1">
-                      {validationErrors.discount}
-                    </p>
-                  )}
-                </div>
-
-                {/* Payment Method */}
-                <div className="w-full md:w-1/3 mb-4 md:mb-0">
-                  <label htmlFor="paymentMethod" className="block font-semibold mb-1">
-                    Payment Method:
-                  </label>
-                  <select
-                    id="paymentMethod"
-                    value={paymentMethod}
-                    onChange={(e) => setPaymentMethod(e.target.value)}
-                    ref={paymentMethodRef}
-                    onKeyDown={(e) => handleEnterKey(e, advanceDetailsRef)}
-                    className={`border border-gray-300 w-full px-4 py-3 rounded-lg ${validationErrors.paymentMethod ? 'border-red-500' : ''}`}
-                  >
-                    <option value="" disabled>Select Payment Method</option>
-                    <option value="cash">Cash</option>
-                    <option value="credit">Card</option>
-                    <option value="online">UPI (Paytm/PhonePe/GPay)</option>
-                  </select>
-                  {validationErrors.paymentMethod && (
-                    <p className="text-red-500 text-xs mt-1">
-                      {validationErrors.paymentMethod}
-                    </p>
-                  )}
-                </div>
-
-                {/* Advance Details */}
-                <div className="w-full md:w-1/3 mb-4 md:mb-0">
-                  <label htmlFor="advanceDetails" className="block font-semibold mb-1">
-                    Advance Paying:
-                  </label>
-                  <input
-                    type="number"
-                    id="advanceDetails"
-                    placeholder="Enter amount paid in advance"
-                    value={advanceDetails}
-                    onChange={(e) => setAdvanceDetails(e.target.value)}
-                    onKeyDown={(e) => handleEnterKey(e, saveButtonRef)}
-                    ref={advanceDetailsRef}
-                    className={`border border-gray-300 w-full px-4 py-3 rounded-lg ${validationErrors.advanceDetails ? 'border-red-500' : ''}`}
-                  />
-                  {validationErrors.advanceDetails && (
-                    <p className="text-red-500 text-xs mt-1">
-                      {validationErrors.advanceDetails}
-                    </p>
-                  )}
-                </div>
               </div>
             </div>
 
-            {/* Save Work Order and Print Buttons on the Same Line */}
+            {/* Save Work Order and Print Buttons */}
             <div className="flex justify-center text-center space-x-4 mt-6">
               <button
+                type="button"
                 onClick={() => {
                   if (!isSaving) saveWorkOrder();
                 }}
                 ref={saveButtonRef}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
+                  if (e.key === "Enter") {
                     e.preventDefault();
+                    
                     if (!isSaving) {
                       saveWorkOrder();
-
                       setTimeout(() => {
                         printButtonRef.current?.focus();
-                      }, 0);
+                      }, 100);
+
+                      
                     }
+                    setTimeout(() => {
+                        printButtonRef.current?.focus();
+                      }, 100);
                   }
                 }}
                 className="flex items-center justify-center w-44 h-12 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition"
@@ -1606,9 +2150,13 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
 
               {allowPrint && (
                 <button
+                  type="button"
                   onClick={() => {
-                    setIsPrinted(true); // Mark as printed
-                    window.print();
+                    dispatch({
+                      type: "SET_WORK_ORDER_FORM",
+                      payload: { isPrinted: true },
+                    });
+                    handlePrint();
                   }}
                   ref={printButtonRef}
                   className="flex items-center justify-center w-44 h-12 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition"
@@ -1621,6 +2169,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
               {/* Exit Button */}
               {allowPrint && (
                 <button
+                  type="button"
                   onClick={handleExit}
                   className="flex items-center justify-center w-44 h-12 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition"
                 >
@@ -1654,6 +2203,8 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
           )}
         </div>
       </form>
+
+      {/* Removed Hidden Bill Print Component */}
     </div>
   );
 };
