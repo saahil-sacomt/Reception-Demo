@@ -16,7 +16,6 @@ const capitalizeFirstLetter = (string) => {
 // Define column styles outside the component for better reusability
 const getColumnStyles = (reportType) => {
   switch (reportType) {
-    
     case 'sales_orders':
       return {
         0: { halign: 'center', cellWidth: 24 }, // Sales Order ID
@@ -86,7 +85,7 @@ const getColumnStyles = (reportType) => {
         4: { halign: 'center', cellWidth: 25 }, // Modification Type
         5: { halign: 'center', cellWidth: 30 }, // Modification Reason
         6: { halign: 'center', cellWidth: 20 }, // Status
-        7: { halign: 'center', cellWidth: 30 }, // Modification Reason
+        7: { halign: 'center', cellWidth: 30 }, // Rejection Reason (Fixed)
         8: { halign: 'center', cellWidth: 25 }, // Created At
         9: { halign: 'center', cellWidth: 25 }, // Updated At
       };
@@ -111,18 +110,18 @@ const getColumnStyles = (reportType) => {
         16: { halign: 'center', cellWidth: 25 }, // Created At
         17: { halign: 'center', cellWidth: 25 }, // Updated At
       };
-      case 'stock_report':
-        return {
-          0: { halign: 'center', cellWidth: 20 }, // Product ID
-          1: { halign: 'center', cellWidth: 30 }, // Product Name
-          2: { halign: 'center', cellWidth: 15 }, // MRP
-          3: { halign: 'center', cellWidth: 15 }, // Rate
-          4: { halign: 'center', cellWidth: 20 }, // HSN Code
-          5: { halign: 'center', cellWidth: 20 }, // Total Sold
-          6: { halign: 'center', cellWidth: 20 }, // Current Stock
-        };
-      default:
-        return {};
+    case 'stock_report':
+      return {
+        0: { halign: 'center', cellWidth: 20 }, // Product ID
+        1: { halign: 'center', cellWidth: 30 }, // Product Name
+        2: { halign: 'center', cellWidth: 15 }, // MRP
+        3: { halign: 'center', cellWidth: 15 }, // Rate
+        4: { halign: 'center', cellWidth: 20 }, // HSN Code
+        5: { halign: 'center', cellWidth: 20 }, // Total Sold
+        6: { halign: 'center', cellWidth: 20 }, // Current Stock
+      };
+    default:
+      return {};
   }
 };
 
@@ -153,13 +152,13 @@ const addHeader = (doc, logoDataUrl, reportDetails) => {
   let periodText = '';
   if (reportDetails.type === 'Daily') {
     periodText = `Date: ${reportDetails.date}`; // Use the raw date directly
-} else if (reportDetails.type === 'Monthly') {
+  } else if (reportDetails.type === 'Monthly') {
     periodText = `Month: ${reportDetails.month}/${reportDetails.year}`;
-} else if (reportDetails.type === 'Date Range') {
+  } else if (reportDetails.type === 'Date Range') {
     periodText = `From: ${reportDetails.fromDate} To: ${reportDetails.toDate}`;
-} else if (reportDetails.type === 'Consolidated') {
+  } else if (reportDetails.type === 'Consolidated') {
     periodText = `Period: ${reportDetails.fromDate} to ${reportDetails.toDate}`;
-}
+  }
 
   doc.text(periodText, doc.internal.pageSize.getWidth() / 2, 50, { align: 'center' });
 
@@ -282,28 +281,28 @@ const ReportGenerator = ({ isCollapsed }) => {
 
       if (reportPeriod === 'daily') {
         if (!date) {
-            setError('Please select a date for the daily report.');
-            setLoading(false);
-            return;
+          setError('Please select a date for the daily report.');
+          setLoading(false);
+          return;
         }
         const selectedDate = new Date(date); // Parse the date input
         if (isNaN(selectedDate.getTime())) {
-            setError('Invalid date selected.');
-            setLoading(false);
-            return;
+          setError('Invalid date selected.');
+          setLoading(false);
+          return;
         }
-        startDate = new Date(`${date}T00:00:00Z`);
-        endDate = new Date(`${date}T23:59:59Z`);
+        startDate = new Date(`${date}T00:00:00+05:30`); // IST timezone
+        endDate = new Date(`${date}T23:59:59+05:30`);
         reportDetails = {
-            type: 'Daily',
-            date: date, // Pass the raw date string here
-            identifier: date,
-            reportTypeLabel: getReportTypeLabel(reportType),
-            branches: branchesToReport,
-            isCombined,
+          type: 'Daily',
+          date: date, // Pass the raw date string here
+          identifier: date,
+          reportTypeLabel: getReportTypeLabel(reportType),
+          branches: branchesToReport,
+          isCombined,
         };
-    }
-     else if (reportPeriod === 'monthly') {
+      }
+      else if (reportPeriod === 'monthly') {
         if (!monthYear) {
           setError('Please select a month and year for the monthly report.');
           setLoading(false);
@@ -316,8 +315,8 @@ const ReportGenerator = ({ isCollapsed }) => {
           return;
         }
         const lastDay = getLastDayOfMonth(year, month);
-        startDate = new Date(`${year}-${month}-01T00:00:00Z`);
-        endDate = new Date(`${year}-${month}-${lastDay}T23:59:59Z`);
+        startDate = new Date(`${year}-${month}-01T00:00:00+05:30`);
+        endDate = new Date(`${year}-${month}-${lastDay}T23:59:59+05:30`);
         reportDetails = {
           type: 'Monthly',
           month,
@@ -345,10 +344,10 @@ const ReportGenerator = ({ isCollapsed }) => {
           setLoading(false);
           return;
         }
-        startDate = new Date(`${fromDate}T00:00:00Z`);
-        endDate = new Date(`${toDate}T23:59:59Z`);
+        startDate = new Date(`${fromDate}T00:00:00+05:30`);
+        endDate = new Date(`${toDate}T23:59:59+05:30`);
         reportDetails = {
-          type: reportType === 'consolidated' ? 'Consolidated' : 'Date Range',
+          type: 'Date Range',
           fromDate: convertUTCToIST(startDate.toISOString(), 'dd-MM-yyyy'),
           toDate: convertUTCToIST(endDate.toISOString(), 'dd-MM-yyyy'),
           identifier: `${fromDate}_to_${toDate}`,
@@ -369,7 +368,7 @@ const ReportGenerator = ({ isCollapsed }) => {
         case 'sales_orders': {
           const query = supabase
             .from('sales_orders')
-            .select('*') // Ensure 'balance_due' is included
+            .select('*') // Ensure 'final_amount' is included
             .gte('created_at', startDate.toISOString())
             .lte('created_at', endDate.toISOString());
 
@@ -609,7 +608,7 @@ const ReportGenerator = ({ isCollapsed }) => {
           // Fetch sales data
           const salesQuery = supabase
             .from('sales_orders')
-            .select('product_entries')
+            .select('items')
             .gte('created_at', startDate.toISOString())
             .lte('created_at', endDate.toISOString());
 
@@ -625,9 +624,9 @@ const ReportGenerator = ({ isCollapsed }) => {
           const productSales = {};
 
           salesData.forEach(sale => {
-            const entries = sale.product_entries || [];
-            entries.forEach(product => {
-              const pid = product.id;
+            const items = sale.items || [];
+            items.forEach(product => {
+              const pid = product.id; // Assuming 'id' refers to 'product_id'
               const quantity = parseInt(product.quantity) || 0;
               if (!productSales[pid]) {
                 productSales[pid] = 0;
@@ -702,6 +701,8 @@ const ReportGenerator = ({ isCollapsed }) => {
         return 'Modification Reports';
       case 'consolidated':
         return 'Consolidated';
+      case 'stock_report':
+        return 'Stock Report';
       default:
         return '';
     }
@@ -795,7 +796,7 @@ const ReportGenerator = ({ isCollapsed }) => {
           'Modification Type',
           'Modification Reason',
           'Status',
-          'Rejection Reason',
+          'Rejection Reason', // Fixed Column
           'Created At',
           'Updated At',
         ];
@@ -822,7 +823,7 @@ const ReportGenerator = ({ isCollapsed }) => {
           'Updated At',
         ];
         break;
-        case 'stock_report':
+      case 'stock_report':
         tableColumn = [
           'Product ID',
           'Product Name',
@@ -938,7 +939,7 @@ const ReportGenerator = ({ isCollapsed }) => {
           record.modification_type || 'N/A',
           record.modification_reason || 'N/A',
           capitalizeFirstLetter(record.status) || 'N/A',
-          record.rejection_reason || 'N/A',
+          record.rejection_reason || 'N/A', // Fixed Column
           record.created_at
             ? convertUTCToIST(record.created_at, 'dd-MM-yyyy hh:mm a')
             : 'N/A',
@@ -969,7 +970,7 @@ const ReportGenerator = ({ isCollapsed }) => {
           record.updated_at || 'N/A',
         ]);
         break;
-        case 'stock_report':
+      case 'stock_report':
         tableRows = data.map((item) => [
           item.product_id || 'N/A',
           item.product_name || 'N/A',
@@ -1069,13 +1070,13 @@ const ReportGenerator = ({ isCollapsed }) => {
       case 'modification_reports': {
         const totalModifications = data.length;
         const approvedModifications = data.filter(record => record.status === 'approved').length;
-        const completedModifications = data.filter(record => record.status === 'completed').length;
         const pendingModifications = data.filter(record => record.status === 'pending').length;
+        const rejectedModifications = data.filter(record => record.status === 'rejected').length;
         summaryTable = [
           ['Total Modification Requests', totalModifications],
           ['Approved', approvedModifications],
           ['Pending', pendingModifications],
-          ['Completed', completedModifications],
+          ['Rejected', rejectedModifications],
         ];
         break;
       }

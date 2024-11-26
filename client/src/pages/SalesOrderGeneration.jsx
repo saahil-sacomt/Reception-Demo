@@ -444,7 +444,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
       const column = type === "id" ? "product_id" : "product_name";
       const { data, error } = await supabase
         .from("products")
-        .select(`product_id, product_name, mrp`)
+        .select(`product_id, product_name, mrp,hsn_code`)
         .ilike(column, `%${query}%`)
         .limit(10);
 
@@ -486,7 +486,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         name: productDetails.product_name,
         price: productDetails.mrp || "",
         stock: productDetails.stock || 0,
-        quantity: updatedEntries[index].quantity || "", // Preserve quantity
+        quantity: updatedEntries[index].quantity || "",
+        hsn_code:productDetails.hsn_code, // Preserve quantity
       };
       updateSalesOrderForm({ productEntries: updatedEntries });
 
@@ -3176,7 +3177,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                             <td className="border px-4 py-2 text-center">{index + 1}</td>
                             <td className="border px-4 py-2 text-center">{product.id}</td>
                             <td className="border px-4 py-2">{product.name}</td>
-                            <td className="border px-4 py-2 text-center">9001</td>
+                            <td className="border px-4 py-2 text-center">{product.hsn_code}</td>
                             <td className="border px-4 py-2 text-center">₹{adjustedPrice.toFixed(2)}</td>
                             <td className="border px-4 py-2 text-center">{product.quantity}</td>
                             <td className="border px-4 py-2 text-center">₹{productSubtotal.toFixed(2)}</td>
