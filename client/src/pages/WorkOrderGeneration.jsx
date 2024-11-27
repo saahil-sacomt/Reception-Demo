@@ -354,9 +354,9 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   // GST Rate and HSN Code
   const GST_RATE = 12; // Total GST is 12% (6% CGST + 6% SGST)
 
-  
-  
-    // Calculate totals
+
+
+  // Calculate totals
   const calculateTotals = useCallback((entries, discountAmt) => {
     // Initialize variables
     let subtotal = 0;
@@ -365,7 +365,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     let cgst = 0;
     let sgst = 0;
     let totalAmount = 0;
-  
+
     // Calculate subtotal (price excluding GST)
     subtotal = entries.reduce((total, product) => {
       const price = parseFloat(product.price) || 0; // MRP including GST
@@ -373,18 +373,18 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       const basePrice = price / 1.12; // Adjusted price excluding GST
       return total + basePrice * quantity;
     }, 0);
-  
+
     // Apply discount
     validDiscountAmount = Math.min(discountAmt || 0, subtotal);
-    discountedSubtotal = Math.max((subtotal*1.12 - validDiscountAmount)/1.12, 0); // Prevent negative subtotal
-  
+    discountedSubtotal = Math.max((subtotal * 1.12 - validDiscountAmount) / 1.12, 0); // Prevent negative subtotal
+
     // Calculate GST amounts
     cgst = discountedSubtotal * 0.06;
     sgst = discountedSubtotal * 0.06;
-  
+
     // Calculate total amount including GST
     totalAmount = discountedSubtotal + cgst + sgst;
-  
+
     return {
       subtotal,
       discountAmount: validDiscountAmount,
@@ -394,7 +394,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       totalAmount,
     };
   }, []);
-  
+
 
 
 
@@ -506,17 +506,18 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   // Balance calculations
   const advance = parseFloat(advanceDetails) || 0;
   const balanceDue = Math.max(totalAmount - advance, 0);
-  const excessAmount = advance - totalAmount;
+  // const excessAmount = advance - totalAmount;
 
 
-  // Advance amount validation
   const validateAdvanceAmount = useCallback(() => {
-    if (parseFloat(advanceDetails) > totalAmount) {
+    const advanceAmount = parseFloat(advanceDetails) || 0;
+    if ( advanceAmount > totalAmount + 1) {
       alert("Advance amount cannot exceed the total amount.");
       return false;
     }
     return true;
   }, [advanceDetails, totalAmount]);
+
 
   // Navigate to the next step with validations
   const nextStep = useCallback(() => {
@@ -581,9 +582,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       if (!paymentMethod) errors.paymentMethod = "Payment method is required.";
       if (!advanceDetails && discount !== subtotal)
         errors.advanceDetails = "Advance details are required.";
-      if (step === 5 && !validateAdvanceAmount()) {
-        return; // Prevent proceeding if advance amount validation fails
-      }
+      
     }
 
     if (Object.keys(errors).length > 0) {
@@ -2052,17 +2051,18 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                     <p><strong>Total Amount:</strong> ₹{totalAmount.toFixed(2)}</p>
                     <p><strong>Advance Paid:</strong> ₹{advance.toFixed(2)}</p>
                     <p><strong>Balance Due:</strong> ₹{balanceDue.toFixed(2)}</p>
-                    {excessAmount > 0 && (
-                      <p className="text-red-500">
+                    
+                      {/* <p className="text-red-500">
                         Advance paid exceeds the total amount by ₹{excessAmount.toFixed(2)}.
-                      </p>
-                    )}
+                      </p> */}
+                    
+
                     <div className="mt-10 space-x-8">
                       <p><strong>Billed by:</strong> {employee || 'N/A'}</p>
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="print:hidden flex flex-col md:flex-row items-center justify-between my-6 space-x-4">
                   {/* Discount Input Field */}
                   <div className="w-full print:w-1/3 mb-4 md:mb-0">
