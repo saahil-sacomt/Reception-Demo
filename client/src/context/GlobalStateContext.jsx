@@ -1,87 +1,91 @@
-// client/src/context/GlobalStateProvider.jsx
 import React, { createContext, useContext, useReducer, useEffect } from "react";
+
+const savedState = localStorage.getItem("globalState")
+  ? JSON.parse(localStorage.getItem("globalState"))
+  : null;
 
 // Create a context
 const GlobalStateContext = createContext();
 
 // Initial State
 const initialState = {
-  pendingRequestsCount: 0,
-  pendingWorkOrdersCount: 0,
-  salesTodayCount: 0,
-  pendingWorkOrders: [],
-  salesOrdersToday: [],
-  salesOrderForm: {
-    step: 0,
-    salesOrderId: "",
-    isEditing: false,
-    isPrinted: false,
-    isOtpSent:false,
-    productEntries: [
-      { id: "", name: "", price: "", quantity: "" },
-    ],
-    advanceDetails: "",
-    dueDate: "",
-    mrNumber: "",
-    isPinVerified: false,
-    patientDetails: null,
-    employee: "",
-    paymentMethod: "",
-    discount: "", // discount amount
-    gstNumber: "",
-    isB2B: false,
-    hasMrNumber: "yes", // 'yes' or 'no'
-    customerName: "",
-    customerPhone: "",
-    address: "",
-    age: "",
-    gender: "",
-    modificationRequestId: null,
-    isSaving: false,
-    allowPrint: false,
-    privilegeCard:null,
-    privilegeCardDetails: null,
-    loyaltyPoints: 0,
-    pointsToAdd: 0,
-    redeemOption:null,
-    redeemPointsAmount:"",
-    isLoading: false,
-    validationErrors: {},
-    fetchMethod: "work_order_id", // 'work_order_id', 'mr_number', 'phone_number'
-    searchQuery: "",
-    workOrders: [],
+  ...{
+    pendingRequestsCount: 0,
+    pendingWorkOrdersCount: 0,
+    salesTodayCount: 0,
+    pendingWorkOrders: [],
+    salesOrdersToday: [],
+    salesOrderForm: {
+      step: 0,
+      salesOrderId: "",
+      isEditing: false,
+      isPrinted: false,
+      isOtpSent: false,
+      productEntries: [{ id: "", name: "", price: "", quantity: "" }],
+      advanceDetails: "",
+      dueDate: "",
+      mrNumber: "",
+      isPinVerified: false,
+      patientDetails: null,
+      employee: "",
+      paymentMethod: "",
+      discount: "", // discount amount
+      gstNumber: "",
+      isB2B: false,
+      hasMrNumber: "yes", // 'yes' or 'no'
+      customerName: "",
+      customerPhone: "",
+      address: "",
+      age: "",
+      gender: "",
+      modificationRequestId: null,
+      isSaving: false,
+      allowPrint: false,
+      privilegeCard: null,
+      privilegeCardDetails: null,
+      loyaltyPoints: 0,
+      pointsToAdd: 0,
+      redeemOption: null,
+      redeemPointsAmount: "",
+      isLoading: false,
+      validationErrors: {},
+      fetchMethod: "work_order_id", // 'work_order_id', 'mr_number', 'phone_number'
+      searchQuery: "",
+      workOrders: [],
+    },
+    workOrderForm: {
+      step: 1,
+      workOrderId: "",
+      isPrinted: false,
+      productEntries: [{ id: "", name: "", price: "", quantity: "" }],
+      advanceDetails: "",
+      dueDate: "",
+      mrNumber: "",
+      isPinVerified: false,
+      patientDetails: null,
+      employee: "",
+      paymentMethod: "",
+      discount: "", // discount amount
+      gstNumber: "",
+      isB2B: false,
+      hasMrNumber: true,
+      customerName: "",
+      customerPhone: "",
+      address: "",
+      age: "",
+      gender: "",
+      modificationRequestId: null,
+      isSaving: false,
+      allowPrint: false,
+    },
   },
-  workOrderForm: {
-    step: 1,
-    workOrderId: "",
-    isPrinted: false,
-    productEntries: [
-      { id: "", name: "", price: "", quantity: "" },
-    ],
-    advanceDetails: "",
-    dueDate: "",
-    mrNumber: "",
-    isPinVerified: false,
-    patientDetails: null,
-    employee: "",
-    paymentMethod: "",
-    discount: "", // discount amount
-    gstNumber: "",
-    isB2B: false,
-    hasMrNumber: true,
-    customerName: "",
-    customerPhone: "",
-    address: "",
-    age: "",
-    gender: "",
-    modificationRequestId: null,
-    isSaving: false,
-    allowPrint: false,
-  },
+  ...savedState, // Merge saved state, if available
 };
 
 // Reducer Function
 const globalStateReducer = (state, action) => {
+  console.log("Action Type:", action.type); // Log action type
+  console.log("Payload:", action.payload); 
   switch (action.type) {
     case "SET_PENDING_REQUESTS_COUNT":
       return { ...state, pendingRequestsCount: action.payload };
@@ -94,17 +98,27 @@ const globalStateReducer = (state, action) => {
     case "SET_SALES_ORDERS_TODAY":
       return { ...state, salesOrdersToday: action.payload };
 
-      // SalesOrderForm actions
+    // SalesOrderForm actions
     case "SET_SALES_ORDER_FORM":
-      return { ...state, salesOrderForm: { ...state.salesOrderForm, ...action.payload } };
-    case "RESET_SALES_ORDER_FORM":
-      return { ...state, salesOrderForm: initialState.salesOrderForm };
+  console.log("Previous State (salesOrderForm):", state.salesOrderForm);
+  console.log("New Payload:", action.payload);
+  return {
+    ...state,
+    salesOrderForm: { ...state.salesOrderForm, ...action.payload },
+  };
+      case "RESET_SALES_ORDER_FORM":
+        console.log("RESET_SALES_ORDER_FORM triggered");
+        return { ...state, salesOrderForm: initialState.salesOrderForm };
 
     // WorkOrderForm actions
     case "SET_WORK_ORDER_FORM":
-      return { ...state, workOrderForm: { ...state.workOrderForm, ...action.payload } };
-    case "RESET_WORK_ORDER_FORM":
-      return { ...state, workOrderForm: initialState.workOrderForm };
+      return {
+        ...state,
+        workOrderForm: { ...state.workOrderForm, ...action.payload },
+      };
+      case "RESET_WORK_ORDER_FORM":
+        console.log("RESET_WORK_ORDER_FORM triggered");
+        return { ...state, workOrderForm: initialState.workOrderForm };
     default:
       return state;
   }
@@ -116,24 +130,47 @@ export const GlobalStateProvider = ({ children }) => {
 
   // Persist state in localStorage
   useEffect(() => {
-    const savedState = JSON.parse(localStorage.getItem("globalState"));
-    if (savedState) {
-      dispatch({ type: "SET_PENDING_REQUESTS_COUNT", payload: savedState.pendingRequestsCount });
-      dispatch({ type: "SET_PENDING_WORK_ORDERS_COUNT", payload: savedState.pendingWorkOrdersCount });
-      dispatch({ type: "SET_SALES_TODAY_COUNT", payload: savedState.salesTodayCount });
-      dispatch({ type: "SET_PENDING_WORK_ORDERS", payload: savedState.pendingWorkOrders });
-      dispatch({ type: "SET_SALES_ORDERS_TODAY", payload: savedState.salesOrdersToday });
-      dispatch({ type: "SET_SALES_ORDER_FORM", payload: savedState.salesOrderForm });
-      dispatch({ type: "SET_WORK_ORDER_FORM", payload: savedState.workOrderForm });
-    }
-  }, []);
-
-  useEffect(() => {
     localStorage.setItem("globalState", JSON.stringify(state));
   }, [state]);
 
+  const resetState = () => {
+    localStorage.removeItem("globalState");
+  dispatch({ type: "RESET_SALES_ORDER_FORM" });
+  dispatch({ type: "RESET_WORK_ORDER_FORM" });
+   // Clear persisted state
+};
+
+
+  useEffect(() => {
+    console.log("Current State:", state);
+  }, [state]);
+
+  useEffect(() => {
+    if (state.salesOrderForm.someCondition === false) {
+      dispatch({
+        type: "SET_SALES_ORDER_FORM",
+        payload: { someCondition: true },
+      });
+    }
+  }, [state.salesOrderForm.someCondition]);
+  
+  useEffect(() => {
+    const handlePageRefresh = () => {
+      resetState(); // Reset state on refresh
+    };
+  
+    window.addEventListener("beforeunload", handlePageRefresh);
+  
+    return () => {
+      window.removeEventListener("beforeunload", handlePageRefresh);
+    };
+  }, []);
+  
+  
+  
+
   return (
-    <GlobalStateContext.Provider value={{ state, dispatch }}>
+    <GlobalStateContext.Provider value={{ state, dispatch, resetState }}>
       {children}
     </GlobalStateContext.Provider>
   );

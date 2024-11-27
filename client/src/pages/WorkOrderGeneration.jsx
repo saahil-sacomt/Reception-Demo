@@ -33,7 +33,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   const { orderId } = useParams(); // Get orderId from route params
   const isEditing = Boolean(orderId);
 
-  const { state, dispatch } = useGlobalState();
+  const { state, dispatch,resetState } = useGlobalState();
   const { workOrderForm } = state;
 
   const {
@@ -441,6 +441,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     );
     if (confirmExit) {
       resetForm();
+      resetState();
     } else {
       dispatch({ type: "SET_WORK_ORDER_FORM", payload: { isPrinted: false } });
     }
@@ -1974,7 +1975,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
           <>
             {/* Printable Area */}
             <div
-              className=" bg-white p-8 pt-0 rounded-lg text-gray-800"
+              className=" bg-white rounded-lg text-gray-800"
 
             >
               <div
@@ -2050,7 +2051,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                   <div>
                     <p><strong>Total Amount:</strong> ₹{totalAmount.toFixed(2)}</p>
                     <p><strong>Advance Paid:</strong> ₹{advance.toFixed(2)}</p>
-                    <p><strong>Balance Due:</strong> ₹{balanceDue.toFixed(2)}</p>
+                    <p className="text-xl">Balance Due: <strong>₹{balanceDue.toFixed(2)}</strong></p>
                     
                       {/* <p className="text-red-500">
                         Advance paid exceeds the total amount by ₹{excessAmount.toFixed(2)}.
