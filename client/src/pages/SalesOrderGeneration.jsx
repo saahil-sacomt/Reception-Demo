@@ -3197,8 +3197,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                         return (
                           <tr key={index}>
                             <td className="border px-4 py-2 text-center">{index + 1}</td>
-                            <td className="border px-4 py-2 text-center">{product.product_id}</td>
-                            <td className="border px-4 py-2">{product.product_name}</td>
+                            <td className="border px-4 py-2 text-center">{product.id}</td>
+                            <td className="border px-4 py-2">{product.name}</td>
                             <td className="border px-4 py-2 text-center">{product.hsn_code}</td>
                             <td className="border px-4 py-2 text-center">₹{price.toFixed(2)}</td>
                             <td className="border px-4 py-2 text-center">{quantity}</td>
