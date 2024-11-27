@@ -2440,7 +2440,6 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                   <label className="block text-gray-700 font-medium mb-1">
                     Enter Customer Name
                   </label>
-                  // Using updateSalesOrderForm
 <input
   type="text"
   placeholder="Enter Customer Name"
