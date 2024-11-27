@@ -259,7 +259,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
   console.log("branch:", branch); // Destructure branch from AuthContext
 
   const { state, dispatch } = useGlobalState(); // Access global state
-  const { salesOrderForm: form } = state;
+  const { salesOrderForm } = state;
 
   const {
     step,
@@ -299,7 +299,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     workOrders,
     isFetchingWorkOrders,
     isLoading
-  } = form;
+  } = salesOrderForm;
 
   // Local states
   const [originalProductEntries, setOriginalProductEntries] = useState([
@@ -487,7 +487,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         price: productDetails.mrp || "",
         stock: productDetails.stock || 0,
         quantity: updatedEntries[index].quantity || "",
-        hsn_code:productDetails.hsn_code, // Preserve quantity
+        hsn_code: productDetails.hsn_code, // Preserve quantity
       };
       updateSalesOrderForm({ productEntries: updatedEntries });
 
@@ -639,7 +639,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
       calculateAmounts(
         productEntries,
         advanceDetails,
-        form.privilegeCard,
+        salesOrderForm.privilegeCard,
         privilegeCardDetails,
         redeemPointsAmount,
         loyaltyPoints,
@@ -649,7 +649,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     [
       productEntries,
       advanceDetails,
-      form.privilegeCard,
+      salesOrderForm.privilegeCard,
       privilegeCardDetails,
       redeemPointsAmount,
       loyaltyPoints,
@@ -686,7 +686,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
   // Function to fetch privilege card by pc_number
   const handleFetchPrivilegeCardByNumber = async () => {
     try {
-      const pcNumber = form.privilegeCardNumber?.trim();
+      const pcNumber = salesOrderForm.privilegeCardNumber?.trim();
 
       if (!pcNumber) {
         updateSalesOrderForm({
@@ -974,7 +974,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
   };
 
   const handleVerifyOtp = async () => {
-    if (form.otp === mockOtp) {
+    if (salesOrderForm.otp === mockOtp) {
       updateSalesOrderForm({ isPinVerified: true });
       updateSalesOrderForm({
         validationErrors: {
@@ -1015,12 +1015,12 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           employee,
           paymentMethod,
           advanceDetails,
-          privilegeCard: form.privilegeCard,
-          redeemPoints: form.redeemPoints,
-          redeemPointsAmount: form.redeemPointsAmount,
+          privilegeCard: salesOrderForm.privilegeCard,
+          redeemPoints: salesOrderForm.redeemPoints,
+          redeemPointsAmount: salesOrderForm.redeemPointsAmount,
           loyaltyPoints,
           discount,
-          privilegeCardNumber: form.privilegeCardNumber,
+          privilegeCardNumber: salesOrderForm.privilegeCardNumber,
           // Add any other necessary fields
         },
       },
@@ -1073,7 +1073,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
 
     return () => clearTimeout(focusTimeout);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, form.privilegeCard, form.redeemOption]);
+  }, [step, salesOrderForm.privilegeCard, salesOrderForm.redeemOption]);
 
   const handleEnterKey = (e, nextFieldRef, prevFieldRef) => {
     if (e.key === "Enter") {
@@ -1198,7 +1198,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
       if (redeemOption === "phone") {
         if (!customerPhone.trim())
           errors.customerPhone = "Phone number is required";
-        if (!form.otp.trim()) errors.otp = "OTP is required";
+        if (!salesOrderForm.otp.trim()) errors.otp = "OTP is required";
         if (!isPinVerified) errors.otp = "Please verify the OTP";
       }
       if (
@@ -1281,10 +1281,10 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         customerNameRef.current?.focus();
       }
     }
-    if (step === 4 && form.privilegeCard) {
-      if (form.redeemOption === "barcode") {
+    if (step === 4 && salesOrderForm.privilegeCard) {
+      if (salesOrderForm.redeemOption === "barcode") {
         privilegeCardRef.current?.focus();
-      } else if (form.redeemOption === "phone") {
+      } else if (salesOrderForm.redeemOption === "phone") {
         privilegePhoneRef.current?.focus();
       }
     }
@@ -1316,12 +1316,12 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
 
     try {
       // Step 1: Handle Loyalty Points Update (if applicable)
-      if (form.privilegeCard && privilegeCardDetails) {
+      if (salesOrderForm.privilegeCard && privilegeCardDetails) {
         const { updatedPoints, pointsToRedeem, pointsToAdd } =
           calculateLoyaltyPoints(
             subtotal,
             redeemPointsAmount,
-            form.privilegeCard,
+            salesOrderForm.privilegeCard,
             privilegeCardDetails,
             loyaltyPoints
           );
@@ -1329,7 +1329,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         const { error: loyaltyError } = await supabase
           .from("privilegecards")
           .update({ loyalty_points: updatedPoints })
-          .eq("pc_number", form.privilegeCardNumber);
+          .eq("pc_number", salesOrderForm.privilegeCardNumber);
 
         if (loyaltyError) {
           console.error("Error updating loyalty points:", loyaltyError);
@@ -1357,10 +1357,10 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
       }
 
       // Step 2: Prepare Variables for sales Data
-      const sanitizedRedeemedPoints = form.privilegeCard
-        ? parseInt(form.redeemPointsAmount) || 0
+      const sanitizedRedeemedPoints = salesOrderForm.privilegeCard
+        ? parseInt(salesOrderForm.redeemPointsAmount) || 0
         : 0;
-      const sanitizedPointsAdded = form.privilegeCard ? pointsToAdd || 0 : 0;
+      const sanitizedPointsAdded = salesOrderForm.privilegeCard ? pointsToAdd || 0 : 0;
 
       // Step 3: Handle Existing sales Update
       if (isEditing) {
@@ -1824,7 +1824,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                     onClick={() =>
                       updateSalesOrderForm({ fetchMethod: "work_order_id" })
                     }
-                    className={`px-4 py-2 rounded-lg ${form.fetchMethod === "work_order_id"
+                    className={`px-4 py-2 rounded-lg ${salesOrderForm.fetchMethod === "work_order_id"
                       ? "bg-green-500 text-white"
                       : "bg-gray-200"
                       }`}
@@ -1844,7 +1844,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                       updateSalesOrderForm({ fetchMethod: "mr_number" })
                     }
                     id="fetchMethod-mr_number"
-                    className={`px-4 py-2 rounded-lg ${form.fetchMethod === "mr_number"
+                    className={`px-4 py-2 rounded-lg ${salesOrderForm.fetchMethod === "mr_number"
                       ? "bg-green-500 text-white"
                       : "bg-gray-200"
                       }`}
@@ -1870,7 +1870,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                       updateSalesOrderForm({ fetchMethod: "phone_number" })
                     }
                     id="fetchMethod-phone_number"
-                    className={`px-4 py-2 rounded-lg ${form.fetchMethod === "phone_number"
+                    className={`px-4 py-2 rounded-lg ${salesOrderForm.fetchMethod === "phone_number"
                       ? "bg-green-500 text-white"
                       : "bg-gray-200"
                       }`}
@@ -2440,22 +2440,23 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                   <label className="block text-gray-700 font-medium mb-1">
                     Enter Customer Name
                   </label>
-                  <input
-                    type="text"
-                    placeholder="Enter Customer Name"
-                    value={customerName}
-                    onChange={(e) =>
-                      updateSalesOrderForm({ customerName: e.target.value })
-                    }
-                    onKeyDown={(e) => {
-                      if (e.key === "ArrowDown") {
-                        e.preventDefault();
-                        customerPhoneRef.current?.focus();
-                      }
-                    }}
-                    ref={customerNameRef}
-                    className="border border-gray-300 w-full px-4 py-3 rounded-lg"
-                  />
+                  // Using updateSalesOrderForm
+<input
+  type="text"
+  placeholder="Enter Customer Name"
+  value={customerName}
+  onChange={(e) =>
+    updateSalesOrderForm({ customerName: e.target.value })
+  }
+  onKeyDown={(e) => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      customerPhoneRef.current?.focus();
+    }
+  }}
+  ref={customerNameRef}
+  className="border border-gray-300 w-full px-4 py-3 rounded-lg"
+/>
 
                   {validationErrors.customerName && (
                     <p className="text-red-500 text-xs mt-1">
@@ -2624,9 +2625,9 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                       },
                     }); // Clear previous errors
                     setTimeout(() => {
-                      if (form.redeemOption === "barcode") {
+                      if (salesOrderForm.redeemOption === "barcode") {
                         privilegeCardRef.current?.focus();
-                      } else if (form.redeemOption === "phone") {
+                      } else if (salesOrderForm.redeemOption === "phone") {
                         privilegePhoneRef.current?.focus();
                       }
                     }, 0);
@@ -2661,9 +2662,9 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                       },
                     }); // Clear previous errors
                     setTimeout(() => {
-                      if (form.redeemOption === "barcode") {
+                      if (salesOrderForm.redeemOption === "barcode") {
                         privilegeCardRef.current?.focus();
-                      } else if (form.redeemOption === "phone") {
+                      } else if (salesOrderForm.redeemOption === "phone") {
                         privilegePhoneRef.current?.focus();
                       }
                     }, 0);
@@ -3148,7 +3149,9 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                   {/* Customer Details */}
                   <div className="mb-6">
                     {/* <p><strong>Work Order ID:</strong> {selectedWorkOrder}</p> */}
-                    <p><strong>Customer Name:</strong> {hasMrNumber ? patientDetails?.name + " | " + patientDetails?.age + " | " + patientDetails?.gender : customerName + " | " + parseInt(age) + " | " + gender}</p>
+                    <p><strong>Customer Name:</strong> {hasMrNumber === "yes"
+    ? `${patientDetails?.name || "N/A"} | ${patientDetails?.age || "N/A"} | ${patientDetails?.gender || "N/A"}`
+    : `${customerName || "N/A"} | ${parseInt(age) || "N/A"} | ${gender || "N/A"}`}</p>
                     <p><strong>Address:</strong> {hasMrNumber ? patientDetails?.address : address}</p>
                     <p><strong>Phone Number:</strong> {hasMrNumber ? patientDetails?.phone_number : customerPhone}</p>
 
@@ -3413,13 +3416,13 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                 type="button" // Added type="button"
                 ref={nextButtonRef}
                 onClick={nextStep}
-                className={`bg-green-500 hover:bg-green-600 text-white mx-2 px-4 py-2 rounded-lg ${step === 4 && !form.isPinVerified
+                className={`bg-green-500 hover:bg-green-600 text-white mx-2 px-4 py-2 rounded-lg ${step === 4 && !salesOrderForm.isPinVerified
                   ? "opacity-50 cursor-not-allowed"
                   : ""
                   }`}
 
 
-                disabled={step === 4 && !form.isPinVerified}
+                disabled={step === 4 && !salesOrderForm.isPinVerified}
               >
                 Next
               </button>
