@@ -79,12 +79,6 @@ const createCustomer = async (name, phone_number) => {
 
 // Function to fetch product details from Supabase
 const fetchProductDetailsFromDatabase = async (productId, branch) => {
-  console.log(
-    "Fetching product details for productId:",
-    productId,
-    "and branch:",
-    branch
-  );
   if (!branch) {
     console.error("Branch code is undefined or missing.");
     return null; // Prevent further execution
@@ -182,84 +176,108 @@ const calculateProductDifferences = (original, updated) => {
   return differences;
 };
 
-// Function to calculate amounts
+// Constants for GST rates
+const CGST_RATE = 0.06; // 6% CGST
+const SGST_RATE = 0.06; // 6% SGST
+const GST_DIVISOR = 1.12; // To extract base price from GST-inclusive price
+
+/**
+ * Function to calculate billing amounts considering GST is already included in product prices.
+ *
+ * @param {Array} productEntries - List of products with price and quantity.
+ * @param {string} advanceDetails - Advance amount paid.
+ * @param {string} discountAmount - Discount to be applied.
+ * @param {boolean} privilegeCard - Indicates if a privilege card is used.
+ * @param {Object} privilegeCardDetails - Details of the privilege card.
+ * @param {string} redeemPointsAmount - Amount to redeem from loyalty points.
+ * @param {string} loyaltyPoints - Available loyalty points.
+ * @returns {Object} - Calculated billing amounts.
+ */
 function calculateAmounts(
   productEntries,
   advanceDetails,
+  discountAmount,
   privilegeCard,
   privilegeCardDetails,
   redeemPointsAmount,
-  loyaltyPoints,
-  selectedWorkOrder,
-  discountAmount,
-
-  
-  
+  loyaltyPoints
 ) {
-  // Step 1: Adjust Prices and Calculate Adjusted Subtotal
-  const adjustedSubtotal = productEntries.reduce((acc, product) => {
-    const originalPrice = parseFloat(product.price) || 0;
-    const adjustedPrice = (originalPrice / 112) * 100; // Adjusted Price using formula
-    const quantity = parseInt(product.quantity) || 0;
-    return acc + adjustedPrice * quantity;
+  // Helper functions for parsing and validation
+  const parsePrice = (price) => {
+    const parsed = parseFloat(price);
+    return isNaN(parsed) || parsed < 0 ? 0 : parsed;
+  };
+
+  const parseQuantity = (quantity) => {
+    const parsed = parseInt(quantity, 10);
+    return isNaN(parsed) || parsed < 0 ? 0 : parsed;
+  };
+
+  // Step 1: Calculate Subtotal Without GST by extracting base prices
+  const subtotalWithoutGST = productEntries.reduce((acc, product) => {
+    const priceWithGST = parsePrice(product.price);
+    const quantity = parseQuantity(product.quantity);
+    const priceExclGST = priceWithGST / GST_DIVISOR; // Base price calculation
+    return acc + priceExclGST * quantity;
   }, 0);
 
-  // Step 2: Calculate Remaining Balance After Advance Paid
-  const advancePaid = parseFloat(advanceDetails) || 0;
-  let remainingAfterAdvance = adjustedSubtotal - advancePaid;
+  // Step 2: Calculate Subtotal Including GST
+  const subtotalWithGST = productEntries.reduce((acc, product) => {
+    const priceWithGST = parsePrice(product.price);
+    const quantity = parseQuantity(product.quantity);
+    return acc + priceWithGST * quantity;
+  }, 0);
 
-  // Step 3: Calculate Discount Based on Remaining Balance After Advance
-  const discount = parseFloat(discountAmount) || 0;
-  const validDiscount = Math.min(discount, remainingAfterAdvance);
+  // Step 3: Subtract Advance Paid
+  const advancePaid = parsePrice(advanceDetails);
+  let balanceDue = subtotalWithGST - advancePaid;
+  balanceDue = Math.max(balanceDue, 0); // Ensure balanceDue is not negative
 
-  // Step 4: Update Remaining Balance After Discount
-  let remainingBalance = remainingAfterAdvance - validDiscount;
+  // Step 4: Apply Discount
+  const discount = parsePrice(discountAmount);
+  balanceDue -= discount;
+  balanceDue = Math.max(balanceDue, 0); // Ensure balanceDue is not negative after discount
 
-  // Step 5: Calculate Privilege Card Discount if Applicable
+  // Step 5: Calculate Balance Without GST
+  const balanceWithoutGST = (balanceDue / 112) * 100;
+
+  // Step 6: Calculate CGST and SGST on Balance Without GST
+  const cgstAmount = balanceWithoutGST * CGST_RATE;
+  const sgstAmount = balanceWithoutGST * SGST_RATE;
+  const gstAmount = cgstAmount + sgstAmount; // Total GST
+
+  // Step 7: Privilege Card Discount (If Applicable)
   let privilegeDiscount = 0;
   if (
     privilegeCard &&
     privilegeCardDetails &&
-    parseFloat(redeemPointsAmount) > 0 &&
-    remainingBalance > 0
+    parsePrice(redeemPointsAmount) > 0 &&
+    balanceDue > 0
   ) {
-    const redeemAmount = parseFloat(redeemPointsAmount) || 0;
-    privilegeDiscount = Math.min(redeemAmount, loyaltyPoints, remainingBalance);
-    remainingBalance -= privilegeDiscount;
+    const redeemAmount = parsePrice(redeemPointsAmount);
+    privilegeDiscount = Math.min(redeemAmount, loyaltyPoints, balanceDue);
+    balanceDue -= privilegeDiscount;
+    balanceDue = Math.max(balanceDue, 0); // Ensure balanceDue is not negative after privilege discount
   }
 
-  // Ensure that if discount makes the total zero or negative, no privilege discount
-  if (remainingBalance <= 0) {
-    privilegeDiscount = 0;
-    remainingBalance = Math.max(remainingBalance, 0);
-  }
-
-  // Step 6: Calculate GST Based on Remaining Balance
-  const cgstAmount = remainingBalance * 0.06;
-  const sgstAmount = remainingBalance * 0.06;
-
-  const adjustedPriceWithGST = adjustedSubtotal + cgstAmount + sgstAmount;
-
-
-  // Step 7: Calculate Final Amount Including GST
-  const finalAmount = remainingBalance + cgstAmount + sgstAmount;
-
-  // Step 8: Ensure Final Amount is Not Negative
-  const finalAmountAdjusted = Math.max(finalAmount, 0);
-
-  
+  // Step 8: Final Payment Due
+  const finalAmount = balanceDue.toFixed(2); // Final amount after all deductions
 
   return {
-    subtotal: adjustedSubtotal, // Adjusted Subtotal
-    discount: validDiscount, // Discount Amount
-    advance: advancePaid, // Advance Paid
-    privilegeDiscount, // Privilege Card Discount
-    cgstAmount, // 6% CGST
-    sgstAmount, // 6% SGST
-    finalAmount: finalAmountAdjusted,
-    adjustedPriceWithGST, // Final Amount Including GST
+    subtotalWithoutGST: subtotalWithoutGST.toFixed(2),
+    subtotalWithGST: subtotalWithGST.toFixed(2),
+    advance: advancePaid.toFixed(2),
+    discount: discount.toFixed(2),
+    balanceDue: balanceDue.toFixed(2),
+    balanceWithoutGST: balanceWithoutGST.toFixed(2),
+    cgstAmount: cgstAmount.toFixed(2),
+    sgstAmount: sgstAmount.toFixed(2),
+    gstAmount: gstAmount.toFixed(2),
+    privilegeDiscount: privilegeDiscount.toFixed(2),
+    finalAmount,
   };
 }
+
 
 
 // Main Component
@@ -515,7 +533,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     }
   };
 
-  const fetchExistingSalesOrder = async (orderId) => {
+  const fetchExistingSalesOrder = useCallback(async (orderId) => {
     try {
       const { data, error } = await supabase
         .from("sales_orders")
@@ -527,44 +545,50 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         updateSalesOrderForm({
           validationErrors: {
             ...validationErrors,
-            generalError: "Sales Not Found.",
+            generalError: "Sales Order Not Found.",
           },
         });
         return;
       }
 
-      // Populate form fields with the fetched data
+      // Standardize product entries to include product_id
+      const standardizedProducts = data.product_entries.map((product) => ({
+        product_id: product.product_id || '', // Ensure product_id exists
+        name: product.name || '',
+        price: product.price || '',
+        quantity: product.quantity || '',
+        hsn_code: product.hsn_code || '',
+        stock: product.stock || 0,
+      }));
+
       updateSalesOrderForm({
-        productEntries: data.items || [
-          { id: "", name: "", price: "", quantity: "" },
-        ],
+        productEntries: standardizedProducts,
         mrNumber: data.mr_number || "",
         customerPhone: data.patient_phone || "",
-        advanceDetails: data.advance_details || "",
+        advanceDetails: data.advance_details ? data.advance_details.toString() : "",
         employee: data.employee || "",
         paymentMethod: data.payment_method || "",
         loyaltyPoints: data.loyalty_points_redeemed || 0,
-        hasMrNumber: data.hasMrNumber || "yes",
-        discount: data.discount || "",
-        privilegeCard: true,
+        hasMrNumber: data.hasMr_number ? "yes" : "no",
+        discount: data.discount ? data.discount.toString() : "",
+        privilegeCard: data.pc_number ? true : false,
         privilegeCardNumber: data.pc_number || "",
-        isEditing: true, // Custom field to indicate editing mode
+        isEditing: true, // Indicates editing mode
         validationErrors: {}, // Clear validation errors
+        step: 3, // Move to the next step
       });
 
-      setOriginalProductEntries(
-        data.items || [{ id: "", name: "", price: "", quantity: "" }]
-      ); // Store original entries
+      setOriginalProductEntries(standardizedProducts); // Store original entries
 
-      // Fetch privilege card details based on pc_number
+      // Fetch privilege card details if applicable
       if (data.pc_number) {
-        const privilegeData = await supabase
+        const { data: privilegeData, error: privilegeError } = await supabase
           .from("privilegecards")
           .select("*")
           .eq("pc_number", data.pc_number)
           .single();
 
-        if (privilegeData.error || !privilegeData.data) {
+        if (privilegeError || !privilegeData) {
           updateSalesOrderForm({ privilegeCardDetails: null });
           updateSalesOrderForm({
             validationErrors: {
@@ -573,28 +597,22 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
             },
           });
         } else {
-          updateSalesOrderForm({ privilegeCardDetails: privilegeData.data });
-          updateSalesOrderForm({ isPinVerified: true });
+          updateSalesOrderForm({ privilegeCardDetails: privilegeData, isPinVerified: true });
         }
       }
 
-      updateSalesOrderForm({ step: 3 }); // Move to the Privilege Card step
-      updateSalesOrderForm({
-        validationErrors: {
-          ...validationErrors,
-          generalError: "",
-        },
-      });
+      updateSalesOrderForm({ validationErrors: { ...validationErrors, generalError: "" } });
     } catch (error) {
-      console.error("Error fetching sales:", error);
+      console.error("Error fetching sales order:", error);
       updateSalesOrderForm({
         validationErrors: {
           ...validationErrors,
-          generalError: "Failed to fetch sales",
+          generalError: "Failed to fetch sales order details.",
         },
       });
     }
-  };
+  }, [updateSalesOrderForm, validationErrors]);
+
 
   useEffect(() => {
     if (orderId) {
@@ -636,12 +654,15 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
   }, [branch]);
 
   const {
-    subtotal,
+    subtotalWithoutGST,
     cgstAmount,
     sgstAmount,
-    adjustedPriceWithGST,
-    discount: calculatedDiscount,
+    subtotalWithGST,
     advance,
+    discount: calculatedDiscount,
+    balanceDue,
+    balanceWithoutGST,
+    gstAmount,
     privilegeDiscount,
     finalAmount,
   } = useMemo(
@@ -649,25 +670,23 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
       calculateAmounts(
         productEntries,
         advanceDetails,
+        discount,
         salesOrderForm.privilegeCard,
         privilegeCardDetails,
         redeemPointsAmount,
-        loyaltyPoints,
-        selectedWorkOrder,
-        discount
+        loyaltyPoints
       ),
     [
       productEntries,
       advanceDetails,
+      discount,
       salesOrderForm.privilegeCard,
       privilegeCardDetails,
       redeemPointsAmount,
       loyaltyPoints,
-      selectedWorkOrder,
-      discount,
     ]
   );
-
+  
   // Function to fetch patient by MR number
   const fetchPatientByMRNumber = async (mrNumber) => {
     const { data, error } = await supabase
@@ -1576,7 +1595,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         }
 
         const validProducts = productEntries.filter(
-          (product) => product.id && product.quantity > 0
+          (product) => product.product_id && product.quantity > 0
         );
 
         if (!validProducts || validProducts.length === 0) {
@@ -1601,7 +1620,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
 
         // Step 6: Deduct Stock for Multiple Products in Bulk
         const deductions = validProducts.map((product) => ({
-          product_id: product.id,
+          product_id: product.product_id,
           branch_code: branch,
           purchase_quantity: product.quantity,
         }));
@@ -1753,8 +1772,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                         {selectedWorkOrder.product_entries.map(
                           (product, index) => (
                             <tr key={index} className="text-center">
-                              <td className="py-1 px-2">{product.id}</td>
-                              <td className="py-1 px-2">{product.name}</td>
+                              <td className="py-1 px-2">{product.product_id}</td>
+                              <td className="py-1 px-2">{product.product_name}</td>
                               <td className="py-1 px-2">{product.price}</td>
                               <td className="py-1 px-2">{product.quantity}</td>
                             </tr>
@@ -3134,36 +3153,27 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           {step === 5 && (
             <>
               {/* Printable Area */}
-              <div
-                className="bg-white rounded-lg text-gray-800"
-              /* Attach the ref here */
-              >
-                <div
-                  className="printable-area print:mt-20 print:block print:absolute print:inset-0 print:w-full bg-white p-4 print:m-0 print:p-0 w-full"
-                >
-                  <div className=" flex justify-between items-center mb-6">
-                    <div className="flex items-center">
-                      <h2 className="text-3xl font-bold">Bill</h2>
-                    </div>
+              <div className="bg-white rounded-lg text-gray-800">
+                <div className="printable-area print:mt-20 print:block print:absolute print:inset-0 print:w-full bg-white p-4 print:m-0 print:p-0 w-full">
+                  {/* Header */}
+                  <div className="flex justify-between items-center mb-6">
+                    <h2 className="text-3xl font-bold">Bill</h2>
                     <div className="text-right">
                       <p><strong>Sales ID:</strong> {salesOrderId}</p>
-                      <p><strong>Date: {formattedDate}</strong></p>
-                      {hasMrNumber && (
-                        <>
-                          <p><strong>MR Number:</strong> {mrNumber}</p>
-                        </>
-                      )}
+                      <p><strong>Date:</strong> {formattedDate}</p>
+                      {hasMrNumber && <p><strong>MR Number:</strong> {mrNumber}</p>}
                     </div>
                   </div>
+
                   {/* Customer Details */}
                   <div className="mb-6">
-                    {/* <p><strong>Work Order ID:</strong> {selectedWorkOrder}</p> */}
-                    <p><strong>Customer Name:</strong> {hasMrNumber === "yes"
-                      ? `${patientDetails?.name || "N/A"} | ${patientDetails?.age || "N/A"} | ${patientDetails?.gender || "N/A"}`
-                      : `${customerName || "N/A"} | ${parseInt(age) || "N/A"} | ${gender || "N/A"}`}</p>
+                    <p>
+                      <strong>Customer Name:</strong> {hasMrNumber === "yes"
+                        ? `${patientDetails?.name || "N/A"} | ${patientDetails?.age || "N/A"} | ${patientDetails?.gender || "N/A"}`
+                        : `${customerName || "N/A"} | ${parseInt(age) || "N/A"} | ${gender || "N/A"}`}
+                    </p>
                     <p><strong>Address:</strong> {hasMrNumber === "yes" ? `${patientDetails?.address || "N/A"}` : `${address || "N/A"}`}</p>
                     <p><strong>Phone Number:</strong> {hasMrNumber === "yes" ? `${patientDetails?.phone_number || "N/A"}` : `${customerPhone || "N/A"}`}</p>
-
                   </div>
 
                   {/* Product Table */}
@@ -3181,57 +3191,54 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                     </thead>
                     <tbody>
                       {productEntries.map((product, index) => {
-                        const adjustedPrice =
-                          (parseFloat(product.price) / 112) * 100 || 0;
-                        const productSubtotal =
-                          adjustedPrice * (parseInt(product.quantity) || 0);
+                        const price = parseFloat(product.price) || 0;
+                        const quantity = parseInt(product.quantity) || 0;
+                        const subtotal = price * quantity;
                         return (
                           <tr key={index}>
                             <td className="border px-4 py-2 text-center">{index + 1}</td>
-                            <td className="border px-4 py-2 text-center">{product.id}</td>
-                            <td className="border px-4 py-2">{product.name}</td>
+                            <td className="border px-4 py-2 text-center">{product.product_id}</td>
+                            <td className="border px-4 py-2">{product.product_name}</td>
                             <td className="border px-4 py-2 text-center">{product.hsn_code}</td>
-                            <td className="border px-4 py-2 text-center">₹{adjustedPrice.toFixed(2)}</td>
-                            <td className="border px-4 py-2 text-center">{product.quantity}</td>
-                            <td className="border px-4 py-2 text-center">₹{productSubtotal.toFixed(2)}</td>
+                            <td className="border px-4 py-2 text-center">₹{price.toFixed(2)}</td>
+                            <td className="border px-4 py-2 text-center">{quantity}</td>
+                            <td className="border px-4 py-2 text-center">₹{subtotal.toFixed(2)}</td>
                           </tr>
                         );
                       })}
                     </tbody>
                   </table>
 
-                  {/* Financial Summary */}
                   <div className="flex justify-between mb-6 space-x-8">
-                    <div>
-                      <p><strong>Subtotal:</strong> ₹{subtotal.toFixed(2)}</p>
-                      <p><strong>CGST (6%):</strong> ₹{cgstAmount.toFixed(2)}</p>
-                      <p><strong>SGST (6%):</strong> ₹{sgstAmount.toFixed(2)}</p>
-                      <p><strong>Total Amount:</strong> ₹{(adjustedPriceWithGST || 0).toFixed(2)}</p>
-                      <div className=" mt-10 space-x-8">
-                        <p><strong>Payment Method:</strong> {paymentMethod.charAt(0).toUpperCase() + paymentMethod.slice(1)}</p>
+                  <div>
+                  <p><strong>Subtotal (Excl. GST):</strong> ₹{subtotalWithoutGST}</p>
+    <p><strong>CGST (6%):</strong> ₹{cgstAmount}</p>
+    <p><strong>SGST (6%):</strong> ₹{sgstAmount}</p>
+    <p><strong>Subtotal (Incl. GST):</strong> ₹{subtotalWithGST}</p>
+                      <p><strong>Payment Method:</strong> {paymentMethod.charAt(0).toUpperCase() + paymentMethod.slice(1)}</p>
                       </div>
+                      
+                  <div>
+                  <p><strong>Advance Paid:</strong> ₹{advance}</p>
+    <p><strong>Discount:</strong> ₹{calculatedDiscount}</p>
+    <p><strong>Balance Due:</strong> ₹{balanceDue}</p>
                       {privilegeCard && privilegeCardDetails && (
-                        <p><strong>Loyalty Points Redeemed:</strong> ₹{pointsToAdd.toFixed(2)}</p>
+                        <>
+                          <p><strong>Privilege Card Discount:</strong> ₹{privilegeDiscount}</p>
+                          <p><strong>Loyalty Points Redeemed:</strong> ₹{privilegeDiscount}</p>
+                        </>
                       )}
-                      {privilegeCard && privilegeCardDetails && (
-                        <p><strong>Loyalty Points Gained:</strong> {pointsToAdd}</p>
-                      )}
+                      <p><strong>Final Payment Due:</strong> ₹{finalAmount}</p>
+                      <div className="mt-4">
+                        
+                        <div className="mt-10 space-x-8">
+                      <p><strong>Billed by:</strong> {employee || 'N/A'}</p>
                     </div>
-                    <div>
-
-                      <p><strong>Advance Paid:</strong> ₹{advance.toFixed(2)}</p>
-                      <p><strong>Discount Amount:</strong> ₹{calculatedDiscount.toFixed(2)}</p>
-                      <p><strong>Discounted Subtotal:</strong> ₹{(Math.max(adjustedPriceWithGST - calculatedDiscount, 0)).toFixed(2)}</p>
-                      {privilegeCard && privilegeCardDetails && (
-                        <p><strong>Privilege Card Discount:</strong> ₹₹{privilegeDiscount.toFixed(2)}</p>
-                      )}
-                      <p><strong>Total Amount after discounts:</strong> ₹{finalAmount.toFixed(2)}</p>
-                      <div className=" mt-10 space-x-8">
-                        <p><strong>Billed by:</strong> {employee}</p>
                       </div>
                     </div>
-
                   </div>
+
+
 
 
 
@@ -3263,7 +3270,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                           const discountValue =
                             e.target.value === "" ? "" : Math.min(
                               Math.max(Number(e.target.value), 0),
-                              Math.max(subtotal - (Number(state.salesOrderForm.advanceDetails) || 0), 0)
+                              Math.max(subtotalWithGST - (Number(state.salesOrderForm.advanceDetails) || 0), 0)
                             );
 
                           dispatch({
@@ -3273,7 +3280,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                         }}
                         className="border border-gray-300 w-full px-4 py-3 rounded-lg"
                         min="0"
-                        max={subtotal}
+                        max={subtotalWithoutGST}
                         onKeyDown={(e) => {
                           if (e.key === "Enter") {
                             e.preventDefault();
@@ -3357,14 +3364,14 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                     }
                   }}
                   className={`bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg transition ${!paymentMethod ||
-                    parseFloat(state.salesOrderForm.discount) > subtotal
+                    parseFloat(state.salesOrderForm.discount) > subtotalWithoutGST
                     ? "opacity-50 cursor-not-allowed"
                     : ""
                     } w-full md:w-auto`}
                   disabled={
                     !paymentMethod ||
                     isLoading ||
-                    parseFloat(state.salesOrderForm.discount) > subtotal
+                    parseFloat(state.salesOrderForm.discount) > subtotalWithoutGST
                   }
                 >
                   {isEditing ? "Update Order" : "Submit Order"}{" "}
