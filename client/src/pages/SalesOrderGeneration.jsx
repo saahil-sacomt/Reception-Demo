@@ -49,6 +49,8 @@ const fetchPrivilegeCardByPhone = async (phone) => {
   return data;
 };
 
+
+
 // Function to fetch customer by phone number
 const fetchCustomerByPhone = async (phone) => {
   const { data, error } = await supabase
@@ -141,6 +143,18 @@ const calculateLoyaltyPoints = (
 
   return { updatedPoints, pointsToRedeem, pointsToAdd };
 };
+
+
+const normalizeWorkOrderProducts = (workOrderProducts) => {
+  return workOrderProducts.map(product => ({
+    id: product.product_id || product.id, // Map `product_id` to `id` if necessary
+    name: product.product_name || product.name, // Map `product_name` to `name` if necessary
+    price: product.price, // Other fields can remain unchanged
+    quantity: product.quantity,
+    ...product, // Retain all other properties
+  }));
+};
+
 
 // Helper function to calculate differences between original and updated products
 const calculateProductDifferences = (original, updated) => {
@@ -1595,7 +1609,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         }
 
         const validProducts = productEntries.filter(
-          (product) => product.product_id && product.quantity > 0
+          (product) => product.id && product.quantity > 0
         );
 
         if (!validProducts || validProducts.length === 0) {
@@ -1620,7 +1634,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
 
         // Step 6: Deduct Stock for Multiple Products in Bulk
         const deductions = validProducts.map((product) => ({
-          product_id: product.product_id,
+          product_id: product.id,
           branch_code: branch,
           purchase_quantity: product.quantity,
         }));
