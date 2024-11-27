@@ -3378,14 +3378,14 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                     }
                   }}
                   className={`bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg transition ${!paymentMethod ||
-                    parseFloat(state.salesOrderForm.discount) > subtotalWithoutGST
+                    parseFloat(state.salesOrderForm.discount) > subtotalWithGST
                     ? "opacity-50 cursor-not-allowed"
                     : ""
                     } w-full md:w-auto`}
                   disabled={
                     !paymentMethod ||
                     isLoading ||
-                    parseFloat(state.salesOrderForm.discount) > subtotalWithoutGST
+                    parseFloat(state.salesOrderForm.discount) > subtotalWithGST
                   }
                 >
                   {isEditing ? "Update Order" : "Submit Order"}{" "}
