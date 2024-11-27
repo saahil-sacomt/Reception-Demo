@@ -686,7 +686,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
       loyaltyPoints,
     ]
   );
-  
+
   // Function to fetch patient by MR number
   const fetchPatientByMRNumber = async (mrNumber) => {
     const { data, error } = await supabase
@@ -1348,7 +1348,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
       if (salesOrderForm.privilegeCard && privilegeCardDetails) {
         const { updatedPoints, pointsToRedeem, pointsToAdd } =
           calculateLoyaltyPoints(
-            subtotal,
+            subtotalWithGST,
             redeemPointsAmount,
             salesOrderForm.privilegeCard,
             privilegeCardDetails,
@@ -1478,7 +1478,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
             patient_phone: hasMrNumber === "yes" ? customerPhone : null,
             employee: employee,
             payment_method: paymentMethod,
-            subtotal: subtotal,
+            subtotal: subtotalWithGST,
             cgst: parseFloat(cgstAmount),
             sgst: parseFloat(sgstAmount),
             total_amount: finalAmount,
@@ -1542,7 +1542,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
             patient_phone: hasMrNumber === "yes" ? customerPhone : null,
             employee: employee,
             payment_method: paymentMethod,
-            subtotal: subtotal,
+            subtotal: subtotalWithGST,
             discount: calculatedDiscount,
             advance_details: advance, // Assuming you have an 'advance_paid' field
             privilege_discount: privilegeDiscount, // Updated field
@@ -3210,30 +3210,30 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                   </table>
 
                   <div className="flex justify-between mb-6 space-x-8">
-                  <div>
-                  <p><strong>Subtotal (Excl. GST):</strong> ₹{subtotalWithoutGST}</p>
-    <p><strong>CGST (6%):</strong> ₹{cgstAmount}</p>
-    <p><strong>SGST (6%):</strong> ₹{sgstAmount}</p>
-    <p><strong>Subtotal (Incl. GST):</strong> ₹{subtotalWithGST}</p>
+                    <div>
+                      <p><strong>Subtotal (Excl. GST):</strong> ₹{subtotalWithoutGST}</p>
+                      <p><strong>CGST (6%):</strong> ₹{cgstAmount}</p>
+                      <p><strong>SGST (6%):</strong> ₹{sgstAmount}</p>
+                      <p><strong>Subtotal (Incl. GST):</strong> ₹{subtotalWithGST}</p>
                       <p><strong>Payment Method:</strong> {paymentMethod.charAt(0).toUpperCase() + paymentMethod.slice(1)}</p>
-                      </div>
-                      
-                  <div>
-                  <p><strong>Advance Paid:</strong> ₹{advance}</p>
-    <p><strong>Discount:</strong> ₹{calculatedDiscount}</p>
-    <p><strong>Balance Due:</strong> ₹{balanceDue}</p>
+                    </div>
+
+                    <div>
+                      <p><strong>Advance Paid:</strong> ₹{advance}</p>
+                      <p><strong>Discount:</strong> ₹{calculatedDiscount}</p>
+                      <p className="text-lg">Final Balance Due: <strong>₹{balanceDue}</strong> </p>
                       {privilegeCard && privilegeCardDetails && (
                         <>
                           <p><strong>Privilege Card Discount:</strong> ₹{privilegeDiscount}</p>
                           <p><strong>Loyalty Points Redeemed:</strong> ₹{privilegeDiscount}</p>
                         </>
                       )}
-                      <p><strong>Final Payment Due:</strong> ₹{finalAmount}</p>
+                      {/* <p><strong>Final Payment Due:</strong> ₹{finalAmount}</p> */}
                       <div className="mt-4">
-                        
+
                         <div className="mt-10 space-x-8">
-                      <p><strong>Billed by:</strong> {employee || 'N/A'}</p>
-                    </div>
+                          <p><strong>Billed by:</strong> {employee || 'N/A'}</p>
+                        </div>
                       </div>
                     </div>
                   </div>
