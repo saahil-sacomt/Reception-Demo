@@ -191,7 +191,10 @@ function calculateAmounts(
   redeemPointsAmount,
   loyaltyPoints,
   selectedWorkOrder,
-  discountAmount
+  discountAmount,
+
+  
+  
 ) {
   // Step 1: Adjust Prices and Calculate Adjusted Subtotal
   const adjustedSubtotal = productEntries.reduce((acc, product) => {
@@ -235,11 +238,16 @@ function calculateAmounts(
   const cgstAmount = remainingBalance * 0.06;
   const sgstAmount = remainingBalance * 0.06;
 
+  const adjustedPriceWithGST = adjustedSubtotal + cgstAmount + sgstAmount;
+
+
   // Step 7: Calculate Final Amount Including GST
   const finalAmount = remainingBalance + cgstAmount + sgstAmount;
 
   // Step 8: Ensure Final Amount is Not Negative
   const finalAmountAdjusted = Math.max(finalAmount, 0);
+
+  
 
   return {
     subtotal: adjustedSubtotal, // Adjusted Subtotal
@@ -248,7 +256,8 @@ function calculateAmounts(
     privilegeDiscount, // Privilege Card Discount
     cgstAmount, // 6% CGST
     sgstAmount, // 6% SGST
-    finalAmount: finalAmountAdjusted, // Final Amount Including GST
+    finalAmount: finalAmountAdjusted,
+    adjustedPriceWithGST, // Final Amount Including GST
   };
 }
 
@@ -630,6 +639,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     subtotal,
     cgstAmount,
     sgstAmount,
+    adjustedPriceWithGST,
     discount: calculatedDiscount,
     advance,
     privilegeDiscount,
@@ -2440,22 +2450,22 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                   <label className="block text-gray-700 font-medium mb-1">
                     Enter Customer Name
                   </label>
-<input
-  type="text"
-  placeholder="Enter Customer Name"
-  value={customerName}
-  onChange={(e) =>
-    updateSalesOrderForm({ customerName: e.target.value })
-  }
-  onKeyDown={(e) => {
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      customerPhoneRef.current?.focus();
-    }
-  }}
-  ref={customerNameRef}
-  className="border border-gray-300 w-full px-4 py-3 rounded-lg"
-/>
+                  <input
+                    type="text"
+                    placeholder="Enter Customer Name"
+                    value={customerName}
+                    onChange={(e) =>
+                      updateSalesOrderForm({ customerName: e.target.value })
+                    }
+                    onKeyDown={(e) => {
+                      if (e.key === "ArrowDown") {
+                        e.preventDefault();
+                        customerPhoneRef.current?.focus();
+                      }
+                    }}
+                    ref={customerNameRef}
+                    className="border border-gray-300 w-full px-4 py-3 rounded-lg"
+                  />
 
                   {validationErrors.customerName && (
                     <p className="text-red-500 text-xs mt-1">
@@ -3149,10 +3159,10 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                   <div className="mb-6">
                     {/* <p><strong>Work Order ID:</strong> {selectedWorkOrder}</p> */}
                     <p><strong>Customer Name:</strong> {hasMrNumber === "yes"
-    ? `${patientDetails?.name || "N/A"} | ${patientDetails?.age || "N/A"} | ${patientDetails?.gender || "N/A"}`
-    : `${customerName || "N/A"} | ${parseInt(age) || "N/A"} | ${gender || "N/A"}`}</p>
-                    <p><strong>Address:</strong> {hasMrNumber ? patientDetails?.address : address}</p>
-                    <p><strong>Phone Number:</strong> {hasMrNumber ? patientDetails?.phone_number : customerPhone}</p>
+                      ? `${patientDetails?.name || "N/A"} | ${patientDetails?.age || "N/A"} | ${patientDetails?.gender || "N/A"}`
+                      : `${customerName || "N/A"} | ${parseInt(age) || "N/A"} | ${gender || "N/A"}`}</p>
+                    <p><strong>Address:</strong> {hasMrNumber === "yes" ? `${patientDetails?.address || "N/A"}` : `${address || "N/A"}`}</p>
+                    <p><strong>Phone Number:</strong> {hasMrNumber === "yes" ? `${patientDetails?.phone_number || "N/A"}` : `${customerPhone || "N/A"}`}</p>
 
                   </div>
 
@@ -3193,8 +3203,10 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                   {/* Financial Summary */}
                   <div className="flex justify-between mb-6 space-x-8">
                     <div>
-                      <p><strong>Subtotal:</strong> ₹{subtotal.toFixed(2)}</p><p><strong>CGST (6%):</strong> ₹{cgstAmount.toFixed(2)}</p>
+                      <p><strong>Subtotal:</strong> ₹{subtotal.toFixed(2)}</p>
+                      <p><strong>CGST (6%):</strong> ₹{cgstAmount.toFixed(2)}</p>
                       <p><strong>SGST (6%):</strong> ₹{sgstAmount.toFixed(2)}</p>
+                      <p><strong>Total Amount:</strong> ₹{(adjustedPriceWithGST || 0).toFixed(2)}</p>
                       <div className=" mt-10 space-x-8">
                         <p><strong>Payment Method:</strong> {paymentMethod.charAt(0).toUpperCase() + paymentMethod.slice(1)}</p>
                       </div>
@@ -3209,11 +3221,11 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
 
                       <p><strong>Advance Paid:</strong> ₹{advance.toFixed(2)}</p>
                       <p><strong>Discount Amount:</strong> ₹{calculatedDiscount.toFixed(2)}</p>
-                      <p><strong>Discounted Subtotal:</strong> ₹{(Math.max(subtotal - calculatedDiscount, 0)).toFixed(2)}</p>
+                      <p><strong>Discounted Subtotal:</strong> ₹{(Math.max(adjustedPriceWithGST - calculatedDiscount, 0)).toFixed(2)}</p>
                       {privilegeCard && privilegeCardDetails && (
                         <p><strong>Privilege Card Discount:</strong> ₹₹{privilegeDiscount.toFixed(2)}</p>
                       )}
-                      <p><strong>Total Amount:</strong> ₹{finalAmount.toFixed(2)}</p>
+                      <p><strong>Total Amount after discounts:</strong> ₹{finalAmount.toFixed(2)}</p>
                       <div className=" mt-10 space-x-8">
                         <p><strong>Billed by:</strong> {employee}</p>
                       </div>

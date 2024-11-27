@@ -89,27 +89,20 @@ const getColumnStyles = (reportType) => {
         8: { halign: 'center', cellWidth: 25 }, // Created At
         9: { halign: 'center', cellWidth: 25 }, // Updated At
       };
-    case 'consolidated':
-      return {
-        0: { halign: 'center', cellWidth: 20 }, // Sales Order ID
-        1: { halign: 'center', cellWidth: 20 }, // Work Order ID
-        2: { halign: 'center', cellWidth: 19 }, // MR Number
-        3: { halign: 'center', cellWidth: 14 }, // Is B2B
-        4: { halign: 'center', cellWidth: 19 }, // Sale Value
-        5: { halign: 'center', cellWidth: 14 }, // CGST (Sales)
-        6: { halign: 'center', cellWidth: 14 }, // SGST (Sales)
-        7: { halign: 'center', cellWidth: 19 }, // Total Sales Amount
-        8: { halign: 'center', cellWidth: 19 }, // Advance Paid (Sales)
-        9: { halign: 'center', cellWidth: 20 }, // Balance Due (Sales)
-        10: { halign: 'center', cellWidth: 19 }, // Due Date (Work Orders)
-        11: { halign: 'center', cellWidth: 20 }, // Advance Details (Work Orders)
-        12: { halign: 'center', cellWidth: 15 }, // CGST (Work Orders)
-        13: { halign: 'center', cellWidth: 15 }, // SGST (Work Orders)
-        14: { halign: 'center', cellWidth: 20 }, // Total Work Amount
-        15: { halign: 'center', cellWidth: 20 }, // Branch
-        16: { halign: 'center', cellWidth: 25 }, // Created At
-        17: { halign: 'center', cellWidth: 25 }, // Updated At
-      };
+      case 'consolidated':
+        return {
+          0: { halign: 'center', cellWidth: 25 }, // Sales Order ID
+          1: { halign: 'center', cellWidth: 25 }, // Work Order ID
+          2: { halign: 'center', cellWidth: 25 }, // MR Number
+          3: { halign: 'center', cellWidth: 25 }, // Total Amount
+          4: { halign: 'center', cellWidth: 25 }, // Total GST
+          5: { halign: 'center', cellWidth: 25 }, // Advance Collected
+          6: { halign: 'center', cellWidth: 25 }, // Balance Collected
+          7: { halign: 'center', cellWidth: 25 }, // Amount Left to Collect
+          8: { halign: 'center', cellWidth: 25 }, // Branch
+          9: { halign: 'center', cellWidth: 25 }, // Created At
+          10: { halign: 'center', cellWidth: 25 }, // Updated At
+        };
     case 'stock_report':
       return {
         0: { halign: 'center', cellWidth: 30 }, // Product ID
@@ -544,50 +537,64 @@ const ReportGenerator = ({ isCollapsed }) => {
           const { data: workData, error: workError } = await workQuery;
           if (workError) throw workError;
 
+          // Create a mapping of work orders by work_order_id
+          const workOrdersMap = {};
+          workData.forEach(work => {
+            workOrdersMap[work.work_order_id] = work;
+          });
+
           // Consolidate data based on work_order_id
           const consolidatedData = salesData.map(sale => {
-            const relatedWork = workData.find(work => work.work_order_id === sale.work_order_id) || {};
+            const relatedWork = workOrdersMap[sale.work_order_id] || {};
+
+            // Calculate Total GST
+            const totalGST = (sale.cgst || 0) + (sale.sgst || 0) + (relatedWork.cgst || 0) + (relatedWork.sgst || 0);
+
+            // Total Amount is from Work Order Total Amount
+            const totalAmount = relatedWork.total_amount || 0;
+
+            // Advance Collected from Work Order
+            const advanceCollected = relatedWork.advance_details || 0;
+
+            // Balance Collected from Sales Order (Final Amount)
+            const balanceCollected = sale.final_amount || 0;
+
+            // Amount Left to Collect
+            const amountLeftToCollect = totalAmount - (advanceCollected + balanceCollected);
+
             return {
               sales_order_id: sale.sales_order_id || 'N/A',
-              work_order_id: sale.work_order_id || relatedWork.work_order_id || 'N/A',
+              work_order_id: sale.work_order_id || 'N/A',
               mr_number: sale.mr_number || relatedWork.mr_number || 'N/A',
-              is_b2b: sale.is_b2b || relatedWork.is_b2b || false,
-              subtotal: sale.subtotal || 0,
-              cgst_sales: sale.cgst || 0,
-              sgst_sales: sale.sgst || 0,
-              total_amount_sales: sale.total_amount || 0,
-              advance_paid_sales: sale.advance_details || 0,
-              balance_due_sales: sale.final_amount || 0,
-              due_date: relatedWork.due_date ? convertUTCToIST(relatedWork.due_date, 'dd-MM-yyyy') : 'N/A',
-              advance_details_work: relatedWork.advance_details || 0,
-              cgst_work: relatedWork.cgst || 0,
-              sgst_work: relatedWork.sgst || 0,
-              total_amount_work: relatedWork.total_amount || 0,
+              total_amount: totalAmount,
+              total_gst: totalGST,
+              advance_collected: advanceCollected,
+              balance_collected: balanceCollected,
+              amount_left_to_collect: amountLeftToCollect,
               branch: sale.branch || relatedWork.branch || 'N/A',
               created_at: sale.created_at ? convertUTCToIST(sale.created_at, 'dd-MM-yyyy hh:mm a') : (relatedWork.created_at ? convertUTCToIST(relatedWork.created_at, 'dd-MM-yyyy hh:mm a') : 'N/A'),
               updated_at: sale.updated_at ? convertUTCToIST(sale.updated_at, 'dd-MM-yyyy hh:mm a') : (relatedWork.updated_at ? convertUTCToIST(relatedWork.updated_at, 'dd-MM-yyyy hh:mm a') : 'N/A'),
             };
           });
 
-          // If there are work_orders without corresponding sales_orders
+          // For work orders without corresponding sales orders
           const additionalWorkOrders = workData.filter(work => !salesData.some(sale => sale.work_order_id === work.work_order_id));
           additionalWorkOrders.forEach(work => {
+            const totalGST = (work.cgst || 0) + (work.sgst || 0);
+            const totalAmount = work.total_amount || 0;
+            const advanceCollected = work.advance_details || 0;
+            const balanceCollected = 0; // Since no sales order
+            const amountLeftToCollect = totalAmount - (advanceCollected + balanceCollected);
+
             consolidatedData.push({
               sales_order_id: 'N/A',
               work_order_id: work.work_order_id || 'N/A',
               mr_number: work.mr_number || 'N/A',
-              is_b2b: work.is_b2b || false,
-              subtotal: 0,
-              cgst_sales: 0,
-              sgst_sales: 0,
-              total_amount_sales: 0,
-              advance_paid_sales: 0,
-              balance_due_sales: 0,
-              due_date: work.due_date ? convertUTCToIST(work.due_date, 'dd-MM-yyyy') : 'N/A',
-              advance_details_work: work.advance_details || 0,
-              cgst_work: work.cgst || 0,
-              sgst_work: work.sgst || 0,
-              total_amount_work: work.total_amount || 0,
+              total_amount: totalAmount,
+              total_gst: totalGST,
+              advance_collected: advanceCollected,
+              balance_collected: balanceCollected,
+              amount_left_to_collect: amountLeftToCollect,
               branch: work.branch || 'N/A',
               created_at: work.created_at ? convertUTCToIST(work.created_at, 'dd-MM-yyyy hh:mm a') : 'N/A',
               updated_at: work.updated_at ? convertUTCToIST(work.updated_at, 'dd-MM-yyyy hh:mm a') : 'N/A',
@@ -814,28 +821,21 @@ const ReportGenerator = ({ isCollapsed }) => {
           'Updated At',
         ];
         break;
-      case 'consolidated':
-        tableColumn = [
-          'Sales Order ID',
-          'Work Order ID',
-          'MR Number',
-          'Is B2B',
-          'Sale Value',
-          'CGST (Sales)',
-          'SGST (Sales)',
-          'Total Sales Amount',
-          'Advance Paid (Sales)',
-          'Balance Due (Sales)',
-          'Due Date (Work Orders)',
-          'Advance Details (Work Orders)',
-          'CGST (Work Orders)',
-          'SGST (Work Orders)',
-          'Total Work Amount',
-          'Branch',
-          'Created At',
-          'Updated At',
-        ];
-        break;
+        case 'consolidated':
+          tableColumn = [
+            'Sales Order ID',
+            'Work Order ID',
+            'MR Number',
+            'Total Amount',
+            'Total GST',
+            'Advance Collected',
+            'Balance Collected',
+            'Amount Left to Collect',
+            'Branch',
+            'Created At',
+            'Updated At',
+          ];
+          break;
       case 'stock_report':
         tableColumn = [
           'Product ID',
@@ -961,28 +961,21 @@ const ReportGenerator = ({ isCollapsed }) => {
             : 'N/A',
         ]);
         break;
-      case 'consolidated':
-        tableRows = data.map((record) => [
-          record.sales_order_id || 'N/A',
-          record.work_order_id || 'N/A',
-          record.mr_number || 'N/A',
-          record.is_b2b ? 'Yes' : 'No',
-          record.subtotal ? Number(record.subtotal).toFixed(2) : '0.00',
-          record.cgst_sales ? Number(record.cgst_sales).toFixed(2) : '0.00',
-          record.sgst_sales ? Number(record.sgst_sales).toFixed(2) : '0.00',
-          record.total_amount_sales ? Number(record.total_amount_sales).toFixed(2) : '0.00',
-          record.advance_paid_sales ? Number(record.advance_paid_sales).toFixed(2) : '0.00',
-          record.balance_due_sales ? Number(record.balance_due_sales).toFixed(2) : '0.00',
-          record.due_date || 'N/A',
-          record.advance_details_work ? Number(record.advance_details_work).toFixed(2) : '0.00',
-          record.cgst_work ? Number(record.cgst_work).toFixed(2) : '0.00',
-          record.sgst_work ? Number(record.sgst_work).toFixed(2) : '0.00',
-          record.total_amount_work ? Number(record.total_amount_work).toFixed(2) : '0.00',
-          record.branch || 'N/A',
-          record.created_at || 'N/A',
-          record.updated_at || 'N/A',
-        ]);
-        break;
+        case 'consolidated':
+          tableRows = data.map((record) => [
+            record.sales_order_id || 'N/A',
+            record.work_order_id || 'N/A',
+            record.mr_number || 'N/A',
+            record.total_amount ? Number(record.total_amount).toFixed(2) : '0.00',
+            record.total_gst ? Number(record.total_gst).toFixed(2) : '0.00',
+            record.advance_collected ? Number(record.advance_collected).toFixed(2) : '0.00',
+            record.balance_collected ? Number(record.balance_collected).toFixed(2) : '0.00',
+            record.amount_left_to_collect ? Number(record.amount_left_to_collect).toFixed(2) : '0.00',
+            record.branch || 'N/A',
+            record.created_at || 'N/A',
+            record.updated_at || 'N/A',
+          ]);
+          break;
       case 'stock_report':
         tableRows = data.map((item) => [
           item.product_id || 'N/A',
@@ -1094,25 +1087,18 @@ const ReportGenerator = ({ isCollapsed }) => {
         break;
       }
       case 'consolidated': {
-        const totalSalesAmount = data.reduce((acc, curr) => acc + (curr.total_amount_sales || 0), 0);
-        const totalWorkAmount = data.reduce((acc, curr) => acc + (curr.total_amount_work || 0), 0);
-        const totalCombinedAmount = totalSalesAmount + totalWorkAmount;
-        const totalBalanceDue = data.reduce((acc, curr) => acc + (curr.balance_due_sales || 0), 0);
-        const totalCGSTSales = data.reduce((acc, curr) => acc + (curr.cgst_sales || 0), 0);
-        const totalSGSTSales = data.reduce((acc, curr) => acc + (curr.sgst_sales || 0), 0);
-        const totalCGSTWork = data.reduce((acc, curr) => acc + (curr.cgst_work || 0), 0);
-        const totalSGSTWork = data.reduce((acc, curr) => acc + (curr.sgst_work || 0), 0);
-        const totalAmountCollected = (totalSalesAmount - totalBalanceDue) + (totalWorkAmount - (data.reduce((acc, curr) => acc + (curr.advance_details_work || 0), 0)));
+        const totalAmount = data.reduce((acc, curr) => acc + (parseFloat(curr.total_amount) || 0), 0);
+        const totalGST = data.reduce((acc, curr) => acc + (parseFloat(curr.total_gst) || 0), 0);
+        const totalAdvanceCollected = data.reduce((acc, curr) => acc + (parseFloat(curr.advance_collected) || 0), 0);
+        const totalBalanceCollected = data.reduce((acc, curr) => acc + (parseFloat(curr.balance_collected) || 0), 0);
+        const totalAmountLeftToCollect = data.reduce((acc, curr) => acc + (parseFloat(curr.amount_left_to_collect) || 0), 0);
+
         summaryTable = [
-          ['Total Sales Amount', totalSalesAmount.toFixed(2)],
-          ['Total Work Amount', totalWorkAmount.toFixed(2)],
-          ['Combined Total Amount', totalCombinedAmount.toFixed(2)],
-          ['Total Balance Due (Sales)', totalBalanceDue.toFixed(2)],
-          ['Total Amount Collected', totalAmountCollected.toFixed(2)], // New Metric
-          ['Total CGST (Sales)', totalCGSTSales.toFixed(2)],
-          ['Total SGST (Sales)', totalSGSTSales.toFixed(2)],
-          ['Total CGST (Work Orders)', totalCGSTWork.toFixed(2)],
-          ['Total SGST (Work Orders)', totalSGSTWork.toFixed(2)],
+          ['Total Amount', totalAmount.toFixed(2)],
+          ['Total GST Collected', totalGST.toFixed(2)],
+          ['Total Advance Collected', totalAdvanceCollected.toFixed(2)],
+          ['Total Balance Collected', totalBalanceCollected.toFixed(2)],
+          ['Total Amount Left to Collect', totalAmountLeftToCollect.toFixed(2)],
         ];
         break;
       }

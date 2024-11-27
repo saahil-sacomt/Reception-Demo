@@ -261,12 +261,12 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
               productEntries: productEntries.map((entry, i) =>
                 i === index
                   ? {
-                      id: productDetails.product_id,
-                      name: productDetails.product_name,
-                      price: productDetails.mrp || "",
-                      quantity: entry.quantity || "",
-                      hsn_code: productDetails.hsn_code || "",
-                    }
+                    id: productDetails.product_id,
+                    name: productDetails.product_name,
+                    price: productDetails.mrp || "",
+                    quantity: entry.quantity || "",
+                    hsn_code: productDetails.hsn_code || "",
+                  }
                   : entry
               ),
             },
@@ -354,25 +354,49 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   // GST Rate and HSN Code
   const GST_RATE = 12; // Total GST is 12% (6% CGST + 6% SGST)
 
-  // Calculate totals
+  
+  
+    // Calculate totals
   const calculateTotals = useCallback((entries, discountAmt) => {
-    const subtotal = entries.reduce((total, product) => {
-      const price = parseFloat(product.price) || 0;
+    // Initialize variables
+    let subtotal = 0;
+    let validDiscountAmount = 0;
+    let discountedSubtotal = 0;
+    let cgst = 0;
+    let sgst = 0;
+    let totalAmount = 0;
+  
+    // Calculate subtotal (price excluding GST)
+    subtotal = entries.reduce((total, product) => {
+      const price = parseFloat(product.price) || 0; // MRP including GST
       const quantity = parseInt(product.quantity) || 0;
-      const basePrice = price / 112 * 100; // Adjusted price
+      const basePrice = price / 1.12; // Adjusted price excluding GST
       return total + basePrice * quantity;
     }, 0);
-
-    const validDiscountAmount = Math.min(discountAmt || 0, subtotal);
-    const discountedSubtotal = Math.max(subtotal - validDiscountAmount, 0); // Prevent negative subtotal
-
-    const cgst = (discountedSubtotal * 6) / 100 || 0;
-    const sgst = (discountedSubtotal * 6) / 100 || 0;
-
-    const totalAmount = Math.max(discountedSubtotal + cgst + sgst, 0); // Include CGST and SGST
-
-    return { subtotal, discountAmount: validDiscountAmount, discountedSubtotal, cgst, sgst, totalAmount };
+  
+    // Apply discount
+    validDiscountAmount = Math.min(discountAmt || 0, subtotal);
+    discountedSubtotal = Math.max((subtotal*1.12 - validDiscountAmount)/1.12, 0); // Prevent negative subtotal
+  
+    // Calculate GST amounts
+    cgst = discountedSubtotal * 0.06;
+    sgst = discountedSubtotal * 0.06;
+  
+    // Calculate total amount including GST
+    totalAmount = discountedSubtotal + cgst + sgst;
+  
+    return {
+      subtotal,
+      discountAmount: validDiscountAmount,
+      discountedSubtotal,
+      cgst,
+      sgst,
+      totalAmount,
+    };
   }, []);
+  
+
+
 
   // Utility function to get today's date in YYYY-MM-DD format
   const getTodayDate = useCallback(() => {
@@ -426,7 +450,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   const handlePrint = useCallback(() => {
     window.print();
     dispatch({ type: "SET_WORK_ORDER_FORM", payload: { isPrinted: true } });
-      resetForm();
+    resetForm();
   }, [dispatch, resetForm]);
 
   // Add a new product entry
@@ -481,7 +505,9 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
 
   // Balance calculations
   const advance = parseFloat(advanceDetails) || 0;
-  const balanceDue = totalAmount - advance;
+  const balanceDue = Math.max(totalAmount - advance, 0);
+  const excessAmount = advance - totalAmount;
+
 
   // Advance amount validation
   const validateAdvanceAmount = useCallback(() => {
@@ -832,20 +858,20 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         mr_number: hasMrNumber ? mrNumber : null,
         patient_details: hasMrNumber
           ? {
-              mr_number: mrNumber,
-              name: patientDetails?.name,
-              age: patientDetails?.age,
-              phone_number: patientDetails?.phoneNumber,
-              gender: patientDetails?.gender,
-              address: patientDetails?.address,
-            }
+            mr_number: mrNumber,
+            name: patientDetails?.name,
+            age: patientDetails?.age,
+            phone_number: patientDetails?.phoneNumber,
+            gender: patientDetails?.gender,
+            address: patientDetails?.address,
+          }
           : {
-              name: customerName,
-              phone_number: customerPhone,
-              address: customerAddress,
-              age: parseInt(customerAge),
-              gender: customerGender,
-            },
+            name: customerName,
+            phone_number: customerPhone,
+            address: customerAddress,
+            age: parseInt(customerAge),
+            gender: customerGender,
+          },
         employee,
         payment_method: paymentMethod,
         subtotal,
@@ -1196,12 +1222,12 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                 productEntries: productEntries.map((entry, i) =>
                   i === index
                     ? {
-                        id: productDetails.product_id,
-                        name: productDetails.product_name,
-                        price: productDetails.mrp || "",
-                        quantity: entry.quantity || "",
-                        hsn_code: productDetails.hsn_code || "",
-                      }
+                      id: productDetails.product_id,
+                      name: productDetails.product_name,
+                      price: productDetails.mrp || "",
+                      quantity: entry.quantity || "",
+                      hsn_code: productDetails.hsn_code || "",
+                    }
                     : entry
                 ),
               },
@@ -2011,6 +2037,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                 </table>
 
                 {/* Financial Summary */}
+                {/* Financial Summary */}
                 <div className="flex justify-between mb-6 space-x-8">
                   <div>
                     <p><strong>Subtotal:</strong> ₹{subtotal.toFixed(2)}</p>
@@ -2025,14 +2052,17 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                     <p><strong>Total Amount:</strong> ₹{totalAmount.toFixed(2)}</p>
                     <p><strong>Advance Paid:</strong> ₹{advance.toFixed(2)}</p>
                     <p><strong>Balance Due:</strong> ₹{balanceDue.toFixed(2)}</p>
-                    <div className=" mt-10 space-x-8">
+                    {excessAmount > 0 && (
+                      <p className="text-red-500">
+                        Advance paid exceeds the total amount by ₹{excessAmount.toFixed(2)}.
+                      </p>
+                    )}
+                    <div className="mt-10 space-x-8">
                       <p><strong>Billed by:</strong> {employee || 'N/A'}</p>
                     </div>
                   </div>
                 </div>
-
-                {/* Payment Method and Advance Details as Text for Print */}
-                {/* Payment Method and Advance Details on the Same Line */}
+                
                 <div className="print:hidden flex flex-col md:flex-row items-center justify-between my-6 space-x-4">
                   {/* Discount Input Field */}
                   <div className="w-full print:w-1/3 mb-4 md:mb-0">
@@ -2042,7 +2072,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                     <input
                       type="number"
                       id="discount"
-                      placeholder="Enter discount percentage"
+                      placeholder="Enter discount Amount"
                       value={discount}
                       onChange={handleDiscountInput}
                       onKeyDown={(e) => handleEnterKey(e, paymentMethodRef)}
@@ -2130,7 +2160,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                   <p className="mt-2 text-md">
                     <strong>Delivery On:</strong> {dueDate || 'N/A'}
                   </p>
-                  
+
                   {isB2B && (
                     <p><strong>GST Number of work assigning:</strong> {gstNumber || 'N/A'}</p>
                   )}
@@ -2157,7 +2187,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     e.preventDefault();
-                    
+
                     if (!isSaving) {
                       saveWorkOrder();
                       setTimeout(() => {
