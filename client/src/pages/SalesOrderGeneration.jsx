@@ -10,7 +10,6 @@ import { PrinterIcon, TrashIcon } from "@heroicons/react/24/outline";
 import supabase from "../supabaseClient";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { deductStockForMultipleProducts } from "../services/authService.js";
 import EmployeeVerification from "../components/EmployeeVerification";
 import { useGlobalState } from "../context/GlobalStateContext";
 
@@ -81,11 +80,11 @@ const fetchProductDetailsFromDatabase = async (productId, branch) => {
       return null;
     }
 
-    // Step 2: Fetch stock information
+    // Step 2: Fetch stock information using products.id (integer)
     const { data: stockData, error: stockError } = await supabase
       .from("stock")
       .select("quantity")
-      .eq("product_id", productData.id) // Note: product_id here refers to products.id
+      .eq("product_id", productData.id) // Use integer id
       .eq("branch_code", branch)
       .single();
 
@@ -107,17 +106,17 @@ const calculateLoyaltyPoints = (
   redeemPointsAmount,
   privilegeCard,
   privilegeCardDetails,
-  LoyaltyPoints
+  loyaltyPoints
 ) => {
   let pointsToRedeem = 0;
   if (privilegeCard && privilegeCardDetails) {
     pointsToRedeem = Math.min(
       parseFloat(redeemPointsAmount) || 0,
-      LoyaltyPoints
+      loyaltyPoints
     );
   }
 
-  let updatedPoints = LoyaltyPoints - pointsToRedeem;
+  let updatedPoints = loyaltyPoints - pointsToRedeem;
 
   const pointsToAdd = Math.floor(subtotal * 0.05);
 
@@ -128,9 +127,10 @@ const calculateLoyaltyPoints = (
 
 const normalizeWorkOrderProducts = (workOrderProducts) => {
   return workOrderProducts.map((product) => ({
-    id: product.product_id || product.id, // Map `product_id` to `id`
+    id: product.id, // Use products.id (integer) for stock operations
+    product_id: product.product_id, // Keep product_id (string) for display
     name: product.product_name || product.name, // Map `product_name` to `name`
-    price: product.price || 0, // Other fields remain unchanged
+    price: product.mrp || 0, // Use `mrp` as price
     quantity: product.quantity || 0,
     hsn_code: product.hsn_code || "",
     stock: product.stock || 0,
@@ -329,7 +329,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
 
   // Local states
   const [originalProductEntries, setOriginalProductEntries] = useState([
-    { id: "", name: "", price: "", quantity: "" },
+    { id: "", product_id: "", name: "", price: "", quantity: "" },
   ]);
   const [selectedWorkOrder, setSelectedWorkOrder] = useState(null);
   const [showWorkOrderModal, setShowWorkOrderModal] = useState(false);
@@ -372,19 +372,19 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
 
   // Function to create a new customer
   const saveCustomerDetails = async (customerDetails) => {
-    
+    const { name, phone_number, address, gender, age } = customerDetails;
 
     const { data, error } = await supabase
       .from("customers")
       .upsert(
         {
           name,
-          phone_number:customerPhone ,
+          phone_number,
           address,
           age: parseInt(age, 10),
           gender,
         },
-        { onConflict: "phone_number" } // Avoid duplication
+        { onConflict: ["phone_number"] } // Ensure unique based on phone_number
       )
       .select();
 
@@ -496,7 +496,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
       const column = type === "id" ? "product_id" : "product_name";
       const { data, error } = await supabase
         .from("products")
-        .select(`product_id, product_name, mrp,hsn_code`)
+        .select(`product_id, product_name, mrp, hsn_code`)
         .ilike(column, `%${query}%`)
         .limit(10);
 
@@ -534,12 +534,13 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     if (productDetails) {
       const updatedEntries = [...productEntries];
       updatedEntries[index] = {
-        id: productDetails.product_id,
+        id: productDetails.id, // Use integer id for stock operations
+        product_id: productDetails.product_id, // Keep string product_id for display
         name: productDetails.product_name,
         price: productDetails.mrp || "",
         stock: productDetails.stock || 0,
         quantity: updatedEntries[index].quantity || "",
-        hsn_code: productDetails.hsn_code, // Preserve quantity
+        hsn_code: productDetails.hsn_code || "",
       };
       updateSalesOrderForm({ productEntries: updatedEntries });
 
@@ -577,10 +578,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           return;
         }
 
-        // Standardize product entries to include product_id
-        const normalizedProducts = normalizeWorkOrderProducts(
-          data.product_entries
-        );
+        // Standardize product entries to include product_id and id
+        const normalizedProducts = normalizeWorkOrderProducts(data.product_entries);
 
         updateSalesOrderForm({
           productEntries: normalizedProducts,
@@ -775,7 +774,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
       } else {
         updateSalesOrderForm({
           privilegeCardDetails: data,
-          isOtpVerified: true, // Assuming successful fetch auto-verifies
+          isPinVerified: true, // Assuming successful fetch auto-verifies
           validationErrors: {
             ...validationErrors,
             privilegeCardNumber: null,
@@ -802,7 +801,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
   // Fetch privilege card details via phone number
   const handleFetchPrivilegeCard = async () => {
     try {
-      const card = await fetchPrivilegeCardByPhone(form.customerPhone);
+      const card = await fetchPrivilegeCardByPhone(customerPhone);
       if (card) {
         updateSalesOrderForm({ privilegeCardDetails: card });
         updateSalesOrderForm({
@@ -1401,11 +1400,11 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     setSearchQuery(e.target.value);
   };
 
+  // Updated handleOrderCompletion function with correct stock update logic
   const handleOrderCompletion = async () => {
     const currentUTCDateTime = getCurrentUTCDateTime();
-     // Prevent duplicate clicks
-    updateSalesOrderForm({ isSaving: true });
-    await saveCustomerDetails();
+    if (isSaving) return; // Prevent duplicate clicks
+    updateSalesOrderForm({ isSaving: true }); // Set isSaving to true
     updateSalesOrderForm({
       validationErrors: {
         ...validationErrors,
@@ -1414,55 +1413,85 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     });
 
     try {
-      // Step 1: Handle Loyalty Points Update (if applicable)
-      if (salesOrderForm.privilegeCard && privilegeCardDetails) {
-        const { updatedPoints, pointsToRedeem, pointsToAdd } =
-          calculateLoyaltyPoints(
-            subtotalWithGST,
-            redeemPointsAmount,
-            salesOrderForm.privilegeCard,
-            privilegeCardDetails,
-            loyaltyPoints
-          );
+      // **Step 1: Save Customer Details (if applicable)**
+      if (hasMrNumber === "no") {
+        // Validate Customer Details
+        const customerErrors = {};
+        if (!customerName.trim())
+          customerErrors.customerName = "Customer name is required.";
+        if (!customerPhone.trim()) {
+          customerErrors.customerPhone = "Customer phone number is required.";
+        }
+        if (!address.trim())
+          customerErrors.address = "Customer address is required.";
+        if (!age || parseInt(age, 10) <= 0)
+          customerErrors.customerAge = "Age must be a positive number.";
+        if (!gender)
+          customerErrors.customerGender = "Customer gender is required.";
+
+        if (Object.keys(customerErrors).length > 0) {
+          updateSalesOrderForm({
+            validationErrors: {
+              ...validationErrors,
+              ...customerErrors,
+            },
+          });
+          updateSalesOrderForm({ isSaving: false });
+          return;
+        }
+
+        // Call saveCustomerDetails with customer details
+        await saveCustomerDetails({
+          name: customerName,
+          phone_number: customerPhone,
+          address,
+          gender,
+          age: parseInt(age, 10),
+        });
+      }
+
+      // **Step 2: Handle Loyalty Points Update (if applicable)**
+      if (privilegeCard && privilegeCardDetails) {
+        const { updatedPoints, pointsToRedeem, pointsToAdd } = calculateLoyaltyPoints(
+          subtotalWithGST,
+          redeemPointsAmount,
+          privilegeCard,
+          privilegeCardDetails,
+          loyaltyPoints
+        );
 
         const { error: loyaltyError } = await supabase
           .from("privilegecards")
           .update({ loyalty_points: updatedPoints })
-          .eq("pc_number", salesOrderForm.privilegeCardNumber);
+          .eq("pc_number", privilegeCardDetails.pc_number);
 
         if (loyaltyError) {
           console.error("Error updating loyalty points:", loyaltyError);
-          dispatch({
-            type: "SET_SALES_ORDER_FORM",
-            payload: {
-              validationErrors: {
-                ...validationErrors,
-                generalError: "Failed to update loyalty points",
-              },
+          updateSalesOrderForm({
+            validationErrors: {
+              ...validationErrors,
+              generalError: "Failed to update loyalty points",
             },
           });
+          updateSalesOrderForm({ isSaving: false });
           return;
         }
 
-        dispatch({
-          type: "SET_SALES_ORDER_FORM",
-          payload: {
-            loyaltyPoints: updatedPoints,
-            pointsToAdd: pointsToAdd,
-            // If pointsToAdd is also part of global state
-          },
+        updateSalesOrderForm({
+          loyaltyPoints: updatedPoints,
+          pointsToAdd: pointsToAdd,
         });
       }
 
-      // Step 2: Prepare Variables for sales Data
-      const sanitizedRedeemedPoints = salesOrderForm.privilegeCard
-        ? parseInt(salesOrderForm.redeemPointsAmount) || 0
+      // **Step 3: Prepare Variables for Sales Data**
+      const sanitizedRedeemedPoints = privilegeCard
+        ? parseInt(redeemPointsAmount) || 0
         : 0;
-      const sanitizedPointsAdded = salesOrderForm.privilegeCard
+      const sanitizedPointsAdded = privilegeCard
         ? pointsToAdd || 0
         : 0;
 
-      // Step 3: Handle Existing sales Update
+      // **Step 4: Handle Existing Sales Update**
       if (isEditing) {
         // a. Calculate Differences
         const differences = calculateProductDifferences(
@@ -1470,92 +1499,108 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           productEntries
         );
 
-        // b. Update Stock Levels
-        for (const { productId, diff } of differences) {
-          if (diff === 0) continue; // No change
-
-          // Fetch current stock
+        // If no differences, proceed without updating stock
+        if (differences.length === 0) {
+          console.log("No differences in product quantities.");
+        } else {
+          // b. Fetch current stock for all affected products
+          const productIds = differences.map((diff) => diff.productId);
           const { data: stockData, error: stockError } = await supabase
             .from("stock")
-            .select("quantity")
-            .eq("product_id", productId)
-            .eq("branch_code", branch)
-            .single();
+            .select("product_id, quantity")
+            .in("product_id", productIds)
+            .eq("branch_code", branch);
 
           if (stockError || !stockData) {
-            console.error(
-              `Error fetching stock for product ${productId}:`,
-              stockError
-            );
-            dispatch({
-              type: "SET_SALES_ORDER_FORM",
-              payload: {
-                validationErrors: {
-                  ...validationErrors,
-                  generalError: `Failed to fetch stock for product ID: ${productId}`,
-                },
+            console.error("Error fetching stock data:", stockError);
+            updateSalesOrderForm({
+              validationErrors: {
+                ...validationErrors,
+                generalError: "Failed to fetch stock data.",
               },
             });
+            updateSalesOrderForm({ isSaving: false });
             return;
           }
 
-          const newStock = stockData.quantity - diff; // Deduct if diff > 0, add if diff < 0
+          // Create a map of current stock
+          const stockMap = new Map();
+          stockData.forEach((stock) => {
+            stockMap.set(stock.product_id, stock.quantity);
+          });
 
-          if (newStock < 0) {
-            dispatch({
-              type: "SET_SALES_ORDER_FORM",
-              payload: {
+          // c. Validate stock deductions
+          for (const { productId, diff } of differences) {
+            const currentStock = stockMap.get(productId) || 0;
+            const newStock = currentStock - diff;
+
+            if (newStock < 0) {
+              updateSalesOrderForm({
                 validationErrors: {
                   ...validationErrors,
                   generalError: `Insufficient stock for product ID: ${productId}. Cannot reduce stock below zero.`,
                 },
-              },
-            });
-            return;
+              });
+              updateSalesOrderForm({ isSaving: false });
+              return;
+            }
           }
 
-          // Update stock
-          const { error: updateStockError } = await supabase
-            .from("stock")
-            .update({ quantity: newStock })
-            .eq("product_id", productId)
-            .eq("branch_code", branch);
+          // d. Update stock quantities in bulk
+          const updateStockPromises = differences.map(({ productId, diff }) => {
+            const newQuantity = stockMap.get(productId) - diff;
+            return supabase
+              .from("stock")
+              .update({ quantity: newQuantity })
+              .eq("product_id", productId)
+              .eq("branch_code", branch);
+          });
 
-          if (updateStockError) {
-            console.error(
-              `Error updating stock for product ${productId}:`,
-              updateStockError
-            );
-            dispatch({
-              type: "SET_SALES_ORDER_FORM",
-              payload: {
-                validationErrors: {
-                  ...validationErrors,
-                  generalError: `Failed to fetch stock for product ID: ${productId}`,
-                },
+          const updateStockResults = await Promise.all(updateStockPromises);
+
+          // Check for any errors in stock updates
+          const stockUpdateErrors = updateStockResults.filter(
+            (result) => result.error
+          );
+
+          if (stockUpdateErrors.length > 0) {
+            console.error("Error updating stock levels:", stockUpdateErrors);
+            updateSalesOrderForm({
+              validationErrors: {
+                ...validationErrors,
+                generalError: "Failed to update stock levels.",
               },
             });
+            updateSalesOrderForm({ isSaving: false });
             return;
           }
         }
 
-        // c. Update sales
+        // c. Update sales order
         const { error: updateError } = await supabase
           .from("sales_orders")
           .update({
-            items: productEntries,
-            advance_details: parseFloat(advance) || 0,
+            items: productEntries.map((prod) => ({
+              id: prod.id, // Integer id for stock
+              product_id: prod.product_id, // String product_id for display
+              name: prod.name,
+              price: parseFloat(prod.price),
+              quantity: parseInt(prod.quantity, 10),
+              hsn_code: prod.hsn_code,
+            })),
+            advance_details: parseFloat(advanceDetails) || 0,
             mr_number: hasMrNumber === "yes" ? mrNumber : null,
-            patient_phone: hasMrNumber === "yes" ? patientDetails.phone_number : customerPhone,
+            patient_phone:
+              hasMrNumber === "yes" ? patientDetails.phone_number : null,
             employee: employee,
             payment_method: paymentMethod,
-            subtotal: subtotalWithoutGST,
+            subtotal: parseFloat(subtotalWithoutGST),
             cgst: parseFloat(cgstAmount),
             sgst: parseFloat(sgstAmount),
-            total_amount: subtotalWithGST,
-            discount: calculatedDiscount,
-            privilege_discount: privilegeDiscount, // Updated field
-            final_amount: balanceDue,
+            total_amount: parseFloat(subtotalWithGST),
+            discount: parseFloat(calculatedDiscount),
+            privilege_discount: parseFloat(privilegeDiscount),
+            final_amount: parseFloat(balanceDue),
             loyalty_points_redeemed: sanitizedRedeemedPoints,
             loyalty_points_added: sanitizedPointsAdded,
             updated_at: currentUTCDateTime,
@@ -1564,20 +1609,18 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           .eq("sales_order_id", salesOrderId);
 
         if (updateError) {
-          console.error("Error updating sales:", updateError);
-          dispatch({
-            type: "SET_SALES_ORDER_FORM",
-            payload: {
-              validationErrors: {
-                ...validationErrors,
-                generalError: "failed to update sales",
-              },
+          console.error("Error updating sales order:", updateError);
+          updateSalesOrderForm({
+            validationErrors: {
+              ...validationErrors,
+              generalError: "Failed to update sales order.",
             },
           });
+          updateSalesOrderForm({ isSaving: false });
           return;
         }
 
-        // Update modification status to completed
+        // d. Update modification status to completed
         const { error: modUpdateError } = await supabase
           .from("modification_requests")
           .update({ status: "completed" })
@@ -1585,22 +1628,31 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
 
         if (modUpdateError) {
           console.error("Error updating modification status:", modUpdateError);
-          dispatch({
-            type: "SET_SALES_ORDER_FORM",
-            payload: {
-              validationErrors: {
-                ...validationErrors,
-                generalError: "failed to update modification status",
-              },
+          updateSalesOrderForm({
+            validationErrors: {
+              ...validationErrors,
+              generalError: "Failed to update modification status.",
             },
           });
+          updateSalesOrderForm({ isSaving: false });
           return;
         }
 
         alert("Sales updated successfully!");
       } else {
-        // Step 4: Insert New sales
+        // **Step 5: Insert New Sales Order**
         const newSalesOrderId = await generateSalesOrderId();
+        if (!newSalesOrderId) {
+          updateSalesOrderForm({
+            validationErrors: {
+              ...validationErrors,
+              generalError: "Failed to generate sales order ID.",
+            },
+          });
+          updateSalesOrderForm({ isSaving: false });
+          return;
+        }
+
         const { error: insertError } = await supabase
           .from("sales_orders")
           .insert({
@@ -1608,41 +1660,46 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
             work_order_id: selectedWorkOrder
               ? selectedWorkOrder.work_order_id
               : null,
-            items: productEntries,
+            items: productEntries.map((prod) => ({
+              id: prod.id, // Integer id for stock
+              product_id: prod.product_id, // String product_id for display
+              name: prod.name,
+              price: parseFloat(prod.price),
+              quantity: parseInt(prod.quantity, 10),
+              hsn_code: prod.hsn_code,
+            })),
             mr_number: hasMrNumber === "yes" ? mrNumber : null,
-            patient_phone: hasMrNumber === "yes" ? patientDetails.phone_number : customerPhone,
+            patient_phone:
+              hasMrNumber === "yes" ? patientDetails.phone_number : null,
             employee: employee,
             payment_method: paymentMethod,
-            subtotal: subtotalWithoutGST,
-            discount: calculatedDiscount,
-            total_amount:subtotalWithGST,
-            advance_details: advance, // Assuming you have an 'advance_paid' field
-            privilege_discount: privilegeDiscount, // Updated field
+            subtotal: parseFloat(subtotalWithoutGST),
+            discount: parseFloat(calculatedDiscount),
+            total_amount: parseFloat(subtotalWithGST),
+            advance_details: parseFloat(advanceDetails) || 0,
+            privilege_discount: parseFloat(privilegeDiscount),
             cgst: parseFloat(cgstAmount),
             sgst: parseFloat(sgstAmount),
-            final_amount: balanceDue, // Correct final amount including GST
+            final_amount: parseFloat(balanceDue),
             loyalty_points_redeemed: sanitizedRedeemedPoints,
             loyalty_points_added: sanitizedPointsAdded,
             updated_at: currentUTCDateTime,
             branch: branch,
-          })
-          .eq("sales_order_id", salesOrderId);
+          });
 
         if (insertError) {
-          console.error("Error inserting sales:", insertError);
-          dispatch({
-            type: "SET_SALES_ORDER_FORM",
-            payload: {
-              validationErrors: {
-                ...validationErrors,
-                generalError: "failed to update work order status",
-              },
+          console.error("Error inserting sales order:", insertError);
+          updateSalesOrderForm({
+            validationErrors: {
+              ...validationErrors,
+              generalError: "Failed to insert sales order.",
             },
           });
+          updateSalesOrderForm({ isSaving: false });
           return;
         }
 
-        // Step 5: Mark Work Order as Used (if applicable)
+        // **Step 6: Mark Work Order as Used (if applicable)**
         if (selectedWorkOrder) {
           const { error: workOrderError } = await supabase
             .from("work_orders")
@@ -1651,77 +1708,112 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
 
           if (workOrderError) {
             console.error("Error marking work order as used:", workOrderError);
-            dispatch({
-              type: "SET_SALES_ORDER_FORM",
-              payload: {
-                validationErrors: {
-                  ...validationErrors,
-                  generalError: "failed to update work order status",
-                },
+            updateSalesOrderForm({
+              validationErrors: {
+                ...validationErrors,
+                generalError: "Failed to update work order status.",
               },
             });
+            updateSalesOrderForm({ isSaving: false });
             return;
           }
         }
 
+        // **Step 7: Deduct Stock for Multiple Products in Bulk**
         const validProducts = productEntries.filter(
           (product) => product.id && product.quantity > 0
         );
 
         if (!validProducts || validProducts.length === 0) {
           console.error("No valid products to process");
-          dispatch({
-            type: "SET_SALES_ORDER_FORM",
-            payload: {
-              validationErrors: {
-                ...validationErrors,
-                generalError: "no valid products to deduct stock",
-              },
+          updateSalesOrderForm({
+            validationErrors: {
+              ...validationErrors,
+              generalError: "No valid products to deduct stock.",
             },
           });
-          dispatch({
-            type: "SET_SALES_ORDER_FORM",
-            payload: { isLoading: false },
-          }); // Ensure loading state is turned off
+          updateSalesOrderForm({ isSaving: false });
           return;
         }
 
         console.log("Valid Products for Deduction:", validProducts);
 
-        // Step 6: Deduct Stock for Multiple Products in Bulk
-        const deductions = validProducts.map((product) => ({
-          product_id: product.id,
-          branch_code: branch,
-          purchase_quantity: product.quantity,
-        }));
+        // Fetch current stock for all valid products in one query
+        const productIds = validProducts.map((prod) => prod.id); // Use integer ids
+        const { data: stockData, error: stockError } = await supabase
+          .from("stock")
+          .select("product_id, quantity")
+          .in("product_id", productIds)
+          .eq("branch_code", branch);
 
-        const deductResponse = await deductStockForMultipleProducts(
-          deductions,
-          branch
-        );
-        if (!deductResponse.success) {
-          console.error("Stock deduction failed:", deductResponse.error);
-          dispatch({
-            type: "SET_SALES_ORDER_FORM",
-            payload: {
-              validationErrors: {
-                ...validationErrors,
-                generalError: `Failed to deduct stocks: ${deductResponse.error}`,
-              },
+        if (stockError || !stockData) {
+          console.error("Error fetching stock data:", stockError);
+          updateSalesOrderForm({
+            validationErrors: {
+              ...validationErrors,
+              generalError: "Failed to fetch stock data.",
             },
           });
+          updateSalesOrderForm({ isSaving: false });
           return;
         }
+
+        // Create a map of current stock
+        const stockMap = new Map();
+        stockData.forEach((stock) => {
+          stockMap.set(stock.product_id, stock.quantity);
+        });
+
+        // Validate stock deductions
+        for (const product of validProducts) {
+          const currentStock = stockMap.get(product.id) || 0;
+          const newStock = currentStock - product.quantity;
+
+          if (newStock < 0) {
+            updateSalesOrderForm({
+              validationErrors: {
+                ...validationErrors,
+                generalError: `Insufficient stock for product ID: ${product.product_id}. Cannot reduce stock below zero.`,
+              },
+            });
+            updateSalesOrderForm({ isSaving: false });
+            return;
+          }
+        }
+
+        // Update stock quantities in bulk
+        const updateStockPromises = validProducts.map((product) => {
+          const newQuantity = stockMap.get(product.id) - product.quantity;
+          return supabase
+            .from("stock")
+            .update({ quantity: newQuantity })
+            .eq("product_id", product.id)
+            .eq("branch_code", branch);
+        });
+
+        const updateStockResults = await Promise.all(updateStockPromises);
+
+        // Check for any errors in stock updates
+        const stockUpdateErrors = updateStockResults.filter(
+          (result) => result.error
+        );
+
+        if (stockUpdateErrors.length > 0) {
+          console.error("Error updating stock levels:", stockUpdateErrors);
+          updateSalesOrderForm({
+            validationErrors: {
+              ...validationErrors,
+              generalError: "Failed to update stock levels.",
+            },
+          });
+          updateSalesOrderForm({ isSaving: false });
+          return;
+        }
+
+        alert("Sales order created successfully!");
       }
 
-      // Step 7: Reset the Form After Successful Submission
-      if (onModificationSuccess) {
-        await supabase
-          .from("modification_requests")
-          .update({ status: "completed" })
-          .eq("order_id", isEditing ? salesOrderId : newSalesOrderId);
-      }
-
+      // **Final Steps: Reset Form and Allow Printing**
       updateSalesOrderForm({ allowPrint: true });
 
       alert("Order processed successfully!");
@@ -1730,27 +1822,21 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
       }, 100);
     } catch (error) {
       console.error("Error completing the order:", error);
-      dispatch({
-        type: "SET_SALES_ORDER_FORM",
-        payload: {
-          validationErrors: {
-            ...validationErrors,
-            generalError: "failed to complete the order",
-          },
+      updateSalesOrderForm({
+        validationErrors: {
+          ...validationErrors,
+          generalError: "Failed to complete the order.",
         },
       });
     } finally {
-      dispatch({
-        type: "SET_SALES_ORDER_FORM",
-        payload: { isLoading: false },
-      });
+      updateSalesOrderForm({ isSaving: false }); // Set isSaving to false
     }
   };
 
   // Function to reset the form
   const resetForm = () => {
     dispatch({ type: "RESET_SALES_ORDER_FORM" });
-    setOriginalProductEntries([{ id: "", name: "", price: "", quantity: "" }]);
+    setOriginalProductEntries([{ id: "", product_id: "", name: "", price: "", quantity: "" }]);
     dispatch({
       type: "SET_SALES_ORDER_FORM",
       payload: {
@@ -1784,7 +1870,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     dispatch({ type: "SET_SALES_ORDER_FORM", payload: { isPrinted: true } });
     resetForm();
     navigate("/home");
-  }, []);
+  }, [dispatch, navigate]);
 
   return (
     <div

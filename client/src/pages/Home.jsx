@@ -633,10 +633,10 @@ const Home = ({ isCollapsed }) => {
                       <p><strong>MR Number:</strong> {selectedWorkOrder.mr_number || 'N/A'}</p>
                       <p><strong>Customer Name:</strong> {selectedWorkOrder.patient_details?.name || 'N/A'}</p>
                       <p><strong>Due Date:</strong> {selectedWorkOrder.due_date || 'N/A'}</p>
-                      <p><strong>Employee:</strong> {selectedWorkOrder.employee || 'N/A'}</p>
+                      <p><strong>Billed by:</strong> {selectedWorkOrder.employee || 'N/A'}</p>
                       <p><strong>Payment Method:</strong> {selectedWorkOrder.payment_method || 'N/A'}</p>
                       <p><strong>Subtotal:</strong> ₹{selectedWorkOrder.subtotal?.toFixed(2) || '0.00'}</p>
-                      <p><strong>Discount:</strong> {selectedWorkOrder.discount_percentage?.toFixed(2)}% (₹{selectedWorkOrder.discount_amount?.toFixed(2) || '0.00'})</p>
+                      <p><strong>Discount:</strong> {selectedWorkOrder.discount_amount?.toFixed(2)} || '0.00'</p>
                       <p><strong>Discounted Subtotal:</strong> ₹{selectedWorkOrder.discounted_subtotal?.toFixed(2) || '0.00'}</p>
                       <p><strong>CGST (6%):</strong> ₹{selectedWorkOrder.cgst?.toFixed(2) || '0.00'}</p>
                       <p><strong>SGST (6%):</strong> ₹{selectedWorkOrder.sgst?.toFixed(2) || '0.00'}</p>
@@ -737,16 +737,16 @@ const Home = ({ isCollapsed }) => {
                       <p><strong>MR Number:</strong> {selectedSalesOrder.mr_number || 'N/A'}</p>
                       <p><strong>Customer Phone:</strong> {selectedSalesOrder.patient_phone || 'N/A'}</p>
                       <p><strong>Branch:</strong> {selectedSalesOrder.branch || 'N/A'}</p>
-                      <p><strong>Created At:</strong> {selectedSalesOrder.created_at || 'N/A'}</p>
                       <p><strong>Subtotal:</strong> ₹{selectedSalesOrder.subtotal?.toFixed(2) || '0.00'}</p>
-                      <p><strong>Discount:</strong> {selectedSalesOrder.discount?.toFixed(2)}% (₹{selectedSalesOrder.discount_amount?.toFixed(2) || '0.00'})</p>
+                      <p><strong>Discount:</strong> {selectedSalesOrder.discount?.toFixed(2) || '0.00'} </p>
                       <p><strong>Final Amount:</strong> ₹{selectedSalesOrder.final_amount?.toFixed(2) || '0.00'}</p>
                       <p><strong>Loyalty Points Redeemed:</strong> {selectedSalesOrder.loyalty_points_redeemed || 0}</p>
                       <p><strong>Loyalty Points Added:</strong> {selectedSalesOrder.loyalty_points_added || 0}</p>
                       <p><strong>CGST (6%):</strong> ₹{selectedSalesOrder.cgst?.toFixed(2) || '0.00'}</p>
                       <p><strong>SGST (6%):</strong> ₹{selectedSalesOrder.sgst?.toFixed(2) || '0.00'}</p>
-                      <p><strong>Total Amount:</strong> ₹{selectedSalesOrder.total_amount?.toFixed(2) || '0.00'}</p>
-                      <p><strong>Balance Due:</strong> ₹{(selectedSalesOrder.total_amount - parseFloat(selectedSalesOrder.advance_details || 0)).toFixed(2)}</p>
+                      <p><strong>Billed by:</strong> {selectedSalesOrder.employee || 'N/A'}</p>
+                      <p><strong>Total Amount:</strong> ₹{selectedSalesOrder.final_amount?.toFixed(2) || '0.00'}</p>
+                      <p><strong>Balance Due:</strong> ₹{(selectedSalesOrder.final_amount - parseFloat(selectedSalesOrder.advance_details || 0)).toFixed(2)}</p>
 
                       {/* Product Details */}
                       <div>

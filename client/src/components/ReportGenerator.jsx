@@ -66,9 +66,9 @@ const getColumnStyles = (reportType) => {
     case 'product_sales':
       return {
         0: { halign: 'center', cellWidth: 20 }, // Product ID
-        1: { halign: 'center', cellWidth: 30 }, // Product Name
-        2: { halign: 'center', cellWidth: 15 }, // MRP
-        3: { halign: 'center', cellWidth: 15 }, // Rate
+        1: { halign: 'center', cellWidth: 40 }, // Product Name
+        2: { halign: 'center', cellWidth: 20 }, // MRP
+        3: { halign: 'center', cellWidth: 20 }, // Rate
         4: { halign: 'center', cellWidth: 20 }, // HSN Code
         5: { halign: 'center', cellWidth: 20 }, // Total Quantity Sold
         6: { halign: 'center', cellWidth: 20 }, // Total Revenue
@@ -82,27 +82,27 @@ const getColumnStyles = (reportType) => {
         1: { halign: 'center', cellWidth: 25 }, // Order ID
         2: { halign: 'center', cellWidth: 20 }, // Order Type
         3: { halign: 'center', cellWidth: 25 }, // Employee Name
-        4: { halign: 'center', cellWidth: 25 }, // Modification Type
-        5: { halign: 'center', cellWidth: 30 }, // Modification Reason
+        4: { halign: 'center', cellWidth: 35 }, // Modification Type
+        5: { halign: 'center', cellWidth: 35 }, // Modification Reason
         6: { halign: 'center', cellWidth: 20 }, // Status
-        7: { halign: 'center', cellWidth: 30 }, // Rejection Reason (Fixed)
+        7: { halign: 'center', cellWidth: 35 }, // Rejection Reason (Fixed)
         8: { halign: 'center', cellWidth: 25 }, // Created At
         9: { halign: 'center', cellWidth: 25 }, // Updated At
       };
-      case 'consolidated':
-        return {
-          0: { halign: 'center', cellWidth: 25 }, // Sales Order ID
-          1: { halign: 'center', cellWidth: 25 }, // Work Order ID
-          2: { halign: 'center', cellWidth: 25 }, // MR Number
-          3: { halign: 'center', cellWidth: 25 }, // Total Amount
-          4: { halign: 'center', cellWidth: 25 }, // Total GST
-          5: { halign: 'center', cellWidth: 25 }, // Advance Collected
-          6: { halign: 'center', cellWidth: 25 }, // Balance Collected
-          7: { halign: 'center', cellWidth: 25 }, // Amount Left to Collect
-          8: { halign: 'center', cellWidth: 25 }, // Branch
-          9: { halign: 'center', cellWidth: 25 }, // Created At
-          10: { halign: 'center', cellWidth: 25 }, // Updated At
-        };
+    case 'consolidated':
+      return {
+        0: { halign: 'center', cellWidth: 25 }, // Sales Order ID
+        1: { halign: 'center', cellWidth: 25 }, // Work Order ID
+        2: { halign: 'center', cellWidth: 25 }, // MR Number
+        3: { halign: 'center', cellWidth: 25 }, // Total Amount
+        4: { halign: 'center', cellWidth: 25 }, // Total GST
+        5: { halign: 'center', cellWidth: 25 }, // Advance Collected
+        6: { halign: 'center', cellWidth: 25 }, // Balance Collected
+        7: { halign: 'center', cellWidth: 25 }, // Total Collected (Replaced)
+        8: { halign: 'center', cellWidth: 25 }, // Branch
+        9: { halign: 'center', cellWidth: 25 }, // Created At
+        10: { halign: 'center', cellWidth: 25 }, // Updated At
+      };
     case 'stock_report':
       return {
         0: { halign: 'center', cellWidth: 30 }, // Product ID
@@ -152,7 +152,7 @@ const addHeader = (doc, logoDataUrl, reportDetails) => {
   } else if (reportDetails.type === 'Consolidated') {
     periodText = `Period: ${reportDetails.fromDate} to ${reportDetails.toDate}`;
   }
-
+  
   doc.text(periodText, doc.internal.pageSize.getWidth() / 2, 50, { align: 'center' });
 
   // Add Branch Information
@@ -420,76 +420,109 @@ const ReportGenerator = ({ isCollapsed }) => {
           break;
         }
         case 'product_sales': {
-          // Fetch stock entries with selected branches and include product details
-          const query = supabase
+          // Fetch products
+          const { data: productsData, error: productsError } = await supabase
+            .from('products')
+            .select('*');
+
+          if (productsError) throw productsError;
+
+          // Fetch stock entries with selected branches
+          const stockQuery = supabase
             .from('stock')
-            .select(`
-              *,
-              product:products(product_name, product_id, mrp, rate, hsn_code)
-            `)
+            .select('*');
+
+          if (!isCombined) {
+            stockQuery.in('branch_code', branchesToReport);
+          }
+
+          const { data: stockData, error: stockError } = await stockQuery;
+
+          if (stockError) throw stockError;
+
+          // Fetch sales_orders
+          const salesQuery = supabase
+            .from('sales_orders')
+            .select('items')
             .gte('created_at', startDate.toISOString())
             .lte('created_at', endDate.toISOString());
 
           if (!isCombined) {
-            query.in('branch_code', branchesToReport);
+            salesQuery.in('branch', branchesToReport);
           }
 
-          ({ data, error } = await query);
-          if (error) throw error;
-          fetchedData = data;
+          const { data: salesData, error: salesError } = await salesQuery;
 
-          if (fetchedData.length === 0) {
-            setError('No stock records found for the selected period and branch.');
-            setLoading(false);
-            return;
+          if (salesError) throw salesError;
+
+          // Fetch work_orders
+          const workQuery = supabase
+            .from('work_orders')
+            .select('product_entries')
+            .gte('created_at', startDate.toISOString())
+            .lte('created_at', endDate.toISOString());
+
+          if (!isCombined) {
+            workQuery.in('branch', branchesToReport);
           }
 
-          // Combine stock and product data based on product_id
-          const combinedData = fetchedData.map((stockItem) => {
-            const product = stockItem.product || {};
+          const { data: workData, error: workError } = await workQuery;
+
+          if (workError) throw workError;
+
+          // Aggregate sales from sales_orders
+          const salesAggregated = {};
+          salesData.forEach(sale => {
+            const items = sale.items || [];
+            items.forEach(item => {
+              const pid = item.id; // Assuming 'id' refers to 'product_id' (integer)
+              const quantity = parseInt(item.quantity) || 0;
+              if (!salesAggregated[pid]) {
+                salesAggregated[pid] = 0;
+              }
+              salesAggregated[pid] += quantity;
+            });
+          });
+
+          // Aggregate sales from work_orders
+          workData.forEach(work => {
+            const products = work.product_entries || [];
+            products.forEach(product => {
+              const pid = product.id; // Assuming 'id' refers to 'product_id' (integer)
+              const quantity = parseInt(product.quantity) || 0;
+              if (!salesAggregated[pid]) {
+                salesAggregated[pid] = 0;
+              }
+              salesAggregated[pid] += quantity;
+            });
+          });
+
+          // Prepare formattedProductIdSummary
+          formattedProductIdSummary = productsData.map(product => {
+            const pid = product.id; // integer product id
+            const productStock = stockData.filter(stock => stock.product_id === pid);
+            const currentStock = productStock.reduce((acc, curr) => acc + (curr.quantity || 0), 0);
+            const totalSold = salesAggregated[pid] || 0;
+            const totalRevenue = (product.mrp || 0) * totalSold;
+
             return {
-              product_id: product.product_id || 'N/A',
-              product_name: product.product_name || 'N/A',
-              mrp: product.mrp || 'N/A',
-              rate: product.rate || 'N/A',
-              hsn_code: product.hsn_code || 'N/A',
-              quantity: stockItem.quantity || 0,
-              total_value: stockItem.total_value || 0,
-              stock_created_at: convertUTCToIST(stockItem.created_at, 'dd-MM-yyyy hh:mm a'),
-              stock_updated_at: convertUTCToIST(stockItem.updated_at, 'dd-MM-yyyy hh:mm a'),
-              // Add any additional stock fields if necessary
+              'Product ID': product.product_id || 'N/A',
+              'Product Name': product.product_name || 'N/A',
+              'MRP': product.mrp ? Number(product.mrp).toFixed(2) : '0.00',
+              'Rate': product.rate ? Number(product.rate).toFixed(2) : '0.00',
+              'HSN Code': product.hsn_code || 'N/A',
+              'Total Quantity Sold': totalSold,
+              'Total Revenue': totalRevenue.toFixed(2),
+              'Stock Created At': convertUTCToIST(product.created_at, 'dd-MM-yyyy hh:mm a'),
+              'Stock Updated At': convertUTCToIST(product.updated_at, 'dd-MM-yyyy hh:mm a'),
+              'Current Stock Count': currentStock,
             };
           });
 
-          // Remove duplicates and summarize data by product_id
-          const productSummary = combinedData.reduce((acc, curr) => {
-            const pid = curr.product_id;
-            if (!acc[pid]) {
-              acc[pid] = {
-                ...curr,
-                total_quantity_sold: 0,
-                total_revenue: 0,
-                current_stock_count: 0,
-              };
-            }
-            acc[pid].total_quantity_sold += curr.quantity;
-            acc[pid].total_revenue += curr.total_value;
-            acc[pid].current_stock_count += curr.quantity; // Assuming quantity represents current stock
-            return acc;
-          }, {});
+          // Sort the summary by Product Name
+          formattedProductIdSummary.sort((a, b) => a['Product Name'].localeCompare(b['Product Name']));
 
-          formattedProductIdSummary = Object.values(productSummary).map((item) => ({
-            'Product ID': item.product_id,
-            'Product Name': item.product_name,
-            'MRP': item.mrp,
-            'Rate': Number(item.rate).toFixed(2),
-            'HSN Code': item.hsn_code,
-            'Total Quantity Sold': item.total_quantity_sold,
-            'Total Revenue': (item.mrp * item.total_quantity_sold).toFixed(2),
-            'Stock Created At': item.stock_created_at,
-            'Stock Updated At': item.stock_updated_at,
-            'Current Stock Count': item.current_stock_count, // New Field
-          }));
+          fetchedData = formattedProductIdSummary;
           break;
         }
         case 'modification_reports': {
@@ -548,19 +581,19 @@ const ReportGenerator = ({ isCollapsed }) => {
             const relatedWork = workOrdersMap[sale.work_order_id] || {};
 
             // Calculate Total GST
-            const totalGST = (sale.cgst || 0) + (sale.sgst || 0) + (relatedWork.cgst || 0) + (relatedWork.sgst || 0);
+            const totalGST = (parseFloat(sale.cgst) || 0) + (parseFloat(sale.sgst) || 0) + (parseFloat(relatedWork.cgst) || 0) + (parseFloat(relatedWork.sgst) || 0);
 
             // Total Amount is from Work Order Total Amount
-            const totalAmount = relatedWork.total_amount || 0;
+            const totalAmount = parseFloat(relatedWork.total_amount) || 0;
 
             // Advance Collected from Work Order
-            const advanceCollected = relatedWork.advance_details || 0;
+            const advanceCollected = parseFloat(relatedWork.advance_details) || 0;
 
             // Balance Collected from Sales Order (Final Amount)
-            const balanceCollected = sale.final_amount || 0;
+            const balanceCollected = parseFloat(sale.final_amount) || 0;
 
-            // Amount Left to Collect
-            const amountLeftToCollect = totalAmount - (advanceCollected + balanceCollected);
+            // Total Collected (Advance + Balance)
+            const totalCollected = advanceCollected + balanceCollected;
 
             return {
               sales_order_id: sale.sales_order_id || 'N/A',
@@ -570,7 +603,7 @@ const ReportGenerator = ({ isCollapsed }) => {
               total_gst: totalGST,
               advance_collected: advanceCollected,
               balance_collected: balanceCollected,
-              amount_left_to_collect: amountLeftToCollect,
+              total_collected: totalCollected, // Replaced 'amount_left_to_collect'
               branch: sale.branch || relatedWork.branch || 'N/A',
               created_at: sale.created_at ? convertUTCToIST(sale.created_at, 'dd-MM-yyyy hh:mm a') : (relatedWork.created_at ? convertUTCToIST(relatedWork.created_at, 'dd-MM-yyyy hh:mm a') : 'N/A'),
               updated_at: sale.updated_at ? convertUTCToIST(sale.updated_at, 'dd-MM-yyyy hh:mm a') : (relatedWork.updated_at ? convertUTCToIST(relatedWork.updated_at, 'dd-MM-yyyy hh:mm a') : 'N/A'),
@@ -580,11 +613,11 @@ const ReportGenerator = ({ isCollapsed }) => {
           // For work orders without corresponding sales orders
           const additionalWorkOrders = workData.filter(work => !salesData.some(sale => sale.work_order_id === work.work_order_id));
           additionalWorkOrders.forEach(work => {
-            const totalGST = (work.cgst || 0) + (work.sgst || 0);
-            const totalAmount = work.total_amount || 0;
-            const advanceCollected = work.advance_details || 0;
+            const totalGST = (parseFloat(work.cgst) || 0) + (parseFloat(work.sgst) || 0);
+            const totalAmount = parseFloat(work.total_amount) || 0;
+            const advanceCollected = parseFloat(work.advance_details) || 0;
             const balanceCollected = 0; // Since no sales order
-            const amountLeftToCollect = totalAmount - (advanceCollected + balanceCollected);
+            const totalCollected = advanceCollected + balanceCollected;
 
             consolidatedData.push({
               sales_order_id: 'N/A',
@@ -594,7 +627,7 @@ const ReportGenerator = ({ isCollapsed }) => {
               total_gst: totalGST,
               advance_collected: advanceCollected,
               balance_collected: balanceCollected,
-              amount_left_to_collect: amountLeftToCollect,
+              total_collected: totalCollected, // Replaced 'amount_left_to_collect'
               branch: work.branch || 'N/A',
               created_at: work.created_at ? convertUTCToIST(work.created_at, 'dd-MM-yyyy hh:mm a') : 'N/A',
               updated_at: work.updated_at ? convertUTCToIST(work.updated_at, 'dd-MM-yyyy hh:mm a') : 'N/A',
@@ -612,7 +645,7 @@ const ReportGenerator = ({ isCollapsed }) => {
 
           if (productsError) throw productsError;
 
-          // Fetch current stock
+          // Fetch stock entries with selected branches
           const stockQuery = supabase
             .from('stock')
             .select('*');
@@ -625,7 +658,24 @@ const ReportGenerator = ({ isCollapsed }) => {
 
           if (stockError) throw stockError;
 
-          // Fetch sales data
+          // Prepare combined data
+          const combinedData = productsData.map(product => {
+            const pid = product.id; // integer product id
+            const productStock = stockData.filter(stock => stock.product_id === pid);
+            const currentStock = productStock.reduce((acc, curr) => acc + (curr.quantity || 0), 0);
+
+            return {
+              product_id: product.product_id || 'N/A',
+              product_name: product.product_name || 'N/A',
+              mrp: product.mrp ? Number(product.mrp).toFixed(2) : '0.00',
+              rate: product.rate ? Number(product.rate).toFixed(2) : '0.00',
+              hsn_code: product.hsn_code || 'N/A',
+              total_sold: 0, // To be updated
+              current_stock: currentStock,
+            };
+          });
+
+          // Fetch sales_orders to calculate total sold per product
           const salesQuery = supabase
             .from('sales_orders')
             .select('items')
@@ -640,43 +690,55 @@ const ReportGenerator = ({ isCollapsed }) => {
 
           if (salesError) throw salesError;
 
-          // Aggregate sales data to get total quantity sold per product
-          const productSales = {};
+          // Fetch work_orders to calculate total sold per product
+          const workQuery = supabase
+            .from('work_orders')
+            .select('product_entries')
+            .gte('created_at', startDate.toISOString())
+            .lte('created_at', endDate.toISOString());
 
+          if (!isCombined) {
+            workQuery.in('branch', branchesToReport);
+          }
+
+          const { data: workData, error: workError } = await workQuery;
+
+          if (workError) throw workError;
+
+          // Aggregate sales from sales_orders
+          const salesAggregated = {};
           salesData.forEach(sale => {
             const items = sale.items || [];
-            items.forEach(product => {
-              const pid = product.id; // Assuming 'id' refers to 'product_id'
-              const quantity = parseInt(product.quantity) || 0;
-              if (!productSales[pid]) {
-                productSales[pid] = 0;
+            items.forEach(item => {
+              const pid = item.id; // Assuming 'id' refers to 'product_id' (integer)
+              const quantity = parseInt(item.quantity) || 0;
+              if (!salesAggregated[pid]) {
+                salesAggregated[pid] = 0;
               }
-              productSales[pid] += quantity;
+              salesAggregated[pid] += quantity;
             });
           });
 
-          // Create a combined data structure
-          const combinedData = productsData.map(product => {
-            const pid = product.product_id;
-            const stockItems = stockData.filter(stock => stock.product_id === product.id);
-            let currentStock = 0;
-            if (stockItems && stockItems.length > 0) {
-              // Sum the stock quantities across branches
-              currentStock = stockItems.reduce((acc, stock) => acc + (stock.quantity || 0), 0);
-            }
-            const totalSold = productSales[pid] || 0;
-            return {
-              product_id: pid,
-              product_name: product.product_name,
-              mrp: product.mrp,
-              rate: product.rate,
-              hsn_code: product.hsn_code,
-              total_sold: totalSold,
-              current_stock: currentStock,
-            };
+          // Aggregate sales from work_orders
+          workData.forEach(work => {
+            const products = work.product_entries || [];
+            products.forEach(product => {
+              const pid = product.id; // Assuming 'id' refers to 'product_id' (integer)
+              const quantity = parseInt(product.quantity) || 0;
+              if (!salesAggregated[pid]) {
+                salesAggregated[pid] = 0;
+              }
+              salesAggregated[pid] += quantity;
+            });
           });
 
-          // Sort by product name
+          // Update total_sold in combinedData
+          combinedData.forEach(product => {
+            const pid = productsData.find(p => p.product_id === product.product_id)?.id;
+            product.total_sold = salesAggregated[pid] || 0;
+          });
+
+          // Sort the summary by Product Name
           combinedData.sort((a, b) => a.product_name.localeCompare(b.product_name));
 
           fetchedData = combinedData;
@@ -821,21 +883,21 @@ const ReportGenerator = ({ isCollapsed }) => {
           'Updated At',
         ];
         break;
-        case 'consolidated':
-          tableColumn = [
-            'Sales Order ID',
-            'Work Order ID',
-            'MR Number',
-            'Total Amount',
-            'Total GST',
-            'Advance Collected',
-            'Balance Collected',
-            'Amount Left to Collect',
-            'Branch',
-            'Created At',
-            'Updated At',
-          ];
-          break;
+      case 'consolidated':
+        tableColumn = [
+          'Sales Order ID',
+          'Work Order ID',
+          'MR Number',
+          'Total Amount',
+          'Total GST',
+          'Advance Collected',
+          'Balance Collected',
+          'Total Collected', // Replaced 'Amount Left to Collect'
+          'Branch',
+          'Created At',
+          'Updated At',
+        ];
+        break;
       case 'stock_report':
         tableColumn = [
           'Product ID',
@@ -847,7 +909,6 @@ const ReportGenerator = ({ isCollapsed }) => {
           'Current Stock',
         ];
         break;
-
       default:
         tableColumn = [];
     }
@@ -961,21 +1022,21 @@ const ReportGenerator = ({ isCollapsed }) => {
             : 'N/A',
         ]);
         break;
-        case 'consolidated':
-          tableRows = data.map((record) => [
-            record.sales_order_id || 'N/A',
-            record.work_order_id || 'N/A',
-            record.mr_number || 'N/A',
-            record.total_amount ? Number(record.total_amount).toFixed(2) : '0.00',
-            record.total_gst ? Number(record.total_gst).toFixed(2) : '0.00',
-            record.advance_collected ? Number(record.advance_collected).toFixed(2) : '0.00',
-            record.balance_collected ? Number(record.balance_collected).toFixed(2) : '0.00',
-            record.amount_left_to_collect ? Number(record.amount_left_to_collect).toFixed(2) : '0.00',
-            record.branch || 'N/A',
-            record.created_at || 'N/A',
-            record.updated_at || 'N/A',
-          ]);
-          break;
+      case 'consolidated':
+        tableRows = data.map((record) => [
+          record.sales_order_id || 'N/A',
+          record.work_order_id || 'N/A',
+          record.mr_number || 'N/A',
+          record.total_amount ? Number(record.total_amount).toFixed(2) : '0.00',
+          record.total_gst ? Number(record.total_gst).toFixed(2) : '0.00',
+          record.advance_collected ? Number(record.advance_collected).toFixed(2) : '0.00',
+          record.balance_collected ? Number(record.balance_collected).toFixed(2) : '0.00',
+          record.total_collected ? Number(record.total_collected).toFixed(2) : '0.00', // Total Collected
+          record.branch || 'N/A',
+          record.created_at || 'N/A',
+          record.updated_at || 'N/A',
+        ]);
+        break;
       case 'stock_report':
         tableRows = data.map((item) => [
           item.product_id || 'N/A',
@@ -1031,24 +1092,24 @@ const ReportGenerator = ({ isCollapsed }) => {
     // Example summary data based on report type
     switch (reportType) {
       case 'sales_orders': {
-        const totalSales = data.reduce((acc, curr) => acc + (curr.total_amount || 0), 0);
-        const totalBalanceDue = data.reduce((acc, curr) => acc + (curr.final_amount || 0), 0);
-        const totalCGST = data.reduce((acc, curr) => acc + (curr.cgst || 0), 0);
-        const totalSGST = data.reduce((acc, curr) => acc + (curr.sgst || 0), 0);
+        const totalSales = data.reduce((acc, curr) => acc + (parseFloat(curr.total_amount) || 0), 0);
+        const totalBalanceDue = data.reduce((acc, curr) => acc + (parseFloat(curr.final_amount) || 0), 0);
+        const totalCGST = data.reduce((acc, curr) => acc + (parseFloat(curr.cgst) || 0), 0);
+        const totalSGST = data.reduce((acc, curr) => acc + (parseFloat(curr.sgst) || 0), 0);
         summaryTable = [
           ['Total Amount Overall (without Advances)', totalSales.toFixed(2)],
-          ['Total Sales Amount (Balance Collected)', totalBalanceDue.toFixed(2)], // Updated to use Balance Due
+          ['Total Sales Amount (Balance Collected)', totalBalanceDue.toFixed(2)],
           ['Total CGST', totalCGST.toFixed(2)],
           ['Total SGST', totalSGST.toFixed(2)],
         ];
         break;
       }
       case 'work_orders': {
-        const totalWorkAmount = data.reduce((acc, curr) => acc + (curr.total_amount || 0), 0);
-        const totalAdvance = data.reduce((acc, curr) => acc + (curr.advance_details || 0), 0);
+        const totalWorkAmount = data.reduce((acc, curr) => acc + (parseFloat(curr.total_amount) || 0), 0);
+        const totalAdvance = data.reduce((acc, curr) => acc + (parseFloat(curr.advance_details) || 0), 0);
         summaryTable = [
           ['Total Work Orders', data.length],
-          ['Total Advances from Work Orders', totalAdvance.toFixed(2)], // Clarified label
+          ['Total Advances from Work Orders', totalAdvance.toFixed(2)],
           ['Total Work Amount', totalWorkAmount.toFixed(2)],
         ];
         break;
@@ -1091,14 +1152,14 @@ const ReportGenerator = ({ isCollapsed }) => {
         const totalGST = data.reduce((acc, curr) => acc + (parseFloat(curr.total_gst) || 0), 0);
         const totalAdvanceCollected = data.reduce((acc, curr) => acc + (parseFloat(curr.advance_collected) || 0), 0);
         const totalBalanceCollected = data.reduce((acc, curr) => acc + (parseFloat(curr.balance_collected) || 0), 0);
-        const totalAmountLeftToCollect = data.reduce((acc, curr) => acc + (parseFloat(curr.amount_left_to_collect) || 0), 0);
+        const totalCollected = data.reduce((acc, curr) => acc + (parseFloat(curr.total_collected) || 0), 0);
 
         summaryTable = [
           ['Total Amount', totalAmount.toFixed(2)],
           ['Total GST Collected', totalGST.toFixed(2)],
           ['Total Advance Collected', totalAdvanceCollected.toFixed(2)],
           ['Total Balance Collected', totalBalanceCollected.toFixed(2)],
-          ['Total Amount Left to Collect', totalAmountLeftToCollect.toFixed(2)],
+          ['Total Collected', totalCollected.toFixed(2)], // Updated summary
         ];
         break;
       }
@@ -1363,7 +1424,7 @@ const ReportGenerator = ({ isCollapsed }) => {
                 ref={dateRef}
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                onKeyDown={(e) => handleKeyDown(e, isEmployee ? generateButtonRef : isCombined ? generateButtonRef : (reportPeriod === 'daily' ? generateButtonRef : branchSelectionRef))}
+                onKeyDown={(e) => handleKeyDown(e, isEmployee ? generateButtonRef : isCombined ? generateButtonRef : branchSelectionRef)}
                 className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
                 required
                 aria-required="true"
