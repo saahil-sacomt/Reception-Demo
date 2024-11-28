@@ -636,7 +636,7 @@ const Home = ({ isCollapsed }) => {
                       <p><strong>Billed by:</strong> {selectedWorkOrder.employee || 'N/A'}</p>
                       <p><strong>Payment Method:</strong> {selectedWorkOrder.payment_method || 'N/A'}</p>
                       <p><strong>Subtotal:</strong> ₹{selectedWorkOrder.subtotal?.toFixed(2) || '0.00'}</p>
-                      <p><strong>Discount:</strong> {selectedWorkOrder.discount_amount?.toFixed(2)} || '0.00'</p>
+                      <p><strong>Discount:</strong> {selectedWorkOrder.discount_amount?.toFixed(2) || '0.00'}</p>
                       <p><strong>Discounted Subtotal:</strong> ₹{selectedWorkOrder.discounted_subtotal?.toFixed(2) || '0.00'}</p>
                       <p><strong>CGST (6%):</strong> ₹{selectedWorkOrder.cgst?.toFixed(2) || '0.00'}</p>
                       <p><strong>SGST (6%):</strong> ₹{selectedWorkOrder.sgst?.toFixed(2) || '0.00'}</p>
@@ -658,7 +658,7 @@ const Home = ({ isCollapsed }) => {
                             <tbody>
                               {selectedWorkOrder.product_entries.map((product, index) => (
                                 <tr key={index}>
-                                  <td className="px-4 py-2 border border-gray-200">{product.name || 'N/A'}</td>
+                                  <td className="px-4 py-2 border border-gray-200">{product.product_name || 'N/A'}</td>
                                   <td className="px-4 py-2 border border-gray-200">{product.quantity || 'N/A'}</td>
                                   <td className="px-4 py-2 border border-gray-200">₹{product.price?.toFixed(2) || '0.00'}</td>
                                 </tr>
@@ -751,7 +751,7 @@ const Home = ({ isCollapsed }) => {
                       {/* Product Details */}
                       <div>
                         <h3 className="text-lg font-semibold mt-4">Product Details</h3>
-                        {selectedSalesOrder.product_entries && selectedSalesOrder.product_entries.length > 0 ? (
+                        {selectedSalesOrder.items && selectedSalesOrder.items.length > 0 ? (
                           <table className="min-w-full border-collapse border border-gray-200">
                             <thead>
                               <tr>
@@ -761,7 +761,7 @@ const Home = ({ isCollapsed }) => {
                               </tr>
                             </thead>
                             <tbody>
-                              {selectedSalesOrder.product_entries.map((product, index) => (
+                              {selectedSalesOrder.items.map((product, index) => (
                                 <tr key={index}>
                                   <td className="px-4 py-2 border border-gray-200">{product.name || 'N/A'}</td>
                                   <td className="px-4 py-2 border border-gray-200">{product.quantity || 'N/A'}</td>
