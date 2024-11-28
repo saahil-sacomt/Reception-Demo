@@ -1272,7 +1272,8 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   // Generate Work Order ID when not editing
   useEffect(() => {
     if (!isEditing && branch && !workOrderId) {
-      generateNewWorkOrderId();
+      console.log('Generating new Work Order ID');
+      generateNewWorkOrderId(); // Check if this is firing correctly
     }
   }, [branch, isEditing, workOrderId, generateNewWorkOrderId]);
 
