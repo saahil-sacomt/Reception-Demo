@@ -109,20 +109,20 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         .select("work_order_id")
         .order("work_order_id", { ascending: false })
         .limit(1);
-
+  
       if (error) {
         console.error("Error fetching last work order:", error);
         return;
       }
-
-      let newWorkOrderId = 3071; // Default to 3665 if no work orders exist
+  
+      let newWorkOrderId = 3071; // Default to 3071 if no work orders exist
       if (lastWorkOrders && lastWorkOrders.length > 0) {
         const lastWorkOrderId = parseInt(lastWorkOrders[0].work_order_id, 10);
         if (!isNaN(lastWorkOrderId)) {
           newWorkOrderId = lastWorkOrderId + 1;
         }
       }
-
+  
       dispatch({
         type: "SET_WORK_ORDER_FORM",
         payload: { workOrderId: newWorkOrderId.toString() },
@@ -132,6 +132,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       console.error("Error generating Work Order ID:", error);
     }
   }, [dispatch]);
+  
 
   // Fetch employees from the Supabase `employees` table
   const fetchEmployees = useCallback(async () => {
