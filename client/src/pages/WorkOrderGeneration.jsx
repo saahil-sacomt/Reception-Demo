@@ -120,7 +120,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
 
       console.log("Last Work Orders Retrieved:", lastWorkOrders);
 
-      let newWorkOrderId = 3071; // Default if no work orders exist
+      let newWorkOrderId = 3701; // Default if no work orders exist
 
       if (lastWorkOrders && lastWorkOrders.length > 0) {
         const lastWorkOrderId = parseInt(lastWorkOrders[0].work_order_id, 10);
