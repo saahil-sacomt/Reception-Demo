@@ -115,7 +115,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         return;
       }
 
-      let newWorkOrderId = 3071; // Default to 3665 if no work orders exist
+      let newWorkOrderId = 3070; // Default to 3665 if no work orders exist
       if (lastWorkOrders && lastWorkOrders.length > 0) {
         const lastWorkOrderId = parseInt(lastWorkOrders[0].work_order_id, 10);
         if (!isNaN(lastWorkOrderId)) {
