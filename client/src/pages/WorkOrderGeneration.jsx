@@ -1276,6 +1276,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       generateNewWorkOrderId(); // Check if this is firing correctly
     }
   }, [branch, isEditing, workOrderId, generateNewWorkOrderId]);
+  
 
   return (
 
