@@ -158,7 +158,7 @@ export const GlobalStateProvider = ({ children }) => {
   }, [state.salesOrderForm.someCondition]);
   */
 
-  /*
+  
   useEffect(() => {
     const handlePageRefresh = () => {
       resetState(); // Reset state on refresh
@@ -170,7 +170,7 @@ export const GlobalStateProvider = ({ children }) => {
       window.removeEventListener("beforeunload", handlePageRefresh);
     };
   }, []);
-  */
+  
 
   return (
     <GlobalStateContext.Provider value={{ state, dispatch, resetState }}>

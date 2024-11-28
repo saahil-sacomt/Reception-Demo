@@ -1264,10 +1264,11 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   );
 
   useEffect(() => {
-    if (isEditing && orderId) {
-      fetchWorkOrderDetails();
+    // If not editing and no workOrderId is set, generate a new one
+    if (!workOrderForm.isEditing && !workOrderId) {
+      generateNewWorkOrderId();
     }
-  }, [isEditing, orderId, fetchWorkOrderDetails]);
+  }, [generateNewWorkOrderId, workOrderForm.isEditing, workOrderId]);
 
   // Handle after print event
   useEffect(() => {
@@ -1284,13 +1285,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     };
   }, [isPrinted, resetForm]);
 
-  // Generate Work Order ID when not editing
-  useEffect(() => {
-    // If not editing and no workOrderId is set, generate a new one
-    if (!workOrderForm.isEditing && !workOrderId) {
-      generateNewWorkOrderId();
-    }
-  }, [generateNewWorkOrderId, workOrderForm.isEditing, workOrderId]);
+  
   
 
   return (
