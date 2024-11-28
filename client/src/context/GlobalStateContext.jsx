@@ -1,5 +1,4 @@
-// client/src/context/GlobalState.jsx
-
+// GlobalState.jsx
 import React, { createContext, useContext, useReducer, useEffect } from "react";
 import merge from "lodash.merge"; // Ensure lodash.merge is installed
 
@@ -31,10 +30,10 @@ const defaultInitialState = {
     patientDetails: null,
     employee: "",
     paymentMethod: "",
-    discount: "", // discount amount
+    discount: "",
     gstNumber: "",
     isB2B: false,
-    hasMrNumber: "yes", // 'yes' or 'no'
+    hasMrNumber: "yes",
     customerName: "",
     customerPhone: "",
     address: "",
@@ -51,7 +50,7 @@ const defaultInitialState = {
     redeemPointsAmount: "",
     isLoading: false,
     validationErrors: {},
-    fetchMethod: "work_order_id", // 'work_order_id', 'mr_number', 'phone_number'
+    fetchMethod: "work_order_id",
     searchQuery: "",
     workOrders: [],
   },
@@ -67,7 +66,7 @@ const defaultInitialState = {
     patientDetails: null,
     employee: "",
     paymentMethod: "",
-    discount: "", // discount amount
+    discount: "",
     gstNumber: "",
     isB2B: false,
     hasMrNumber: true,

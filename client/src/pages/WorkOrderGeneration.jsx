@@ -104,6 +104,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   // Generate a new Work Order ID
   const generateNewWorkOrderId = useCallback(async () => {
     try {
+      console.log("Attempting to generate new Work Order ID...");
       const { data: lastWorkOrders, error } = await supabase
         .from("work_orders")
         .select("work_order_id")
@@ -112,14 +113,20 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   
       if (error) {
         console.error("Error fetching last work order:", error);
+        alert("Error generating Work Order ID. Please try again.");
         return;
       }
   
-      let newWorkOrderId = 3071; // Default to 3071 if no work orders exist
+      console.log("Last Work Orders Retrieved:", lastWorkOrders);
+  
+      let newWorkOrderId = 3071; // Default if no work orders exist
       if (lastWorkOrders && lastWorkOrders.length > 0) {
         const lastWorkOrderId = parseInt(lastWorkOrders[0].work_order_id, 10);
+        console.log("Last Work Order ID:", lastWorkOrderId);
         if (!isNaN(lastWorkOrderId)) {
           newWorkOrderId = lastWorkOrderId + 1;
+        } else {
+          console.warn("Invalid lastWorkOrderId, defaulting to:", newWorkOrderId);
         }
       }
   
@@ -130,8 +137,10 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       console.log("Generated Work Order ID:", newWorkOrderId);
     } catch (error) {
       console.error("Error generating Work Order ID:", error);
+      alert("An unexpected error occurred while generating Work Order ID.");
     }
   }, [dispatch]);
+  
   
 
   // Fetch employees from the Supabase `employees` table
