@@ -2332,10 +2332,10 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           </div>
 
           {/* Product Price Input (Editable) */}
-          <div className="relative w-1/4">
+          <div className="relative w-1/3">
             <input
               type="number"
-              step="0.01"
+              step="0.1"
               min="0"
               placeholder="Price"
               value={product.price}
