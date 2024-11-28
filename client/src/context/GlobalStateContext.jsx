@@ -73,12 +73,20 @@ const defaultInitialState = {
     customerName: "",
     customerPhone: "",
     address: "",
-    age: "",
-    gender: "",
+    customerAge: "",
+    customerGender: "",
     modificationRequestId: null,
     isSaving: false,
     allowPrint: false,
   },
+  // Add Modal States
+  modals: {
+    showWorkOrdersModal: false,
+    showSalesModal: false,
+  },
+  // Add Selected Order States
+  selectedWorkOrder: null,
+  selectedSalesOrder: null,
 };
 
 // Deep merge defaultInitialState with savedState
@@ -121,6 +129,51 @@ const globalStateReducer = (state, action) => {
     case "RESET_WORK_ORDER_FORM":
       console.log("RESET_WORK_ORDER_FORM triggered");
       return { ...state, workOrderForm: defaultInitialState.workOrderForm };
+
+    // Modal Actions
+    case "SET_MODAL_STATE":
+      return {
+        ...state,
+        modals: {
+          ...state.modals,
+          ...action.payload,
+        },
+      };
+    case "RESET_MODAL_STATES":
+      return {
+        ...state,
+        modals: {
+          showWorkOrdersModal: false,
+          showSalesModal: false,
+        },
+        selectedWorkOrder: null,
+        selectedSalesOrder: null,
+      };
+
+    // Selected Work Order Actions
+    case "SET_SELECTED_WORK_ORDER":
+      return {
+        ...state,
+        selectedWorkOrder: action.payload,
+      };
+    case "RESET_SELECTED_WORK_ORDER":
+      return {
+        ...state,
+        selectedWorkOrder: null,
+      };
+
+    // Selected Sales Order Actions
+    case "SET_SELECTED_SALES_ORDER":
+      return {
+        ...state,
+        selectedSalesOrder: action.payload,
+      };
+    case "RESET_SELECTED_SALES_ORDER":
+      return {
+        ...state,
+        selectedSalesOrder: null,
+      };
+
     default:
       return state;
   }
@@ -139,6 +192,9 @@ export const GlobalStateProvider = ({ children }) => {
     localStorage.removeItem("globalState");
     dispatch({ type: "RESET_SALES_ORDER_FORM" });
     dispatch({ type: "RESET_WORK_ORDER_FORM" });
+    dispatch({ type: "RESET_MODAL_STATES" });
+    dispatch({ type: "RESET_SELECTED_WORK_ORDER" });
+    dispatch({ type: "RESET_SELECTED_SALES_ORDER" });
     // Optionally reset other parts of the state if necessary
   };
 
@@ -146,19 +202,6 @@ export const GlobalStateProvider = ({ children }) => {
     console.log("Current State:", state);
   }, [state]);
 
-  // Removed unnecessary useEffect hooks that might interfere with state integrity
-  /*
-  useEffect(() => {
-    if (state.salesOrderForm.someCondition === false) {
-      dispatch({
-        type: "SET_SALES_ORDER_FORM",
-        payload: { someCondition: true },
-      });
-    }
-  }, [state.salesOrderForm.someCondition]);
-  */
-
-  
   useEffect(() => {
     const handlePageRefresh = () => {
       resetState(); // Reset state on refresh
@@ -170,7 +213,6 @@ export const GlobalStateProvider = ({ children }) => {
       window.removeEventListener("beforeunload", handlePageRefresh);
     };
   }, []);
-  
 
   return (
     <GlobalStateContext.Provider value={{ state, dispatch, resetState }}>

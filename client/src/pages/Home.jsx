@@ -18,8 +18,12 @@ import supabase from '../supabaseClient';
 import { useGlobalState } from "../context/GlobalStateContext";
 
 const Home = ({ isCollapsed }) => {
-  // State Variables
+  // Access Global State
   const { state, dispatch } = useGlobalState();
+  const { modals, selectedWorkOrder, selectedSalesOrder } = state;
+  const { showWorkOrdersModal, showSalesModal } = modals;
+
+  // Other State Variables
   const [showSplash, setShowSplash] = useState(sessionStorage.getItem('showSplash') === 'true');
   const navigate = useNavigate();
   const { user, name, role, branch } = useAuth();
@@ -28,15 +32,13 @@ const Home = ({ isCollapsed }) => {
   const [pendingWorkOrdersCount, setPendingWorkOrdersCount] = useState(0);
   const [salesTodayCount, setSalesTodayCount] = useState(0);
 
-  // New State Variables for Modals
-  const [pendingWorkOrders, setPendingWorkOrders] = useState([]);
-  const [salesOrdersToday, setSalesOrdersToday] = useState([]);
+  // Removed Local Modal State Variables
+  // const [showWorkOrdersModal, setShowWorkOrdersModal] = useState(false);
+  // const [showSalesModal, setShowSalesModal] = useState(false);
 
-  // Modal State Variables
-  const [showWorkOrdersModal, setShowWorkOrdersModal] = useState(false);
-  const [showSalesModal, setShowSalesModal] = useState(false);
-  const [selectedWorkOrder, setSelectedWorkOrder] = useState(null);
-  const [selectedSalesOrder, setSelectedSalesOrder] = useState(null);
+  // Removed Local Selected Order States
+  // const [selectedWorkOrder, setSelectedWorkOrder] = useState(null);
+  // const [selectedSalesOrder, setSelectedSalesOrder] = useState(null);
 
   // Fetch approved/rejected modification requests for the logged-in employee
   const fetchActionRequests = async () => {
@@ -53,6 +55,40 @@ const Home = ({ isCollapsed }) => {
     } else {
       console.error("Error fetching action requests:", error.message);
     }
+  };
+
+  // Function to open the Work Orders Modal
+  const openWorkOrdersModal = () => {
+    dispatch({
+      type: "SET_MODAL_STATE",
+      payload: { showWorkOrdersModal: true },
+    });
+  };
+
+  // Function to close the Work Orders Modal
+  const closeWorkOrdersModal = () => {
+    dispatch({
+      type: "SET_MODAL_STATE",
+      payload: { showWorkOrdersModal: false },
+    });
+    dispatch({ type: "RESET_SELECTED_WORK_ORDER" }); // Reset selected work order
+  };
+
+  // Function to open the Sales Modal
+  const openSalesModal = () => {
+    dispatch({
+      type: "SET_MODAL_STATE",
+      payload: { showSalesModal: true },
+    });
+  };
+
+  // Function to close the Sales Modal
+  const closeSalesModal = () => {
+    dispatch({
+      type: "SET_MODAL_STATE",
+      payload: { showSalesModal: false },
+    });
+    dispatch({ type: "RESET_SELECTED_SALES_ORDER" }); // Reset selected sales order
   };
 
   // Fetch approved modification requests
@@ -88,13 +124,13 @@ const Home = ({ isCollapsed }) => {
       .eq('branch', branch)
       .gte('due_date', today); // Fetch work orders with due_date today or in the future
 
-      if (!error && data) {
-        dispatch({ type: "SET_PENDING_WORK_ORDERS", payload: data });
-        dispatch({ type: "SET_PENDING_WORK_ORDERS_COUNT", payload: data.length });
-      } else {
-        console.error("Error fetching pending work orders:", error.message);
-      }
-    };
+    if (!error && data) {
+      dispatch({ type: "SET_PENDING_WORK_ORDERS", payload: data });
+      dispatch({ type: "SET_PENDING_WORK_ORDERS_COUNT", payload: data.length });
+    } else {
+      console.error("Error fetching pending work orders:", error.message);
+    }
+  };
 
   // Fetch sales orders created today
   const fetchSalesOrdersToday = async () => {
@@ -108,13 +144,13 @@ const Home = ({ isCollapsed }) => {
       .eq('branch', branch)
       .gte('created_at', today); // Fetch sales orders created today
 
-      if (!error && data) {
-        dispatch({ type: "SET_SALES_ORDERS_TODAY", payload: data });
-        dispatch({ type: "SET_SALES_TODAY_COUNT", payload: data.length });
-      } else {
-        console.error("Error fetching sales orders today:", error.message);
-      }
-    };
+    if (!error && data) {
+      dispatch({ type: "SET_SALES_ORDERS_TODAY", payload: data });
+      dispatch({ type: "SET_SALES_TODAY_COUNT", payload: data.length });
+    } else {
+      console.error("Error fetching sales orders today:", error.message);
+    }
+  };
 
   // Fetch pending modification requests count for admin
   const fetchPendingRequestsCount = async () => {
@@ -400,7 +436,7 @@ const Home = ({ isCollapsed }) => {
             {/* Welcome Message */}
             <div className="mb-4 md:mb-0">
               <h2 className="font-normal text-[25px] text-green-500">
-              {getWelcomeMessage()}
+                {getWelcomeMessage()}
               </h2>
               <p className="text-sm text-gray-600">
                 Send, track & manage your documents & Privilege cards.
@@ -421,7 +457,7 @@ const Home = ({ isCollapsed }) => {
               {/* Pending Work Orders */}
               <div
                 className="flex flex-col px-8 py-2 transition-colors duration-300 hover:bg-gray-200 cursor-pointer"
-                onClick={() => setShowWorkOrdersModal(true)}
+                onClick={openWorkOrdersModal}
               >
                 <p className="text-3xl font-semibold text-green-500">{state.pendingWorkOrdersCount}</p>
                 <p className="text-xs text-gray-600 py-2">Pending Work Orders</p>
@@ -430,7 +466,7 @@ const Home = ({ isCollapsed }) => {
               {/* Sales Today */}
               <div
                 className="flex flex-col px-8 py-2 transition-colors duration-300 hover:bg-gray-200 cursor-pointer"
-                onClick={() => setShowSalesModal(true)}
+                onClick={openSalesModal}
               >
                 <p className="text-3xl font-semibold text-green-500">{state.salesTodayCount}</p>
                 <p className="text-xs text-gray-600 py-2">Sales Today</p>
@@ -542,9 +578,6 @@ const Home = ({ isCollapsed }) => {
                 </div>
               </div>
             )}
-
-            
-
           </div>
           {/* Reports and Stock Management Section for Employee */}
           {role === 'employee' && (
@@ -573,220 +606,220 @@ const Home = ({ isCollapsed }) => {
 
       {/* Pending Work Orders Modal */}
       {showWorkOrdersModal && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-              <div className="bg-white rounded-lg w-11/12 md:w-3/4 lg:w-1/2 p-6 relative">
-                {/* Close Button */}
-                <button
-                  onClick={() => { setShowWorkOrdersModal(false); setSelectedWorkOrder(null); }}
-                  className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"
-                  aria-label="Close Modal"
-                >
-                  <XMarkIcon className="h-6 w-6" />
-                </button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white rounded-lg w-11/12 md:w-3/4 lg:w-1/2 p-6 relative">
+            {/* Close Button */}
+            <button
+              onClick={closeWorkOrdersModal}
+              className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"
+              aria-label="Close Modal"
+            >
+              <XMarkIcon className="h-6 w-6" />
+            </button>
 
-                {/* Modal Content */}
-                {!selectedWorkOrder ? (
-                  <>
-                    <h2 className="text-xl font-semibold mb-4">Pending Work Orders</h2>
-                    {state.pendingWorkOrdersCount > 0 ? (
-                      <div className="grid grid-cols-1 gap-4 max-h-96 overflow-y-auto">
-                        {state.pendingWorkOrders.map((order) => (
-                          <div key={order.work_order_id} className="bg-white shadow-md rounded-lg p-4 flex flex-col">
-                            <div className="flex justify-between items-center">
-                              <h3 className="text-lg font-semibold text-green-500">{order.work_order_id}</h3>
-                              <button
-                                onClick={async () => {
-                                  const details = await fetchWorkOrderDetails(order.work_order_id);
-                                  if (details) setSelectedWorkOrder(details);
-                                }}
-                                className="text-blue-600 hover:underline"
-                                aria-label={`View details for Work Order ${order.work_order_id}`}
-                              >
-                                View Details
-                              </button>
-                            </div>
-                            <p className="text-sm text-gray-600 mt-2"><strong>Customer:</strong> {order.patient_details?.name || 'N/A'}</p>
-                            <p className="text-sm text-gray-600"><strong>MR Number:</strong> {order.mr_number || 'N/A'}</p>
-                          </div>
-                        ))}
+            {/* Modal Content */}
+            {!selectedWorkOrder ? (
+              <>
+                <h2 className="text-xl font-semibold mb-4">Pending Work Orders</h2>
+                {state.pendingWorkOrdersCount > 0 ? (
+                  <div className="grid grid-cols-1 gap-4 max-h-96 overflow-y-auto">
+                    {state.pendingWorkOrders.map((order) => (
+                      <div key={order.work_order_id} className="bg-white shadow-md rounded-lg p-4 flex flex-col">
+                        <div className="flex justify-between items-center">
+                          <h3 className="text-lg font-semibold text-green-500">{order.work_order_id}</h3>
+                          <button
+                            onClick={async () => {
+                              const details = await fetchWorkOrderDetails(order.work_order_id);
+                              if (details) dispatch({ type: "SET_SELECTED_WORK_ORDER", payload: details });
+                            }}
+                            className="text-blue-600 hover:underline"
+                            aria-label={`View details for Work Order ${order.work_order_id}`}
+                          >
+                            View Details
+                          </button>
+                        </div>
+                        <p className="text-sm text-gray-600 mt-2"><strong>Customer:</strong> {order.patient_details?.name || 'N/A'}</p>
+                        <p className="text-sm text-gray-600"><strong>MR Number:</strong> {order.mr_number || 'N/A'}</p>
                       </div>
+                    ))}
+                  </div>
 
-                    ) : (
-                      <p>No pending work orders.</p>
-                    )}
-                  </>
                 ) : (
-                  <>
-                    {/* If a work order is selected, show its details */}
-                    <button
-                      onClick={() => setSelectedWorkOrder(null)}
-                      className="flex items-center text-gray-600 hover:text-gray-800 mb-4"
-                      aria-label="Back to Work Orders List"
-                    >
-                      <ArrowLeftIcon className="h-5 w-5 mr-1" />
-                      Back
-                    </button>
-                    <h2 className="text-xl font-semibold mb-4">Work Order Details</h2>
-                    {/* Display Work Order Details */}
-                    <div className="space-y-2 overflow-y-auto max-h-108">
-                      <p><strong>Work Order ID:</strong> {selectedWorkOrder.work_order_id || 'N/A'}</p>
-                      <p><strong>MR Number:</strong> {selectedWorkOrder.mr_number || 'N/A'}</p>
-                      <p><strong>Customer Name:</strong> {selectedWorkOrder.patient_details?.name || 'N/A'}</p>
-                      <p><strong>Due Date:</strong> {selectedWorkOrder.due_date || 'N/A'}</p>
-                      <p><strong>Billed by:</strong> {selectedWorkOrder.employee || 'N/A'}</p>
-                      <p><strong>Payment Method:</strong> {selectedWorkOrder.payment_method || 'N/A'}</p>
-                      <p><strong>Subtotal:</strong> ₹{selectedWorkOrder.subtotal?.toFixed(2) || '0.00'}</p>
-                      <p><strong>Discount:</strong> {selectedWorkOrder.discount_amount?.toFixed(2) || '0.00'}</p>
-                      <p><strong>Discounted Subtotal:</strong> ₹{selectedWorkOrder.discounted_subtotal?.toFixed(2) || '0.00'}</p>
-                      <p><strong>CGST (6%):</strong> ₹{selectedWorkOrder.cgst?.toFixed(2) || '0.00'}</p>
-                      <p><strong>SGST (6%):</strong> ₹{selectedWorkOrder.sgst?.toFixed(2) || '0.00'}</p>
-                      <p><strong>Total Amount:</strong> ₹{selectedWorkOrder.total_amount?.toFixed(2) || '0.00'}</p>
-                      <p><strong>Balance Due:</strong> ₹{(selectedWorkOrder.total_amount - parseFloat(selectedWorkOrder.advance_details || 0)).toFixed(2)}</p>
-
-                      {/* Product Details */}
-                      <div>
-                        <h3 className="text-lg font-semibold mt-4">Product Details</h3>
-                        {selectedWorkOrder.product_entries && selectedWorkOrder.product_entries.length > 0 ? (
-                          <table className="min-w-full border-collapse border border-gray-200">
-                            <thead>
-                              <tr>
-                              <th className="px-4 py-2 border border-gray-200">Product ID</th>
-                                <th className="px-4 py-2 border border-gray-200">Product Name</th>
-                                <th className="px-4 py-2 border border-gray-200">Quantity</th>
-                                <th className="px-4 py-2 border border-gray-200">Price</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {selectedWorkOrder.product_entries.map((product, index) => (
-                                <tr key={index}>
-                                <td className="px-4 py-2 border border-gray-200">{product.product_id || 'N/A'}</td>
-                                  <td className="px-4 py-2 border border-gray-200">{product.product_name || 'N/A'}</td>
-                                  <td className="px-4 py-2 border border-gray-200">{product.quantity || 'N/A'}</td>
-                                  <td className="px-4 py-2 border border-gray-200">₹{product.price?.toFixed(2) || '0.00'}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        ) : (
-                          <p>No product details available.</p>
-                        )}
-                      </div>
-                    </div>
-                  </>
+                  <p>No pending work orders.</p>
                 )}
-              </div>
-            </div>
-          )}
-
-          {/* Sales Today Modal */}
-          {showSalesModal && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-              <div className="bg-white rounded-lg w-11/12 md:w-3/4 lg:w-1/2 p-6 relative">
-                {/* Close Button */}
+              </>
+            ) : (
+              <>
+                {/* If a work order is selected, show its details */}
                 <button
-                  onClick={() => { setShowSalesModal(false); setSelectedSalesOrder(null); }}
-                  className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"
-                  aria-label="Close Modal"
+                  onClick={() => dispatch({ type: "RESET_SELECTED_WORK_ORDER" })}
+                  className="flex items-center text-gray-600 hover:text-gray-800 mb-4"
+                  aria-label="Back to Work Orders List"
                 >
-                  <XMarkIcon className="h-6 w-6" />
+                  <ArrowLeftIcon className="h-5 w-5 mr-1" />
+                  Back
                 </button>
+                <h2 className="text-xl font-semibold mb-4">Work Order Details</h2>
+                {/* Display Work Order Details */}
+                <div className="space-y-2 overflow-y-auto max-h-108">
+                  <p><strong>Work Order ID:</strong> {selectedWorkOrder.work_order_id || 'N/A'}</p>
+                  <p><strong>MR Number:</strong> {selectedWorkOrder.mr_number || 'N/A'}</p>
+                  <p><strong>Customer Name:</strong> {selectedWorkOrder.patient_details?.name || 'N/A'}</p>
+                  <p><strong>Due Date:</strong> {selectedWorkOrder.due_date || 'N/A'}</p>
+                  <p><strong>Billed by:</strong> {selectedWorkOrder.employee || 'N/A'}</p>
+                  <p><strong>Payment Method:</strong> {selectedWorkOrder.payment_method || 'N/A'}</p>
+                  <p><strong>Subtotal:</strong> ₹{selectedWorkOrder.subtotal?.toFixed(2) || '0.00'}</p>
+                  <p><strong>Discount:</strong> {selectedWorkOrder.discount_amount?.toFixed(2) || '0.00'}</p>
+                  <p><strong>Discounted Subtotal:</strong> ₹{selectedWorkOrder.discounted_subtotal?.toFixed(2) || '0.00'}</p>
+                  <p><strong>CGST (6%):</strong> ₹{selectedWorkOrder.cgst?.toFixed(2) || '0.00'}</p>
+                  <p><strong>SGST (6%):</strong> ₹{selectedWorkOrder.sgst?.toFixed(2) || '0.00'}</p>
+                  <p><strong>Total Amount:</strong> ₹{selectedWorkOrder.total_amount?.toFixed(2) || '0.00'}</p>
+                  <p><strong>Balance Due:</strong> ₹{(selectedWorkOrder.total_amount - parseFloat(selectedWorkOrder.advance_details || 0)).toFixed(2)}</p>
 
-                {/* Modal Content */}
-                {!selectedSalesOrder ? (
-                  <>
-                    <h2 className="text-xl font-semibold mb-4">Sales Orders Today</h2>
-                    {state.salesTodayCount > 0 ? (
-                      <div className="grid grid-cols-1 gap-4 max-h-96 overflow-y-auto">
-                        {state.salesOrdersToday.map((order) => (
-                          <div key={order.sales_order_id} className="bg-white shadow-md rounded-lg p-4 flex flex-col">
-                            <div className="flex justify-between items-center">
-                              <h3 className="text-lg font-semibold text-green-500">{order.sales_order_id}</h3>
-                              <button
-                                onClick={async () => {
-                                  const details = await fetchSalesOrderDetails(order.sales_order_id);
-                                  if (details) setSelectedSalesOrder(details);
-                                }}
-                                className="text-blue-600 hover:underline"
-                                aria-label={`View details for Sales Order ${order.sales_order_id}`}
-                              >
-                                View Details
-                              </button>
-                            </div>
-                            <p className="text-sm text-gray-600 mt-2"><strong>Customer Phone:</strong> {order.patient_phone || 'N/A'}</p>
-                            <p className="text-sm text-gray-600"><strong>MR Number:</strong> {order.mr_number || 'N/A'}</p>
-                          </div>
-                        ))}
-                      </div>
+                  {/* Product Details */}
+                  <div>
+                    <h3 className="text-lg font-semibold mt-4">Product Details</h3>
+                    {selectedWorkOrder.product_entries && selectedWorkOrder.product_entries.length > 0 ? (
+                      <table className="min-w-full border-collapse border border-gray-200">
+                        <thead>
+                          <tr>
+                            <th className="px-4 py-2 border border-gray-200">Product ID</th>
+                            <th className="px-4 py-2 border border-gray-200">Product Name</th>
+                            <th className="px-4 py-2 border border-gray-200">Quantity</th>
+                            <th className="px-4 py-2 border border-gray-200">Price</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {selectedWorkOrder.product_entries.map((product, index) => (
+                            <tr key={index}>
+                              <td className="px-4 py-2 border border-gray-200">{product.product_id || 'N/A'}</td>
+                              <td className="px-4 py-2 border border-gray-200">{product.product_name || 'N/A'}</td>
+                              <td className="px-4 py-2 border border-gray-200">{product.quantity || 'N/A'}</td>
+                              <td className="px-4 py-2 border border-gray-200">₹{product.price?.toFixed(2) || '0.00'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     ) : (
-                      <p>No sales orders today.</p>
+                      <p>No product details available.</p>
                     )}
-                  </>
-                ) : (
-                  <>
-                    {/* If a sales order is selected, show its details */}
-                    <button
-                      onClick={() => setSelectedSalesOrder(null)}
-                      className="flex items-center text-gray-600 hover:text-gray-800 mb-4"
-                      aria-label="Back to Sales Orders List"
-                    >
-                      <ArrowLeftIcon className="h-5 w-5 mr-1" />
-                      Back
-                    </button>
-                    <h2 className="text-xl font-semibold mb-4">Sales Order Details</h2>
-                    {/* Display Sales Order Details */}
-                    <div className="space-y-2 overflow-y-auto max-h-108">
-                      <p><strong>Sales Order ID:</strong> {selectedSalesOrder.sales_order_id || 'N/A'}</p>
-                      <p><strong>MR Number:</strong> {selectedSalesOrder.mr_number || 'N/A'}</p>
-                      <p><strong>Customer Phone:</strong> {selectedSalesOrder.patient_phone || 'N/A'}</p>
-                      <p><strong>Branch:</strong> {selectedSalesOrder.branch || 'N/A'}</p>
-                      <p><strong>Subtotal:</strong> ₹{selectedSalesOrder.subtotal?.toFixed(2) || '0.00'}</p>
-                      <p><strong>Discount:</strong> {selectedSalesOrder.discount?.toFixed(2) || '0.00'} </p>
-                      <p><strong>Final Amount:</strong> ₹{selectedSalesOrder.final_amount?.toFixed(2) || '0.00'}</p>
-                      <p><strong>Loyalty Points Redeemed:</strong> {selectedSalesOrder.loyalty_points_redeemed || 0}</p>
-                      <p><strong>Loyalty Points Added:</strong> {selectedSalesOrder.loyalty_points_added || 0}</p>
-                      <p><strong>CGST (6%):</strong> ₹{selectedSalesOrder.cgst?.toFixed(2) || '0.00'}</p>
-                      <p><strong>SGST (6%):</strong> ₹{selectedSalesOrder.sgst?.toFixed(2) || '0.00'}</p>
-                      <p><strong>Billed by:</strong> {selectedSalesOrder.employee || 'N/A'}</p>
-                      <p><strong>Total Amount:</strong> ₹{selectedSalesOrder.final_amount?.toFixed(2) || '0.00'}</p>
-                      <p><strong>Balance Due:</strong> ₹{(selectedSalesOrder.final_amount - parseFloat(selectedSalesOrder.advance_details || 0)).toFixed(2)}</p>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
-                      {/* Product Details */}
-                      <div>
-                        <h3 className="text-lg font-semibold mt-4">Product Details</h3>
-                        {selectedSalesOrder.items && selectedSalesOrder.items.length > 0 ? (
-                          <table className="min-w-full border-collapse border border-gray-200">
-                            <thead>
-                              <tr>
-                              <th className="px-4 py-2 border border-gray-200">Product ID</th>
-                                <th className="px-4 py-2 border border-gray-200">Product Name</th>
-                                <th className="px-4 py-2 border border-gray-200">Quantity</th>
-                                <th className="px-4 py-2 border border-gray-200">Price</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {selectedSalesOrder.items.map((product, index) => (
-                                <tr key={index}>
-                                <td className="px-4 py-2 border border-gray-200">{product.product_id || 'N/A'}</td>
-                                  <td className="px-4 py-2 border border-gray-200">{product.name || 'N/A'}</td>
-                                  <td className="px-4 py-2 border border-gray-200">{product.quantity || 'N/A'}</td>
-                                  <td className="px-4 py-2 border border-gray-200">₹{product.price?.toFixed(2) || '0.00'}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        ) : (
-                          <p>No product details available.</p>
-                        )}
+      {/* Sales Today Modal */}
+      {showSalesModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white rounded-lg w-11/12 md:w-3/4 lg:w-1/2 p-6 relative">
+            {/* Close Button */}
+            <button
+              onClick={closeSalesModal}
+              className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"
+              aria-label="Close Modal"
+            >
+              <XMarkIcon className="h-6 w-6" />
+            </button>
+
+            {/* Modal Content */}
+            {!selectedSalesOrder ? (
+              <>
+                <h2 className="text-xl font-semibold mb-4">Sales Orders Today</h2>
+                {state.salesTodayCount > 0 ? (
+                  <div className="grid grid-cols-1 gap-4 max-h-96 overflow-y-auto">
+                    {state.salesOrdersToday.map((order) => (
+                      <div key={order.sales_order_id} className="bg-white shadow-md rounded-lg p-4 flex flex-col">
+                        <div className="flex justify-between items-center">
+                          <h3 className="text-lg font-semibold text-green-500">{order.sales_order_id}</h3>
+                          <button
+                            onClick={async () => {
+                              const details = await fetchSalesOrderDetails(order.sales_order_id);
+                              if (details) dispatch({ type: "SET_SELECTED_SALES_ORDER", payload: details });
+                            }}
+                            className="text-blue-600 hover:underline"
+                            aria-label={`View details for Sales Order ${order.sales_order_id}`}
+                          >
+                            View Details
+                          </button>
+                        </div>
+                        <p className="text-sm text-gray-600 mt-2"><strong>Customer Phone:</strong> {order.patient_phone || 'N/A'}</p>
+                        <p className="text-sm text-gray-600"><strong>MR Number:</strong> {order.mr_number || 'N/A'}</p>
                       </div>
-                    </div>
-                  </>
+                    ))}
+                  </div>
+                ) : (
+                  <p>No sales orders today.</p>
                 )}
-              </div>
-            </div>
-          )}
+              </>
+            ) : (
+              <>
+                {/* If a sales order is selected, show its details */}
+                <button
+                  onClick={() => dispatch({ type: "RESET_SELECTED_SALES_ORDER" })}
+                  className="flex items-center text-gray-600 hover:text-gray-800 mb-4"
+                  aria-label="Back to Sales Orders List"
+                >
+                  <ArrowLeftIcon className="h-5 w-5 mr-1" />
+                  Back
+                </button>
+                <h2 className="text-xl font-semibold mb-4">Sales Order Details</h2>
+                {/* Display Sales Order Details */}
+                <div className="space-y-2 overflow-y-auto max-h-108">
+                  <p><strong>Sales Order ID:</strong> {selectedSalesOrder.sales_order_id || 'N/A'}</p>
+                  <p><strong>MR Number:</strong> {selectedSalesOrder.mr_number || 'N/A'}</p>
+                  <p><strong>Customer Phone:</strong> {selectedSalesOrder.patient_phone || 'N/A'}</p>
+                  <p><strong>Branch:</strong> {selectedSalesOrder.branch || 'N/A'}</p>
+                  <p><strong>Subtotal:</strong> ₹{selectedSalesOrder.subtotal?.toFixed(2) || '0.00'}</p>
+                  <p><strong>Discount:</strong> {selectedSalesOrder.discount?.toFixed(2) || '0.00'} </p>
+                  <p><strong>Final Amount:</strong> ₹{selectedSalesOrder.final_amount?.toFixed(2) || '0.00'}</p>
+                  <p><strong>Loyalty Points Redeemed:</strong> {selectedSalesOrder.loyalty_points_redeemed || 0}</p>
+                  <p><strong>Loyalty Points Added:</strong> {selectedSalesOrder.loyalty_points_added || 0}</p>
+                  <p><strong>CGST (6%):</strong> ₹{selectedSalesOrder.cgst?.toFixed(2) || '0.00'}</p>
+                  <p><strong>SGST (6%):</strong> ₹{selectedSalesOrder.sgst?.toFixed(2) || '0.00'}</p>
+                  <p><strong>Billed by:</strong> {selectedSalesOrder.employee || 'N/A'}</p>
+                  <p><strong>Total Amount:</strong> ₹{selectedSalesOrder.final_amount?.toFixed(2) || '0.00'}</p>
+                  <p><strong>Balance Due:</strong> ₹{(selectedSalesOrder.final_amount - parseFloat(selectedSalesOrder.advance_details || 0)).toFixed(2)}</p>
 
-          {/* Sales Today Modal End */}
-        
+                  {/* Product Details */}
+                  <div>
+                    <h3 className="text-lg font-semibold mt-4">Product Details</h3>
+                    {selectedSalesOrder.items && selectedSalesOrder.items.length > 0 ? (
+                      <table className="min-w-full border-collapse border border-gray-200">
+                        <thead>
+                          <tr>
+                            <th className="px-4 py-2 border border-gray-200">Product ID</th>
+                            <th className="px-4 py-2 border border-gray-200">Product Name</th>
+                            <th className="px-4 py-2 border border-gray-200">Quantity</th>
+                            <th className="px-4 py-2 border border-gray-200">Price</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {selectedSalesOrder.items.map((product, index) => (
+                            <tr key={index}>
+                              <td className="px-4 py-2 border border-gray-200">{product.product_id || 'N/A'}</td>
+                              <td className="px-4 py-2 border border-gray-200">{product.name || 'N/A'}</td>
+                              <td className="px-4 py-2 border border-gray-200">{product.quantity || 'N/A'}</td>
+                              <td className="px-4 py-2 border border-gray-200">₹{product.price?.toFixed(2) || '0.00'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    ) : (
+                      <p>No product details available.</p>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Sales Today Modal End */}
+    
     </div>
   );
 };
