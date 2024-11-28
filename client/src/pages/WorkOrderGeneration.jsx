@@ -105,31 +105,36 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   const generateNewWorkOrderId = useCallback(async () => {
     try {
       console.log("Attempting to generate new Work Order ID...");
+
       const { data: lastWorkOrders, error } = await supabase
         .from("work_orders")
         .select("work_order_id")
         .order("work_order_id", { ascending: false })
         .limit(1);
-  
+
       if (error) {
         console.error("Error fetching last work order:", error);
         alert("Error generating Work Order ID. Please try again.");
         return;
       }
-  
+
       console.log("Last Work Orders Retrieved:", lastWorkOrders);
-  
+
       let newWorkOrderId = 3071; // Default if no work orders exist
+
       if (lastWorkOrders && lastWorkOrders.length > 0) {
         const lastWorkOrderId = parseInt(lastWorkOrders[0].work_order_id, 10);
         console.log("Last Work Order ID:", lastWorkOrderId);
         if (!isNaN(lastWorkOrderId)) {
           newWorkOrderId = lastWorkOrderId + 1;
         } else {
-          console.warn("Invalid lastWorkOrderId, defaulting to:", newWorkOrderId);
+          console.warn(
+            "Invalid lastWorkOrderId, defaulting to:",
+            newWorkOrderId
+          );
         }
       }
-  
+
       dispatch({
         type: "SET_WORK_ORDER_FORM",
         payload: { workOrderId: newWorkOrderId.toString() },
@@ -1281,11 +1286,11 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
 
   // Generate Work Order ID when not editing
   useEffect(() => {
-    if (!isEditing && branch && !workOrderId) {
-      console.log('Generating new Work Order ID');
-      generateNewWorkOrderId(); // Check if this is firing correctly
+    // If not editing and no workOrderId is set, generate a new one
+    if (!workOrderForm.isEditing && !workOrderId) {
+      generateNewWorkOrderId();
     }
-  }, [branch, isEditing, workOrderId, generateNewWorkOrderId]);
+  }, [generateNewWorkOrderId, workOrderForm.isEditing, workOrderId]);
   
 
   return (

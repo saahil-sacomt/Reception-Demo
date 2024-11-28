@@ -1,6 +1,6 @@
 // GlobalState.jsx
 import React, { createContext, useContext, useReducer, useEffect } from "react";
-import merge from "lodash.merge"; // Ensure lodash.merge is installed
+import merge from "lodash.merge"; // Import lodash.merge
 
 const savedState = localStorage.getItem("globalState")
   ? JSON.parse(localStorage.getItem("globalState"))
@@ -81,7 +81,7 @@ const defaultInitialState = {
   },
 };
 
-// Merge defaultInitialState with savedState
+// Deep merge defaultInitialState with savedState
 const initialState = merge({}, defaultInitialState, savedState);
 
 // Reducer Function
@@ -146,7 +146,7 @@ export const GlobalStateProvider = ({ children }) => {
     console.log("Current State:", state);
   }, [state]);
 
-  // Removed the `someCondition` useEffect as it may cause unintended side effects
+  // Removed unnecessary useEffect hooks that might interfere with state integrity
   /*
   useEffect(() => {
     if (state.salesOrderForm.someCondition === false) {
@@ -158,15 +158,14 @@ export const GlobalStateProvider = ({ children }) => {
   }, [state.salesOrderForm.someCondition]);
   */
 
-  // Removed the beforeunload handler to prevent unintended state resets on refresh
   /*
   useEffect(() => {
     const handlePageRefresh = () => {
       resetState(); // Reset state on refresh
     };
-
+  
     window.addEventListener("beforeunload", handlePageRefresh);
-
+  
     return () => {
       window.removeEventListener("beforeunload", handlePageRefresh);
     };
