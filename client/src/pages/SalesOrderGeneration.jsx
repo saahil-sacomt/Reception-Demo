@@ -517,6 +517,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     updateSalesOrderForm({ productEntries: updatedProductEntries });
     validateField(index, field);
   };
+  
 
   const handleProductInputChange = async (index, value) => {
     if (!branch) {
@@ -1202,8 +1203,14 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
 
     if (field === "id" && !productEntries[index].id) {
       errors[`productId-${index}`] = "Product ID is required";
-    } else if (field === "price" && !productEntries[index].price) {
-      errors[`productPrice-${index}`] = "Price is required";
+    } if (field === "price") {
+      const price = parseFloat(productEntries[index].price);
+      if (isNaN(price) || price < 0) {
+        errors[`productPrice-${index}`] = "Enter a valid non-negative number";
+      } else {
+        delete errors[`productPrice-${index}`];
+      }
+    
     } else if (field === "quantity" && productEntries[index].stock > 0) {
       const quantity = parseInt(productEntries[index].quantity, 10);
       if (!quantity) {
@@ -2241,279 +2248,251 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                 Product Details
               </label>
               <div className="space-y-6">
-                {productEntries &&
-                  Array.isArray(productEntries) &&
-                  productEntries.map((product, index) => (
-                    <div key={index} className="flex space-x-2 items-center">
-                      {/* Product ID Input */}
-                      <div className="relative w-2/4">
-                        <input
-                          type="text"
-                          id={`productId-${index}`}
-                          placeholder="Enter Product ID"
-                          value={productEntries[index].id}
-                          onChange={async (e) => {
-                            const value = e.target.value.trim();
-                            const updatedSuggestions = [...productSuggestions];
-                            if (value) {
-                              updatedSuggestions[index] =
-                                await fetchProductSuggestions(value, "id");
-                            } else {
-                              updatedSuggestions[index] = [];
-                            }
-                            setProductSuggestions(updatedSuggestions);
+    {productEntries &&
+      Array.isArray(productEntries) &&
+      productEntries.map((product, index) => (
+        <div key={index} className="flex space-x-2 items-center relative">
+          {/* Product ID Input */}
+          <div className="relative w-2/4">
+            <input
+              type="text"
+              id={`productId-${index}`}
+              placeholder="Enter Product ID"
+              value={product.product_id}
+              onChange={async (e) => {
+                const value = e.target.value.trim();
+                const updatedSuggestions = [...productSuggestions];
+                if (value) {
+                  updatedSuggestions[index] = await fetchProductSuggestions(value, "id");
+                } else {
+                  updatedSuggestions[index] = [];
+                }
+                setProductSuggestions(updatedSuggestions);
 
-                            handleProductChange(index, "id", value); // Update ID field
-                            await handleProductInputChange(index, value); // Fetch product details
-                          }}
-                          onBlur={async () => {
-                            const selectedProduct = productSuggestions[
-                              index
-                            ]?.find(
-                              (prod) =>
-                                prod.product_id === productEntries[index].id
-                            );
-                            if (selectedProduct) {
-                              // Automatically fetch data and move focus to quantity
-                              const productDetails =
-                                await fetchProductDetailsFromDatabase(
-                                  selectedProduct.product_id,
-                                  branch
-                                );
-                              if (productDetails) {
-                                handleProductChange(
-                                  index,
-                                  "id",
-                                  productDetails.product_id
-                                );
-                                handleProductChange(
-                                  index,
-                                  "name",
-                                  productDetails.product_name
-                                );
-                                handleProductChange(
-                                  index,
-                                  "price",
-                                  productDetails.mrp || ""
-                                );
-                                handleProductChange(
-                                  index,
-                                  "stock",
-                                  productDetails.stock || 0
-                                );
-                                if (productDetails.stock > 0) {
-                                  setTimeout(() => {
-                                    quantityRefs.current[index]?.focus();
-                                  }, 100);
-                                }
-                              }
-                            }
-                          }}
-                          list={`productIdSuggestions-${index}`}
-                          className="border border-gray-300 px-4 py-3 rounded-lg w-full"
-                          onKeyDown={(e) => {
-                            if (e.key === "ArrowDown") {
-                              e.preventDefault();
-                              document
-                                .getElementById(`productQuantity-${index}`)
-                                ?.focus();
-                            }
-                          }}
-                        />
-                        <datalist id={`productIdSuggestions-${index}`}>
-                          {productSuggestions[index] &&
-                            productSuggestions[index].map((suggestion) => (
-                              <option
-                                key={suggestion.product_id}
-                                value={suggestion.product_id}
-                              />
-                            ))}
-                        </datalist>
-
-                        {validationErrors[`productId-${index}`] && (
-                          <p className="text-red-500 text-xs absolute -bottom-5 left-0">
-                            {validationErrors[`productId-${index}`]}
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Product Name Input (Read-Only) */}
-                      <div className="relative w-1/2">
-                        <input
-                          type="text"
-                          value={product.name}
-                          readOnly
-                          className="border border-gray-300 px-4 py-3 rounded-lg w-full bg-gray-100"
-                        />
-                      </div>
-
-                      {/* Product Price Input (Read-Only) */}
-                      <div className="relative w-1/4">
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          placeholder="Price"
-                          value={product.price}
-                          readOnly
-                          className="border border-gray-300 px-4 py-3 rounded-lg w-full text-center bg-gray-100"
-                        />
-                        {validationErrors[`productPrice-${index}`] && (
-                          <p className="text-red-500 text-xs absolute -bottom-5 left-0">
-                            {validationErrors[`productPrice-${index}`]}
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Quantity Input */}
-                      <div className="relative w-2/4">
-                        {product.stock === 0 ? (
-                          <input
-                            type="text"
-                            value="Out of Stock"
-                            readOnly
-                            className="border border-gray-300 px-4 py-3 rounded-lg w-full text-center bg-red-100 text-red-600"
-                          />
-                        ) : (
-                          <input
-                            type="number"
-                            id={`productQuantity-${index}`}
-                            placeholder="Quantity"
-                            value={product.quantity}
-                            onChange={(e) =>
-                              handleProductChange(
-                                index,
-                                "quantity",
-                                e.target.value
-                              )
-                            }
-                            className="border border-gray-300 px-4 py-3 rounded-lg w-full text-center"
-                            min="1"
-                            max={product.stock} // Prevent ordering more than available stock
-                            ref={(el) => (quantityRefs.current[index] = el)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                e.preventDefault();
-                                if (e.shiftKey) {
-                                  // Shift + Enter: Add new product field and focus on first product ID
-                                  updateSalesOrderForm({
-                                    productEntries: [
-                                      ...productEntries,
-                                      {
-                                        id: "",
-                                        name: "",
-                                        price: "",
-                                        quantity: "",
-                                      },
-                                    ],
-                                  });
-                                  setOriginalProductEntries([
-                                    ...originalProductEntries,
-                                    {
-                                      id: "",
-                                      name: "",
-                                      price: "",
-                                      quantity: "",
-                                    },
-                                  ]); // Update original entries
-                                  setProductSuggestions([
-                                    ...productSuggestions,
-                                    [],
-                                  ]);
-                                  setTimeout(
-                                    () =>
-                                      document
-                                        .getElementById(
-                                          `productId-${productEntries.length}`
-                                        )
-                                        ?.focus(),
-                                    0
-                                  );
-                                } else {
-                                  // Enter: Proceed to the next step
-                                  nextStep();
-                                }
-                              }
-                              // Handle Arrow Keys for navigation
-                              else if (e.key === "ArrowRight") {
-                                e.preventDefault();
-                                e.target.parentElement.nextSibling?.focus();
-                              } else if (e.key === "ArrowLeft") {
-                                e.preventDefault();
-                                document
-                                  .getElementById(`productPrice-${index}`)
-                                  ?.focus();
-                              }
-                            }}
-                          />
-                        )}
-                        {validationErrors[`productQuantity-${index}`] && (
-                          <p className="text-red-500 text-xs absolute -bottom-5 left-0">
-                            {validationErrors[`productQuantity-${index}`]}
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Delete Button */}
-                      <button
-                        type="button"
-                        onClick={() => removeProductEntry(index)}
-                        className="text-red-500 hover:text-red-700 transition"
-                        onKeyDown={(e) => {
-                          if (e.key === "ArrowLeft") {
-                            e.preventDefault();
-                            document
-                              .getElementById(`productQuantity-${index}`)
-                              ?.focus();
-                          }
-                        }}
-                      >
-                        <TrashIcon className="w-5 h-5" />
-                      </button>
-                    </div>
-                  ))}
-                <button
-                  type="button" // Added type="button"
-                  onClick={() => {
-                    updateSalesOrderForm({
-                      productEntries: [
-                        ...productEntries,
-                        { id: "", name: "", price: "", quantity: "" },
-                      ],
-                    });
-                    setOriginalProductEntries([
-                      ...originalProductEntries,
-                      { id: "", name: "", price: "", quantity: "" },
-                    ]); // Update original entries
-                    setProductSuggestions([...productSuggestions, []]);
-                    setTimeout(
-                      () =>
-                        document
-                          .getElementById(`productId-${productEntries.length}`)
-                          ?.focus(),
-                      0
-                    );
-                  }}
-                  className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition"
-                  onKeyDown={(e) => {
-                    if (e.key === "ArrowDown") {
-                      e.preventDefault();
-                      document
-                        .getElementById(`productId-${productEntries.length}`)
-                        ?.focus();
+                handleProductChange(index, "id", value); // Update ID field
+                await handleProductInputChange(index, value); // Fetch product details
+              }}
+              onBlur={async () => {
+                const selectedProduct = productSuggestions[index]?.find(
+                  (prod) => prod.product_id === product.id
+                );
+                if (selectedProduct) {
+                  // Automatically fetch data and move focus to quantity
+                  const productDetails = await fetchProductDetailsFromDatabase(
+                    selectedProduct.product_id,
+                    branch
+                  );
+                  if (productDetails) {
+                    handleProductChange(index, "id", productDetails.product_id);
+                    handleProductChange(index, "name", productDetails.product_name);
+                    handleProductChange(index, "price", productDetails.mrp || "");
+                    handleProductChange(index, "stock", productDetails.stock || 0);
+                    if (productDetails.stock > 0) {
+                      setTimeout(() => {
+                        quantityRefs.current[index]?.focus();
+                      }, 100);
                     }
-                  }}
-                >
-                  Add Product
-                </button>
-                {/* Stock Validation Error */}
-                {validationErrors.stock && (
-                  <p className="text-red-500 text-xs mt-1">
-                    {validationErrors.stock}
-                  </p>
-                )}
-              </div>
-            </div>
+                  }
+                }
+              }}
+              list={`productIdSuggestions-${index}`}
+              className="border border-gray-300 px-4 py-3 rounded-lg w-full"
+              onKeyDown={(e) => {
+                if (e.key === "ArrowDown") {
+                  e.preventDefault();
+                  document.getElementById(`productQuantity-${index}`)?.focus();
+                }
+              }}
+            />
+            <datalist id={`productIdSuggestions-${index}`}>
+              {productSuggestions[index] &&
+                productSuggestions[index].map((suggestion) => (
+                  <option
+                    key={suggestion.product_id}
+                    value={suggestion.product_id}
+                  />
+                ))}
+            </datalist>
+
+            {validationErrors[`productId-${index}`] && (
+              <p className="text-red-500 text-xs absolute -bottom-5 left-0">
+                {validationErrors[`productId-${index}`]}
+              </p>
+            )}
+          </div>
+
+          {/* Product Name Input (Read-Only) */}
+          <div className="relative w-1/2">
+            <input
+              type="text"
+              value={product.name}
+              readOnly
+              className="border border-gray-300 px-4 py-3 rounded-lg w-full bg-gray-100"
+            />
+          </div>
+
+          {/* Product Price Input (Editable) */}
+          <div className="relative w-1/4">
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="Price"
+              value={product.price}
+              onChange={(e) => handleProductChange(index, 'price', e.target.value)}
+              className="border border-gray-300 px-4 py-3 rounded-lg w-full text-center bg-white"
+            />
+            {validationErrors[`productPrice-${index}`] && (
+              <p className="text-red-500 text-xs absolute -bottom-5 left-0">
+                {validationErrors[`productPrice-${index}`]}
+              </p>
+            )}
+          </div>
+
+          {/* Quantity Input */}
+          <div className="relative w-2/4">
+            {product.stock === 0 ? (
+              <input
+                type="text"
+                value="Out of Stock"
+                readOnly
+                className="border border-gray-300 px-4 py-3 rounded-lg w-full text-center bg-red-100 text-red-600"
+              />
+            ) : (
+              <input
+                type="number"
+                id={`productQuantity-${index}`}
+                placeholder="Quantity"
+                value={product.quantity}
+                onChange={(e) =>
+                  handleProductChange(index, "quantity", e.target.value)
+                }
+                className="border border-gray-300 px-4 py-3 rounded-lg w-full text-center"
+                min="1"
+                max={product.stock} // Prevent ordering more than available stock
+                ref={(el) => (quantityRefs.current[index] = el)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    if (e.shiftKey) {
+                      // Shift + Enter: Add new product field and focus on first product ID
+                      updateSalesOrderForm({
+                        productEntries: [
+                          ...productEntries,
+                          {
+                            id: "",
+                            name: "",
+                            price: "",
+                            quantity: "",
+                          },
+                        ],
+                      });
+                      setOriginalProductEntries([
+                        ...originalProductEntries,
+                        {
+                          id: "",
+                          name: "",
+                          price: "",
+                          quantity: "",
+                        },
+                      ]); // Update original entries
+                      setProductSuggestions([
+                        ...productSuggestions,
+                        [],
+                      ]);
+                      setTimeout(
+                        () =>
+                          document
+                            .getElementById(`productId-${productEntries.length}`)
+                            ?.focus(),
+                        0
+                      );
+                    } else {
+                      // Enter: Proceed to the next step
+                      nextStep();
+                    }
+                  }
+                  // Handle Arrow Keys for navigation
+                  else if (e.key === "ArrowRight") {
+                    e.preventDefault();
+                    e.target.parentElement.nextSibling?.focus();
+                  } else if (e.key === "ArrowLeft") {
+                    e.preventDefault();
+                    document
+                      .getElementById(`productPrice-${index}`)
+                      ?.focus();
+                  }
+                }}
+              />
+            )}
+            {validationErrors[`productQuantity-${index}`] && (
+              <p className="text-red-500 text-xs absolute -bottom-5 left-0">
+                {validationErrors[`productQuantity-${index}`]}
+              </p>
+            )}
+          </div>
+
+          {/* Delete Button */}
+          <button
+            type="button"
+            onClick={() => removeProductEntry(index)}
+            className="text-red-500 hover:text-red-700 transition"
+            onKeyDown={(e) => {
+              if (e.key === "ArrowLeft") {
+                e.preventDefault();
+                document
+                  .getElementById(`productQuantity-${index}`)
+                  ?.focus();
+              }
+            }}
+            aria-label={`Remove Product ${index + 1}`}
+          >
+            <TrashIcon className="w-5 h-5" />
+          </button>
+        </div>
+      ))}
+    <button
+      type="button" // Ensure type="button" to prevent form submission
+      onClick={() => {
+        updateSalesOrderForm({
+          productEntries: [
+            ...productEntries,
+            { id: "", name: "", price: "", quantity: "" },
+          ],
+        });
+        setOriginalProductEntries([
+          ...originalProductEntries,
+          { id: "", name: "", price: "", quantity: "" },
+        ]); // Update original entries
+        setProductSuggestions([...productSuggestions, []]);
+        setTimeout(
+          () =>
+            document
+              .getElementById(`productId-${productEntries.length}`)
+              ?.focus(),
+          0
+        );
+      }}
+      className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition"
+      onKeyDown={(e) => {
+        if (e.key === "ArrowDown") {
+          e.preventDefault();
+          document
+            .getElementById(`productId-${productEntries.length}`)
+            ?.focus();
+        }
+      }}
+    >
+      Add Product
+    </button>
+    {/* Stock Validation Error */}
+    {validationErrors.stock && (
+      <p className="text-red-500 text-xs mt-1">
+        {validationErrors.stock}
+      </p>
+    )}
+  </div>
+</div>
           )}
 
           {/* Step 3: Patient or Customer Details */}
