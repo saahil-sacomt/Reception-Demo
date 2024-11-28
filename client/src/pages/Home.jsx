@@ -650,6 +650,7 @@ const Home = ({ isCollapsed }) => {
                           <table className="min-w-full border-collapse border border-gray-200">
                             <thead>
                               <tr>
+                              <th className="px-4 py-2 border border-gray-200">Product ID</th>
                                 <th className="px-4 py-2 border border-gray-200">Product Name</th>
                                 <th className="px-4 py-2 border border-gray-200">Quantity</th>
                                 <th className="px-4 py-2 border border-gray-200">Price</th>
@@ -658,6 +659,7 @@ const Home = ({ isCollapsed }) => {
                             <tbody>
                               {selectedWorkOrder.product_entries.map((product, index) => (
                                 <tr key={index}>
+                                <td className="px-4 py-2 border border-gray-200">{product.product_id || 'N/A'}</td>
                                   <td className="px-4 py-2 border border-gray-200">{product.product_name || 'N/A'}</td>
                                   <td className="px-4 py-2 border border-gray-200">{product.quantity || 'N/A'}</td>
                                   <td className="px-4 py-2 border border-gray-200">₹{product.price?.toFixed(2) || '0.00'}</td>
@@ -755,6 +757,7 @@ const Home = ({ isCollapsed }) => {
                           <table className="min-w-full border-collapse border border-gray-200">
                             <thead>
                               <tr>
+                              <th className="px-4 py-2 border border-gray-200">Product ID</th>
                                 <th className="px-4 py-2 border border-gray-200">Product Name</th>
                                 <th className="px-4 py-2 border border-gray-200">Quantity</th>
                                 <th className="px-4 py-2 border border-gray-200">Price</th>
@@ -763,6 +766,7 @@ const Home = ({ isCollapsed }) => {
                             <tbody>
                               {selectedSalesOrder.items.map((product, index) => (
                                 <tr key={index}>
+                                <td className="px-4 py-2 border border-gray-200">{product.product_id || 'N/A'}</td>
                                   <td className="px-4 py-2 border border-gray-200">{product.name || 'N/A'}</td>
                                   <td className="px-4 py-2 border border-gray-200">{product.quantity || 'N/A'}</td>
                                   <td className="px-4 py-2 border border-gray-200">₹{product.price?.toFixed(2) || '0.00'}</td>
