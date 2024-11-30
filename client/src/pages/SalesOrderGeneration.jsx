@@ -915,8 +915,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         query = query.eq("customer_id", customerId);
       }
 
-      // Exclude work orders that are already used
-      query = query.eq("is_used", false);
+      // Exclude work orders that are already used and belong to the current branch
+      query = query.eq("is_used", false).eq("branch", branch); // Added branch filter
 
       const { data, error } = await query.order("created_at", {
         ascending: false,
