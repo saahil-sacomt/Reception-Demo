@@ -460,35 +460,86 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     return `${financialYearStart}-${financialYearEnd}`;
   };
 
-  const generateSalesOrderId = async () => {
+  const generateSalesOrderId = async (branch) => {
+    // Define default starting sales_order_id for each branch
+    const branchDefaultIds = {
+      "TVR": 1001,  // Default ID for Trivandrum
+      "NTA": 2001,  // Default ID for Neyyantinkara
+      "KOT1": 3001, // Default ID for Kottarakara 1
+      "KOT2": 4001, // Default ID for Kottarakara 2
+      "KAT": 5001,  // Default ID for Kattakada
+    };
+
+    if (!branch) {
+      console.error("Branch is undefined. Cannot generate Sales Order ID.");
+      return;
+    }
+
     try {
-      // Fetch the maximum sales_order_id
+      console.log("Branch passed:", branch);  // Debugging: check the branch passed
+      console.log("Default Sales Order ID for this branch:", branchDefaultIds[branch]); // Debugging: check the default ID for the branch
+
+      // Fetch the maximum sales_order_id for the specific branch
       const { data, error } = await supabase
         .from("sales_orders")
         .select("sales_order_id")
+        .eq("branch", branch)  // Filter by branch
         .order("sales_order_id", { ascending: false })
         .limit(1);
 
       if (error) {
-        console.error("Error fetching last sales_order_id:", error);
+        console.error(`Error fetching last sales_order_id for branch ${branch}:`, error);
         return null;
       }
 
-      let lastSalesOrderId = 4054;
+      // Set the default starting sales_order_id for the branch if no orders exist
+      let lastSalesOrderId = branchDefaultIds[branch] || 1000;  // Default to 1000 if branch not found in the map
+
+      // If data exists, extract the last sales_order_id for that branch
       if (data && data.length > 0) {
-        lastSalesOrderId = parseInt(data[0].sales_order_id, 10) || 0;
+        lastSalesOrderId = parseInt(data[0].sales_order_id, 10) || lastSalesOrderId;
       }
+
+      console.log("Calculated lastSalesOrderId:", lastSalesOrderId); // Debugging: check lastSalesOrderId
 
       // Increment the last sales_order_id by 1
       const newSalesOrderId = lastSalesOrderId + 1;
+
+      // Optionally, you can update the sales order form with the new ID
       updateSalesOrderForm({ salesOrderId: newSalesOrderId });
 
       return newSalesOrderId.toString();
     } catch (error) {
-      console.error("Error generating sales_order_id:", error);
+      console.error(`Error generating sales_order_id for branch ${branch}:`, error);
       return null;
     }
   };
+
+  // Function to fetch and set a new sales ID when the branch is available
+  const fetchSalesOrderId = async () => {
+    if (branch && !isEditing) {
+      // Only generate ID if not editing
+      const newSalesOrderId = await generateSalesOrderId(branch); // Pass branch here
+      if (newSalesOrderId) {
+        updateSalesOrderForm({ salesOrderId: newSalesOrderId });
+        updateSalesOrderForm({
+          validationErrors: {
+            ...validationErrors,
+            generalError: "",
+          },
+        });
+      } else {
+        updateSalesOrderForm({
+          validationErrors: {
+            ...validationErrors,
+            generalError: "Failed to generate ID",
+          },
+        });
+      }
+    }
+  };
+
+
 
   const fetchProductSuggestions = async (query, type) => {
     if (!query) return [];
@@ -511,14 +562,21 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     }
   };
 
+  // Function to handle changes in product fields
   const handleProductChange = (index, field, value) => {
     const updatedProductEntries = [...productEntries];
     updatedProductEntries[index][field] = value;
     updateSalesOrderForm({ productEntries: updatedProductEntries });
+
+    // If the product_id is changed, fetch the new product details
+    if (field === 'product_id') {
+      handleProductInputChange(index, value);
+    }
+
     validateField(index, field);
   };
-  
 
+  // Function to handle product ID input changes and fetch product details
   const handleProductInputChange = async (index, value) => {
     if (!branch) {
       console.error("Branch is undefined. Cannot fetch product details.");
@@ -559,6 +617,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
       updateSalesOrderForm({ productEntries: updatedEntries });
     }
   };
+
 
   const fetchExistingSalesOrder = useCallback(
     async (orderId) => {
@@ -651,29 +710,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId]);
 
-  // Function to fetch and set a new sales ID when the branch is available
-  const fetchSalesOrderId = async () => {
-    if (branch && !isEditing) {
-      // Only generate ID if not editing
-      const newSalesOrderId = await generateSalesOrderId();
-      if (newSalesOrderId) {
-        updateSalesOrderForm({ salesOrderId: newSalesOrderId });
-        updateSalesOrderForm({
-          validationErrors: {
-            ...validationErrors,
-            generalError: "",
-          },
-        });
-      } else {
-        updateSalesOrderForm({
-          validationErrors: {
-            ...validationErrors,
-            generalError: "Failed to generate ID",
-          },
-        });
-      }
-    }
-  };
+
 
   useEffect(() => {
     if (branch) {
@@ -1210,7 +1247,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
       } else {
         delete errors[`productPrice-${index}`];
       }
-    
+
     } else if (field === "quantity" && productEntries[index].stock > 0) {
       const quantity = parseInt(productEntries[index].quantity, 10);
       if (!quantity) {
@@ -1409,6 +1446,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
 
   // Updated handleOrderCompletion function with correct stock update logic
   const handleOrderCompletion = async () => {
+    console.log("Submit handler triggered");
     const currentUTCDateTime = getCurrentUTCDateTime();
     if (isSaving) return; // Prevent duplicate clicks
     updateSalesOrderForm({ isSaving: true }); // Set isSaving to true
@@ -1648,7 +1686,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         alert("Sales updated successfully!");
       } else {
         // **Step 5: Insert New Sales Order**
-        const newSalesOrderId = await generateSalesOrderId();
+        const newSalesOrderId = await generateSalesOrderId(branch);
         if (!newSalesOrderId) {
           updateSalesOrderForm({
             validationErrors: {
@@ -1881,9 +1919,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
 
   return (
     <div
-      className={`transition-all duration-300 ${
-        isCollapsed ? "mx-20" : "mx-20 px-20"
-      } justify-center mt-16 p-4 mx-auto`}
+      className={`transition-all duration-300 ${isCollapsed ? "mx-20" : "mx-20 px-20"
+        } justify-center mt-16 p-4 mx-auto`}
     >
       {/* Modal for Work Order Details */}
       {showWorkOrderModal && (
@@ -1932,7 +1969,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                         {selectedWorkOrder.product_entries.map(
                           (product, index) => (
                             <tr key={index} className="text-center">
-                              <td className="py-1 px-2">{product.id}</td>
+                              <td className="py-1 px-2">{product.product_id}</td>
                               <td className="py-1 px-2">{product.name}</td>
                               <td className="py-1 px-2">{product.price}</td>
                               <td className="py-1 px-2">{product.quantity}</td>
@@ -1980,9 +2017,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         {Array.from({ length: 6 }, (_, i) => (
           <div
             key={i}
-            className={`flex-1 h-2 rounded-xl mx-1 ${
-              step > i ? "bg-[#5db76d]" : "bg-gray-300"
-            } transition-all duration-300`}
+            className={`flex-1 h-2 rounded-xl mx-1 ${step > i ? "bg-[#5db76d]" : "bg-gray-300"
+              } transition-all duration-300`}
           />
         ))}
       </div>
@@ -2014,11 +2050,10 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                     onClick={() =>
                       updateSalesOrderForm({ fetchMethod: "work_order_id" })
                     }
-                    className={`px-4 py-2 rounded-lg ${
-                      salesOrderForm.fetchMethod === "work_order_id"
-                        ? "bg-green-500 text-white"
-                        : "bg-gray-200"
-                    }`}
+                    className={`px-4 py-2 rounded-lg ${salesOrderForm.fetchMethod === "work_order_id"
+                      ? "bg-green-500 text-white"
+                      : "bg-gray-200"
+                      }`}
                     onKeyDown={(e) => {
                       if (e.key === "ArrowRight") {
                         e.preventDefault();
@@ -2036,11 +2071,10 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                       updateSalesOrderForm({ fetchMethod: "mr_number" })
                     }
                     id="fetchMethod-mr_number"
-                    className={`px-4 py-2 rounded-lg ${
-                      salesOrderForm.fetchMethod === "mr_number"
-                        ? "bg-green-500 text-white"
-                        : "bg-gray-200"
-                    }`}
+                    className={`px-4 py-2 rounded-lg ${salesOrderForm.fetchMethod === "mr_number"
+                      ? "bg-green-500 text-white"
+                      : "bg-gray-200"
+                      }`}
                     onKeyDown={(e) => {
                       if (e.key === "ArrowRight") {
                         e.preventDefault();
@@ -2063,11 +2097,10 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                       updateSalesOrderForm({ fetchMethod: "phone_number" })
                     }
                     id="fetchMethod-phone_number"
-                    className={`px-4 py-2 rounded-lg ${
-                      salesOrderForm.fetchMethod === "phone_number"
-                        ? "bg-green-500 text-white"
-                        : "bg-gray-200"
-                    }`}
+                    className={`px-4 py-2 rounded-lg ${salesOrderForm.fetchMethod === "phone_number"
+                      ? "bg-green-500 text-white"
+                      : "bg-gray-200"
+                      }`}
                     onKeyDown={(e) => {
                       if (e.key === "ArrowLeft") {
                         e.preventDefault();
@@ -2087,8 +2120,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                 {fetchMethod === "work_order_id"
                   ? "Enter Work Order ID"
                   : fetchMethod === "mr_number"
-                  ? "Enter MR Number"
-                  : "Enter Phone Number"}
+                    ? "Enter MR Number"
+                    : "Enter Phone Number"}
               </label>
               <input
                 type="text"
@@ -2096,8 +2129,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                   fetchMethod === "work_order_id"
                     ? "Work Order ID"
                     : fetchMethod === "mr_number"
-                    ? "MR Number"
-                    : "Phone Number"
+                      ? "MR Number"
+                      : "Phone Number"
                 }
                 value={state.salesOrderForm.searchQuery}
                 ref={workOrderInputRef}
@@ -2248,251 +2281,252 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                 Product Details
               </label>
               <div className="space-y-6">
-    {productEntries &&
-      Array.isArray(productEntries) &&
-      productEntries.map((product, index) => (
-        <div key={index} className="flex space-x-2 items-center relative">
-          {/* Product ID Input */}
-          <div className="relative w-2/4">
-            <input
-              type="text"
-              id={`productId-${index}`}
-              placeholder="Enter Product ID"
-              value={product.product_id}
-              onChange={async (e) => {
-                const value = e.target.value.trim();
-                const updatedSuggestions = [...productSuggestions];
-                if (value) {
-                  updatedSuggestions[index] = await fetchProductSuggestions(value, "id");
-                } else {
-                  updatedSuggestions[index] = [];
-                }
-                setProductSuggestions(updatedSuggestions);
+                {productEntries &&
+                  Array.isArray(productEntries) &&
+                  productEntries.map((product, index) => (
+                    <div key={index} className="flex space-x-2 items-center relative">
+                      {/* Product ID Input */}
+                      <div className="relative w-2/4">
+                        <input
+                          type="text"
+                          id={`productId-${index}`}
+                          placeholder="Enter Product ID"
+                          value={product.product_id || ""}
+                          onChange={async (e) => {
+                            const value = e.target.value.trim();
+                            const updatedSuggestions = [...productSuggestions];
+                            if (value) {
+                              updatedSuggestions[index] = await fetchProductSuggestions(value, "id");
+                            } else {
+                              updatedSuggestions[index] = [];
+                            }
+                            setProductSuggestions(updatedSuggestions);
 
-                handleProductChange(index, "id", value); // Update ID field
-                await handleProductInputChange(index, value); // Fetch product details
-              }}
-              onBlur={async () => {
-                const selectedProduct = productSuggestions[index]?.find(
-                  (prod) => prod.product_id === product.id
-                );
-                if (selectedProduct) {
-                  // Automatically fetch data and move focus to quantity
-                  const productDetails = await fetchProductDetailsFromDatabase(
-                    selectedProduct.product_id,
-                    branch
-                  );
-                  if (productDetails) {
-                    handleProductChange(index, "id", productDetails.product_id);
-                    handleProductChange(index, "name", productDetails.product_name);
-                    handleProductChange(index, "price", productDetails.mrp || "");
-                    handleProductChange(index, "stock", productDetails.stock || 0);
-                    if (productDetails.stock > 0) {
-                      setTimeout(() => {
-                        quantityRefs.current[index]?.focus();
-                      }, 100);
+                            handleProductChange(index, "product_id", value); // Update product_id field
+                            await handleProductInputChange(index, value); // Fetch product details
+                          }}
+                          onBlur={async () => {
+                            const selectedProduct = productSuggestions[index]?.find(
+                              (prod) => prod.product_id === product.product_id // Corrected comparison
+                            );
+                            if (selectedProduct) {
+                              // Automatically fetch data and move focus to quantity
+                              const productDetails = await fetchProductDetailsFromDatabase(
+                                selectedProduct.product_id,
+                                branch
+                              );
+                              if (productDetails) {
+                                handleProductChange(index, "product_id", productDetails.product_id);
+                                handleProductChange(index, "name", productDetails.product_name);
+                                handleProductChange(index, "price", productDetails.mrp || "");
+                                handleProductChange(index, "stock", productDetails.stock || 0);
+                                if (productDetails.stock > 0) {
+                                  setTimeout(() => {
+                                    quantityRefs.current[index]?.focus();
+                                  }, 100);
+                                }
+                              }
+                            }
+                          }}
+                          list={`productIdSuggestions-${index}`}
+                          className="border border-gray-300 px-4 py-3 rounded-lg w-full"
+                          onKeyDown={(e) => {
+                            if (e.key === "ArrowDown") {
+                              e.preventDefault();
+                              document.getElementById(`productQuantity-${index}`)?.focus();
+                            }
+                          }}
+                        />
+                        <datalist id={`productIdSuggestions-${index}`}>
+                          {productSuggestions[index] &&
+                            productSuggestions[index].map((suggestion) => (
+                              <option
+                                key={suggestion.product_id}
+                                value={suggestion.product_id}
+                              />
+                            ))}
+                        </datalist>
+
+                        {validationErrors[`productId-${index}`] && (
+                          <p className="text-red-500 text-xs absolute -bottom-5 left-0">
+                            {validationErrors[`productId-${index}`]}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Product Name Input (Read-Only) */}
+                      <div className="relative w-1/2">
+                        <input
+                          type="text"
+                          value={product.name}
+                          readOnly
+                          className="border border-gray-300 px-4 py-3 rounded-lg w-full bg-gray-100"
+                        />
+                      </div>
+
+                      {/* Product Price Input (Editable) */}
+                      <div className="relative w-1/3">
+                        <input
+                          type="number"
+                          step="0.1"
+                          min="0"
+                          placeholder="Price"
+                          value={product.price}
+                          onChange={(e) => handleProductChange(index, 'price', e.target.value)}
+                          className="border border-gray-300 px-4 py-3 rounded-lg w-full text-center bg-white"
+                        />
+                        {validationErrors[`productPrice-${index}`] && (
+                          <p className="text-red-500 text-xs absolute -bottom-5 left-0">
+                            {validationErrors[`productPrice-${index}`]}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Quantity Input */}
+                      <div className="relative w-2/4">
+                        {product.stock === 0 ? (
+                          <input
+                            type="text"
+                            value="Out of Stock"
+                            readOnly
+                            className="border border-gray-300 px-4 py-3 rounded-lg w-full text-center bg-red-100 text-red-600"
+                          />
+                        ) : (
+                          <input
+                            type="number"
+                            id={`productQuantity-${index}`}
+                            placeholder="Quantity"
+                            value={product.quantity}
+                            onChange={(e) =>
+                              handleProductChange(index, "quantity", e.target.value)
+                            }
+                            className="border border-gray-300 px-4 py-3 rounded-lg w-full text-center"
+                            min="1"
+                            max={product.stock} // Prevent ordering more than available stock
+                            ref={(el) => (quantityRefs.current[index] = el)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                if (e.shiftKey) {
+                                  // Shift + Enter: Add new product field and focus on first product ID
+                                  updateSalesOrderForm({
+                                    productEntries: [
+                                      ...productEntries,
+                                      {
+                                        id: "",
+                                        name: "",
+                                        price: "",
+                                        quantity: "",
+                                      },
+                                    ],
+                                  });
+                                  setOriginalProductEntries([
+                                    ...originalProductEntries,
+                                    {
+                                      id: "",
+                                      name: "",
+                                      price: "",
+                                      quantity: "",
+                                    },
+                                  ]); // Update original entries
+                                  setProductSuggestions([
+                                    ...productSuggestions,
+                                    [],
+                                  ]);
+                                  setTimeout(
+                                    () =>
+                                      document
+                                        .getElementById(`productId-${productEntries.length}`)
+                                        ?.focus(),
+                                    0
+                                  );
+                                } else {
+                                  // Enter: Proceed to the next step
+                                  nextStep();
+                                }
+                              }
+                              // Handle Arrow Keys for navigation
+                              else if (e.key === "ArrowRight") {
+                                e.preventDefault();
+                                e.target.parentElement.nextSibling?.focus();
+                              } else if (e.key === "ArrowLeft") {
+                                e.preventDefault();
+                                document
+                                  .getElementById(`productPrice-${index}`)
+                                  ?.focus();
+                              }
+                            }}
+                          />
+                        )}
+                        {validationErrors[`productQuantity-${index}`] && (
+                          <p className="text-red-500 text-xs absolute -bottom-5 left-0">
+                            {validationErrors[`productQuantity-${index}`]}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Delete Button */}
+                      <button
+                        type="button"
+                        onClick={() => removeProductEntry(index)}
+                        className="text-red-500 hover:text-red-700 transition"
+                        onKeyDown={(e) => {
+                          if (e.key === "ArrowLeft") {
+                            e.preventDefault();
+                            document
+                              .getElementById(`productQuantity-${index}`)
+                              ?.focus();
+                          }
+                        }}
+                        aria-label={`Remove Product ${index + 1}`}
+                      >
+                        <TrashIcon className="w-5 h-5" />
+                      </button>
+                    </div>
+                  ))}
+                <button
+                  type="button" // Ensure type="button" to prevent form submission
+                  onClick={() => {
+                    updateSalesOrderForm({
+                      productEntries: [
+                        ...productEntries,
+                        { id: "", name: "", price: "", quantity: "" },
+                      ],
+                    });
+                    setOriginalProductEntries([
+                      ...originalProductEntries,
+                      { id: "", name: "", price: "", quantity: "" },
+                    ]); // Update original entries
+                    setProductSuggestions([...productSuggestions, []]);
+                    setTimeout(
+                      () =>
+                        document
+                          .getElementById(`productId-${productEntries.length}`)
+                          ?.focus(),
+                      0
+                    );
+                  }}
+                  className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition"
+                  onKeyDown={(e) => {
+                    if (e.key === "ArrowDown") {
+                      e.preventDefault();
+                      document
+                        .getElementById(`productId-${productEntries.length}`)
+                        ?.focus();
                     }
-                  }
-                }
-              }}
-              list={`productIdSuggestions-${index}`}
-              className="border border-gray-300 px-4 py-3 rounded-lg w-full"
-              onKeyDown={(e) => {
-                if (e.key === "ArrowDown") {
-                  e.preventDefault();
-                  document.getElementById(`productQuantity-${index}`)?.focus();
-                }
-              }}
-            />
-            <datalist id={`productIdSuggestions-${index}`}>
-              {productSuggestions[index] &&
-                productSuggestions[index].map((suggestion) => (
-                  <option
-                    key={suggestion.product_id}
-                    value={suggestion.product_id}
-                  />
-                ))}
-            </datalist>
+                  }}
+                >
+                  Add Product
+                </button>
+                {/* Stock Validation Error */}
+                {validationErrors.stock && (
+                  <p className="text-red-500 text-xs mt-1">
+                    {validationErrors.stock}
+                  </p>
+                )}
 
-            {validationErrors[`productId-${index}`] && (
-              <p className="text-red-500 text-xs absolute -bottom-5 left-0">
-                {validationErrors[`productId-${index}`]}
-              </p>
-            )}
-          </div>
-
-          {/* Product Name Input (Read-Only) */}
-          <div className="relative w-1/2">
-            <input
-              type="text"
-              value={product.name}
-              readOnly
-              className="border border-gray-300 px-4 py-3 rounded-lg w-full bg-gray-100"
-            />
-          </div>
-
-          {/* Product Price Input (Editable) */}
-          <div className="relative w-1/3">
-            <input
-              type="number"
-              step="0.1"
-              min="0"
-              placeholder="Price"
-              value={product.price}
-              onChange={(e) => handleProductChange(index, 'price', e.target.value)}
-              className="border border-gray-300 px-4 py-3 rounded-lg w-full text-center bg-white"
-            />
-            {validationErrors[`productPrice-${index}`] && (
-              <p className="text-red-500 text-xs absolute -bottom-5 left-0">
-                {validationErrors[`productPrice-${index}`]}
-              </p>
-            )}
-          </div>
-
-          {/* Quantity Input */}
-          <div className="relative w-2/4">
-            {product.stock === 0 ? (
-              <input
-                type="text"
-                value="Out of Stock"
-                readOnly
-                className="border border-gray-300 px-4 py-3 rounded-lg w-full text-center bg-red-100 text-red-600"
-              />
-            ) : (
-              <input
-                type="number"
-                id={`productQuantity-${index}`}
-                placeholder="Quantity"
-                value={product.quantity}
-                onChange={(e) =>
-                  handleProductChange(index, "quantity", e.target.value)
-                }
-                className="border border-gray-300 px-4 py-3 rounded-lg w-full text-center"
-                min="1"
-                max={product.stock} // Prevent ordering more than available stock
-                ref={(el) => (quantityRefs.current[index] = el)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    if (e.shiftKey) {
-                      // Shift + Enter: Add new product field and focus on first product ID
-                      updateSalesOrderForm({
-                        productEntries: [
-                          ...productEntries,
-                          {
-                            id: "",
-                            name: "",
-                            price: "",
-                            quantity: "",
-                          },
-                        ],
-                      });
-                      setOriginalProductEntries([
-                        ...originalProductEntries,
-                        {
-                          id: "",
-                          name: "",
-                          price: "",
-                          quantity: "",
-                        },
-                      ]); // Update original entries
-                      setProductSuggestions([
-                        ...productSuggestions,
-                        [],
-                      ]);
-                      setTimeout(
-                        () =>
-                          document
-                            .getElementById(`productId-${productEntries.length}`)
-                            ?.focus(),
-                        0
-                      );
-                    } else {
-                      // Enter: Proceed to the next step
-                      nextStep();
-                    }
-                  }
-                  // Handle Arrow Keys for navigation
-                  else if (e.key === "ArrowRight") {
-                    e.preventDefault();
-                    e.target.parentElement.nextSibling?.focus();
-                  } else if (e.key === "ArrowLeft") {
-                    e.preventDefault();
-                    document
-                      .getElementById(`productPrice-${index}`)
-                      ?.focus();
-                  }
-                }}
-              />
-            )}
-            {validationErrors[`productQuantity-${index}`] && (
-              <p className="text-red-500 text-xs absolute -bottom-5 left-0">
-                {validationErrors[`productQuantity-${index}`]}
-              </p>
-            )}
-          </div>
-
-          {/* Delete Button */}
-          <button
-            type="button"
-            onClick={() => removeProductEntry(index)}
-            className="text-red-500 hover:text-red-700 transition"
-            onKeyDown={(e) => {
-              if (e.key === "ArrowLeft") {
-                e.preventDefault();
-                document
-                  .getElementById(`productQuantity-${index}`)
-                  ?.focus();
-              }
-            }}
-            aria-label={`Remove Product ${index + 1}`}
-          >
-            <TrashIcon className="w-5 h-5" />
-          </button>
-        </div>
-      ))}
-    <button
-      type="button" // Ensure type="button" to prevent form submission
-      onClick={() => {
-        updateSalesOrderForm({
-          productEntries: [
-            ...productEntries,
-            { id: "", name: "", price: "", quantity: "" },
-          ],
-        });
-        setOriginalProductEntries([
-          ...originalProductEntries,
-          { id: "", name: "", price: "", quantity: "" },
-        ]); // Update original entries
-        setProductSuggestions([...productSuggestions, []]);
-        setTimeout(
-          () =>
-            document
-              .getElementById(`productId-${productEntries.length}`)
-              ?.focus(),
-          0
-        );
-      }}
-      className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition"
-      onKeyDown={(e) => {
-        if (e.key === "ArrowDown") {
-          e.preventDefault();
-          document
-            .getElementById(`productId-${productEntries.length}`)
-            ?.focus();
-        }
-      }}
-    >
-      Add Product
-    </button>
-    {/* Stock Validation Error */}
-    {validationErrors.stock && (
-      <p className="text-red-500 text-xs mt-1">
-        {validationErrors.stock}
-      </p>
-    )}
-  </div>
-</div>
+              </div>
+            </div>
           )}
 
           {/* Step 3: Patient or Customer Details */}
@@ -2508,11 +2542,10 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                   type="button" // Added type="button"
                   id="hasMrNumber-yes"
                   onClick={() => updateSalesOrderForm({ hasMrNumber: "yes" })}
-                  className={`px-4 py-2 rounded-lg ${
-                    hasMrNumber === "yes"
-                      ? "bg-green-500 text-white"
-                      : "bg-gray-200"
-                  }`}
+                  className={`px-4 py-2 rounded-lg ${hasMrNumber === "yes"
+                    ? "bg-green-500 text-white"
+                    : "bg-gray-200"
+                    }`}
                   onKeyDown={(e) => {
                     if (e.key === "ArrowRight") {
                       e.preventDefault();
@@ -2526,11 +2559,10 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                   type="button" // Added type="button"
                   id="hasMrNumber-no"
                   onClick={() => updateSalesOrderForm({ hasMrNumber: "no" })}
-                  className={`px-4 py-2 rounded-lg ${
-                    hasMrNumber === "no"
-                      ? "bg-green-500 text-white"
-                      : "bg-gray-200"
-                  }`}
+                  className={`px-4 py-2 rounded-lg ${hasMrNumber === "no"
+                    ? "bg-green-500 text-white"
+                    : "bg-gray-200"
+                    }`}
                   onKeyDown={(e) => {
                     if (e.key === "ArrowLeft") {
                       e.preventDefault();
@@ -2801,11 +2833,10 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                       }
                     }, 0);
                   }}
-                  className={`px-4 py-2 rounded-lg ${
-                    state.salesOrderForm.privilegeCard
-                      ? "bg-green-500 text-white"
-                      : "bg-gray-200"
-                  }`}
+                  className={`px-4 py-2 rounded-lg ${state.salesOrderForm.privilegeCard
+                    ? "bg-green-500 text-white"
+                    : "bg-gray-200"
+                    }`}
                   onKeyDown={(e) => {
                     if (e.key === "ArrowRight") {
                       e.preventDefault();
@@ -2840,11 +2871,10 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                     }, 0);
                   }}
                   id="privilegeCard-no"
-                  className={`px-4 py-2 rounded-lg ${
-                    !state.salesOrderForm.privilegeCard
-                      ? "bg-green-500 text-white"
-                      : "bg-gray-200"
-                  }`}
+                  className={`px-4 py-2 rounded-lg ${!state.salesOrderForm.privilegeCard
+                    ? "bg-green-500 text-white"
+                    : "bg-gray-200"
+                    }`}
                   onKeyDown={(e) => {
                     if (e.key === "ArrowLeft") {
                       e.preventDefault();
@@ -2870,11 +2900,10 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                           payload: { redeemOption: "barcode" },
                         })
                       }
-                      className={`px-4 py-2 rounded-lg ${
-                        state.salesOrderForm.redeemOption === "barcode"
-                          ? "bg-green-500 text-white"
-                          : "bg-gray-200"
-                      }`}
+                      className={`px-4 py-2 rounded-lg ${state.salesOrderForm.redeemOption === "barcode"
+                        ? "bg-green-500 text-white"
+                        : "bg-gray-200"
+                        }`}
                       onKeyDown={(e) => {
                         if (e.key === "ArrowRight") {
                           e.preventDefault();
@@ -2900,11 +2929,10 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                           payload: { redeemOption: "phone" },
                         })
                       }
-                      className={`px-4 py-2 rounded-lg ${
-                        state.salesOrderForm.redeemOption === "phone"
-                          ? "bg-green-500 text-white"
-                          : "bg-gray-200"
-                      }`}
+                      className={`px-4 py-2 rounded-lg ${state.salesOrderForm.redeemOption === "phone"
+                        ? "bg-green-500 text-white"
+                        : "bg-gray-200"
+                        }`}
                       onKeyDown={(e) => {
                         if (e.key === "ArrowLeft") {
                           e.preventDefault();
@@ -2956,13 +2984,13 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                       </button>
                       {state.salesOrderForm.validationErrors
                         ?.privilegeCardNumber && (
-                        <p className="text-red-500 text-xs mt-1">
-                          {
-                            state.salesOrderForm.validationErrors
-                              .privilegeCardNumber
-                          }
-                        </p>
-                      )}
+                          <p className="text-red-500 text-xs mt-1">
+                            {
+                              state.salesOrderForm.validationErrors
+                                .privilegeCardNumber
+                            }
+                          </p>
+                        )}
                     </>
                   )}
 
@@ -3121,11 +3149,10 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                                   payload: { redeemPoints: true },
                                 });
                               }}
-                              className={`px-4 py-2 mb-2 rounded-lg ${
-                                state.salesOrderForm.redeemOption === "full"
-                                  ? "bg-green-500 text-white"
-                                  : "bg-gray-200"
-                              }`}
+                              className={`px-4 py-2 mb-2 rounded-lg ${state.salesOrderForm.redeemOption === "full"
+                                ? "bg-green-500 text-white"
+                                : "bg-gray-200"
+                                }`}
                             >
                               Redeem Full Points
                             </button>
@@ -3148,11 +3175,10 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                                   0
                                 ); // Focus on custom amount input
                               }}
-                              className={`px-4 py-2 mb-2 rounded-lg ${
-                                state.salesOrderForm.redeemOption === "custom"
-                                  ? "bg-green-500 text-white"
-                                  : "bg-gray-200"
-                              }`}
+                              className={`px-4 py-2 mb-2 rounded-lg ${state.salesOrderForm.redeemOption === "custom"
+                                ? "bg-green-500 text-white"
+                                : "bg-gray-200"
+                                }`}
                             >
                               Redeem Custom Amount
                             </button>
@@ -3188,9 +3214,9 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                                         e.target.value === ""
                                           ? ""
                                           : Math.min(
-                                              Number(e.target.value),
-                                              loyaltyPoints
-                                            ),
+                                            Number(e.target.value),
+                                            loyaltyPoints
+                                          ),
                                     },
                                   })
                                 }
@@ -3207,11 +3233,11 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                                 state.salesOrderForm.redeemPointsAmount
                               ) > loyaltyPoints ||
                                 parseFloat(redeemPointsAmount) < 0) && (
-                                <p className="text-red-500 text-xs mt-1">
-                                  Please enter a valid amount up to your
-                                  available points.
-                                </p>
-                              )}
+                                  <p className="text-red-500 text-xs mt-1">
+                                    Please enter a valid amount up to your
+                                    available points.
+                                  </p>
+                                )}
                             </div>
                           )}
                         </div>
@@ -3321,12 +3347,10 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                     <p>
                       <strong>Customer Name:</strong>{" "}
                       {hasMrNumber === "yes"
-                        ? `${patientDetails?.name || "N/A"} | ${
-                            patientDetails?.age || "N/A"
-                          } | ${patientDetails?.gender || "N/A"}`
-                        : `${customerName || "N/A"} | ${
-                            parseInt(age) || "N/A"
-                          } | ${gender || "N/A"}`}
+                        ? `${patientDetails?.name || "N/A"} | ${patientDetails?.age || "N/A"
+                        } | ${patientDetails?.gender || "N/A"}`
+                        : `${customerName || "N/A"} | ${parseInt(age) || "N/A"
+                        } | ${gender || "N/A"}`}
                     </p>
                     <p>
                       <strong>Address:</strong>{" "}
@@ -3418,7 +3442,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                         <strong>Discount:</strong> ₹{calculatedDiscount}
                       </p>
                       <p className="text-xl">
-                        Final Balance Due: <strong className="text-xl">₹{balanceDue}</strong>{" "}
+                        Final Amount: <strong className="text-xl">₹{balanceDue}</strong>{" "}
                       </p>
                       {privilegeCard && privilegeCardDetails && (
                         <>
@@ -3477,15 +3501,15 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                             e.target.value === ""
                               ? ""
                               : Math.min(
-                                  Math.max(Number(e.target.value), 0),
-                                  Math.max(
-                                    subtotalWithGST -
-                                      (Number(
-                                        state.salesOrderForm.advanceDetails
-                                      ) || 0),
-                                    0
-                                  )
-                                );
+                                Math.max(Number(e.target.value), 0),
+                                Math.max(
+                                  subtotalWithGST -
+                                  (Number(
+                                    state.salesOrderForm.advanceDetails
+                                  ) || 0),
+                                  0
+                                )
+                              );
 
                           dispatch({
                             type: "SET_SALES_ORDER_FORM",
@@ -3577,12 +3601,11 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                       ); /* Move focus to Print button after saving */
                     }
                   }}
-                  className={`flex items-center justify-center w-44 h-12 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition ${
-                    !paymentMethod ||
+                  className={`flex items-center justify-center w-44 h-12 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition ${!paymentMethod ||
                     parseFloat(state.salesOrderForm.discount) > subtotalWithGST
-                      ? "opacity-50 cursor-not-allowed"
-                      : ""
-                  }`}
+                    ? "opacity-50 cursor-not-allowed"
+                    : ""
+                    }`}
                   disabled={
                     !paymentMethod ||
                     isLoading || isSaving ||
@@ -3647,11 +3670,10 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                 type="button" // Added type="button"
                 ref={nextButtonRef}
                 onClick={nextStep}
-                className={`bg-green-500 hover:bg-green-600 text-white mx-2 px-4 py-2 rounded-lg ${
-                  step === 4 && !salesOrderForm.isPinVerified
-                    ? "opacity-50 cursor-not-allowed"
-                    : ""
-                }`}
+                className={`bg-green-500 hover:bg-green-600 text-white mx-2 px-4 py-2 rounded-lg ${step === 4 && !salesOrderForm.isPinVerified
+                  ? "opacity-50 cursor-not-allowed"
+                  : ""
+                  }`}
                 disabled={step === 4 && !salesOrderForm.isPinVerified}
               >
                 Next

@@ -105,26 +105,47 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   const generateNewWorkOrderId = useCallback(async () => {
     try {
       console.log("Attempting to generate new Work Order ID...");
-
+  
+      // Define default starting Work Order IDs per branch
+      const branchDefaultIds = {
+        "TVR": 3701,  // Trivandrum
+        "NTA": 4701,  // Neyyantinkara
+        "KOT1": 5701, // Kottarakara 1
+        "KOT2": 6701, // Kottarakara 2
+        "KAT": 7701,  // Kattakada
+        // Add other branches as needed
+      };
+  
+      if (!branch) {
+        console.error("Branch is undefined. Cannot generate Work Order ID.");
+        alert("Branch information is missing. Please try again.");
+        return;
+      }
+  
+      console.log("Current Branch:", branch);
+      console.log("Default Work Order ID for this branch:", branchDefaultIds[branch] || 1001);
+  
+      // Fetch the last Work Order ID for the current branch
       const { data: lastWorkOrders, error } = await supabase
         .from("work_orders")
         .select("work_order_id")
+        .eq("branch", branch) // Filter by branch
         .order("work_order_id", { ascending: false })
         .limit(1);
-
+  
       if (error) {
         console.error("Error fetching last work order:", error);
-        alert("Error generating Work Order ID. Please try again.");
+        // alert("Error generating Work Order ID. Please try again.");
         return;
       }
-
-      console.log("Last Work Orders Retrieved:", lastWorkOrders);
-
-      let newWorkOrderId = 3701; // Default if no work orders exist
-
+  
+      console.log("Last Work Orders Retrieved for branch:", lastWorkOrders);
+  
+      let newWorkOrderId = branchDefaultIds[branch] || 1001; // Default if no work orders exist for branch
+  
       if (lastWorkOrders && lastWorkOrders.length > 0) {
         const lastWorkOrderId = parseInt(lastWorkOrders[0].work_order_id, 10);
-        console.log("Last Work Order ID:", lastWorkOrderId);
+        console.log("Last Work Order ID for branch:", lastWorkOrderId);
         if (!isNaN(lastWorkOrderId)) {
           newWorkOrderId = lastWorkOrderId + 1;
         } else {
@@ -134,7 +155,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
           );
         }
       }
-
+  
       dispatch({
         type: "SET_WORK_ORDER_FORM",
         payload: { workOrderId: newWorkOrderId.toString() },
@@ -144,7 +165,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       console.error("Error generating Work Order ID:", error);
       alert("An unexpected error occurred while generating Work Order ID.");
     }
-  }, [dispatch]);
+  }, [dispatch, branch]);
   
   
 
@@ -1264,11 +1285,12 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   );
 
   useEffect(() => {
-    // If not editing and no workOrderId is set, generate a new one
-    if (!workOrderForm.isEditing && !workOrderId) {
+    // Only generate a new Work Order ID if the branch is available
+    if (branch && !workOrderForm.isEditing && !workOrderId) {
       generateNewWorkOrderId();
     }
-  }, [generateNewWorkOrderId, workOrderForm.isEditing, workOrderId]);
+  }, [branch, generateNewWorkOrderId, workOrderForm.isEditing, workOrderId]);
+  
 
   // Handle after print event
   useEffect(() => {
@@ -2063,7 +2085,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                   <div>
                     <p><strong>Total Amount:</strong> ₹{totalAmount.toFixed(2)}</p>
                     <p><strong>Advance Paid:</strong> ₹{advance.toFixed(2)}</p>
-                    <p className="text-xl">Balance Due: <strong>₹{balanceDue.toFixed(2)}</strong></p>
+                    <p className="text-xl">Final Amount: <strong>₹{balanceDue.toFixed(2)}</strong></p>
                     
                       {/* <p className="text-red-500">
                         Advance paid exceeds the total amount by ₹{excessAmount.toFixed(2)}.

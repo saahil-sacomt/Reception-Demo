@@ -1,6 +1,7 @@
-// GlobalState.jsx
+// client/src/GlobalState.jsx
+
 import React, { createContext, useContext, useReducer, useEffect } from "react";
-import merge from "lodash.merge"; // Import lodash.merge
+import merge from "lodash.merge"; // Ensure lodash.merge is installed: npm install lodash.merge
 
 const savedState = localStorage.getItem("globalState")
   ? JSON.parse(localStorage.getItem("globalState"))
@@ -83,10 +84,16 @@ const defaultInitialState = {
   modals: {
     showWorkOrdersModal: false,
     showSalesModal: false,
+    showPurchaseModal: false, // New Purchase Modal
   },
   // Add Selected Order States
   selectedWorkOrder: null,
   selectedSalesOrder: null,
+  // Add Purchase Modal Content
+  purchaseModal: {
+    action: null, // 'add' or 'update'
+    content: null,
+  },
 };
 
 // Deep merge defaultInitialState with savedState
@@ -145,9 +152,40 @@ const globalStateReducer = (state, action) => {
         modals: {
           showWorkOrdersModal: false,
           showSalesModal: false,
+          showPurchaseModal: false, // Reset Purchase Modal
         },
         selectedWorkOrder: null,
         selectedSalesOrder: null,
+        purchaseModal: {
+          action: null,
+          content: null,
+        },
+      };
+    
+    // Purchase Modal Actions
+    case "SET_PURCHASE_MODAL":
+      return {
+        ...state,
+        purchaseModal: {
+          action: action.payload.action,
+          content: action.payload.content,
+        },
+        modals: {
+          ...state.modals,
+          showPurchaseModal: action.payload.showModal,
+        },
+      };
+    case "RESET_PURCHASE_MODAL":
+      return {
+        ...state,
+        purchaseModal: {
+          action: null,
+          content: null,
+        },
+        modals: {
+          ...state.modals,
+          showPurchaseModal: false,
+        },
       };
 
     // Selected Work Order Actions

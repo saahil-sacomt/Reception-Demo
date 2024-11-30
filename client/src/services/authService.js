@@ -761,3 +761,34 @@ const verifyPin = async () => {
     onVerify(false);
   }
 };
+
+export const addPurchase = async (purchaseData) => {
+  try {
+      const { data, error } = await supabase
+          .from("purchases")
+          .insert([
+              {
+                  product_id: purchaseData.product_id,
+                  branch_code: purchaseData.branch_code,
+                  quantity: purchaseData.quantity,
+                  rate: purchaseData.rate,
+                  mrp: purchaseData.mrp,
+                  purchase_from: purchaseData.purchase_from,
+                  bill_number: purchaseData.bill_number,
+                  bill_date: purchaseData.bill_date,
+                  employee_id: purchaseData.employee_id,
+                  employee_name: purchaseData.employee_name,
+              },
+          ]);
+
+      if (error) {
+          console.error("Error adding purchase:", error);
+          return { success: false, error: error.message };
+      }
+
+      return { success: true, data };
+  } catch (err) {
+      console.error("Unexpected error adding purchase:", err);
+      return { success: false, error: "An unexpected error occurred." };
+  }
+};
