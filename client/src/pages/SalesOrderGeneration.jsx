@@ -47,13 +47,16 @@ const fetchPrivilegeCardByPhone = async (phone) => {
 };
 
 // Function to fetch customer by phone number
+// Function to fetch customer by phone number
 const fetchCustomerByPhone = async (phone) => {
   const { data, error } = await supabase
     .from("customers")
     .select("*")
     .eq("phone_number", phone)
+    .single();
 
   if (error) {
+    console.error("Error fetching customer by phone:", error.message);
     return null;
   }
   return data;
@@ -124,19 +127,89 @@ const calculateLoyaltyPoints = (
   return { updatedPoints, pointsToRedeem, pointsToAdd };
 };
 
-const normalizeWorkOrderProducts = (workOrderProducts) => {
-  return workOrderProducts.map((product) => ({
-    id: product.id, // Use products.id (integer) for stock operations
-    product_id: product.product_id, // Keep product_id (string) for display
-    name: product.product_name || product.name, // Map `product_name` to `name`
-    price: product.mrp || 0, // Use `mrp` as price
-    quantity: product.quantity || 0,
-    hsn_code: product.hsn_code || "",
-    stock: product.stock || 0,
-    ...product, // Retain all other properties
-  }));
-};
+// Helper function to normalize work order products with correct product IDs
+const normalizeWorkOrderProducts = async (workOrderProducts, branch) => {
+  if (!Array.isArray(workOrderProducts)) {
+    console.error("workOrderProducts is not an array:", workOrderProducts);
+    return [];
+  }
 
+  // Extract all unique product_ids (strings) from workOrderProducts
+  const uniqueProductIds = [
+    ...new Set(workOrderProducts.map((product) => product.product_id)),
+  ];
+
+  // Fetch all products with these product_ids
+  const { data: productsData, error: productsError } = await supabase
+    .from("products")
+    .select("id, product_id, product_name, mrp, hsn_code")
+    .in("product_id", uniqueProductIds);
+
+  if (productsError) {
+    console.error("Error fetching products:", productsError.message);
+    return workOrderProducts.map((product) => ({
+      ...product,
+      id: null, // Assign null if product not found
+      stock: 0, // Default stock to 0
+    }));
+  }
+
+  // Create a map from product_id (string) to product details
+  const productsMap = new Map();
+  productsData.forEach((prod) => {
+    productsMap.set(prod.product_id, prod);
+  });
+
+  // Extract all product IDs (integers) to fetch stock
+  const productIds = productsData.map((prod) => prod.id);
+
+  // Fetch current stock for these products in the specific branch
+  const { data: stockData, error: stockError } = await supabase
+    .from("stock")
+    .select("product_id, quantity")
+    .in("product_id", productIds)
+    .eq("branch_code", branch);
+
+  if (stockError) {
+    console.error("Error fetching stock data:", stockError.message);
+    // Assign stock as 0 if fetching fails
+  }
+
+  // Create a map from product_id (integer) to quantity
+  const stockMap = new Map();
+  if (stockData) {
+    stockData.forEach((stock) => {
+      stockMap.set(stock.product_id, stock.quantity);
+    });
+  }
+
+  // Normalize the workOrderProducts with correct product details and stock
+  const normalizedProducts = workOrderProducts.map((product) => {
+    const prod = productsMap.get(product.product_id);
+    if (prod) {
+      return {
+        id: prod.id, // Integer ID from products table
+        product_id: prod.product_id, // String product_id for display
+        name: prod.product_name, // Product name
+        price: prod.mrp || 0, // Price (MRP)
+        quantity: parseInt(product.quantity, 10) || 0, // Quantity from work order
+        hsn_code: prod.hsn_code || "",
+        stock: stockMap.get(prod.id) || 0, // Current stock
+      };
+    } else {
+      // Product not found in products table
+      return {
+        ...product,
+        id: null,
+        stock: 0,
+      };
+    }
+  });
+
+  console.log("Normalized Products with Stock:", normalizedProducts);
+
+  return normalizedProducts;
+};
 
 // Helper function to calculate differences between original and updated products
 const calculateProductDifferences = (original, updated) => {
@@ -463,11 +536,11 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
   const generateSalesOrderId = async (branch) => {
     // Define default starting sales_order_id for each branch
     const branchDefaultIds = {
-      "TVR": 1001,  // Default ID for Trivandrum
-      "NTA": 2001,  // Default ID for Neyyantinkara
-      "KOT1": 3001, // Default ID for Kottarakara 1
-      "KOT2": 4001, // Default ID for Kottarakara 2
-      "KAT": 5001,  // Default ID for Kattakada
+      TVR: 1001, // Default ID for Trivandrum
+      NTA: 2001, // Default ID for Neyyantinkara
+      KOT1: 3001, // Default ID for Kottarakara 1
+      KOT2: 4001, // Default ID for Kottarakara 2
+      KAT: 5001, // Default ID for Kattakada
     };
 
     if (!branch) {
@@ -476,28 +549,35 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     }
 
     try {
-      console.log("Branch passed:", branch);  // Debugging: check the branch passed
-      console.log("Default Sales Order ID for this branch:", branchDefaultIds[branch]); // Debugging: check the default ID for the branch
+      console.log("Branch passed:", branch); // Debugging: check the branch passed
+      console.log(
+        "Default Sales Order ID for this branch:",
+        branchDefaultIds[branch]
+      ); // Debugging: check the default ID for the branch
 
       // Fetch the maximum sales_order_id for the specific branch
       const { data, error } = await supabase
         .from("sales_orders")
         .select("sales_order_id")
-        .eq("branch", branch)  // Filter by branch
+        .eq("branch", branch) // Filter by branch
         .order("sales_order_id", { ascending: false })
         .limit(1);
 
       if (error) {
-        console.error(`Error fetching last sales_order_id for branch ${branch}:`, error);
+        console.error(
+          `Error fetching last sales_order_id for branch ${branch}:`,
+          error
+        );
         return null;
       }
 
       // Set the default starting sales_order_id for the branch if no orders exist
-      let lastSalesOrderId = branchDefaultIds[branch] || 1000;  // Default to 1000 if branch not found in the map
+      let lastSalesOrderId = branchDefaultIds[branch] || 1000; // Default to 1000 if branch not found in the map
 
       // If data exists, extract the last sales_order_id for that branch
       if (data && data.length > 0) {
-        lastSalesOrderId = parseInt(data[0].sales_order_id, 10) || lastSalesOrderId;
+        lastSalesOrderId =
+          parseInt(data[0].sales_order_id, 10) || lastSalesOrderId;
       }
 
       console.log("Calculated lastSalesOrderId:", lastSalesOrderId); // Debugging: check lastSalesOrderId
@@ -510,7 +590,10 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
 
       return newSalesOrderId.toString();
     } catch (error) {
-      console.error(`Error generating sales_order_id for branch ${branch}:`, error);
+      console.error(
+        `Error generating sales_order_id for branch ${branch}:`,
+        error
+      );
       return null;
     }
   };
@@ -538,8 +621,6 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
       }
     }
   };
-
-
 
   const fetchProductSuggestions = async (query, type) => {
     if (!query) return [];
@@ -569,7 +650,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     updateSalesOrderForm({ productEntries: updatedProductEntries });
 
     // If the product_id is changed, fetch the new product details
-    if (field === 'product_id') {
+    if (field === "product_id") {
       handleProductInputChange(index, value);
     }
 
@@ -618,17 +699,18 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     }
   };
 
-
   const fetchExistingSalesOrder = useCallback(
     async (orderId) => {
       try {
+        console.log(`Fetching sales order with ID: ${orderId}`);
         const { data, error } = await supabase
           .from("sales_orders")
           .select("*")
           .eq("sales_order_id", orderId)
           .single();
-  
+
         if (error || !data) {
+          console.error("Sales Order Not Found:", error?.message || "No data");
           updateSalesOrderForm({
             validationErrors: {
               ...validationErrors,
@@ -637,43 +719,22 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           });
           return;
         }
-  
-        // Normalize product entries
-        const normalizedProducts = normalizeWorkOrderProducts(data.product_entries);
-  
-        // Extract product IDs (integer IDs from products.id)
-        const productIds = normalizedProducts.map((prod) => prod.id);
-  
-        // Fetch current stock for these products in the specific branch
-        const { data: stockData, error: stockError } = await supabase
-          .from("stock")
-          .select("product_id, quantity")
-          .in("product_id", productIds)
-          .eq("branch_code", branch);
-  
-        if (stockError) {
-          console.error("Error fetching stock data:", stockError.message);
-          // Assign stock as 0 if fetching fails
-          normalizedProducts.forEach((prod) => {
-            prod.stock = 0;
-          });
-        } else {
-          const stockMap = new Map();
-          stockData.forEach((stock) => {
-            stockMap.set(stock.product_id, stock.quantity);
-          });
-  
-          // Assign current stock to each product
-          normalizedProducts.forEach((prod) => {
-            prod.stock = stockMap.get(prod.id) || 0;
-          });
-        }
-  
+
+        console.log("Fetched Sales Order Data:", data);
+
+        // Normalize product entries with correct product IDs and stock
+        const normalizedProducts = await normalizeWorkOrderProducts(
+          data.items, // Assuming 'items' holds product_entries
+          branch
+        );
+
+        console.log("Normalized Products:", normalizedProducts);
+
         // Update global form state with fetched data
         updateSalesOrderForm({
           productEntries: normalizedProducts,
           mrNumber: data.mr_number || "",
-          customerPhone: data.patient_phone || "",
+          customerPhone: data.patient_phone || "", // Assuming patient_phone is customer phone
           advanceDetails: data.advance_details
             ? data.advance_details.toString()
             : "",
@@ -686,11 +747,11 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           privilegeCardNumber: data.pc_number || "",
           isEditing: true, // Indicates editing mode
           validationErrors: {}, // Clear validation errors
-          step: 3, // Move to the next step
+          step: 3, // Move to the next step (adjust as per your step logic)
         });
-  
+
         setOriginalProductEntries(normalizedProducts); // Store original entries
-  
+
         // Fetch privilege card details if applicable
         if (data.pc_number) {
           const { data: privilegeData, error: privilegeError } = await supabase
@@ -698,7 +759,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
             .select("*")
             .eq("pc_number", data.pc_number)
             .single();
-  
+
           if (privilegeError || !privilegeData) {
             updateSalesOrderForm({ privilegeCardDetails: null });
             updateSalesOrderForm({
@@ -715,10 +776,83 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
             });
           }
         }
-  
+
         updateSalesOrderForm({
           validationErrors: { ...validationErrors, generalError: "" },
         });
+
+        // Fetch patient or customer details based on MR Number
+        if (data.mr_number) {
+          const patient = await fetchPatientByMRNumber(data.mr_number.trim());
+
+          if (patient) {
+            updateSalesOrderForm({
+              patientDetails: {
+                name: patient.name,
+                age: patient.age,
+                condition: patient.condition || "N/A",
+                phone_number: patient.phone_number || "N/A",
+                gender: patient.gender || "N/A",
+                address: patient.address || "N/A",
+              },
+            });
+            updateSalesOrderForm({
+              validationErrors: {
+                ...validationErrors,
+                generalError: "",
+              },
+            });
+          } else {
+            updateSalesOrderForm({
+              patientDetails: null,
+              validationErrors: {
+                ...validationErrors,
+                generalError: "No patient found with the provided MR Number.",
+              },
+            });
+          }
+        } else {
+          // Fetch customer details via phone number
+          const customerPhone = data.patient_phone; // Assuming patient_phone is customer phone
+          if (customerPhone) {
+            const customer = await fetchCustomerByPhone(customerPhone.trim());
+
+            if (customer) {
+              updateSalesOrderForm({
+                patientDetails: {
+                  name: customer.name,
+                  age: customer.age,
+                  condition: customer.condition || "N/A", // Assuming condition is applicable
+                  phone_number: customer.phone_number || "N/A",
+                  gender: customer.gender || "N/A",
+                  address: customer.address || "N/A",
+                },
+                validationErrors: {
+                  ...validationErrors,
+                  generalError: "",
+                },
+              });
+            } else {
+              updateSalesOrderForm({
+                patientDetails: null,
+                validationErrors: {
+                  ...validationErrors,
+                  generalError:
+                    "No customer found with the provided Phone Number.",
+                },
+              });
+            }
+          } else {
+            updateSalesOrderForm({
+              patientDetails: null,
+              validationErrors: {
+                ...validationErrors,
+                generalError:
+                  "Selected work order doesn't contain a Phone Number.",
+              },
+            });
+          }
+        }
       } catch (error) {
         console.error("Error fetching sales order:", error);
         updateSalesOrderForm({
@@ -731,7 +865,6 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     },
     [updateSalesOrderForm, validationErrors, branch]
   );
-  
 
   useEffect(() => {
     if (orderId) {
@@ -739,8 +872,6 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId]);
-
-
 
   useEffect(() => {
     if (branch) {
@@ -784,6 +915,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     ]
   );
 
+  // Function to fetch patient by MR number
   // Function to fetch patient by MR number
   const fetchPatientByMRNumber = async (mrNumber) => {
     const { data, error } = await supabase
@@ -994,34 +1126,87 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     }
   };
 
-  function handleSelectWorkOrder(workOrder) {
-    const normalizedProducts = normalizeWorkOrderProducts(
-      workOrder.product_entries
+  const handleSelectWorkOrder = async (workOrder) => {
+    if (!branch) {
+      console.error("Branch is undefined. Cannot normalize products.");
+      return;
+    }
+
+    console.log("Selected Work Order:", workOrder);
+    console.log("Product Entries:", workOrder.product_entries);
+
+    if (!Array.isArray(workOrder.product_entries)) {
+      console.error(
+        "product_entries is not an array:",
+        workOrder.product_entries
+      );
+      updateSalesOrderForm({
+        validationErrors: {
+          ...validationErrors,
+          generalError: "Invalid product entries in the selected work order.",
+        },
+      });
+      return;
+    }
+
+    const normalizedProducts = await normalizeWorkOrderProducts(
+      workOrder.product_entries,
+      branch
     );
+
+    if (!Array.isArray(normalizedProducts)) {
+      console.error(
+        "Normalized products are not an array:",
+        normalizedProducts
+      );
+      return;
+    }
+
     setSelectedWorkOrder({
       ...workOrder,
-      product_entries: normalizedProducts, // Ensure products match the `id` and `name` structure
+      product_entries: normalizedProducts,
     });
     setShowWorkOrderModal(true);
-  }
+  };
 
   async function confirmWorkOrderSelection() {
-    const normalizedProducts = normalizeWorkOrderProducts(
-      selectedWorkOrder.product_entries
+    if (!selectedWorkOrder) {
+      console.error("No work order selected.");
+      return;
+    }
+
+    // Ensure branch is available
+    if (!branch) {
+      console.error("Branch is undefined. Cannot normalize products.");
+      return;
+    }
+
+    // Normalize products with branch
+    const normalizedProducts = await normalizeWorkOrderProducts(
+      selectedWorkOrder.product_entries,
+      branch
     );
-    // Set relevant data from the work order
+
+    if (!Array.isArray(normalizedProducts)) {
+      console.error(
+        "Normalized products are not an array:",
+        normalizedProducts
+      );
+      return;
+    }
+
+    // Update global state
     updateSalesOrderForm({
       mrNumber: selectedWorkOrder.mr_number,
       advanceDetails: selectedWorkOrder.advance_details || "",
       hasMrNumber: selectedWorkOrder.mr_number ? "yes" : "no",
-      productEntries: normalizedProducts, // Pass normalized products
+      productEntries: normalizedProducts,
     });
 
     setOriginalProductEntries(normalizedProducts);
-
     setShowWorkOrderModal(false);
 
-    // Automatically fetch patient details
+    // Automatically fetch patient or customer details
     if (selectedWorkOrder.mr_number) {
       const patient = await fetchPatientByMRNumber(
         selectedWorkOrder.mr_number.trim()
@@ -1037,34 +1222,95 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
             gender: patient.gender || "N/A",
             address: patient.address || "N/A",
           },
-        });
-        updateSalesOrderForm({
           validationErrors: {
             ...validationErrors,
             generalError: "",
           },
         });
       } else {
-        updateSalesOrderForm({ patientDetails: null });
         updateSalesOrderForm({
+          patientDetails: null,
           validationErrors: {
             ...validationErrors,
-            generalError: "No patient found with the provided work order.",
+            generalError: "No patient found with the provided MR Number.",
           },
         });
       }
-    } else {
-      updateSalesOrderForm({ patientDetails: null });
+    } else if (selectedWorkOrder.patient_details) {
+      // Use patient_details from the work order
+      const patientDetails = selectedWorkOrder.patient_details;
+
       updateSalesOrderForm({
+        patientDetails: {
+          name: patientDetails.name || "",
+          age: patientDetails.age || "",
+          condition: patientDetails.condition || "N/A",
+          phone_number: patientDetails.phone_number || "N/A",
+          gender: patientDetails.gender || "N/A",
+          address: patientDetails.address || "N/A",
+        },
+        customerName: patientDetails.name || "",
+        customerPhone: patientDetails.phone_number || "",
+        address: patientDetails.address || "",
+        age: patientDetails.age || "",
+        gender: patientDetails.gender || "",
         validationErrors: {
           ...validationErrors,
-          generalError: "Selected work order doesn't contain an MR number.",
+          generalError: "",
         },
       });
+    } else {
+      // If patient_details is not present, try fetching customer details using phone number
+      const customerPhone =
+        selectedWorkOrder.patient_details?.phone_number ||
+        selectedWorkOrder.customer_phone;
+
+      if (customerPhone) {
+        const customer = await fetchCustomerByPhone(customerPhone.trim());
+        if (customer) {
+          updateSalesOrderForm({
+            patientDetails: {
+              name: customer.name,
+              age: customer.age,
+              condition: customer.condition || "N/A",
+              phone_number: customer.phone_number || "N/A",
+              gender: customer.gender || "N/A",
+              address: customer.address || "N/A",
+            },
+            customerName: customer.name || "",
+            customerPhone: customer.phone_number || "",
+            address: customer.address || "",
+            age: customer.age || "",
+            gender: customer.gender || "",
+            validationErrors: {
+              ...validationErrors,
+              generalError: "",
+            },
+          });
+        } else {
+          updateSalesOrderForm({
+            patientDetails: null,
+            validationErrors: {
+              ...validationErrors,
+              generalError: "No customer found with the provided phone number.",
+            },
+          });
+        }
+      } else {
+        // No MR number, no patient_details, and no customer_phone
+        updateSalesOrderForm({
+          patientDetails: null,
+          validationErrors: {
+            ...validationErrors,
+            generalError:
+              "Selected work order doesn't contain customer details.",
+          },
+        });
+      }
     }
 
     // Move to the next step
-    updateSalesOrderForm({ step: 3 }); // Adjust step numbering as needed
+    updateSalesOrderForm({ step: 3 });
   }
 
   // Function to send OTP
@@ -1270,14 +1516,14 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
 
     if (field === "id" && !productEntries[index].id) {
       errors[`productId-${index}`] = "Product ID is required";
-    } if (field === "price") {
+    }
+    if (field === "price") {
       const price = parseFloat(productEntries[index].price);
       if (isNaN(price) || price < 0) {
         errors[`productPrice-${index}`] = "Enter a valid non-negative number";
       } else {
         delete errors[`productPrice-${index}`];
       }
-
     } else if (field === "quantity" && productEntries[index].stock > 0) {
       const quantity = parseInt(productEntries[index].quantity, 10);
       if (!quantity) {
@@ -1357,11 +1603,11 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           errors.customerPhone = "Please enter a valid 10-digit phone number";
         }
         if (!address.trim())
-          errors["address"] = "Customer address is required.";
-        if (!age) errors["customerAge"] = "Customer age is required.";
+          errors.address = "Customer address is required.";
+        if (!age) errors.customerAge = "Customer age is required.";
         if (age && parseInt(age) < 0)
-          errors["customerAge"] = "Age cannot be negative.";
-        if (!gender) errors["customerGender"] = "Customer gender is required.";
+          errors.customerAge = "Age cannot be negative.";
+        if (!gender) errors.customerGender = "Customer gender is required.";
       }
     } else if (step === 3 && privilegeCard) {
       if (redeemOption === "phone") {
@@ -1527,13 +1773,14 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
 
       // **Step 2: Handle Loyalty Points Update (if applicable)**
       if (privilegeCard && privilegeCardDetails) {
-        const { updatedPoints, pointsToRedeem, pointsToAdd } = calculateLoyaltyPoints(
-          subtotalWithGST,
-          redeemPointsAmount,
-          privilegeCard,
-          privilegeCardDetails,
-          loyaltyPoints
-        );
+        const { updatedPoints, pointsToRedeem, pointsToAdd } =
+          calculateLoyaltyPoints(
+            subtotalWithGST,
+            redeemPointsAmount,
+            privilegeCard,
+            privilegeCardDetails,
+            loyaltyPoints
+          );
 
         const { error: loyaltyError } = await supabase
           .from("privilegecards")
@@ -1562,9 +1809,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
       const sanitizedRedeemedPoints = privilegeCard
         ? parseInt(redeemPointsAmount) || 0
         : 0;
-      const sanitizedPointsAdded = privilegeCard
-        ? pointsToAdd || 0
-        : 0;
+      const sanitizedPointsAdded = privilegeCard ? pointsToAdd || 0 : 0;
 
       // **Step 4: Handle Existing Sales Update**
       if (isEditing) {
@@ -1911,7 +2156,9 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
   // Function to reset the form
   const resetForm = () => {
     dispatch({ type: "RESET_SALES_ORDER_FORM" });
-    setOriginalProductEntries([{ id: "", product_id: "", name: "", price: "", quantity: "" }]);
+    setOriginalProductEntries([
+      { id: "", product_id: "", name: "", price: "", quantity: "" },
+    ]);
     dispatch({
       type: "SET_SALES_ORDER_FORM",
       payload: {
@@ -1949,8 +2196,9 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
 
   return (
     <div
-      className={`transition-all duration-300 ${isCollapsed ? "mx-20" : "mx-20 px-20"
-        } justify-center mt-16 p-4 mx-auto`}
+      className={`transition-all duration-300 ${
+        isCollapsed ? "mx-20" : "mx-20 px-20"
+      } justify-center mt-16 p-4 mx-auto`}
     >
       {/* Modal for Work Order Details */}
       {showWorkOrderModal && (
@@ -1999,7 +2247,9 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                         {selectedWorkOrder.product_entries.map(
                           (product, index) => (
                             <tr key={index} className="text-center">
-                              <td className="py-1 px-2">{product.product_id}</td>
+                              <td className="py-1 px-2">
+                                {product.product_id}
+                              </td>
                               <td className="py-1 px-2">{product.name}</td>
                               <td className="py-1 px-2">{product.price}</td>
                               <td className="py-1 px-2">{product.quantity}</td>
@@ -2047,8 +2297,9 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         {Array.from({ length: 6 }, (_, i) => (
           <div
             key={i}
-            className={`flex-1 h-2 rounded-xl mx-1 ${step > i ? "bg-[#5db76d]" : "bg-gray-300"
-              } transition-all duration-300`}
+            className={`flex-1 h-2 rounded-xl mx-1 ${
+              step > i ? "bg-[#5db76d]" : "bg-gray-300"
+            } transition-all duration-300`}
           />
         ))}
       </div>
@@ -2080,10 +2331,11 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                     onClick={() =>
                       updateSalesOrderForm({ fetchMethod: "work_order_id" })
                     }
-                    className={`px-4 py-2 rounded-lg ${salesOrderForm.fetchMethod === "work_order_id"
-                      ? "bg-green-500 text-white"
-                      : "bg-gray-200"
-                      }`}
+                    className={`px-4 py-2 rounded-lg ${
+                      salesOrderForm.fetchMethod === "work_order_id"
+                        ? "bg-green-500 text-white"
+                        : "bg-gray-200"
+                    }`}
                     onKeyDown={(e) => {
                       if (e.key === "ArrowRight") {
                         e.preventDefault();
@@ -2101,10 +2353,11 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                       updateSalesOrderForm({ fetchMethod: "mr_number" })
                     }
                     id="fetchMethod-mr_number"
-                    className={`px-4 py-2 rounded-lg ${salesOrderForm.fetchMethod === "mr_number"
-                      ? "bg-green-500 text-white"
-                      : "bg-gray-200"
-                      }`}
+                    className={`px-4 py-2 rounded-lg ${
+                      salesOrderForm.fetchMethod === "mr_number"
+                        ? "bg-green-500 text-white"
+                        : "bg-gray-200"
+                    }`}
                     onKeyDown={(e) => {
                       if (e.key === "ArrowRight") {
                         e.preventDefault();
@@ -2127,10 +2380,11 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                       updateSalesOrderForm({ fetchMethod: "phone_number" })
                     }
                     id="fetchMethod-phone_number"
-                    className={`px-4 py-2 rounded-lg ${salesOrderForm.fetchMethod === "phone_number"
-                      ? "bg-green-500 text-white"
-                      : "bg-gray-200"
-                      }`}
+                    className={`px-4 py-2 rounded-lg ${
+                      salesOrderForm.fetchMethod === "phone_number"
+                        ? "bg-green-500 text-white"
+                        : "bg-gray-200"
+                    }`}
                     onKeyDown={(e) => {
                       if (e.key === "ArrowLeft") {
                         e.preventDefault();
@@ -2150,8 +2404,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                 {fetchMethod === "work_order_id"
                   ? "Enter Work Order ID"
                   : fetchMethod === "mr_number"
-                    ? "Enter MR Number"
-                    : "Enter Phone Number"}
+                  ? "Enter MR Number"
+                  : "Enter Phone Number"}
               </label>
               <input
                 type="text"
@@ -2159,8 +2413,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                   fetchMethod === "work_order_id"
                     ? "Work Order ID"
                     : fetchMethod === "mr_number"
-                      ? "MR Number"
-                      : "Phone Number"
+                    ? "MR Number"
+                    : "Phone Number"
                 }
                 value={state.salesOrderForm.searchQuery}
                 ref={workOrderInputRef}
@@ -2293,6 +2547,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           )}
 
           {/* Step 2: Product Details */}
+          {/* Step 2: Product Details */}
           {state.salesOrderForm.step === 1 && (
             <div className="w-full bg-gray-50 p-6 rounded-md shadow-inner space-y-6">
               <h2 className="text-lg font-semibold text-gray-700 text-center">
@@ -2314,7 +2569,10 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                 {productEntries &&
                   Array.isArray(productEntries) &&
                   productEntries.map((product, index) => (
-                    <div key={index} className="flex space-x-2 items-center relative">
+                    <div
+                      key={index}
+                      className="flex space-x-2 items-center relative"
+                    >
                       {/* Product ID Input */}
                       <div className="relative w-2/4">
                         <input
@@ -2326,7 +2584,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                             const value = e.target.value.trim();
                             const updatedSuggestions = [...productSuggestions];
                             if (value) {
-                              updatedSuggestions[index] = await fetchProductSuggestions(value, "id");
+                              updatedSuggestions[index] =
+                                await fetchProductSuggestions(value, "id");
                             } else {
                               updatedSuggestions[index] = [];
                             }
@@ -2336,20 +2595,39 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                             await handleProductInputChange(index, value); // Fetch product details
                           }}
                           onBlur={async () => {
-                            const selectedProduct = productSuggestions[index]?.find(
+                            const selectedProduct = productSuggestions[
+                              index
+                            ]?.find(
                               (prod) => prod.product_id === product.product_id // Corrected comparison
                             );
                             if (selectedProduct) {
                               // Automatically fetch data and move focus to quantity
-                              const productDetails = await fetchProductDetailsFromDatabase(
-                                selectedProduct.product_id,
-                                branch
-                              );
+                              const productDetails =
+                                await fetchProductDetailsFromDatabase(
+                                  selectedProduct.product_id,
+                                  branch
+                                );
                               if (productDetails) {
-                                handleProductChange(index, "product_id", productDetails.product_id);
-                                handleProductChange(index, "name", productDetails.product_name);
-                                handleProductChange(index, "price", productDetails.mrp || "");
-                                handleProductChange(index, "stock", productDetails.stock || 0);
+                                handleProductChange(
+                                  index,
+                                  "product_id",
+                                  productDetails.product_id
+                                );
+                                handleProductChange(
+                                  index,
+                                  "name",
+                                  productDetails.product_name
+                                );
+                                handleProductChange(
+                                  index,
+                                  "price",
+                                  productDetails.mrp || ""
+                                );
+                                handleProductChange(
+                                  index,
+                                  "stock",
+                                  productDetails.stock || 0
+                                );
                                 if (productDetails.stock > 0) {
                                   setTimeout(() => {
                                     quantityRefs.current[index]?.focus();
@@ -2363,7 +2641,9 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                           onKeyDown={(e) => {
                             if (e.key === "ArrowDown") {
                               e.preventDefault();
-                              document.getElementById(`productQuantity-${index}`)?.focus();
+                              document
+                                .getElementById(`productQuantity-${index}`)
+                                ?.focus();
                             }
                           }}
                         />
@@ -2402,7 +2682,9 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                           min="0"
                           placeholder="Price"
                           value={product.price}
-                          onChange={(e) => handleProductChange(index, 'price', e.target.value)}
+                          onChange={(e) =>
+                            handleProductChange(index, "price", e.target.value)
+                          }
                           className="border border-gray-300 px-4 py-3 rounded-lg w-full text-center bg-white"
                         />
                         {validationErrors[`productPrice-${index}`] && (
@@ -2428,7 +2710,11 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                             placeholder="Quantity"
                             value={product.quantity}
                             onChange={(e) =>
-                              handleProductChange(index, "quantity", e.target.value)
+                              handleProductChange(
+                                index,
+                                "quantity",
+                                e.target.value
+                              )
                             }
                             className="border border-gray-300 px-4 py-3 rounded-lg w-full text-center"
                             min="1"
@@ -2444,6 +2730,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                                       ...productEntries,
                                       {
                                         id: "",
+                                        product_id: "",
                                         name: "",
                                         price: "",
                                         quantity: "",
@@ -2454,6 +2741,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                                     ...originalProductEntries,
                                     {
                                       id: "",
+                                      product_id: "",
                                       name: "",
                                       price: "",
                                       quantity: "",
@@ -2466,7 +2754,9 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                                   setTimeout(
                                     () =>
                                       document
-                                        .getElementById(`productId-${productEntries.length}`)
+                                        .getElementById(
+                                          `productId-${productEntries.length}`
+                                        )
                                         ?.focus(),
                                     0
                                   );
@@ -2478,7 +2768,13 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                               // Handle Arrow Keys for navigation
                               else if (e.key === "ArrowRight") {
                                 e.preventDefault();
-                                e.target.parentElement.nextSibling?.focus();
+                                // Focus on the next input field, e.g., price or delete button
+                                const nextIndex = index + 1;
+                                if (nextIndex < productEntries.length) {
+                                  document
+                                    .getElementById(`productId-${nextIndex}`)
+                                    ?.focus();
+                                }
                               } else if (e.key === "ArrowLeft") {
                                 e.preventDefault();
                                 document
@@ -2520,12 +2816,24 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                     updateSalesOrderForm({
                       productEntries: [
                         ...productEntries,
-                        { id: "", name: "", price: "", quantity: "" },
+                        {
+                          id: "",
+                          product_id: "",
+                          name: "",
+                          price: "",
+                          quantity: "",
+                        },
                       ],
                     });
                     setOriginalProductEntries([
                       ...originalProductEntries,
-                      { id: "", name: "", price: "", quantity: "" },
+                      {
+                        id: "",
+                        product_id: "",
+                        name: "",
+                        price: "",
+                        quantity: "",
+                      },
                     ]); // Update original entries
                     setProductSuggestions([...productSuggestions, []]);
                     setTimeout(
@@ -2554,7 +2862,6 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                     {validationErrors.stock}
                   </p>
                 )}
-
               </div>
             </div>
           )}
@@ -2572,10 +2879,11 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                   type="button" // Added type="button"
                   id="hasMrNumber-yes"
                   onClick={() => updateSalesOrderForm({ hasMrNumber: "yes" })}
-                  className={`px-4 py-2 rounded-lg ${hasMrNumber === "yes"
-                    ? "bg-green-500 text-white"
-                    : "bg-gray-200"
-                    }`}
+                  className={`px-4 py-2 rounded-lg ${
+                    hasMrNumber === "yes"
+                      ? "bg-green-500 text-white"
+                      : "bg-gray-200"
+                  }`}
                   onKeyDown={(e) => {
                     if (e.key === "ArrowRight") {
                       e.preventDefault();
@@ -2589,10 +2897,11 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                   type="button" // Added type="button"
                   id="hasMrNumber-no"
                   onClick={() => updateSalesOrderForm({ hasMrNumber: "no" })}
-                  className={`px-4 py-2 rounded-lg ${hasMrNumber === "no"
-                    ? "bg-green-500 text-white"
-                    : "bg-gray-200"
-                    }`}
+                  className={`px-4 py-2 rounded-lg ${
+                    hasMrNumber === "no"
+                      ? "bg-green-500 text-white"
+                      : "bg-gray-200"
+                  }`}
                   onKeyDown={(e) => {
                     if (e.key === "ArrowLeft") {
                       e.preventDefault();
@@ -2822,12 +3131,33 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                       {validationErrors.age}
                     </p>
                   )}
+
+                  {/* {patientDetails && (
+      <div className="mt-4 bg-gray-100 p-4 rounded border border-gray-200">
+        <p>
+          <strong>Name:</strong> {patientDetails.name}
+        </p>
+        <p>
+          <strong>Age:</strong> {patientDetails.age}
+        </p>
+        <p>
+          <strong>Gender:</strong> {patientDetails.gender}
+        </p>
+        <p>
+          <strong>Address:</strong> {patientDetails.address}
+        </p>
+        <p>
+          <strong>Phone number:</strong>{" "}
+          {patientDetails.phone_number}
+        </p>
+      </div>
+    )} */}
                 </>
+                
               )}
             </div>
           )}
 
-          {/* Step 4: Privilege Card */}
           {/* Step 3: Privilege Card */}
           {state.salesOrderForm.step === 3 && (
             <div className="bg-gray-50 p-6 rounded-md shadow-inner space-y-4">
@@ -2863,10 +3193,11 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                       }
                     }, 0);
                   }}
-                  className={`px-4 py-2 rounded-lg ${state.salesOrderForm.privilegeCard
-                    ? "bg-green-500 text-white"
-                    : "bg-gray-200"
-                    }`}
+                  className={`px-4 py-2 rounded-lg ${
+                    state.salesOrderForm.privilegeCard
+                      ? "bg-green-500 text-white"
+                      : "bg-gray-200"
+                  }`}
                   onKeyDown={(e) => {
                     if (e.key === "ArrowRight") {
                       e.preventDefault();
@@ -2901,10 +3232,11 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                     }, 0);
                   }}
                   id="privilegeCard-no"
-                  className={`px-4 py-2 rounded-lg ${!state.salesOrderForm.privilegeCard
-                    ? "bg-green-500 text-white"
-                    : "bg-gray-200"
-                    }`}
+                  className={`px-4 py-2 rounded-lg ${
+                    !state.salesOrderForm.privilegeCard
+                      ? "bg-green-500 text-white"
+                      : "bg-gray-200"
+                  }`}
                   onKeyDown={(e) => {
                     if (e.key === "ArrowLeft") {
                       e.preventDefault();
@@ -2930,10 +3262,11 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                           payload: { redeemOption: "barcode" },
                         })
                       }
-                      className={`px-4 py-2 rounded-lg ${state.salesOrderForm.redeemOption === "barcode"
-                        ? "bg-green-500 text-white"
-                        : "bg-gray-200"
-                        }`}
+                      className={`px-4 py-2 rounded-lg ${
+                        state.salesOrderForm.redeemOption === "barcode"
+                          ? "bg-green-500 text-white"
+                          : "bg-gray-200"
+                      }`}
                       onKeyDown={(e) => {
                         if (e.key === "ArrowRight") {
                           e.preventDefault();
@@ -2959,10 +3292,11 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                           payload: { redeemOption: "phone" },
                         })
                       }
-                      className={`px-4 py-2 rounded-lg ${state.salesOrderForm.redeemOption === "phone"
-                        ? "bg-green-500 text-white"
-                        : "bg-gray-200"
-                        }`}
+                      className={`px-4 py-2 rounded-lg ${
+                        state.salesOrderForm.redeemOption === "phone"
+                          ? "bg-green-500 text-white"
+                          : "bg-gray-200"
+                      }`}
                       onKeyDown={(e) => {
                         if (e.key === "ArrowLeft") {
                           e.preventDefault();
@@ -3014,13 +3348,13 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                       </button>
                       {state.salesOrderForm.validationErrors
                         ?.privilegeCardNumber && (
-                          <p className="text-red-500 text-xs mt-1">
-                            {
-                              state.salesOrderForm.validationErrors
-                                .privilegeCardNumber
-                            }
-                          </p>
-                        )}
+                        <p className="text-red-500 text-xs mt-1">
+                          {
+                            state.salesOrderForm.validationErrors
+                              .privilegeCardNumber
+                          }
+                        </p>
+                      )}
                     </>
                   )}
 
@@ -3179,10 +3513,11 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                                   payload: { redeemPoints: true },
                                 });
                               }}
-                              className={`px-4 py-2 mb-2 rounded-lg ${state.salesOrderForm.redeemOption === "full"
-                                ? "bg-green-500 text-white"
-                                : "bg-gray-200"
-                                }`}
+                              className={`px-4 py-2 mb-2 rounded-lg ${
+                                state.salesOrderForm.redeemOption === "full"
+                                  ? "bg-green-500 text-white"
+                                  : "bg-gray-200"
+                              }`}
                             >
                               Redeem Full Points
                             </button>
@@ -3205,10 +3540,11 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                                   0
                                 ); // Focus on custom amount input
                               }}
-                              className={`px-4 py-2 mb-2 rounded-lg ${state.salesOrderForm.redeemOption === "custom"
-                                ? "bg-green-500 text-white"
-                                : "bg-gray-200"
-                                }`}
+                              className={`px-4 py-2 mb-2 rounded-lg ${
+                                state.salesOrderForm.redeemOption === "custom"
+                                  ? "bg-green-500 text-white"
+                                  : "bg-gray-200"
+                              }`}
                             >
                               Redeem Custom Amount
                             </button>
@@ -3244,9 +3580,9 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                                         e.target.value === ""
                                           ? ""
                                           : Math.min(
-                                            Number(e.target.value),
-                                            loyaltyPoints
-                                          ),
+                                              Number(e.target.value),
+                                              loyaltyPoints
+                                            ),
                                     },
                                   })
                                 }
@@ -3263,11 +3599,11 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                                 state.salesOrderForm.redeemPointsAmount
                               ) > loyaltyPoints ||
                                 parseFloat(redeemPointsAmount) < 0) && (
-                                  <p className="text-red-500 text-xs mt-1">
-                                    Please enter a valid amount up to your
-                                    available points.
-                                  </p>
-                                )}
+                                <p className="text-red-500 text-xs mt-1">
+                                  Please enter a valid amount up to your
+                                  available points.
+                                </p>
+                              )}
                             </div>
                           )}
                         </div>
@@ -3377,10 +3713,12 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                     <p>
                       <strong>Customer Name:</strong>{" "}
                       {hasMrNumber === "yes"
-                        ? `${patientDetails?.name || "N/A"} | ${patientDetails?.age || "N/A"
-                        } | ${patientDetails?.gender || "N/A"}`
-                        : `${customerName || "N/A"} | ${parseInt(age) || "N/A"
-                        } | ${gender || "N/A"}`}
+                        ? `${patientDetails?.name || "N/A"} | ${
+                            patientDetails?.age || "N/A"
+                          } | ${patientDetails?.gender || "N/A"}`
+                        : `${customerName || "N/A"} | ${
+                            parseInt(age) || "N/A"
+                          } | ${gender || "N/A"}`}
                     </p>
                     <p>
                       <strong>Address:</strong>{" "}
@@ -3472,7 +3810,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                         <strong>Discount:</strong> ₹{calculatedDiscount}
                       </p>
                       <p className="text-xl">
-                        Final Amount: <strong className="text-xl">₹{balanceDue}</strong>{" "}
+                        Final Amount:{" "}
+                        <strong className="text-xl">₹{balanceDue}</strong>{" "}
                       </p>
                       {privilegeCard && privilegeCardDetails && (
                         <>
@@ -3531,15 +3870,15 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                             e.target.value === ""
                               ? ""
                               : Math.min(
-                                Math.max(Number(e.target.value), 0),
-                                Math.max(
-                                  subtotalWithGST -
-                                  (Number(
-                                    state.salesOrderForm.advanceDetails
-                                  ) || 0),
-                                  0
-                                )
-                              );
+                                  Math.max(Number(e.target.value), 0),
+                                  Math.max(
+                                    subtotalWithGST -
+                                      (Number(
+                                        state.salesOrderForm.advanceDetails
+                                      ) || 0),
+                                    0
+                                  )
+                                );
 
                           dispatch({
                             type: "SET_SALES_ORDER_FORM",
@@ -3631,14 +3970,16 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                       ); /* Move focus to Print button after saving */
                     }
                   }}
-                  className={`flex items-center justify-center w-44 h-12 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition ${!paymentMethod ||
+                  className={`flex items-center justify-center w-44 h-12 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition ${
+                    !paymentMethod ||
                     parseFloat(state.salesOrderForm.discount) > subtotalWithGST
-                    ? "opacity-50 cursor-not-allowed"
-                    : ""
-                    }`}
+                      ? "opacity-50 cursor-not-allowed"
+                      : ""
+                  }`}
                   disabled={
                     !paymentMethod ||
-                    isLoading || isSaving ||
+                    isLoading ||
+                    isSaving ||
                     parseFloat(state.salesOrderForm.discount) > subtotalWithGST
                   }
                 >
@@ -3700,10 +4041,11 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                 type="button" // Added type="button"
                 ref={nextButtonRef}
                 onClick={nextStep}
-                className={`bg-green-500 hover:bg-green-600 text-white mx-2 px-4 py-2 rounded-lg ${step === 4 && !salesOrderForm.isPinVerified
-                  ? "opacity-50 cursor-not-allowed"
-                  : ""
-                  }`}
+                className={`bg-green-500 hover:bg-green-600 text-white mx-2 px-4 py-2 rounded-lg ${
+                  step === 4 && !salesOrderForm.isPinVerified
+                    ? "opacity-50 cursor-not-allowed"
+                    : ""
+                }`}
                 disabled={step === 4 && !salesOrderForm.isPinVerified}
               >
                 Next
