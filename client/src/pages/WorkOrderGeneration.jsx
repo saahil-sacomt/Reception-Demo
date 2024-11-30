@@ -855,29 +855,30 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
           return;
         }
 
-        customerId = existingCustomer?.id;
+        customerId = null; 
       } else {
         // Create new customer
         const { data: newCustomer, error: customerCreationError } =
-          await supabase
-            .from("customers")
-            .insert({
-              name: customerName.trim(),
-              phone_number: customerPhone.trim(),
-              address: customerAddress.trim(),
-              age: parseInt(customerAge),
-              gender: customerGender,
-            })
-            .select("id")
-            .single();
+  await supabase
+    .from("customers")
+    .insert({
+      name: customerName.trim(),
+      phone_number: customerPhone.trim(),
+      address: customerAddress.trim(),
+      age: parseInt(customerAge, 10),
+      gender: customerGender,
+    })
+    .select("customer_id") // Correct field selection
+    .single();
 
-        if (customerCreationError) {
-          alert("Failed to create a new customer.");
-          dispatch({ type: "SET_WORK_ORDER_FORM", payload: { isSaving: false } });
-          return;
-        }
+if (customerCreationError) {
+  console.error("Error creating customer:", customerCreationError.message);
+  alert("Failed to create a new customer.");
+  dispatch({ type: "SET_WORK_ORDER_FORM", payload: { isSaving: false } });
+  return;
+}
 
-        customerId = newCustomer?.id;
+customerId = newCustomer?.customer_id;
       }
 
       // Prepare the payload
@@ -894,18 +895,18 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         mr_number: hasMrNumber ? mrNumber : null,
         patient_details: hasMrNumber
           ? {
-            mr_number: mrNumber,
-            name: patientDetails?.name,
-            age: patientDetails?.age,
-            phone_number: patientDetails?.phoneNumber,
-            gender: patientDetails?.gender,
-            address: patientDetails?.address,
+            mr_number: mrNumber.trim(),
+            name: patientDetails?.name || "",
+            age: patientDetails?.age || "",
+            phone_number: patientDetails?.phoneNumber || "",
+            gender: patientDetails?.gender || "",
+            address: patientDetails?.address || "",
           }
-          : {
-            name: customerName,
-            phone_number: customerPhone,
-            address: customerAddress,
-            age: parseInt(customerAge),
+        : {
+            name: customerName.trim(),
+            phone_number: customerPhone.trim(),
+            address: customerAddress.trim(),
+            age: parseInt(customerAge, 10),
             gender: customerGender,
           },
         employee,
@@ -1118,9 +1119,9 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         .select("*")
         .eq("work_order_id", orderId)
         .single();
-
+  
       if (error) {
-        console.error("Error fetching work order details:", error);
+        console.error("Error fetching work order details:", error.message);
         alert("Failed to fetch work order details.");
         navigate("/home");
       } else {
@@ -1132,7 +1133,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
           quantity: entry.quantity.toString(),
           hsn_code: entry.hsn_code,
         }));
-
+  
         dispatch({
           type: "SET_WORK_ORDER_FORM",
           payload: {
@@ -1150,8 +1151,9 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
             hasMrNumber: data.mr_number ? true : false,
           },
         });
-
+  
         if (data.mr_number) {
+          // **Handle Existing Patient**
           dispatch({
             type: "SET_WORK_ORDER_FORM",
             payload: { mrNumber: data.mr_number },
@@ -1160,17 +1162,12 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
           try {
             const { data: patientData, error: patientError } = await supabase
               .from("patients")
-              .select(
-                "name, age, phone_number, gender, address"
-              ) // Ensure 'address' is fetched
+              .select("name, age, phone_number, gender, address")
               .eq("mr_number", data.mr_number)
               .single();
-
+  
             if (patientError) {
-              console.error(
-                "Error fetching patient details for existing work order:",
-                patientError.message
-              );
+              console.error("Error fetching patient details:", patientError.message);
               dispatch({
                 type: "SET_WORK_ORDER_FORM",
                 payload: { patientDetails: null },
@@ -1191,43 +1188,38 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
               });
             }
           } catch (err) {
-            console.error(
-              "Unexpected error fetching patient details for existing work order:",
-              err
-            );
+            console.error("Unexpected error fetching patient details:", err);
             dispatch({
               type: "SET_WORK_ORDER_FORM",
               payload: { patientDetails: null },
             });
           }
-        } else {
-          dispatch({
-            type: "SET_WORK_ORDER_FORM",
-            payload: {
-              customerName: data.patient_details?.name || "",
-              customerPhone: data.patient_details?.phone_number || "",
-              customerAddress: data.patient_details?.address || "",
-              customerAge: data.patient_details?.age?.toString() || "",
-              customerGender: data.patient_details?.gender || "",
-            },
-          });
-        }
-
-        // Fetch the corresponding modification request
-        const { data: modData, error: modError } = await supabase
-          .from("modification_requests")
-          .select("*")
-          .eq("order_id", orderId)
-          .eq("status", "approved") // Assuming the status was 'approved'
-          .single();
-
-        if (modError) {
-          console.error("Error fetching modification request:", modError);
-        } else {
-          dispatch({
-            type: "SET_WORK_ORDER_FORM",
-            payload: { modificationRequestId: modData.request_id },
-          });
+        } else if (data.customer_id) {
+          // **Handle Existing Customer**
+          const { data: customerData, error: customerError } = await supabase
+            .from("customers")
+            .select("name, phone_number, address, age, gender")
+            .eq("customer_id", data.customer_id)
+            .single();
+  
+          if (customerError) {
+            console.error("Error fetching customer details:", customerError.message);
+            dispatch({
+              type: "SET_WORK_ORDER_FORM",
+              payload: { customerDetails: null },
+            });
+          } else {
+            dispatch({
+              type: "SET_WORK_ORDER_FORM",
+              payload: {
+                customerName: customerData.name,
+                customerPhone: customerData.phone_number,
+                customerAddress: customerData.address,
+                customerAge: customerData.age ? customerData.age.toString() : "",
+                customerGender: customerData.gender || "",
+              },
+            });
+          }
         }
       }
     } catch (err) {
@@ -1236,6 +1228,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       navigate("/home");
     }
   }, [dispatch, navigate, orderId]);
+  
 
   // Handle Shift + Enter and Enter key for product entries
   const handleProductEntryShiftEnter = useCallback(
