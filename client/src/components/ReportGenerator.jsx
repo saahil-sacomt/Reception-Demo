@@ -14,7 +14,7 @@ const capitalizeFirstLetter = (string) => {
 };
 
 // Define column styles outside the component for better reusability
-const getColumnStyles = (reportType) => {
+const getColumnStyles = (reportType, isEmployee = false) => {
   switch (reportType) {
     case 'sales_orders':
       return {
@@ -99,9 +99,10 @@ const getColumnStyles = (reportType) => {
         5: { halign: 'center', cellWidth: 25 }, // Advance Collected
         6: { halign: 'center', cellWidth: 25 }, // Balance Collected
         7: { halign: 'center', cellWidth: 25 }, // Total Collected (Replaced)
-        8: { halign: 'center', cellWidth: 25 }, // Branch
-        9: { halign: 'center', cellWidth: 25 }, // Created At
-        10: { halign: 'center', cellWidth: 25 }, // Updated At
+        8: { halign: 'center', cellWidth: 25 }, // Patient/Customer Name (New Column)
+        9: { halign: 'center', cellWidth: 25 }, // Branch
+        10: { halign: 'center', cellWidth: 25 }, // Created At
+        11: { halign: 'center', cellWidth: 25 }, // Updated At
       };
     case 'stock_report':
       return {
@@ -113,6 +114,39 @@ const getColumnStyles = (reportType) => {
         5: { halign: 'center', cellWidth: 30 }, // Total Sold
         6: { halign: 'center', cellWidth: 30 }, // Current Stock
       };
+    case 'purchase_report': {
+      if (isEmployee) {
+        return {
+          0: { halign: 'center', cellWidth: 20 }, // Purchase ID
+          1: { halign: 'center', cellWidth: 20 }, // Product ID
+          2: { halign: 'center', cellWidth: 30 }, // Branch Code
+          3: { halign: 'center', cellWidth: 15 }, // Quantity
+          // Rate column omitted for employees
+          4: { halign: 'center', cellWidth: 25 }, // MRP
+          5: { halign: 'center', cellWidth: 35 }, // Purchase From
+          6: { halign: 'center', cellWidth: 25 }, // Bill Number
+          7: { halign: 'center', cellWidth: 20 }, // Bill Date
+          8: { halign: 'center', cellWidth: 25 }, // Created At
+          9: { halign: 'center', cellWidth: 25 }, // Updated At
+          10: { halign: 'center', cellWidth: 25 }, // Employee Name
+        };
+      } else {
+        return {
+          0: { halign: 'center', cellWidth: 20 }, // Purchase ID
+          1: { halign: 'center', cellWidth: 20 }, // Product ID
+          2: { halign: 'center', cellWidth: 30 }, // Branch Code
+          3: { halign: 'center', cellWidth: 15 }, // Quantity
+          4: { halign: 'center', cellWidth: 15 }, // Rate
+          5: { halign: 'center', cellWidth: 25 }, // MRP
+          6: { halign: 'center', cellWidth: 35 }, // Purchase From
+          7: { halign: 'center', cellWidth: 25 }, // Bill Number
+          8: { halign: 'center', cellWidth: 20 }, // Bill Date
+          9: { halign: 'center', cellWidth: 25 }, // Created At
+          10: { halign: 'center', cellWidth: 25 }, // Updated At
+          11: { halign: 'center', cellWidth: 25 }, // Employee Name
+        };
+      }
+    }
     default:
       return {};
   }
@@ -152,7 +186,7 @@ const addHeader = (doc, logoDataUrl, reportDetails) => {
   } else if (reportDetails.type === 'Consolidated') {
     periodText = `Period: ${reportDetails.fromDate} to ${reportDetails.toDate}`;
   }
-  
+
   doc.text(periodText, doc.internal.pageSize.getWidth() / 2, 50, { align: 'center' });
 
   // Add Branch Information
@@ -206,6 +240,10 @@ const ReportGenerator = ({ isCollapsed }) => {
   const branchSelectionRef = useRef();
   const generateButtonRef = useRef();
 
+  // References for additional data fetching
+  const [patients, setPatients] = useState([]); // To store patient data
+  const [customers, setCustomers] = useState([]); // To store customer data
+
   // Determine if the user is an employee
   const isEmployee = role === 'employee';
 
@@ -258,6 +296,37 @@ const ReportGenerator = ({ isCollapsed }) => {
     };
     getBranches();
   }, [fetchAllBranches, isEmployee]);
+
+  // Fetch patients and customers for consolidated report
+  useEffect(() => {
+    const fetchPatientsAndCustomers = async () => {
+      try {
+        // Fetch patients
+        const { data: patientsData, error: patientsError } = await supabase
+          .from('patients')
+          .select('mr_number, name');
+
+        if (patientsError) throw patientsError;
+
+        setPatients(patientsData);
+
+        // Fetch customers
+        const { data: customersData, error: customersError } = await supabase
+          .from('customers')
+          .select('customer_id, name');
+
+        if (customersError) throw customersError;
+
+        setCustomers(customersData);
+      } catch (err) {
+        console.error('Error fetching patients or customers:', err);
+      }
+    };
+
+    if (reportType === 'consolidated') {
+      fetchPatientsAndCustomers();
+    }
+  }, [reportType]);
 
   // Utility function to get the last day of a month
   const getLastDayOfMonth = (year, month) => {
@@ -542,10 +611,10 @@ const ReportGenerator = ({ isCollapsed }) => {
           break;
         }
         case 'consolidated': {
-          // Fetch sales_orders
+          // Fetch sales_orders with necessary fields
           const salesQuery = supabase
             .from('sales_orders')
-            .select('*')
+            .select('sales_order_id, work_order_id, mr_number, final_amount, cgst, sgst, total_amount, created_at, updated_at, branch, customer_id')
             .gte('created_at', startDate.toISOString())
             .lte('created_at', endDate.toISOString());
 
@@ -559,7 +628,7 @@ const ReportGenerator = ({ isCollapsed }) => {
           // Fetch work_orders
           const workQuery = supabase
             .from('work_orders')
-            .select('*')
+            .select('work_order_id, mr_number, sgst, cgst, total_amount, advance_details, created_at, updated_at, branch')
             .gte('created_at', startDate.toISOString())
             .lte('created_at', endDate.toISOString());
 
@@ -595,6 +664,23 @@ const ReportGenerator = ({ isCollapsed }) => {
             // Total Collected (Advance + Balance)
             const totalCollected = advanceCollected + balanceCollected;
 
+            // Determine Patient/Customer Name with trimming and case-insensitive matching
+            let patientCustomerName = 'N/A';
+            if (sale.mr_number && typeof sale.mr_number === 'string') {
+              const trimmedMrNumber = sale.mr_number.trim().toLowerCase();
+              const patient = patients.find(p => p.mr_number.trim().toLowerCase() === trimmedMrNumber);
+              if (patient) {
+                patientCustomerName = patient.name;
+              }
+            }
+            if (patientCustomerName === 'N/A' && sale.customer_id && typeof sale.customer_id === 'string') {
+              const trimmedCustomerId = sale.customer_id.trim().toLowerCase();
+              const customer = customers.find(c => c.customer_id.trim().toLowerCase() === trimmedCustomerId);
+              if (customer) {
+                patientCustomerName = customer.name;
+              }
+            }
+
             return {
               sales_order_id: sale.sales_order_id || 'N/A',
               work_order_id: sale.work_order_id || 'N/A',
@@ -604,6 +690,7 @@ const ReportGenerator = ({ isCollapsed }) => {
               advance_collected: advanceCollected,
               balance_collected: balanceCollected,
               total_collected: totalCollected, // Replaced 'amount_left_to_collect'
+              patient_customer_name: patientCustomerName, // New Field
               branch: sale.branch || relatedWork.branch || 'N/A',
               created_at: sale.created_at ? convertUTCToIST(sale.created_at, 'dd-MM-yyyy hh:mm a') : (relatedWork.created_at ? convertUTCToIST(relatedWork.created_at, 'dd-MM-yyyy hh:mm a') : 'N/A'),
               updated_at: sale.updated_at ? convertUTCToIST(sale.updated_at, 'dd-MM-yyyy hh:mm a') : (relatedWork.updated_at ? convertUTCToIST(relatedWork.updated_at, 'dd-MM-yyyy hh:mm a') : 'N/A'),
@@ -613,6 +700,16 @@ const ReportGenerator = ({ isCollapsed }) => {
           // For work orders without corresponding sales orders
           const additionalWorkOrders = workData.filter(work => !salesData.some(sale => sale.work_order_id === work.work_order_id));
           additionalWorkOrders.forEach(work => {
+            // Determine Patient/Customer Name with trimming and case-insensitive matching
+            let patientCustomerName = 'N/A';
+            if (work.mr_number && typeof work.mr_number === 'string') {
+              const trimmedMrNumber = work.mr_number.trim().toLowerCase();
+              const patient = patients.find(p => p.mr_number.trim().toLowerCase() === trimmedMrNumber);
+              if (patient) {
+                patientCustomerName = patient.name;
+              }
+            }
+
             const totalGST = (parseFloat(work.cgst) || 0) + (parseFloat(work.sgst) || 0);
             const totalAmount = parseFloat(work.total_amount) || 0;
             const advanceCollected = parseFloat(work.advance_details) || 0;
@@ -628,6 +725,7 @@ const ReportGenerator = ({ isCollapsed }) => {
               advance_collected: advanceCollected,
               balance_collected: balanceCollected,
               total_collected: totalCollected, // Replaced 'amount_left_to_collect'
+              patient_customer_name: patientCustomerName, // New Field
               branch: work.branch || 'N/A',
               created_at: work.created_at ? convertUTCToIST(work.created_at, 'dd-MM-yyyy hh:mm a') : 'N/A',
               updated_at: work.updated_at ? convertUTCToIST(work.updated_at, 'dd-MM-yyyy hh:mm a') : 'N/A',
@@ -734,14 +832,33 @@ const ReportGenerator = ({ isCollapsed }) => {
 
           // Update total_sold in combinedData
           combinedData.forEach(product => {
-            const pid = productsData.find(p => p.product_id === product.product_id)?.id;
-            product.total_sold = salesAggregated[pid] || 0;
+            const matchingProduct = productsData.find(p => p.product_id === product.product_id);
+            if (matchingProduct) {
+              const pid = matchingProduct.id;
+              product.total_sold = salesAggregated[pid] || 0;
+            }
           });
 
           // Sort the summary by Product Name
           combinedData.sort((a, b) => a.product_name.localeCompare(b.product_name));
 
           fetchedData = combinedData;
+          break;
+        }
+        case 'purchase_report': {
+          const purchaseQuery = supabase
+            .from('purchases')
+            .select('*')
+            .gte('created_at', startDate.toISOString())
+            .lte('created_at', endDate.toISOString());
+
+          if (!isCombined) {
+            purchaseQuery.in('branch_code', branchesToReport);
+          }
+
+          ({ data, error } = await purchaseQuery);
+          if (error) throw error;
+          fetchedData = data;
           break;
         }
         default:
@@ -766,7 +883,7 @@ const ReportGenerator = ({ isCollapsed }) => {
     } finally {
       setLoading(false);
     }
-  }, [reportType, reportPeriod, date, monthYear, fromDate, toDate, selectedBranches, isCombined, isEmployee, userBranch]);
+  }, [reportType, reportPeriod, date, monthYear, fromDate, toDate, selectedBranches, isCombined, isEmployee, userBranch, patients, customers]);
 
   // Helper function to get report type label
   const getReportTypeLabel = (reportType) => {
@@ -785,6 +902,8 @@ const ReportGenerator = ({ isCollapsed }) => {
         return 'Consolidated';
       case 'stock_report':
         return 'Stock Report';
+      case 'purchase_report':
+        return 'Purchase Report';
       default:
         return '';
     }
@@ -893,6 +1012,7 @@ const ReportGenerator = ({ isCollapsed }) => {
           'Advance Collected',
           'Balance Collected',
           'Total Collected', // Replaced 'Amount Left to Collect'
+          'Patient/Customer Name', // New Column
           'Branch',
           'Created At',
           'Updated At',
@@ -909,6 +1029,40 @@ const ReportGenerator = ({ isCollapsed }) => {
           'Current Stock',
         ];
         break;
+      case 'purchase_report': {
+        if (isEmployee) {
+          tableColumn = [
+            'Purchase ID',
+            'Product ID',
+            'Branch Code',
+            'Quantity',
+            // 'Rate' column omitted for employees
+            'MRP',
+            'Purchase From',
+            'Bill Number',
+            'Bill Date',
+            'Created At',
+            'Updated At',
+            'Employee Name',
+          ];
+        } else {
+          tableColumn = [
+            'Purchase ID',
+            'Product ID',
+            'Branch Code',
+            'Quantity',
+            'Party Rate',
+            'MRP',
+            'Purchase From',
+            'Bill Number',
+            'Bill Date',
+            'Created At',
+            'Updated At',
+            'Employee Name',
+          ];
+        }
+        break;
+      }
       default:
         tableColumn = [];
     }
@@ -1032,6 +1186,7 @@ const ReportGenerator = ({ isCollapsed }) => {
           record.advance_collected ? Number(record.advance_collected).toFixed(2) : '0.00',
           record.balance_collected ? Number(record.balance_collected).toFixed(2) : '0.00',
           record.total_collected ? Number(record.total_collected).toFixed(2) : '0.00', // Total Collected
+          record.patient_customer_name || 'N/A', // New Column
           record.branch || 'N/A',
           record.created_at || 'N/A',
           record.updated_at || 'N/A',
@@ -1048,6 +1203,40 @@ const ReportGenerator = ({ isCollapsed }) => {
           item.current_stock || 0,
         ]);
         break;
+      case 'purchase_report': {
+        if (isEmployee) {
+          tableRows = data.map((record) => [
+            record.id || 'N/A', // Purchase ID
+            record.product_id || 'N/A',
+            record.branch_code || 'N/A',
+            record.quantity || 0,
+            // Rate column omitted for employees
+            record.mrp ? Number(record.mrp).toFixed(2) : '0.00',
+            record.purchase_from || 'N/A',
+            record.bill_number || 'N/A',
+            record.bill_date ? convertUTCToIST(new Date(record.bill_date).toISOString(), 'dd-MM-yyyy') : 'N/A',
+            record.created_at ? convertUTCToIST(record.created_at, 'dd-MM-yyyy hh:mm a') : 'N/A',
+            record.updated_at ? convertUTCToIST(record.updated_at, 'dd-MM-yyyy hh:mm a') : 'N/A',
+            record.employee_name || 'N/A',
+          ]);
+        } else {
+          tableRows = data.map((record) => [
+            record.id || 'N/A', // Purchase ID
+            record.product_id || 'N/A',
+            record.branch_code || 'N/A',
+            record.quantity || 0,
+            record.rate ? Number(record.rate).toFixed(2) : '0.00',
+            record.mrp ? Number(record.mrp).toFixed(2) : '0.00',
+            record.purchase_from || 'N/A',
+            record.bill_number || 'N/A',
+            record.bill_date ? convertUTCToIST(new Date(record.bill_date).toISOString(), 'dd-MM-yyyy') : 'N/A',
+            record.created_at ? convertUTCToIST(record.created_at, 'dd-MM-yyyy hh:mm a') : 'N/A',
+            record.updated_at ? convertUTCToIST(record.updated_at, 'dd-MM-yyyy hh:mm a') : 'N/A',
+            record.employee_name || 'N/A',
+          ]);
+        }
+        break;
+      }
       default:
         tableRows = [];
     }
@@ -1078,7 +1267,7 @@ const ReportGenerator = ({ isCollapsed }) => {
       theme: 'striped',
       showHead: 'everyPage',
       pageBreak: 'auto',
-      columnStyles: getColumnStyles(reportType),
+      columnStyles: getColumnStyles(reportType, isEmployee),
     });
 
     // Calculate and Add Summary
@@ -1136,9 +1325,9 @@ const ReportGenerator = ({ isCollapsed }) => {
       }
       case 'modification_reports': {
         const totalModifications = data.length;
-        const approvedModifications = data.filter(record => record.status === 'approved').length;
-        const pendingModifications = data.filter(record => record.status === 'pending').length;
-        const rejectedModifications = data.filter(record => record.status === 'rejected').length;
+        const approvedModifications = data.filter(record => record.status.toLowerCase() === 'approved').length;
+        const pendingModifications = data.filter(record => record.status.toLowerCase() === 'pending').length;
+        const rejectedModifications = data.filter(record => record.status.toLowerCase() === 'rejected').length;
         summaryTable = [
           ['Total Modification Requests', totalModifications],
           ['Approved', approvedModifications],
@@ -1171,6 +1360,21 @@ const ReportGenerator = ({ isCollapsed }) => {
           ['Total Products', totalProducts],
           ['Total Quantity Sold', totalQuantitySold],
           ['Total Current Stock', totalCurrentStock],
+        ];
+        break;
+      }
+      case 'purchase_report': {
+        const totalPurchases = data.length;
+        const totalQuantity = data.reduce((acc, curr) => acc + (curr.quantity || 0), 0);
+        const totalMRP = data.reduce((acc, curr) => acc + (parseFloat(curr.mrp) || 0), 0);
+        const totalAmount = isEmployee
+          ? data.reduce((acc, curr) => acc + (parseFloat(curr.mrp) * (curr.quantity || 0)), 0)
+          : data.reduce((acc, curr) => acc + ((parseFloat(curr.rate) || 0) * (curr.quantity || 0)), 0);
+        summaryTable = [
+          ['Total Purchases', totalPurchases],
+          ['Total Quantity', totalQuantity],
+          ['Total MRP', totalMRP.toFixed(2)],
+          ['Total Amount', totalAmount.toFixed(2)],
         ];
         break;
       }
@@ -1244,6 +1448,7 @@ const ReportGenerator = ({ isCollapsed }) => {
   const reportTypes = isEmployee ? [
     { value: 'consolidated', label: 'Consolidated' },
     { value: 'stock_report', label: 'Stock Report' },
+    { value: 'purchase_report', label: 'Purchase Report' }, // Added Purchase Report for employees
   ] : [
     { value: 'sales_orders', label: 'Sales Orders' },
     { value: 'work_orders', label: 'Work Orders' },
@@ -1252,6 +1457,7 @@ const ReportGenerator = ({ isCollapsed }) => {
     { value: 'modification_reports', label: 'Modification Reports' },
     { value: 'consolidated', label: 'Consolidated' },
     { value: 'stock_report', label: 'Stock Report' },
+    { value: 'purchase_report', label: 'Purchase Report' }, // Added Purchase Report for admins
   ];
 
   // Ensure reportType is valid for the current role
