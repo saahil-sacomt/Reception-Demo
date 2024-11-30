@@ -33,6 +33,7 @@ const defaultInitialState = {
     paymentMethod: "",
     discount: "",
     gstNumber: "",
+    customerId: "",
     isB2B: false,
     hasMrNumber: "yes",
     customerName: "",

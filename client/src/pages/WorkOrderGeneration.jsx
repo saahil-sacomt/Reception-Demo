@@ -2018,7 +2018,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                 {/* Header Information */}
                 <div className=" flex justify-between items-center mb-6">
                   <div className="flex items-center">
-                    <h2 className="text-3xl font-bold">Bill</h2>
+                    <h2 className="text-3xl font-bold">Work Order</h2>
                   </div>
                   <div className="text-right">
                     <p><strong>Work Order ID:</strong> {workOrderId}</p>
