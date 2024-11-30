@@ -255,12 +255,12 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
       return;
     }
 
-    if (isNaN(rate) || rate <= 0) {
+    if (isNaN(rate) || rate < -1) {
       setError("Please enter a valid rate greater than 0.");
       return;
     }
 
-    if (isNaN(mrp) || mrp <= 0) {
+    if (isNaN(mrp) || mrp < -1) {
       setError("Please enter a valid MRP greater than 0.");
       return;
     }
