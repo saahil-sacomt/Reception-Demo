@@ -52,7 +52,6 @@ const fetchCustomerByPhone = async (phone) => {
     .from("customers")
     .select("*")
     .eq("phone_number", phone)
-    .single();
 
   if (error) {
     return null;
@@ -137,6 +136,7 @@ const normalizeWorkOrderProducts = (workOrderProducts) => {
     ...product, // Retain all other properties
   }));
 };
+
 
 // Helper function to calculate differences between original and updated products
 const calculateProductDifferences = (original, updated) => {
@@ -627,7 +627,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           .select("*")
           .eq("sales_order_id", orderId)
           .single();
-
+  
         if (error || !data) {
           updateSalesOrderForm({
             validationErrors: {
@@ -637,10 +637,39 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           });
           return;
         }
-
-        // Standardize product entries to include product_id and id
+  
+        // Normalize product entries
         const normalizedProducts = normalizeWorkOrderProducts(data.product_entries);
-
+  
+        // Extract product IDs (integer IDs from products.id)
+        const productIds = normalizedProducts.map((prod) => prod.id);
+  
+        // Fetch current stock for these products in the specific branch
+        const { data: stockData, error: stockError } = await supabase
+          .from("stock")
+          .select("product_id, quantity")
+          .in("product_id", productIds)
+          .eq("branch_code", branch);
+  
+        if (stockError) {
+          console.error("Error fetching stock data:", stockError.message);
+          // Assign stock as 0 if fetching fails
+          normalizedProducts.forEach((prod) => {
+            prod.stock = 0;
+          });
+        } else {
+          const stockMap = new Map();
+          stockData.forEach((stock) => {
+            stockMap.set(stock.product_id, stock.quantity);
+          });
+  
+          // Assign current stock to each product
+          normalizedProducts.forEach((prod) => {
+            prod.stock = stockMap.get(prod.id) || 0;
+          });
+        }
+  
+        // Update global form state with fetched data
         updateSalesOrderForm({
           productEntries: normalizedProducts,
           mrNumber: data.mr_number || "",
@@ -659,9 +688,9 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           validationErrors: {}, // Clear validation errors
           step: 3, // Move to the next step
         });
-
+  
         setOriginalProductEntries(normalizedProducts); // Store original entries
-
+  
         // Fetch privilege card details if applicable
         if (data.pc_number) {
           const { data: privilegeData, error: privilegeError } = await supabase
@@ -669,7 +698,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
             .select("*")
             .eq("pc_number", data.pc_number)
             .single();
-
+  
           if (privilegeError || !privilegeData) {
             updateSalesOrderForm({ privilegeCardDetails: null });
             updateSalesOrderForm({
@@ -686,7 +715,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
             });
           }
         }
-
+  
         updateSalesOrderForm({
           validationErrors: { ...validationErrors, generalError: "" },
         });
@@ -700,8 +729,9 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         });
       }
     },
-    [updateSalesOrderForm, validationErrors]
+    [updateSalesOrderForm, validationErrors, branch]
   );
+  
 
   useEffect(() => {
     if (orderId) {
