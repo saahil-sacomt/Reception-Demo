@@ -5,28 +5,27 @@ import React, {
   useEffect,
   useRef,
   useCallback,
-  useMemo, // Added useMemo here
+  useMemo,
 } from "react";
 import {
   addOrUpdateStock,
   addNewProduct,
   updateExistingProduct,
-  addPurchase, // Updated service function to add purchase
+  addPurchase,
 } from "../services/authService";
 import supabase from "../supabaseClient";
 import { useAuth } from "../context/AuthContext";
-import { useGlobalState } from "../context/GlobalStateContext"; // Import global state hook
-import { debounce } from "lodash"; // Ensure lodash is installed: npm install lodash
-import Modal from "react-modal"; // Install react-modal: npm install react-modal
-import EmployeeVerification from "../components/EmployeeVerification"; // Adjust the path as needed
+import { useGlobalState } from "../context/GlobalStateContext";
+import { debounce } from "lodash";
+import Modal from "react-modal";
+import EmployeeVerification from "../components/EmployeeVerification";
 
-// Set the app element for accessibility
 Modal.setAppElement("#root");
 
 const EmployeeStockManagement = ({ isCollapsed }) => {
-  const { user, role, branch } = useAuth(); // Correct destructuring
-  const { state, dispatch } = useGlobalState(); // Access global state
-  const [mode, setMode] = useState("update"); // Default mode set to 'update'
+  const { user, role, branch } = useAuth();
+  const { state, dispatch } = useGlobalState();
+  const [mode, setMode] = useState("update");
 
   // State for Add New Product
   const [newProductName, setNewProductName] = useState("");
@@ -37,7 +36,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
   const [newPurchaseFrom, setNewPurchaseFrom] = useState("");
   const [newBillNumber, setNewBillNumber] = useState("");
   const [newBillDate, setNewBillDate] = useState("");
-  const [newEmployeeId, setNewEmployeeId] = useState(null); // Selected Employee ID
+  const [newEmployeeId, setNewEmployeeId] = useState(null);
 
   // State for Update Existing Product
   const [updateSearchQuery, setUpdateSearchQuery] = useState("");
@@ -49,7 +48,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
   const [updatePurchaseFrom, setUpdatePurchaseFrom] = useState("");
   const [updateBillNumber, setUpdateBillNumber] = useState("");
   const [updateBillDate, setUpdateBillDate] = useState("");
-  const [updateEmployeeId, setUpdateEmployeeId] = useState(null); // Selected Employee ID
+  const [updateEmployeeId, setUpdateEmployeeId] = useState(null);
 
   // State for Current Stock Search
   const [stockSearchQuery, setStockSearchQuery] = useState("");
@@ -64,12 +63,9 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
 
   // Pagination States
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10; // Adjust this number as needed
+  const itemsPerPage = 10;
 
-  const isUploadingRef = useRef(false); // To track if an upload is in progress
-
-  // Modal States (Managed via Global State)
-  // purchaseModal is managed globally via GlobalState.jsx
+  const isUploadingRef = useRef(false);
 
   // Warn user before unloading the page during upload
   useEffect(() => {
@@ -93,7 +89,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
       const { data, error } = await supabase
         .from("employees")
         .select("id, name")
-        .eq("branch", branch) // Fetch employees only for the current branch
+        .eq("branch", branch)
         .order("name", { ascending: true });
 
       if (error) {
@@ -121,8 +117,8 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
       const { data, error } = await supabase
         .from("products")
         .select("id, product_name, product_id, rate, mrp, purchase_from")
-        .or(`product_name.ilike.%${query}%,product_id.ilike.%${query}%`) // Combined conditions
-        .limit(20); // Limit to 20 suggestions
+        .or(`product_name.ilike.%${query}%,product_id.ilike.%${query}%`)
+        .limit(20);
 
       if (error) {
         console.error("Error fetching suggestions:", error);
@@ -130,8 +126,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
         return;
       }
 
-      console.log("Fetched product suggestions:", data);
-      setProductSuggestions(data || []); // Update suggestions list
+      setProductSuggestions(data || []);
     } catch (err) {
       console.error("Error fetching product suggestions:", err);
     }
@@ -172,12 +167,11 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
   // Function to generate a unique bill number per branch
   const generateBillNumber = useCallback(async () => {
     try {
-      // Fetch the latest bill number for the branch
       const { data, error } = await supabase
         .from("purchases")
         .select("bill_number")
         .eq("branch_code", branch)
-        .order("bill_number", { ascending: false })
+        .order("created_at", { ascending: false })
         .limit(1);
 
       if (error) {
@@ -185,7 +179,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
         return "";
       }
 
-      let newBillNumber = "BILL-0001"; // Default bill number
+      let newBillNumber = "BILL-0001";
 
       if (data && data.length > 0) {
         const lastBillNumber = data[0].bill_number;
@@ -207,7 +201,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
   useEffect(() => {
     const setupBillDetails = async () => {
       const billNumber = await generateBillNumber();
-      const currentDate = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+      const currentDate = new Date().toISOString().split("T")[0];
 
       if (mode === "add") {
         setNewBillNumber(billNumber);
@@ -229,11 +223,11 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
     setError("");
     setSuccess("");
 
-    // Trim string values to avoid validation failures due to extra spaces
     const trimmedProductName = newProductName.trim();
     const trimmedProductId = newProductId.trim();
     const trimmedPurchaseFrom = newPurchaseFrom.trim();
     const trimmedBillNumber = newBillNumber.trim();
+    const trimmedBillDate = newBillDate.trim();
 
     // Collect missing fields
     const missingFields = [];
@@ -244,6 +238,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
     if (!newQuantity) missingFields.push("Quantity");
     if (!trimmedPurchaseFrom) missingFields.push("Purchase From");
     if (!trimmedBillNumber) missingFields.push("Bill Number");
+    if (!trimmedBillDate) missingFields.push("Bill Date");
     if (!newEmployeeId) missingFields.push("Employee");
 
     if (missingFields.length > 0) {
@@ -287,7 +282,6 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
         .single();
 
       if (fetchError && fetchError.code !== "PGRST116") {
-        // PGRST116: Row not found
         console.error("Error checking existing product:", fetchError);
         setError("Failed to verify Product ID.");
         setIsLoading(false);
@@ -312,6 +306,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
         bill_date: newBillDate,
         bill_number: newBillNumber,
         employee: employeeName,
+        employee_id: newEmployeeId,
         product_name: trimmedProductName,
         product_id: trimmedProductId,
         rate,
@@ -332,7 +327,6 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
     } catch (error) {
       console.error("Error during add new product:", error);
       setError("An unexpected error occurred.");
-    } finally {
       setIsLoading(false);
       isUploadingRef.current = false;
     }
@@ -344,14 +338,19 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
     setError("");
     setSuccess("");
 
+    const trimmedPurchaseFrom = updatePurchaseFrom.trim();
+    const trimmedBillNumber = updateBillNumber.trim();
+    const trimmedBillDate = updateBillDate.trim();
+
     // Validation
     const missingFields = [];
     if (!updateSearchQuery) missingFields.push("Product Search");
     if (!updateQuantity) missingFields.push("Quantity to Add");
     if (!updateRate) missingFields.push("Rate");
     if (!updateMrp) missingFields.push("MRP");
-    if (!updatePurchaseFrom) missingFields.push("Purchase From");
-    if (!updateBillNumber) missingFields.push("Bill Number");
+    if (!trimmedPurchaseFrom) missingFields.push("Purchase From");
+    if (!trimmedBillNumber) missingFields.push("Bill Number");
+    if (!trimmedBillDate) missingFields.push("Bill Date");
     if (!updateEmployeeId) missingFields.push("Employee");
 
     if (missingFields.length > 0) {
@@ -360,7 +359,9 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
     }
 
     if (!selectedProduct) {
-      setError("No product selected. Please search and select a product to update.");
+      setError(
+        "No product selected. Please search and select a product to update."
+      );
       return;
     }
 
@@ -400,12 +401,13 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
         bill_date: updateBillDate,
         bill_number: updateBillNumber,
         employee: employeeName,
+        employee_id: updateEmployeeId,
         product_name: selectedProduct.product_name,
         product_id: selectedProduct.product_id,
         rate,
         mrp,
         quantity,
-        purchase_from: updatePurchaseFrom.trim(),
+        purchase_from: trimmedPurchaseFrom,
       };
 
       // Dispatch to set purchase modal content
@@ -420,7 +422,6 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
     } catch (error) {
       console.error("Error during update existing product:", error);
       setError("An unexpected error occurred.");
-    } finally {
       setIsLoading(false);
       isUploadingRef.current = false;
     }
@@ -447,6 +448,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
       purchase_from,
       bill_number,
       bill_date,
+      employee_id,
       employee,
     } = previewData;
 
@@ -457,7 +459,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
         product_id: product_id.trim(),
         rate: parseFloat(rate),
         mrp: parseFloat(mrp),
-        hsn_code: "9001", // Default HSN code
+        hsn_code: "9001",
         purchase_from: purchase_from.trim(),
       });
 
@@ -466,8 +468,6 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
         dispatch({ type: "RESET_PURCHASE_MODAL" });
         return;
       }
-
-      console.log("New product added with ID:", addProductResponse.data.id);
 
       // Update Stock for the Branch
       const updateStockResponse = await addOrUpdateStock(
@@ -495,8 +495,8 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
         purchase_from: purchase_from.trim(),
         bill_number: bill_number.trim(),
         bill_date: bill_date,
-        employee_id: newEmployeeId,
-        employee_name: employee, // Storing employee name
+        employee_id: employee_id,
+        employee_name: employee,
       });
 
       if (!addPurchaseResponse.success) {
@@ -507,25 +507,9 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
 
       setSuccess("New product added and stock updated successfully.");
       // Reset form
-      setNewProductName("");
-      setNewProductId("");
-      setNewRate("");
-      setNewMrp("");
-      setNewQuantity("");
-      setNewPurchaseFrom("");
-      setNewBillNumber("");
-      setNewBillDate("");
-      setNewEmployeeId(null);
-
-      // Generate new bill number and date
-      const newBillNumberGenerated = await generateBillNumber();
-      const currentDate = new Date().toISOString().split("T")[0];
-      setNewBillNumber(newBillNumberGenerated);
-      setNewBillDate(currentDate);
-
-      // Refresh stock data and employees
+      handleModeSelection("add");
+      // Refresh stock data
       fetchStockData();
-      fetchEmployees();
     } catch (error) {
       console.error("Error processing add new product:", error);
       setError("An unexpected error occurred.");
@@ -557,14 +541,15 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
       purchase_from,
       bill_number,
       bill_date,
+      employee_id,
       employee,
     } = previewData;
 
     try {
       // Update Stock for the Branch
       const updateStockResponse = await updateExistingProduct(
-        selectedProduct.id, // Internal product ID
-        branch, // Ensure branch code is correctly passed
+        selectedProduct.id,
+        branch,
         parseInt(quantity, 10),
         parseFloat(rate),
         parseFloat(mrp),
@@ -587,8 +572,8 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
         purchase_from: purchase_from.trim(),
         bill_number: bill_number.trim(),
         bill_date: bill_date,
-        employee_id: updateEmployeeId,
-        employee_name: employee, // Storing employee name
+        employee_id: employee_id,
+        employee_name: employee,
       });
 
       if (!addPurchaseResponse.success) {
@@ -599,26 +584,9 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
 
       setSuccess("Stock updated successfully and purchase recorded.");
       // Reset form
-      setUpdateSearchQuery("");
-      setProductSuggestions([]);
-      setSelectedProduct(null);
-      setUpdateQuantity("");
-      setUpdateRate("");
-      setUpdateMrp("");
-      setUpdatePurchaseFrom("");
-      setUpdateBillNumber("");
-      setUpdateBillDate("");
-      setUpdateEmployeeId(null);
-
-      // Generate new bill number and date
-      const newBillNumberGenerated = await generateBillNumber();
-      const currentDate = new Date().toISOString().split("T")[0];
-      setUpdateBillNumber(newBillNumberGenerated);
-      setUpdateBillDate(currentDate);
-
-      // Refresh stock data and employees
+      handleModeSelection("update");
+      // Refresh stock data
       fetchStockData();
-      fetchEmployees();
     } catch (error) {
       console.error("Error processing update existing product:", error);
       setError("An unexpected error occurred.");
@@ -635,7 +603,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
     setUpdateSearchQuery(query);
 
     if (query.length > 2) {
-      debouncedFetchSuggestions(query); // Use the debounced function
+      debouncedFetchSuggestions(query);
     } else {
       setProductSuggestions([]);
       setSelectedProduct(null);
@@ -653,17 +621,17 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
     setSelectedProduct(product);
 
     setUpdateSearchQuery(`${product.product_name} (${product.product_id})`);
-    setProductSuggestions([]); // Clear suggestions dropdown
+    setProductSuggestions([]);
 
     // Populate fields with the selected product's details
-    setUpdateRate(product.rate !== null ? product.rate.toString() : ""); // Populate rate
-    setUpdateMrp(product.mrp !== null ? product.mrp.toString() : ""); // Populate MRP
-    setUpdatePurchaseFrom(product.purchase_from || ""); // Populate purchase_from if available
+    setUpdateRate(product.rate !== null ? product.rate.toString() : "");
+    setUpdateMrp(product.mrp !== null ? product.mrp.toString() : "");
+    setUpdatePurchaseFrom(product.purchase_from || "");
 
     // Generate bill details for update
     const setupBillDetails = async () => {
       const billNumber = await generateBillNumber();
-      const currentDate = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+      const currentDate = new Date().toISOString().split("T")[0];
       setUpdateBillNumber(billNumber);
       setUpdateBillDate(currentDate);
     };
@@ -685,11 +653,11 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
         .from("stock")
         .select(
           `
-                    quantity,
-                    product:products(id, product_name, product_id, rate, mrp, purchase_from)
-                `
+                quantity,
+                product:products(id, product_name, product_id, rate, mrp, purchase_from)
+            `
         )
-        .eq("branch_code", branch); // Ensure branch_code matches the current branch
+        .eq("branch_code", branch);
 
       if (error) {
         console.error("Error fetching stock data:", error);
@@ -724,7 +692,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
       })
       .sort((a, b) =>
         a.product.product_name.localeCompare(b.product.product_name)
-      ); // Sort alphabetically by product name
+      );
   }, [filteredStocks, stockSearchQuery]);
 
   // Calculate total pages based on filtered stock
@@ -746,6 +714,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
 
   // Handler for Confirming in Modal
   const handleConfirmModal = () => {
+    setIsLoading(true);
     if (state.purchaseModal.action === "add") {
       processAddNewProduct();
     } else if (state.purchaseModal.action === "update") {
@@ -773,12 +742,12 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
       </h1>
 
       {/* Mode Selection Buttons */}
-      <div className="flex justify-center mb-6">
+      <div className="flex justify-center mb-6 text-lg font-semibold">
         <button
           onClick={() => handleModeSelection("add")}
           className={`mx-2 px-4 py-2 rounded ${
             mode === "add"
-              ? "bg-blue-500 text-white"
+              ? "bg-green-500 text-white shadow-2xl"
               : "bg-gray-200 text-gray-700 hover:bg-gray-300"
           }`}
         >
@@ -788,7 +757,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
           onClick={() => handleModeSelection("update")}
           className={`mx-2 px-4 py-2 rounded ${
             mode === "update"
-              ? "bg-blue-500 text-white"
+              ? "bg-green-500 text-white shadow-2xl"
               : "bg-gray-200 text-gray-700 hover:bg-gray-300"
           }`}
         >
@@ -842,21 +811,22 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
             {/* Bill Date */}
             <div>
               <label htmlFor="newBillDate" className="block mb-2 font-medium">
-                Bill Date
+                Bill Date<span className="text-red-500">*</span>
               </label>
               <input
                 type="date"
                 id="newBillDate"
                 value={newBillDate}
-                readOnly
-                className="w-full p-2 border rounded bg-gray-100"
+                onChange={(e) => setNewBillDate(e.target.value)}
+                className="w-full p-2 border rounded"
+                required
               />
             </div>
 
             {/* Bill Number */}
             <div>
               <label htmlFor="newBillNumber" className="block mb-2 font-medium">
-                Bill Number
+                Bill Number<span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -871,7 +841,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
             {/* Employee Selection */}
             <div>
               <label htmlFor="newEmployee" className="block mb-2 font-medium">
-                Employee
+                Employee<span className="text-red-500">*</span>
               </label>
               <select
                 id="newEmployee"
@@ -900,7 +870,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
                 htmlFor="newPurchaseFrom"
                 className="block mb-2 font-medium"
               >
-                Purchase From
+                Purchase From<span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -918,7 +888,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
                 htmlFor="newProductName"
                 className="block mb-2 font-medium"
               >
-                Product Name
+                Product Name<span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -933,7 +903,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
             {/* Product ID */}
             <div>
               <label htmlFor="newProductId" className="block mb-2 font-medium">
-                Product ID
+                Product ID<span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -950,7 +920,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
             {/* Rate */}
             <div>
               <label htmlFor="newRate" className="block mb-2 font-medium">
-                Rate
+                Party Rate<span className="text-red-500">*</span>
               </label>
               <input
                 type="number"
@@ -967,7 +937,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
             {/* MRP */}
             <div>
               <label htmlFor="newMrp" className="block mb-2 font-medium">
-                MRP
+                MRP<span className="text-red-500">*</span>
               </label>
               <input
                 type="number"
@@ -984,7 +954,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
             {/* Quantity */}
             <div>
               <label htmlFor="newQuantity" className="block mb-2 font-medium">
-                Quantity
+                Quantity<span className="text-red-500">*</span>
               </label>
               <input
                 type="number"
@@ -1025,14 +995,15 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
                 htmlFor="updateBillDate"
                 className="block mb-2 font-medium"
               >
-                Bill Date
+                Bill Date<span className="text-red-500">*</span>
               </label>
               <input
                 type="date"
                 id="updateBillDate"
                 value={updateBillDate}
-                readOnly
-                className="w-full p-2 border rounded bg-gray-100"
+                onChange={(e) => setUpdateBillDate(e.target.value)}
+                className="w-full p-2 border rounded"
+                required
               />
             </div>
 
@@ -1042,7 +1013,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
                 htmlFor="updateBillNumber"
                 className="block mb-2 font-medium"
               >
-                Bill Number
+                Bill Number<span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -1060,7 +1031,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
                 htmlFor="updateEmployee"
                 className="block mb-2 font-medium"
               >
-                Employee
+                Employee<span className="text-red-500">*</span>
               </label>
               <select
                 id="updateEmployee"
@@ -1087,7 +1058,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
           <div className="relative grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
             <div className="md:col-span-3">
               <label htmlFor="searchProduct" className="block mb-2 font-medium">
-                Search Product by Name or ID
+                Search Product by Name or ID<span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -1102,6 +1073,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
                 placeholder="Type product name or ID"
                 className="w-full p-2 border rounded"
                 autoComplete="off"
+                required
               />
 
               {/* Suggestion Dropdown */}
@@ -1131,7 +1103,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
                     htmlFor="updatePurchaseFrom"
                     className="block mb-2 font-medium"
                   >
-                    Purchase From
+                    Purchase From<span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -1185,7 +1157,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
                     htmlFor="updateRate"
                     className="block mb-2 font-medium"
                   >
-                    Rate
+                    Party Rate<span className="text-red-500">*</span>
                   </label>
                   <input
                     type="number"
@@ -1202,7 +1174,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
                 {/* MRP */}
                 <div>
                   <label htmlFor="updateMrp" className="block mb-2 font-medium">
-                    MRP
+                    MRP<span className="text-red-500">*</span>
                   </label>
                   <input
                     type="number"
@@ -1222,7 +1194,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
                     htmlFor="updateQuantity"
                     className="block mb-2 font-medium"
                   >
-                    Quantity to Add
+                    Quantity to Add<span className="text-red-500">*</span>
                   </label>
                   <input
                     type="number"
@@ -1238,48 +1210,6 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
             </>
           )}
 
-          {/* Employee Verification */}
-          {updateEmployeeId && selectedProduct && (
-            <div className="mb-4">
-              <h3 className="text-lg font-medium mb-2">Verify Employee</h3>
-              <EmployeeVerification
-                employee={
-                  employees.find((emp) => emp.id === updateEmployeeId)?.name ||
-                  ""
-                }
-                onVerify={(isVerified) => {
-                  if (isVerified) {
-                    // Proceed to open modal
-                    const employeeName =
-                      employees.find((emp) => emp.id === updateEmployeeId)
-                        ?.name || "Unknown";
-                    const previewData = {
-                      mode: "Update Existing Product",
-                      bill_date: updateBillDate,
-                      bill_number: updateBillNumber,
-                      employee: employeeName,
-                      product_name: selectedProduct.product_name,
-                      product_id: selectedProduct.product_id,
-                      rate: parseFloat(updateRate),
-                      mrp: parseFloat(updateMrp),
-                      quantity: parseInt(updateQuantity, 10),
-                      purchase_from: updatePurchaseFrom.trim(),
-                    };
-
-                    dispatch({
-                      type: "SET_PURCHASE_MODAL",
-                      payload: {
-                        action: "update",
-                        content: previewData,
-                        showModal: true,
-                      },
-                    });
-                  }
-                }}
-              />
-            </div>
-          )}
-
           {selectedProduct && (
             <button
               type="submit"
@@ -1288,7 +1218,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
                   ? "bg-blue-500 cursor-not-allowed"
                   : "bg-green-500 hover:bg-green-600"
               }`}
-              disabled={isLoading || !updateEmployeeId}
+              disabled={isLoading}
             >
               {isLoading ? "Preparing..." : "Update Stock"}
             </button>
@@ -1320,9 +1250,8 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
                   <th className="py-2 px-4 border-b">Product ID</th>
                   <th className="py-2 px-4 border-b">Product Name</th>
                   <th className="py-2 px-4 border-b">Quantity</th>
-                  {/* Conditionally render Rate column */}
                   {role !== "employee" && (
-                    <th className="py-2 px-4 border-b">Rate</th>
+                    <th className="py-2 px-4 border-b">Party Rate</th>
                   )}
                   <th className="py-2 px-4 border-b">MRP</th>
                   <th className="py-2 px-4 border-b">Actions</th>
@@ -1353,7 +1282,6 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
                         : "N/A"}
                     </td>
                     <td className="py-2 px-4 border-b text-center">
-                      {/* Button to select the product for updating */}
                       <button
                         onClick={() => handleSelectProduct(stock.product)}
                         className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded"
@@ -1414,10 +1342,10 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
 
       {/* Purchase Modal */}
       <Modal
-        isOpen={state.purchaseModal.showModal}
+        isOpen={state.modals.showPurchaseModal}
         onRequestClose={handleCancelModal}
         contentLabel="Preview Purchase"
-        className="max-w-3xl mx-auto mt-20 bg-white p-6 rounded shadow-lg outline-none"
+        className="max-w-4xl mx-auto mt-20 bg-white p-6 rounded shadow-lg outline-none"
         overlayClassName="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center"
       >
         {state.purchaseModal.content && (
@@ -1504,11 +1432,12 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
                     dispatch({
                       type: "SET_PURCHASE_MODAL",
                       payload: {
-                        ...state.purchaseModal,
+                        action: state.purchaseModal.action,
                         content: {
                           ...state.purchaseModal.content,
                           isEmployeeVerified: true,
                         },
+                        showModal: true,
                       },
                     });
                   }
