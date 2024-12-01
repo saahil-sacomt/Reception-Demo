@@ -19,8 +19,6 @@ import { useGlobalState } from "../context/GlobalStateContext";
 import { debounce } from "lodash";
 import Modal from "react-modal";
 import EmployeeVerification from "../components/EmployeeVerification";
-import { format } from "date-fns";
-
 
 
 Modal.setAppElement("#root");
@@ -69,15 +67,6 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
   const itemsPerPage = 10;
 
   const isUploadingRef = useRef(false);
-  // Function to get current date and time in the desired format
-const getCurrentDateTime = () => {
-  const now = new Date();
-  return format(now, "yyyy-MM-dd HH:mm:ss");
-};
-
-// Use in your add/update logic
-const trimmedBillDate = newBillDate.trim();
-const formattedBillDate = format(new Date(trimmedBillDate), "yyyy-MM-dd");
 
   // Warn user before unloading the page during upload
   useEffect(() => {
