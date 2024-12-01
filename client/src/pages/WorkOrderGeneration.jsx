@@ -953,7 +953,13 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
           .eq("work_order_id", workOrderId);
 
         if (error) {
-          alert("Failed to update work order.");
+          if (error.status === 409) {
+            alert("Work Order ID already exists. Generating a new ID...");
+            await generateNewWorkOrderId();
+            await saveWorkOrder(); // Retry saving with the new ID
+          } else {
+            alert("Failed to update work order.");
+          }
         } else {
           alert("Work order updated successfully!");
           dispatch({
@@ -1425,8 +1431,8 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                       }}
                       list={`productIdSuggestions-${index}`}
                       className={`border border-gray-300 px-4 py-3 rounded-lg w-full ${validationErrors[`productId-${index}`]
-                          ? "border-red-500"
-                          : ""
+                        ? "border-red-500"
+                        : ""
                         }`}
                       aria-label={`Product ID input ${index + 1}`}
                     />
@@ -1478,8 +1484,8 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                       }}
                       onBlur={() => validateField(index, "price")} // Validate on blur
                       className={`border border-gray-300 px-4 py-3 rounded-lg w-full text-center ${validationErrors[`productPrice-${index}`]
-                          ? "border-red-500"
-                          : ""
+                        ? "border-red-500"
+                        : ""
                         }`}
                       aria-label={`Product Price input ${index + 1}`}
                     />
@@ -1522,8 +1528,8 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                       }}
                       onBlur={() => validateField(index, "quantity")}
                       className={`border border-gray-300 px-4 py-3 rounded-lg w-full text-center ${validationErrors[`productQuantity-${index}`]
-                          ? "border-red-500"
-                          : ""
+                        ? "border-red-500"
+                        : ""
                         }`}
                       aria-label={`Product Quantity input ${index + 1}`}
                     />
@@ -1624,8 +1630,8 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                 }}
                 ref={yesButtonRef}
                 className={`px-4 py-2 rounded-lg focus:outline-none ${hasMrNumber === true
-                    ? "bg-green-600 text-white"
-                    : "bg-green-500 text-white hover:bg-green-600"
+                  ? "bg-green-600 text-white"
+                  : "bg-green-500 text-white hover:bg-green-600"
                   }`}
                 aria-pressed={hasMrNumber === true}
                 aria-label="Select Yes for MR Number"
@@ -1650,8 +1656,8 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                 }}
                 ref={noButtonRef}
                 className={`px-4 py-2 rounded-lg focus:outline-none ${hasMrNumber === false
-                    ? "bg-red-600 text-white"
-                    : "bg-red-500 text-white hover:bg-red-600"
+                  ? "bg-red-600 text-white"
+                  : "bg-red-500 text-white hover:bg-red-600"
                   }`}
                 aria-pressed={hasMrNumber === false}
                 aria-label="Select No for MR Number"
