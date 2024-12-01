@@ -1,7 +1,7 @@
 // client/src/GlobalState.jsx
 
 import React, { createContext, useContext, useReducer, useEffect } from "react";
-import merge from "lodash.merge"; // Ensure lodash.merge is installed: npm install lodash.merge
+import merge from "lodash.merge";
 
 const savedState = localStorage.getItem("globalState")
   ? JSON.parse(localStorage.getItem("globalState"))
@@ -54,6 +54,8 @@ const defaultInitialState = {
     validationErrors: {},
     fetchMethod: "work_order_id",
     searchQuery: "",
+    workOrderDiscount: 0,
+    submitted:false,
     workOrders: [],
   },
   workOrderForm: {
@@ -80,19 +82,20 @@ const defaultInitialState = {
     modificationRequestId: null,
     isSaving: false,
     allowPrint: false,
+    submitted:false,
   },
   // Add Modal States
   modals: {
     showWorkOrdersModal: false,
     showSalesModal: false,
-    showPurchaseModal: false, // New Purchase Modal
+    showPurchaseModal: false,
   },
   // Add Selected Order States
   selectedWorkOrder: null,
   selectedSalesOrder: null,
   // Add Purchase Modal Content
   purchaseModal: {
-    action: null, // 'add' or 'update'
+    action: null,
     content: null,
   },
 };
@@ -102,8 +105,6 @@ const initialState = merge({}, defaultInitialState, savedState);
 
 // Reducer Function
 const globalStateReducer = (state, action) => {
-  console.log("Action Type:", action.type); // Log action type
-  console.log("Payload:", action.payload); 
   switch (action.type) {
     case "SET_PENDING_REQUESTS_COUNT":
       return { ...state, pendingRequestsCount: action.payload };
@@ -118,14 +119,11 @@ const globalStateReducer = (state, action) => {
 
     // SalesOrderForm actions
     case "SET_SALES_ORDER_FORM":
-      console.log("Previous State (salesOrderForm):", state.salesOrderForm);
-      console.log("New Payload:", action.payload);
       return {
         ...state,
         salesOrderForm: { ...state.salesOrderForm, ...action.payload },
       };
     case "RESET_SALES_ORDER_FORM":
-      console.log("RESET_SALES_ORDER_FORM triggered");
       return { ...state, salesOrderForm: defaultInitialState.salesOrderForm };
 
     // WorkOrderForm actions
@@ -135,7 +133,6 @@ const globalStateReducer = (state, action) => {
         workOrderForm: { ...state.workOrderForm, ...action.payload },
       };
     case "RESET_WORK_ORDER_FORM":
-      console.log("RESET_WORK_ORDER_FORM triggered");
       return { ...state, workOrderForm: defaultInitialState.workOrderForm };
 
     // Modal Actions
@@ -153,7 +150,7 @@ const globalStateReducer = (state, action) => {
         modals: {
           showWorkOrdersModal: false,
           showSalesModal: false,
-          showPurchaseModal: false, // Reset Purchase Modal
+          showPurchaseModal: false,
         },
         selectedWorkOrder: null,
         selectedSalesOrder: null,
@@ -162,7 +159,7 @@ const globalStateReducer = (state, action) => {
           content: null,
         },
       };
-    
+
     // Purchase Modal Actions
     case "SET_PURCHASE_MODAL":
       return {
@@ -234,20 +231,15 @@ export const GlobalStateProvider = ({ children }) => {
     dispatch({ type: "RESET_MODAL_STATES" });
     dispatch({ type: "RESET_SELECTED_WORK_ORDER" });
     dispatch({ type: "RESET_SELECTED_SALES_ORDER" });
-    // Optionally reset other parts of the state if necessary
   };
 
   useEffect(() => {
-    console.log("Current State:", state);
-  }, [state]);
-
-  useEffect(() => {
     const handlePageRefresh = () => {
-      resetState(); // Reset state on refresh
+      resetState();
     };
-  
+
     window.addEventListener("beforeunload", handlePageRefresh);
-  
+
     return () => {
       window.removeEventListener("beforeunload", handlePageRefresh);
     };

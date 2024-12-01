@@ -19,6 +19,9 @@ import { useGlobalState } from "../context/GlobalStateContext";
 import { debounce } from "lodash";
 import Modal from "react-modal";
 import EmployeeVerification from "../components/EmployeeVerification";
+import { format } from "date-fns";
+
+
 
 Modal.setAppElement("#root");
 
@@ -66,6 +69,15 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
   const itemsPerPage = 10;
 
   const isUploadingRef = useRef(false);
+  // Function to get current date and time in the desired format
+const getCurrentDateTime = () => {
+  const now = new Date();
+  return format(now, "yyyy-MM-dd HH:mm:ss");
+};
+
+// Use in your add/update logic
+const trimmedBillDate = newBillDate.trim();
+const formattedBillDate = format(new Date(trimmedBillDate), "yyyy-MM-dd");
 
   // Warn user before unloading the page during upload
   useEffect(() => {
@@ -255,12 +267,12 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
       return;
     }
 
-    if (isNaN(rate) || rate < -1) {
+    if (isNaN(rate) || rate < 0) {
       setError("Please enter a valid rate greater than 0.");
       return;
     }
 
-    if (isNaN(mrp) || mrp < -1) {
+    if (isNaN(mrp) || mrp < 0) {
       setError("Please enter a valid MRP greater than 0.");
       return;
     }
@@ -369,17 +381,17 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
     const rate = parseFloat(updateRate);
     const mrp = parseFloat(updateMrp);
 
-    if (isNaN(quantity) || quantity <= 0) {
+    if (isNaN(quantity) || quantity < 0) {
       setError("Please enter a valid quantity greater than 0.");
       return;
     }
 
-    if (isNaN(rate) || rate <= 0) {
+    if (isNaN(rate) || rate < -1) {
       setError("Please enter a valid rate greater than 0.");
       return;
     }
 
-    if (isNaN(mrp) || mrp <= 0) {
+    if (isNaN(mrp) || mrp < -1) {
       setError("Please enter a valid MRP greater than 0.");
       return;
     }
