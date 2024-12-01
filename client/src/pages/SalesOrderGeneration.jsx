@@ -1,4 +1,11 @@
-import React, {useState,useEffect,useRef,useMemo,memo,useCallback,} from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useMemo,
+  memo,
+  useCallback,
+} from "react";
 import { PrinterIcon, TrashIcon } from "@heroicons/react/24/outline";
 import supabase from "../supabaseClient";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
@@ -44,7 +51,7 @@ const fetchCustomerByPhone = async (phone) => {
     .from("customers")
     .select("*")
     .eq("phone_number", phone)
-    .order("created_at", { ascending: false })
+    .order("created_at", { ascending: false });
 
   if (error) {
     console.error("Error fetching customer by phone:", error.message);
@@ -95,7 +102,7 @@ const fetchProductDetailsFromDatabase = async (productId, branch) => {
 
 // Helper function to calculate loyalty points
 const calculateLoyaltyPoints = (
-  subtotal,
+  subtotalWithGST,
   redeemPointsAmount,
   privilegeCard,
   privilegeCardDetails,
@@ -110,92 +117,94 @@ const calculateLoyaltyPoints = (
   }
 
   let updatedPoints = loyaltyPoints - pointsToRedeem;
-  const pointsToAdd = Math.floor(subtotal * 0.05);
+  const pointsToAdd = Math.floor(amountAfterDiscount * 0.05);
   updatedPoints += pointsToAdd;
   return { updatedPoints, pointsToRedeem, pointsToAdd };
 };
 
 // Helper function to normalize work order products with correct product IDs
+// Helper function to normalize work order products
+// Helper function to normalize work order products
 const normalizeWorkOrderProducts = async (workOrderProducts, branch) => {
   if (!Array.isArray(workOrderProducts)) {
     console.error("workOrderProducts is not an array:", workOrderProducts);
     return [];
   }
 
-  // Extract all unique product_ids (strings) from workOrderProducts
-  const uniqueProductIds = [
-    ...new Set(workOrderProducts.map((product) => product.product_id)),
-  ];
+  // Map over workOrderProducts to use the details directly
+  const normalizedProducts = workOrderProducts.map((product) => ({
+    id: product.id || null, // Integer ID if available
+    product_id: product.product_id, // String product_id
+    name: product.product_name || product.name || "", // Use product_name from work order
+    price: parseFloat(product.price) || 0,
+    quantity: parseInt(product.quantity, 10) || 0,
+    hsn_code: product.hsn_code || "",
+    stock: 0, // Will fetch stock later
+  }));
 
-  // Fetch all products with these product_ids
-  const { data: productsData, error: productsError } = await supabase
-    .from("products")
-    .select("id, product_id, product_name, mrp, hsn_code")
-    .in("product_id", uniqueProductIds);
+  // Fetch integer IDs for products if not available
+  const productsWithoutId = normalizedProducts.filter((product) => !product.id);
+  if (productsWithoutId.length > 0) {
+    // Fetch integer IDs from products table
+    const productIdsToFetch = productsWithoutId.map(
+      (product) => product.product_id
+    );
+    const { data: productsData, error: productsError } = await supabase
+      .from("products")
+      .select("id, product_id")
+      .in("product_id", productIdsToFetch);
 
-  if (productsError) {
-    console.error("Error fetching products:", productsError.message);
-    return workOrderProducts.map((product) => ({
-      ...product,
-      id: null, // Assign null if product not found
-      stock: 0, // Default stock to 0
-    }));
-  }
-
-  // Create a map from product_id (string) to product details
-  const productsMap = new Map();
-  productsData.forEach((prod) => {
-    productsMap.set(prod.product_id, prod);
-  });
-
-  // Extract all product IDs (integers) to fetch stock
-  const productIds = productsData.map((prod) => prod.id);
-
-  // Fetch current stock for these products in the specific branch
-  const { data: stockData, error: stockError } = await supabase
-    .from("stock")
-    .select("product_id, quantity")
-    .in("product_id", productIds)
-    .eq("branch_code", branch);
-
-  if (stockError) {
-    console.error("Error fetching stock data:", stockError.message);
-    // Assign stock as 0 if fetching fails
-  }
-
-  // Create a map from product_id (integer) to quantity
-  const stockMap = new Map();
-  if (stockData) {
-    stockData.forEach((stock) => {
-      stockMap.set(stock.product_id, stock.quantity);
-    });
-  }
-
-  // Normalize the workOrderProducts with correct product details and stock
-  const normalizedProducts = workOrderProducts.map((product) => {
-    const prod = productsMap.get(product.product_id);
-    if (prod) {
-      return {
-        id: prod.id, // Integer ID from products table
-        product_id: prod.product_id, // String product_id for display
-        name: prod.product_name, // Product name
-        price: prod.mrp || 0, // Price (MRP)
-        quantity: parseInt(product.quantity, 10) || 0, // Quantity from work order
-        hsn_code: prod.hsn_code || "",
-        stock: stockMap.get(prod.id) || 0, // Current stock
-      };
+    if (productsError) {
+      console.error("Error fetching products data:", productsError.message);
     } else {
-      return {
-        ...product,
-        id: null,
-        stock: 0,
-      };
+      const idMap = new Map();
+      productsData.forEach((product) => {
+        idMap.set(product.product_id, product.id);
+      });
+
+      // Update normalizedProducts with integer IDs
+      normalizedProducts.forEach((product) => {
+        if (!product.id && idMap.has(product.product_id)) {
+          product.id = idMap.get(product.product_id);
+        }
+      });
     }
+  }
+
+  // Now fetch stock for these products using integer IDs
+  const productIds = normalizedProducts
+    .map((product) => product.id)
+    .filter((id) => id !== null);
+
+  // Fetch stock for these product IDs
+  let stockMap = new Map();
+
+  if (productIds.length > 0) {
+    const { data: stockData, error: stockError } = await supabase
+      .from("stock")
+      .select("product_id, quantity")
+      .in("product_id", productIds)
+      .eq("branch_code", branch);
+
+    if (stockError) {
+      console.error("Error fetching stock data:", stockError.message);
+    } else {
+      stockData.forEach((stock) => {
+        stockMap.set(stock.product_id, stock.quantity);
+      });
+    }
+  }
+
+  // Update normalizedProducts with stock
+  const updatedProducts = normalizedProducts.map((product) => {
+    const stockQuantity = stockMap.get(product.id) || 0;
+    return {
+      ...product,
+      stock: stockQuantity,
+    };
   });
 
-  console.log("Normalized Products with Stock:", normalizedProducts);
-
-  return normalizedProducts;
+  return updatedProducts;
 };
 
 // Helper function to calculate differences between original and updated products
@@ -238,12 +247,18 @@ const GST_DIVISOR = 1.12; // To extract base price from GST-inclusive price
 function calculateAmounts(
   productEntries,
   advanceDetails,
-  discountAmount,
+  salesDiscountAmount,
+  workOrderDiscountAmount,
   privilegeCard,
   privilegeCardDetails,
   redeemPointsAmount,
   loyaltyPoints
 ) {
+  // Constants for GST rates
+  const CGST_RATE = 0.06; // 6%
+  const SGST_RATE = 0.06; // 6%
+  const GST_RATE = CGST_RATE + SGST_RATE; // Total GST rate (12%)
+
   // Helper functions for parsing and validation
   const parsePrice = (price) => {
     const parsed = parseFloat(price);
@@ -255,40 +270,38 @@ function calculateAmounts(
     return isNaN(parsed) || parsed < 0 ? 0 : parsed;
   };
 
-  // Step 1: Calculate Subtotal Without GST by extracting base prices
-  const subtotalWithoutGST = productEntries.reduce((acc, product) => {
-    const priceWithGST = parsePrice(product.price);
-    const quantity = parseQuantity(product.quantity);
-    const priceExclGST = priceWithGST / GST_DIVISOR; // Base price calculation
-    return acc + priceExclGST * quantity;
-  }, 0);
-
-  // Step 2: Calculate Subtotal Including GST
+  // **Step 1: Calculate Subtotal Including GST**
   const subtotalWithGST = productEntries.reduce((acc, product) => {
-    const priceWithGST = parsePrice(product.price);
+    const priceIncludingGST = parsePrice(product.price);
     const quantity = parseQuantity(product.quantity);
-    return acc + priceWithGST * quantity;
+    return acc + priceIncludingGST * quantity;
   }, 0);
 
-  // Step 3: Subtract Advance Paid
+  // **Step 2: Apply Discounts**
+  let totalDiscount =
+    parsePrice(workOrderDiscountAmount) + parsePrice(salesDiscountAmount);
+
+  // Ensure totalDiscount doesn't exceed subtotalWithGST
+  if (totalDiscount > subtotalWithGST) {
+    totalDiscount = subtotalWithGST;
+  }
+
+  const amountAfterDiscount = subtotalWithGST - totalDiscount;
+
+  // **Step 3: Extract GST from Amount After Discount**
+  const taxableValue = amountAfterDiscount / (1 + GST_RATE);
+  const gstAmount = amountAfterDiscount - taxableValue;
+  const cgstAmount = gstAmount / 2;
+  const sgstAmount = gstAmount / 2;
+
+  // **Step 4: Subtract Advance Paid**
   const advancePaid = parsePrice(advanceDetails);
-  let balanceDue = subtotalWithGST - advancePaid;
-  balanceDue = Math.max(balanceDue, 0); // Ensure balanceDue is not negative
+  let balanceDue = amountAfterDiscount - advancePaid;
 
-  // Step 4: Apply Discount
-  const discount = parsePrice(discountAmount);
-  balanceDue -= discount;
-  balanceDue = Math.max(balanceDue, 0); // Ensure balanceDue is not negative after discount
+  // Ensure balanceDue is not negative
+  balanceDue = Math.max(balanceDue, 0);
 
-  // Step 5: Calculate Balance Without GST
-  const balanceWithoutGST = (balanceDue / 112) * 100;
-
-  // Step 6: Calculate CGST and SGST on Balance Without GST
-  const cgstAmount = balanceWithoutGST * CGST_RATE;
-  const sgstAmount = balanceWithoutGST * SGST_RATE;
-  const gstAmount = cgstAmount + sgstAmount; // Total GST
-
-  // Step 7: Privilege Card Discount (If Applicable)
+  // **Step 5: Apply Privilege Card Discount (If Applicable)**
   let privilegeDiscount = 0;
   if (
     privilegeCard &&
@@ -299,22 +312,24 @@ function calculateAmounts(
     const redeemAmount = parsePrice(redeemPointsAmount);
     privilegeDiscount = Math.min(redeemAmount, loyaltyPoints, balanceDue);
     balanceDue -= privilegeDiscount;
-    balanceDue = Math.max(balanceDue, 0); // Ensure balanceDue is not negative after privilege discount
+    // Ensure balanceDue is not negative after privilege discount
+    balanceDue = Math.max(balanceDue, 0);
   }
 
-  // Step 8: Final Payment Due
+  // **Step 6: Final Payment Due**
   const finalAmount = balanceDue.toFixed(2); // Final amount after all deductions
 
   return {
-    subtotalWithoutGST: subtotalWithoutGST.toFixed(2),
     subtotalWithGST: subtotalWithGST.toFixed(2),
-    advance: advancePaid.toFixed(2),
-    discount: discount.toFixed(2),
-    balanceDue: balanceDue.toFixed(2),
-    balanceWithoutGST: balanceWithoutGST.toFixed(2),
+    subtotalWithoutGST: taxableValue.toFixed(2), // Add this line
+    totalDiscount: totalDiscount.toFixed(2),
+    amountAfterDiscount: amountAfterDiscount.toFixed(2),
+    taxableValue: taxableValue.toFixed(2),
+    gstAmount: gstAmount.toFixed(2),
     cgstAmount: cgstAmount.toFixed(2),
     sgstAmount: sgstAmount.toFixed(2),
-    gstAmount: gstAmount.toFixed(2),
+    advance: advancePaid.toFixed(2),
+    balanceDue: balanceDue.toFixed(2),
     privilegeDiscount: privilegeDiscount.toFixed(2),
     finalAmount,
   };
@@ -383,6 +398,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     workOrders,
     isFetchingWorkOrders,
     isLoading,
+    workOrderDiscount,
   } = salesOrderForm;
 
   // Local states
@@ -431,7 +447,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
   // Function to create a new customer
   const saveCustomerDetails = async (customerDetails) => {
     const { name, phone_number, address, gender, age } = customerDetails;
-  
+
     const { data, error } = await supabase
       .from("customers")
       .insert({
@@ -442,14 +458,13 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         gender,
       })
       .select();
-  
+
     if (error) {
       console.error("Error saving customer details:", error);
       throw error; // Stop further execution on failure
     }
     return data; // Returns an array of inserted records
   };
-  
 
   // Fetch Employees based on branch
   const fetchEmployees = async () => {
@@ -691,7 +706,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           .select("*")
           .eq("sales_order_id", orderId)
           .single();
-  
+
         if (error || !data) {
           console.error("Sales Order Not Found:", error?.message || "No data");
           updateSalesOrderForm({
@@ -702,17 +717,17 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           });
           return;
         }
-  
+
         console.log("Fetched Sales Order Data:", data);
-  
+
         // Normalize product entries with correct product IDs and stock
         const normalizedProducts = await normalizeWorkOrderProducts(
           data.items, // Assuming 'items' holds product_entries
           branch
         );
-  
+
         console.log("Normalized Products:", normalizedProducts);
-  
+
         // Update global form state with fetched data
         updateSalesOrderForm({
           productEntries: normalizedProducts,
@@ -733,9 +748,9 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           validationErrors: {}, // Clear validation errors
           step: 3, // Move to the next step (adjust as per your step logic)
         });
-  
+
         setOriginalProductEntries(normalizedProducts); // Store original entries
-  
+
         // Fetch privilege card details if applicable
         if (data.pc_number) {
           const { data: privilegeData, error: privilegeError } = await supabase
@@ -743,7 +758,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
             .select("*")
             .eq("pc_number", data.pc_number)
             .single();
-  
+
           if (privilegeError || !privilegeData) {
             updateSalesOrderForm({ privilegeCardDetails: null });
             updateSalesOrderForm({
@@ -760,15 +775,15 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
             });
           }
         }
-  
+
         updateSalesOrderForm({
           validationErrors: { ...validationErrors, generalError: "" },
         });
-  
+
         // Fetch customer details via customer_id
         if (data.customer_id) {
           const customer = await fetchCustomerById(data.customer_id.trim());
-  
+
           if (customer) {
             updateSalesOrderForm({
               patientDetails: {
@@ -815,7 +830,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     },
     [updateSalesOrderForm, validationErrors, branch]
   );
-  
+
   // New helper function to fetch customer by customer_id
   const fetchCustomerById = async (customerId) => {
     const { data, error } = await supabase
@@ -823,14 +838,13 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
       .select("*")
       .eq("customer_id", customerId)
       .single();
-  
+
     if (error) {
       console.error("Error fetching customer by ID:", error.message);
       return null;
     }
     return data;
   };
-  
 
   useEffect(() => {
     if (orderId) {
@@ -848,38 +862,39 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
   }, [branch]);
 
   const {
-    subtotalWithoutGST,
+    subtotalWithGST,
+    subtotalWithoutGST, // Add this line
+    totalDiscount,
+    amountAfterDiscount,
+    taxableValue,
+    gstAmount,
     cgstAmount,
     sgstAmount,
-    subtotalWithGST,
     advance,
-    discount: calculatedDiscount,
     balanceDue,
-    balanceWithoutGST,
-    gstAmount,
     privilegeDiscount,
     finalAmount,
-  } = useMemo(
-    () =>
-      calculateAmounts(
-        productEntries,
-        advanceDetails,
-        discount,
-        salesOrderForm.privilegeCard,
-        privilegeCardDetails,
-        redeemPointsAmount,
-        loyaltyPoints
-      ),
-    [
+  } = useMemo(() => {
+    return calculateAmounts(
       productEntries,
       advanceDetails,
-      discount,
-      salesOrderForm.privilegeCard,
+      discount, // salesDiscountAmount
+      workOrderDiscount, // workOrderDiscountAmount
+      privilegeCard,
       privilegeCardDetails,
       redeemPointsAmount,
-      loyaltyPoints,
-    ]
-  );
+      loyaltyPoints
+    );
+  }, [
+    productEntries,
+    advanceDetails,
+    discount,
+    workOrderDiscount,
+    privilegeCard,
+    privilegeCardDetails,
+    redeemPointsAmount,
+    loyaltyPoints,
+  ]);
 
   // Function to fetch patient by MR number
   // Function to fetch patient by MR number
@@ -1046,9 +1061,9 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
       // Exclude work orders that are already used and belong to the current branch
       query = query.eq("is_used", false).eq("branch", branch); // Added branch filter
 
-      const { data, error } = await query.order("created_at", {
-        ascending: false,
-      });
+      const { data, error } = await query
+        .select("*") // Or specify the fields explicitly
+        .order("created_at", { ascending: false });
 
       if (error) {
         console.error("Error fetching work orders:", error.message);
@@ -1131,6 +1146,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     setSelectedWorkOrder({
       ...workOrder,
       product_entries: normalizedProducts,
+      discount_amount: workOrder.discount_amount || 0,
     });
     setShowWorkOrderModal(true);
   };
@@ -1167,6 +1183,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
       advanceDetails: selectedWorkOrder.advance_details || "",
       hasMrNumber: selectedWorkOrder.mr_number ? "yes" : "no",
       productEntries: normalizedProducts,
+      workOrderDiscount: selectedWorkOrder.discount_amount || 0,
     });
 
     setOriginalProductEntries(normalizedProducts);
@@ -1276,7 +1293,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     }
 
     // Move to the next step
-    updateSalesOrderForm({ step: 3 });
+    updateSalesOrderForm({ step: 1 });
   }
 
   // Function to send OTP
@@ -1568,8 +1585,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         } else if (!/^\d{10}$/.test(customerPhone)) {
           errors.customerPhone = "Please enter a valid 10-digit phone number";
         }
-        if (!address.trim())
-          errors.address = "Customer address is required.";
+        if (!address.trim()) errors.address = "Customer address is required.";
         if (!age) errors.customerAge = "Customer age is required.";
         if (age && parseInt(age) < 0)
           errors.customerAge = "Age cannot be negative.";
@@ -1698,10 +1714,10 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         generalError: "",
       },
     });
-  
+
     try {
       let customerId = null;
-  
+
       // **Step 1: Save Customer Details (if applicable)**
       if (hasMrNumber === "no") {
         // Validate Customer Details
@@ -1717,7 +1733,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           customerErrors.customerAge = "Age must be a positive number.";
         if (!gender)
           customerErrors.customerGender = "Customer gender is required.";
-  
+
         if (Object.keys(customerErrors).length > 0) {
           updateSalesOrderForm({
             validationErrors: {
@@ -1728,7 +1744,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           updateSalesOrderForm({ isSaving: false });
           return;
         }
-  
+
         // Call saveCustomerDetails with customer details
         const savedCustomer = await saveCustomerDetails({
           name: customerName,
@@ -1737,14 +1753,14 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           gender,
           age: parseInt(age, 10),
         });
-  
+
         if (savedCustomer && savedCustomer.length > 0) {
           customerId = savedCustomer[0].customer_id; // Retrieve customer_id from the first inserted record
         } else {
           throw new Error("Failed to retrieve customer_id after insertion.");
         }
       }
-  
+
       // **Step 2: Handle Loyalty Points Update (if applicable)**
       if (privilegeCard && privilegeCardDetails) {
         const { updatedPoints, pointsToRedeem, pointsToAdd } =
@@ -1755,12 +1771,12 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
             privilegeCardDetails,
             loyaltyPoints
           );
-  
+
         const { error: loyaltyError } = await supabase
           .from("privilegecards")
           .update({ loyalty_points: updatedPoints })
           .eq("pc_number", privilegeCardDetails.pc_number);
-  
+
         if (loyaltyError) {
           console.error("Error updating loyalty points:", loyaltyError);
           updateSalesOrderForm({
@@ -1772,19 +1788,19 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           updateSalesOrderForm({ isSaving: false });
           return;
         }
-  
+
         updateSalesOrderForm({
           loyaltyPoints: updatedPoints,
           pointsToAdd: pointsToAdd,
         });
       }
-  
+
       // **Step 3: Prepare Variables for Sales Data**
       const sanitizedRedeemedPoints = privilegeCard
         ? parseInt(redeemPointsAmount) || 0
         : 0;
       const sanitizedPointsAdded = privilegeCard ? pointsToAdd || 0 : 0;
-  
+
       // **Step 4: Handle Existing Sales Update**
       if (isEditing) {
         // Existing logic remains the same, but ensure to use customer_id if necessary
@@ -1802,12 +1818,14 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           updateSalesOrderForm({ isSaving: false });
           return;
         }
-  
+
         const { error: insertError } = await supabase
           .from("sales_orders")
           .insert({
             sales_order_id: newSalesOrderId,
-            work_order_id: selectedWorkOrder ? selectedWorkOrder.work_order_id : null,
+            work_order_id: selectedWorkOrder
+              ? selectedWorkOrder.work_order_id
+              : null,
             items: productEntries.map((prod) => ({
               id: prod.id, // Integer id for stock
               product_id: prod.product_id, // String product_id for display
@@ -1817,12 +1835,13 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
               hsn_code: prod.hsn_code,
             })),
             mr_number: hasMrNumber === "yes" ? mrNumber : null,
-            patient_phone: hasMrNumber === "yes" ? patientDetails.phone_number : null,
+            patient_phone:
+              hasMrNumber === "yes" ? patientDetails.phone_number : null,
             customer_id: customerId, // Associate with customer_id
             employee: employee,
             payment_method: paymentMethod,
             subtotal: parseFloat(subtotalWithoutGST),
-            discount: parseFloat(calculatedDiscount),
+            discount: parseFloat(totalDiscount),
             total_amount: parseFloat(subtotalWithGST),
             advance_details: parseFloat(advanceDetails) || 0,
             privilege_discount: parseFloat(privilegeDiscount),
@@ -1834,7 +1853,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
             updated_at: currentUTCDateTime,
             branch: branch,
           });
-  
+
         if (insertError) {
           console.error("Error inserting sales order:", insertError);
           updateSalesOrderForm({
@@ -1846,14 +1865,14 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           updateSalesOrderForm({ isSaving: false });
           return;
         }
-  
+
         // **Step 6: Mark Work Order as Used (if applicable)**
         if (selectedWorkOrder) {
           const { error: workOrderError } = await supabase
             .from("work_orders")
             .update({ is_used: true })
             .eq("work_order_id", selectedWorkOrder.work_order_id);
-  
+
           if (workOrderError) {
             console.error("Error marking work order as used:", workOrderError);
             updateSalesOrderForm({
@@ -1866,12 +1885,12 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
             return;
           }
         }
-  
+
         // **Step 7: Deduct Stock for Multiple Products in Bulk**
         const validProducts = productEntries.filter(
           (product) => product.id && product.quantity > 0
         );
-  
+
         if (!validProducts || validProducts.length === 0) {
           console.error("No valid products to process");
           updateSalesOrderForm({
@@ -1883,9 +1902,9 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           updateSalesOrderForm({ isSaving: false });
           return;
         }
-  
+
         console.log("Valid Products for Deduction:", validProducts);
-  
+
         // Fetch current stock for all valid products in one query
         const productIds = validProducts.map((prod) => prod.id); // Use integer ids
         const { data: stockData, error: stockError } = await supabase
@@ -1893,7 +1912,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           .select("product_id, quantity")
           .in("product_id", productIds)
           .eq("branch_code", branch);
-  
+
         if (stockError || !stockData) {
           console.error("Error fetching stock data:", stockError);
           updateSalesOrderForm({
@@ -1905,18 +1924,18 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           updateSalesOrderForm({ isSaving: false });
           return;
         }
-  
+
         // Create a map of current stock
         const stockMap = new Map();
         stockData.forEach((stock) => {
           stockMap.set(stock.product_id, stock.quantity);
         });
-  
+
         // Validate stock deductions
         for (const product of validProducts) {
           const currentStock = stockMap.get(product.id) || 0;
           const newStock = currentStock - product.quantity;
-  
+
           if (newStock < 0) {
             updateSalesOrderForm({
               validationErrors: {
@@ -1928,7 +1947,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
             return;
           }
         }
-  
+
         // Update stock quantities in bulk
         const updateStockPromises = validProducts.map((product) => {
           const newQuantity = stockMap.get(product.id) - product.quantity;
@@ -1938,14 +1957,14 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
             .eq("product_id", product.id)
             .eq("branch_code", branch);
         });
-  
+
         const updateStockResults = await Promise.all(updateStockPromises);
-  
+
         // Check for any errors in stock updates
         const stockUpdateErrors = updateStockResults.filter(
           (result) => result.error
         );
-  
+
         if (stockUpdateErrors.length > 0) {
           console.error("Error updating stock levels:", stockUpdateErrors);
           updateSalesOrderForm({
@@ -1957,13 +1976,13 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           updateSalesOrderForm({ isSaving: false });
           return;
         }
-  
+
         alert("Sales order created successfully!");
       }
-  
+
       // **Final Steps: Reset Form and Allow Printing**
       updateSalesOrderForm({ allowPrint: true });
-  
+
       alert("Order processed successfully!");
       setTimeout(() => {
         printButtonRef.current?.focus(); // Move focus to the Print button
@@ -1980,7 +1999,6 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
       updateSalesOrderForm({ isSaving: false }); // Set isSaving to false
     }
   };
-  
 
   // Function to reset the form
   const resetForm = () => {
@@ -2375,7 +2393,6 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
             </div>
           )}
 
-          {/* Step 2: Product Details */}
           {/* Step 2: Product Details */}
           {state.salesOrderForm.step === 1 && (
             <div className="w-full bg-gray-50 p-6 rounded-md shadow-inner space-y-6">
@@ -2960,10 +2977,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                       {validationErrors.age}
                     </p>
                   )}
-
-                  
                 </>
-                
               )}
             </div>
           )}
@@ -3505,14 +3519,14 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                     <h2 className="text-3xl font-bold">Bill</h2>
                     <div className="text-right">
                       <p>
-                        <strong>Sales ID:</strong> {salesOrderId}
+                        Sales ID:<strong> {salesOrderId}</strong>
                       </p>
                       <p>
-                        <strong>Date:</strong> {formattedDate}
+                        Date:<strong> {formattedDate}</strong>
                       </p>
                       {hasMrNumber && (
                         <p>
-                          <strong>MR Number:</strong> {mrNumber}
+                          MR Number:<strong> {mrNumber}</strong>
                         </p>
                       )}
                     </div>
@@ -3589,53 +3603,64 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                     </tbody>
                   </table>
 
+                  {/* Financial Summary */}
                   <div className="flex justify-between mb-6 space-x-8">
                     <div>
-                      <p>
-                        <strong>Subtotal (Excl. GST):</strong> ₹
-                        {subtotalWithoutGST}
-                      </p>
-                      <p>
-                        <strong>CGST (6%):</strong> ₹{cgstAmount}
-                      </p>
-                      <p>
-                        <strong>SGST (6%):</strong> ₹{sgstAmount}
-                      </p>
+                      {/* Subtotal Including GST */}
                       <p>
                         <strong>Subtotal (Incl. GST):</strong> ₹
-                        {subtotalWithGST}
+                        {parseFloat(subtotalWithGST).toFixed(2)}
+                      </p>
+
+                      {/* Work Order and Sales Discounts */}
+                      <p>
+                        <strong>Work Order Discount:</strong> ₹
+                        {parseFloat(workOrderDiscount).toFixed(2)}
                       </p>
                       <p>
-                        <strong>Payment Method:</strong>{" "}
-                        {paymentMethod.charAt(0).toUpperCase() +
-                          paymentMethod.slice(1)}
+                        <strong>Sales Discount:</strong> ₹
+                        {parseFloat(discount).toFixed(2)}
+                      </p>
+                      <p>
+                        <strong>Total Discount:</strong> ₹
+                        {parseFloat(totalDiscount).toFixed(2)}
+                      </p>
+
+                      {/* Amount After Discounts */}
+
+                      <p>
+                        <strong>CGST (6%):</strong> ₹
+                        {parseFloat(cgstAmount).toFixed(2)}
+                      </p>
+                      <p>
+                        <strong>SGST (6%):</strong> ₹
+                        {parseFloat(sgstAmount).toFixed(2)}
                       </p>
                     </div>
 
                     <div>
-                      <p>
-                        <strong>Advance Paid:</strong> ₹{advance}
-                      </p>
-                      <p>
-                        <strong>Discount:</strong> ₹{calculatedDiscount}
-                      </p>
                       <p className="text-xl">
-                        Final Amount:{" "}
-                        <strong className="text-xl">₹{balanceDue}</strong>{" "}
+                        <strong>Amount After Discounts:</strong> ₹
+                        {parseFloat(amountAfterDiscount).toFixed(2)}
                       </p>
-                      {privilegeCard && privilegeCardDetails && (
-                        <>
-                          <p>
-                            <strong>Privilege Card Discount:</strong> ₹
-                            {privilegeDiscount}
-                          </p>
-                          <p>
-                            <strong>Loyalty Points Redeemed:</strong> ₹
-                            {privilegeDiscount}
-                          </p>
-                        </>
-                      )}
-                      {/* <p><strong>Final Payment Due:</strong> ₹{finalAmount}</p> */}
+                      {/* Taxable Value and GST Breakdown */}
+                      <p>
+                        <strong>Taxable Value:</strong> ₹
+                        {parseFloat(taxableValue).toFixed(2)}
+                      </p>
+                      {/* Advance Paid */}
+                      <p>
+                        <strong>Advance Paid:</strong> ₹
+                        {parseFloat(advance).toFixed(2)}
+                      </p>
+                      {/* Final Amount Due */}
+                      <p className="text-xl">
+                        <strong>Final Amount Due:</strong>{" "}
+                        <span className="text-xl">
+                          ₹{parseFloat(balanceDue).toFixed(2)}
+                        </span>
+                      </p>
+                      {/* Billed By */}
                       <div className="mt-4">
                         <div className="mt-10 space-x-8">
                           <p>
@@ -3653,7 +3678,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                         <span className="font-semibold">
                           Loyalty Points Redeemed:
                         </span>{" "}
-                        ₹{redeemPointsAmount.toFixed(2)}
+                        ₹{parseFloat(redeemPointsAmount || 0).toFixed(2)}
                       </p>
                       <p>
                         <span className="font-semibold">
@@ -3674,30 +3699,12 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                       <input
                         type="number"
                         placeholder="Enter Discount Amount"
-                        value={state.salesOrderForm.discount}
+                        value={discount}
                         onChange={(e) => {
-                          const discountValue =
-                            e.target.value === ""
-                              ? ""
-                              : Math.min(
-                                  Math.max(Number(e.target.value), 0),
-                                  Math.max(
-                                    subtotalWithGST -
-                                      (Number(
-                                        state.salesOrderForm.advanceDetails
-                                      ) || 0),
-                                    0
-                                  )
-                                );
-
-                          dispatch({
-                            type: "SET_SALES_ORDER_FORM",
-                            payload: { discount: discountValue },
-                          });
+                          const discountValue = e.target.value;
+                          updateSalesOrderForm({ discount: discountValue });
                         }}
                         className="border border-gray-300 w-full px-4 py-3 rounded-lg"
-                        min="0"
-                        max={subtotalWithoutGST}
                         onKeyDown={(e) => {
                           if (e.key === "Enter") {
                             e.preventDefault();
@@ -3724,9 +3731,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                         id="paymentMethod"
                         value={paymentMethod}
                         onChange={(e) =>
-                          dispatch({
-                            type: "SET_SALES_ORDER_FORM",
-                            payload: { paymentMethod: e.target.value },
+                          updateSalesOrderForm({
+                            paymentMethod: e.target.value,
                           })
                         }
                         ref={paymentMethodRef}

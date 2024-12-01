@@ -33,7 +33,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   const { orderId } = useParams(); // Get orderId from route params
   const isEditing = Boolean(orderId);
 
-  const { state, dispatch,resetState } = useGlobalState();
+  const { state, dispatch, resetState } = useGlobalState();
   const { workOrderForm } = state;
 
   const {
@@ -57,7 +57,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     customerAddress,
     customerAge,
     customerGender,
-    modificationRequestId,
+    // modificationRequestId, // Removed modificationRequestId
     isSaving,
     allowPrint,
     employees,
@@ -105,7 +105,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   const generateNewWorkOrderId = useCallback(async () => {
     try {
       console.log("Attempting to generate new Work Order ID...");
-  
+
       // Define default starting Work Order IDs per branch
       const branchDefaultIds = {
         "TVR": 3701,  // Trivandrum
@@ -115,16 +115,16 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         "KAT": 7701,  // Kattakada
         // Add other branches as needed
       };
-  
+
       if (!branch) {
         console.error("Branch is undefined. Cannot generate Work Order ID.");
         alert("Branch information is missing. Please try again.");
         return;
       }
-  
+
       console.log("Current Branch:", branch);
       console.log("Default Work Order ID for this branch:", branchDefaultIds[branch] || 1001);
-  
+
       // Fetch the last Work Order ID for the current branch
       const { data: lastWorkOrders, error } = await supabase
         .from("work_orders")
@@ -132,17 +132,17 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         .eq("branch", branch) // Filter by branch
         .order("work_order_id", { ascending: false })
         .limit(1);
-  
+
       if (error) {
         console.error("Error fetching last work order:", error);
         // alert("Error generating Work Order ID. Please try again.");
         return;
       }
-  
+
       console.log("Last Work Orders Retrieved for branch:", lastWorkOrders);
-  
+
       let newWorkOrderId = branchDefaultIds[branch] || 1001; // Default if no work orders exist for branch
-  
+
       if (lastWorkOrders && lastWorkOrders.length > 0) {
         const lastWorkOrderId = parseInt(lastWorkOrders[0].work_order_id, 10);
         console.log("Last Work Order ID for branch:", lastWorkOrderId);
@@ -155,7 +155,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
           );
         }
       }
-  
+
       dispatch({
         type: "SET_WORK_ORDER_FORM",
         payload: { workOrderId: newWorkOrderId.toString() },
@@ -166,8 +166,6 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       alert("An unexpected error occurred while generating Work Order ID.");
     }
   }, [dispatch, branch]);
-  
-  
 
   // Fetch employees from the Supabase `employees` table
   const fetchEmployees = useCallback(async () => {
@@ -297,12 +295,12 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
               productEntries: productEntries.map((entry, i) =>
                 i === index
                   ? {
-                    id: productDetails.product_id,
-                    name: productDetails.product_name,
-                    price: productDetails.mrp || "",
-                    quantity: entry.quantity || "",
-                    hsn_code: productDetails.hsn_code || "",
-                  }
+                      id: productDetails.product_id,
+                      name: productDetails.product_name,
+                      price: productDetails.mrp || "",
+                      quantity: entry.quantity || "",
+                      hsn_code: productDetails.hsn_code || "",
+                    }
                   : entry
               ),
             },
@@ -390,8 +388,6 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   // GST Rate and HSN Code
   const GST_RATE = 12; // Total GST is 12% (6% CGST + 6% SGST)
 
-
-
   // Calculate totals
   const calculateTotals = useCallback((entries, discountAmt) => {
     // Initialize variables
@@ -430,9 +426,6 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       totalAmount,
     };
   }, []);
-
-
-
 
   // Utility function to get today's date in YYYY-MM-DD format
   const getTodayDate = useCallback(() => {
@@ -545,16 +538,14 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   const balanceDue = Math.max(totalAmount - advance, 0);
   // const excessAmount = advance - totalAmount;
 
-
   const validateAdvanceAmount = useCallback(() => {
     const advanceAmount = parseFloat(advanceDetails) || 0;
-    if ( advanceAmount > totalAmount + 1) {
+    if (advanceAmount > totalAmount + 1) {
       alert("Advance amount cannot exceed the total amount.");
       return false;
     }
     return true;
   }, [advanceDetails, totalAmount]);
-
 
   // Navigate to the next step with validations
   const nextStep = useCallback(() => {
@@ -859,26 +850,26 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       } else {
         // Create new customer
         const { data: newCustomer, error: customerCreationError } =
-  await supabase
-    .from("customers")
-    .insert({
-      name: customerName.trim(),
-      phone_number: customerPhone.trim(),
-      address: customerAddress.trim(),
-      age: parseInt(customerAge, 10),
-      gender: customerGender,
-    })
-    .select("customer_id") // Correct field selection
-    .single();
+          await supabase
+            .from("customers")
+            .insert({
+              name: customerName.trim(),
+              phone_number: customerPhone.trim(),
+              address: customerAddress.trim(),
+              age: parseInt(customerAge, 10),
+              gender: customerGender,
+            })
+            .select("customer_id") // Correct field selection
+            .single();
 
-if (customerCreationError) {
-  console.error("Error creating customer:", customerCreationError.message);
-  alert("Failed to create a new customer.");
-  dispatch({ type: "SET_WORK_ORDER_FORM", payload: { isSaving: false } });
-  return;
-}
+        if (customerCreationError) {
+          console.error("Error creating customer:", customerCreationError.message);
+          alert("Failed to create a new customer.");
+          dispatch({ type: "SET_WORK_ORDER_FORM", payload: { isSaving: false } });
+          return;
+        }
 
-customerId = newCustomer?.customer_id;
+        customerId = newCustomer?.customer_id;
       }
 
       // Prepare the payload
@@ -895,20 +886,20 @@ customerId = newCustomer?.customer_id;
         mr_number: hasMrNumber ? mrNumber : null,
         patient_details: hasMrNumber
           ? {
-            mr_number: mrNumber.trim(),
-            name: patientDetails?.name || "",
-            age: patientDetails?.age || "",
-            phone_number: patientDetails?.phoneNumber || "",
-            gender: patientDetails?.gender || "",
-            address: patientDetails?.address || "",
-          }
-        : {
-            name: customerName.trim(),
-            phone_number: customerPhone.trim(),
-            address: customerAddress.trim(),
-            age: parseInt(customerAge, 10),
-            gender: customerGender,
-          },
+              mr_number: mrNumber.trim(),
+              name: patientDetails?.name || "",
+              age: patientDetails?.age || "",
+              phone_number: patientDetails?.phoneNumber || "",
+              gender: patientDetails?.gender || "",
+              address: patientDetails?.address || "",
+            }
+          : {
+              name: customerName.trim(),
+              phone_number: customerPhone.trim(),
+              address: customerAddress.trim(),
+              age: parseInt(customerAge, 10),
+              gender: customerGender,
+            },
         employee,
         payment_method: paymentMethod,
         subtotal,
@@ -1133,7 +1124,7 @@ customerId = newCustomer?.customer_id;
           quantity: entry.quantity.toString(),
           hsn_code: entry.hsn_code,
         }));
-  
+
         dispatch({
           type: "SET_WORK_ORDER_FORM",
           payload: {
@@ -1151,7 +1142,7 @@ customerId = newCustomer?.customer_id;
             hasMrNumber: data.mr_number ? true : false,
           },
         });
-  
+
         if (data.mr_number) {
           // **Handle Existing Patient**
           dispatch({
@@ -1165,7 +1156,7 @@ customerId = newCustomer?.customer_id;
               .select("name, age, phone_number, gender, address")
               .eq("mr_number", data.mr_number)
               .single();
-  
+
             if (patientError) {
               console.error("Error fetching patient details:", patientError.message);
               dispatch({
@@ -1201,7 +1192,7 @@ customerId = newCustomer?.customer_id;
             .select("name, phone_number, address, age, gender")
             .eq("customer_id", data.customer_id)
             .single();
-  
+
           if (customerError) {
             console.error("Error fetching customer details:", customerError.message);
             dispatch({
@@ -1228,7 +1219,6 @@ customerId = newCustomer?.customer_id;
       navigate("/home");
     }
   }, [dispatch, navigate, orderId]);
-  
 
   // Handle Shift + Enter and Enter key for product entries
   const handleProductEntryShiftEnter = useCallback(
@@ -1251,12 +1241,12 @@ customerId = newCustomer?.customer_id;
                 productEntries: productEntries.map((entry, i) =>
                   i === index
                     ? {
-                      id: productDetails.product_id,
-                      name: productDetails.product_name,
-                      price: productDetails.mrp || "",
-                      quantity: entry.quantity || "",
-                      hsn_code: productDetails.hsn_code || "",
-                    }
+                        id: productDetails.product_id,
+                        name: productDetails.product_name,
+                        price: productDetails.mrp || "",
+                        quantity: entry.quantity || "",
+                        hsn_code: productDetails.hsn_code || "",
+                      }
                     : entry
                 ),
               },
@@ -1283,7 +1273,6 @@ customerId = newCustomer?.customer_id;
       generateNewWorkOrderId();
     }
   }, [branch, generateNewWorkOrderId, workOrderForm.isEditing, workOrderId]);
-  
 
   // Handle after print event
   useEffect(() => {
@@ -1299,9 +1288,6 @@ customerId = newCustomer?.customer_id;
       window.onafterprint = null; // Cleanup the event listener
     };
   }, [isPrinted, resetForm]);
-
-  
-  
 
   return (
 
@@ -2026,7 +2012,7 @@ customerId = newCustomer?.customer_id;
 
                 {/* Customer Details */}
                 <div className="mb-6">
-                  <p><strong>Customer Name:</strong> {hasMrNumber ? `${patientDetails?.name || 'N/A'} | ${patientDetails?.age || 'N/A'} | ${patientDetails?.gender || 'N/A'}` : `${customerName || 'N/A'} | ${customerAge || 'N/A'} | ${customerGender || 'N/A'}`}</p>
+                  <p>Customer Name: <strong> {hasMrNumber ? `${patientDetails?.name || 'N/A'} | ${patientDetails?.age || 'N/A'} | ${patientDetails?.gender || 'N/A'}` : `${customerName || 'N/A'} | ${customerAge || 'N/A'} | ${customerGender || 'N/A'}`}</strong></p>
                   <p><strong>Address:</strong> {hasMrNumber ? (patientDetails?.address || 'N/A') : (customerAddress || 'N/A')}</p>
                   <p><strong>Phone Number:</strong> {hasMrNumber ? (patientDetails?.phoneNumber || 'N/A') : (customerPhone || 'N/A')}</p>
                 </div>
@@ -2064,20 +2050,20 @@ customerId = newCustomer?.customer_id;
                 </table>
 
                 {/* Financial Summary */}
-                {/* Financial Summary */}
                 <div className="flex justify-between mb-6 space-x-8">
                   <div>
                     <p><strong>Subtotal:</strong> ₹{subtotal.toFixed(2)}</p>
-                    <p><strong>Discount Amount:</strong> ₹{validDiscountAmount.toFixed(2)}</p>
-                    <p><strong>Discounted Subtotal:</strong> ₹{discountedSubtotal.toFixed(2)}</p>
+                    
                     <p><strong>CGST (6%):</strong> ₹{cgst.toFixed(2)}</p>
                     <p><strong>SGST (6%):</strong> ₹{sgst.toFixed(2)}</p>
                     <p><strong>Payment Method:</strong> {paymentMethod.charAt(0).toUpperCase() + paymentMethod.slice(1)}</p>
-                    <p><strong>Advance Paying:</strong> ₹{advance.toFixed(2)}</p>
+                    
                   </div>
                   <div>
                     <p><strong>Total Amount:</strong> ₹{totalAmount.toFixed(2)}</p>
-                    <p><strong>Advance Paid:</strong> ₹{advance.toFixed(2)}</p>
+                    <p><strong>Discount Amount:</strong> ₹{validDiscountAmount.toFixed(2)}</p>
+                    <p><strong>Discounted Subtotal:</strong> ₹{discountedSubtotal.toFixed(2)}</p>
+                    <p><strong>Advance Paying:</strong> ₹{advance.toFixed(2)}</p>
                     <p className="text-xl">Final Amount: <strong>₹{balanceDue.toFixed(2)}</strong></p>
                     
                       {/* <p className="text-red-500">
