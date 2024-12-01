@@ -3520,7 +3520,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                 <div className="printable-area print:mt-20 print:block print:absolute print:inset-0 print:w-full bg-white p-4 print:m-0 print:p-0 w-full">
                   {/* Header */}
                   <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-3xl font-bold">Bill</h2>
+                    <h2 className="text-3xl font-bold">Tax Invoice</h2>
                     <div className="text-right">
                       <p>
                         Sales ID:<strong> {salesOrderId}</strong>
