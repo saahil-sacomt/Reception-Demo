@@ -3581,7 +3581,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                         <th className="border px-4 py-2">HSN Code</th>
                         <th className="border px-4 py-2">Price</th>
                         <th className="border px-4 py-2">Quantity</th>
-                        <th className="border px-4 py-2">Subtotal</th>
+                        <th className="border px-4 py-2">Total</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -3620,16 +3620,10 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                   <div className="flex justify-between mb-6 space-x-8">
                     <div>
                       {/* Subtotal Including GST */}
-                      <p>
-                        Subtotal (Incl. GST):
-                        <strong>
-                          {" "}
-                          ₹{parseFloat(subtotalWithGST).toFixed(2)}
-                        </strong>
-                      </p>
+                      
 
                       {/* Work Order and Sales Discounts */}
-                      <p>
+                      {/* <p>
                         Work Order Discount:
                         <strong>
                           {" "}
@@ -3646,10 +3640,38 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                           {" "}
                           ₹{parseFloat(totalDiscount).toFixed(2)}
                         </strong>
-                      </p>
+                      </p> */}
 
                       {/* Amount After Discounts */}
+                      <p>
+                        Advance Paid:
+                        <strong> ₹{parseFloat(advance).toFixed(2)}</strong>
+                      </p>
+                      <p>
+                      
+                          Balance paid:{" "}
+                          <strong>
+                          <span>
+                            ₹{parseFloat(balanceDue).toFixed(2)}
+                          </span>
+                        </strong>
+                        </p>
 
+                      
+                    </div>
+
+                    <div>
+                      {/* <p className="text-lg">
+                        <strong>
+                          Amount After Discounts: ₹
+                          {parseFloat(amountAfterDiscount).toFixed(2)}
+                        </strong>
+                      </p> */}
+                      {/* Taxable Value and GST Breakdown */}
+                      <p>
+                        Subtotal (Excl. GST):
+                        <strong> ₹{parseFloat(taxableValue).toFixed(2)}</strong>
+                      </p>
                       <p>
                         CGST (6%):
                         <strong> ₹{parseFloat(cgstAmount).toFixed(2)}</strong>
@@ -3658,34 +3680,20 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                         SGST (6%):
                         <strong> ₹{parseFloat(sgstAmount).toFixed(2)}</strong>
                       </p>
-                    </div>
-
-                    <div>
-                      <p className="text-lg">
-                        <strong>
-                          Amount After Discounts: ₹
-                          {parseFloat(amountAfterDiscount).toFixed(2)}
-                        </strong>
-                      </p>
-                      {/* Taxable Value and GST Breakdown */}
-                      <p>
-                        Taxable Value:
-                        <strong> ₹{parseFloat(taxableValue).toFixed(2)}</strong>
-                      </p>
                       {/* Advance Paid */}
-                      <p>
-                        Advance Paid:
-                        <strong> ₹{parseFloat(advance).toFixed(2)}</strong>
-                      </p>
+                      
                       {/* Final Amount Due */}
-                      <p className="text-xl">
+                      
+                        
+                        <p className="text-xl">
                         <strong>
-                          Final Amount Due:{" "}
-                          <span className="text-xl">
-                            ₹{parseFloat(balanceDue).toFixed(2)}
-                          </span>
+                        Total Paid (Incl. GST):
+                        
+                          {" "}
+                          ₹{parseFloat(subtotalWithGST).toFixed(2)}
                         </strong>
                       </p>
+                      
                       {/* Billed By */}
                       <div className="mt-4">
                         <div className="mt-10 space-x-8">

@@ -2080,7 +2080,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                       <th className="border px-4 py-2">HSN Code</th>
                       <th className="border px-4 py-2">Price</th>
                       <th className="border px-4 py-2">Quantity</th>
-                      <th className="border px-4 py-2">Subtotal</th>
+                      <th className="border px-4 py-2">Total</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -2124,10 +2124,10 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                       Subtotal:<strong> ₹{subtotal.toFixed(2)}</strong>
                     </p>
 
-                    <p>
+                    {/* <p>
                       Discounted Subtotal:
                       <strong> ₹{discountedSubtotal.toFixed(2)}</strong>
-                    </p>
+                    </p> */}
 
                     <p>
                       CGST (6%):<strong> ₹{cgst.toFixed(2)}</strong>
@@ -2145,20 +2145,21 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                     </p>
                   </div>
                   <div className="text-right">
-                    <p>
+                    {/* <p>
                       Total Amount (Incl. GST):
                       <strong> ₹{totalAmountWithGST.toFixed(2)}</strong>
-                    </p>
-                    <p>
+                    </p> */}
+                    {/* <p>
                       Discount Amount:
                       <strong> ₹{validDiscountAmount.toFixed(2)}</strong>
-                    </p>
-                    <p>
-                      Discounted Total:{" "}
-                      <strong>₹{discountedTotal.toFixed(2)}</strong> {/* Add Discounted Total */}
-                    </p>
+                    </p> */}
+                    
                     <p>
                       Advance Paying:<strong> ₹{advance.toFixed(2)}</strong>
+                    </p>
+                    <p className="text-xl">
+                    <strong>Total Amount (Incl. GST):{" "}
+                      ₹{discountedTotal.toFixed(2)}</strong>
                     </p>
                     <p className="text-xl">
                       <strong>Amount Due: ₹{balanceDue.toFixed(2)}</strong>
