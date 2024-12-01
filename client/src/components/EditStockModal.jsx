@@ -1,74 +1,108 @@
-import React, { useState, useEffect } from 'react';
-import { editStock } from '../services/authService';
+// client/src/components/EditStockModal.jsx
+
+import React, { useState } from "react";
+import { ClipLoader } from "react-spinners";
+import { editStock } from "../services/authService";
 
 const EditStockModal = ({ isOpen, onClose, stockEntry, refreshStockData }) => {
-  const [quantity, setQuantity] = useState(stockEntry?.quantity || 0);
-  const [rate, setRate] = useState(stockEntry?.product?.rate || 0);
-  const [mrp, setMrp] = useState(stockEntry?.product?.mrp || 0);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [quantity, setQuantity] = useState(stockEntry.quantity);
+  const [rate, setRate] = useState(stockEntry.product.rate || "");
+  const [mrp, setMrp] = useState(stockEntry.product.mrp || "");
+  const [hsnCode, setHsnCode] = useState(stockEntry.product.hsn_code || "");
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
-  useEffect(() => {
-    if (stockEntry) {
-      setQuantity(stockEntry.quantity || 0);
-      setRate(stockEntry.product?.rate || 0);
-      setMrp(stockEntry.product?.mrp || 0);
-    }
-  }, [stockEntry]);
+  if (!isOpen) return null;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
-    setSuccess('');
+    setError("");
+    setSuccess("");
 
-    const productId = stockEntry.product?.product_id; // Alphanumeric product_id
-    const branchCode = stockEntry.branch_code;
-
-    if (!productId || !branchCode) {
-      setError('Missing product ID or branch code.');
+    if (!quantity || quantity < 0) {
+      setError("Please enter a valid quantity.");
       return;
     }
 
     setIsLoading(true);
-    const response = await editStock(
-      productId,
-      branchCode,
-      parseInt(quantity, 10),
-      parseFloat(rate),
-      parseFloat(mrp)
-    );
-    setIsLoading(false);
+    try {
+      const response = await editStock(
+        stockEntry.product.id, // Integer ID
+        stockEntry.branch_code,
+        parseInt(quantity, 10),
+        rate ? parseFloat(rate) : null,
+        mrp ? parseFloat(mrp) : null
+      );
 
-    if (response.success) {
-      setSuccess('Stock updated successfully!');
-      refreshStockData(); // Refresh stock data
-      setTimeout(() => {
-        setSuccess(''); // Clear success message after 2 seconds
-        onClose();
-      }, 2000);
-    } else {
-      setError(response.error || 'Failed to update stock.');
+      if (response.success) {
+        setSuccess("Stock updated successfully.");
+        refreshStockData();
+        setTimeout(() => {
+          onClose();
+        }, 1000);
+      } else {
+        setError(response.error);
+      }
+    } catch (err) {
+      console.error("Error updating stock:", err);
+      setError("An unexpected error occurred.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
+    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+      <div className="bg-white p-6 rounded-lg w-96">
         <h2 className="text-xl font-semibold mb-4">Edit Stock</h2>
-        {error && <div className="text-red-500 mb-4">{error}</div>}
-        {success && <div className="text-green-500 mb-4">{success}</div>}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label htmlFor="quantity" className="block mb-1 font-medium">
+        {error && (
+          <div className="flex items-center text-red-500 mb-4 whitespace-pre-line">
+            <svg
+              className="w-5 h-5 mr-2"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+            <span>{error}</span>
+          </div>
+        )}
+        {success && (
+          <div className="flex items-center text-green-500 mb-4 whitespace-pre-line">
+            <svg
+              className="w-5 h-5 mr-2"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M5 13l4 4L19 7"
+              />
+            </svg>
+            <span>{success}</span>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit}>
+          {/* Quantity Input */}
+          <div className="mb-4">
+            <label htmlFor="quantityEdit" className="block mb-2 font-medium">
               Quantity
             </label>
             <input
               type="number"
-              id="quantity"
+              id="quantityEdit"
               value={quantity}
               onChange={(e) => setQuantity(e.target.value)}
               className="w-full p-2 border rounded"
@@ -76,51 +110,82 @@ const EditStockModal = ({ isOpen, onClose, stockEntry, refreshStockData }) => {
               required
             />
           </div>
-          <div>
-            <label htmlFor="rate" className="block mb-1 font-medium">
+
+          {/* Rate Input */}
+          <div className="mb-4">
+            <label htmlFor="rateEdit" className="block mb-2 font-medium">
               Rate
             </label>
             <input
               type="number"
-              id="rate"
+              id="rateEdit"
               value={rate}
               onChange={(e) => setRate(e.target.value)}
               className="w-full p-2 border rounded"
               min="0"
               step="0.01"
+              required
             />
           </div>
-          <div>
-            <label htmlFor="mrp" className="block mb-1 font-medium">
+
+          {/* MRP Input */}
+          <div className="mb-4">
+            <label htmlFor="mrpEdit" className="block mb-2 font-medium">
               MRP
             </label>
             <input
               type="number"
-              id="mrp"
+              id="mrpEdit"
               value={mrp}
               onChange={(e) => setMrp(e.target.value)}
               className="w-full p-2 border rounded"
               min="0"
               step="0.01"
+              required
             />
           </div>
 
-          <div className="flex justify-end space-x-4">
+          {/* HSN Code Input */}
+          <div className="mb-4">
+            <label htmlFor="hsnCodeEdit" className="block mb-2 font-medium">
+              HSN Code
+            </label>
+            <input
+              type="text"
+              id="hsnCodeEdit"
+              value={hsnCode}
+              onChange={(e) => setHsnCode(e.target.value)}
+              className="w-full p-2 border rounded"
+              required
+            />
+          </div>
+
+          <div className="flex justify-end">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+              className="mr-4 px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+              disabled={isLoading}
             >
               Cancel
             </button>
             <button
               type="submit"
-              className={`px-4 py-2 bg-green-500 text-white rounded ${
-                isLoading ? 'opacity-50' : ''
+              className={`px-4 py-2 text-white rounded flex items-center justify-center ${
+                isLoading
+                  ? "bg-blue-500 cursor-not-allowed"
+                  : "bg-green-500 hover:bg-green-600"
               }`}
               disabled={isLoading}
             >
-              {isLoading ? 'Updating...' : 'Update'}
+              {isLoading ? (
+                <>
+                  <ClipLoader size={20} color="#ffffff" />
+                  <span className="ml-2">Updating...</span>
+                </>
+              ) : (
+                "Update"
+              )}
             </button>
           </div>
         </form>

@@ -53,13 +53,214 @@ const parseXML = (file) => {
 };
 
 /**
+ * Adds or updates a single stock entry.
+ * @param {number} productId - Internal product ID.
+ * @param {string} branchCode - Branch code.
+ * @param {number} quantity - Quantity to add.
+ * @param {number|null} rate - Rate (optional).
+ * @param {number|null} mrp - MRP (optional).
+ * @returns {Object} - { success: boolean, error: string | null }
+ */
+export const addOrUpdateStock = async (productId, branchCode, quantity, rate = null, mrp = null) => {
+  try {
+    // Fetch existing stock entry
+    const { data: existingStock, error: stockError } = await supabase
+      .from("stock")
+      .select("quantity")
+      .eq("branch_code", branchCode)
+      .eq("product_id", productId)
+      .single();
+
+    if (stockError && stockError.code !== "PGRST116") { // PGRST116: No rows found
+      throw stockError;
+    }
+
+    if (existingStock) {
+      // Update existing stock
+      const { error: updateError } = await supabase
+        .from("stock")
+        .update({
+          quantity: existingStock.quantity + quantity,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("branch_code", branchCode)
+        .eq("product_id", productId);
+
+      if (updateError) throw updateError;
+    } else {
+      // Insert new stock entry
+      const { error: insertError } = await supabase.from("stock").insert([
+        {
+          product_id: productId,
+          branch_code: branchCode,
+          quantity: quantity,
+          hsn_code: "", // You can set a default or fetch from product
+        },
+      ]);
+
+      if (insertError) throw insertError;
+    }
+
+    // Optionally, update rate and mrp in products table if provided
+    if (rate !== null || mrp !== null) {
+      const updateData = {};
+      if (rate !== null) updateData.rate = rate;
+      if (mrp !== null) updateData.mrp = mrp;
+
+      const { error: productUpdateError } = await supabase
+        .from("products")
+        .update(updateData)
+        .eq("id", productId);
+
+      if (productUpdateError) throw productUpdateError;
+    }
+
+    return { success: true, error: null };
+  } catch (error) {
+    console.error("Error in addOrUpdateStock:", error.message);
+    return { success: false, error: error.message };
+  }
+};
+
+// client/src/services/authService.js
+
+// client/src/services/authService.js
+
+/**
+ * Assign stock from one branch to another.
+ * @param {Array<Object>} assignments - Array of assignment objects.
+ * Each object should contain product_id (integer), from_branch_code, to_branch_code, quantity, notes (optional).
+ * @returns {Object} - { success: boolean, error: string | null }
+ */
+export const assignStock = async (assignments) => {
+  try {
+    for (let assignment of assignments) {
+      const { product_id, from_branch_code, to_branch_code, quantity, notes } = assignment;
+
+      // **Step 1: Verify Sufficient Stock in Source Branch**
+      const { data: sourceStock, error: sourceError } = await supabase
+        .from('stock')
+        .select('quantity')
+        .eq('product_id', product_id)
+        .eq('branch_code', from_branch_code)
+        .single();
+
+      if (sourceError) {
+        throw new Error(`Error fetching stock from source branch: ${sourceError.message}`);
+      }
+
+      if (!sourceStock) {
+        throw new Error(`Stock entry not found for product ID ${product_id} in branch ${from_branch_code}.`);
+      }
+
+      if (sourceStock.quantity < quantity) {
+        throw new Error(`Insufficient stock for product ID ${product_id} in branch ${from_branch_code}. Available: ${sourceStock.quantity}, Requested: ${quantity}.`);
+      }
+
+      // **Step 2: Deduct Stock from Source Branch**
+      const { error: deductError } = await supabase
+        .from('stock')
+        .update({ quantity: sourceStock.quantity - quantity })
+        .eq('product_id', product_id)
+        .eq('branch_code', from_branch_code);
+
+      if (deductError) {
+        throw new Error(`Failed to deduct stock from branch ${from_branch_code}: ${deductError.message}`);
+      }
+
+      // **Step 3: Add Stock to Destination Branch**
+      // Check if the destination branch already has this product
+      const { data: destStock, error: destError } = await supabase
+        .from('stock')
+        .select('quantity')
+        .eq('product_id', product_id)
+        .eq('branch_code', to_branch_code)
+        .single();
+
+      if (destError && destError.code !== 'PGRST116') { // PGRST116: Row not found, which is acceptable
+        throw new Error(`Error fetching stock from destination branch: ${destError.message}`);
+      }
+
+      if (destStock) {
+        // **Case 1:** Destination branch already has this product; update the quantity
+        const { error: addError } = await supabase
+          .from('stock')
+          .update({ quantity: destStock.quantity + quantity })
+          .eq('product_id', product_id)
+          .eq('branch_code', to_branch_code);
+
+        if (addError) {
+          throw new Error(`Failed to add stock to branch ${to_branch_code}: ${addError.message}`);
+        }
+      } else {
+        // **Case 2:** Destination branch does not have this product; insert a new record
+        const { error: insertError } = await supabase
+          .from('stock')
+          .insert([
+            {
+              product_id: product_id,
+              branch_code: to_branch_code,
+              quantity: quantity,
+            },
+          ]);
+
+        if (insertError) {
+          throw new Error(`Failed to insert stock into branch ${to_branch_code}: ${insertError.message}`);
+        }
+      }
+
+      // **Step 4: Insert Record into `stock_assignments`**
+      // Fetch rate and mrp from the products table
+      const { data: productData, error: productError } = await supabase
+        .from('products')
+        .select('rate, mrp, hsn_code')
+        .eq('id', product_id)
+        .single();
+
+      if (productError) {
+        throw new Error(`Error fetching product details for product ID ${product_id}: ${productError.message}`);
+      }
+
+      const { rate, mrp, hsn_code } = productData;
+
+      const { error: assignError } = await supabase
+        .from('stock_assignments')
+        .insert([
+          {
+            product_id: product_id,
+            from_branch_code: from_branch_code,
+            to_branch_code: to_branch_code,
+            quantity: quantity,
+            notes: notes || '',
+            rate: rate || null,
+            mrp: mrp || null,
+            // assigned_at is automatically set by default
+          },
+        ]);
+
+      if (assignError) {
+        throw new Error(`Failed to record stock assignment: ${assignError.message}`);
+      }
+    }
+
+    return { success: true, error: null };
+  } catch (error) {
+    console.error('Error in assignStock:', error.message);
+    return { success: false, error: error.message };
+  }
+};
+
+
+
+/**
  * Bulk uploads stock data from a CSV or XML file.
  * @param {File} file - The uploaded file (CSV or XML).
  * @param {string} format - The file format ('csv' or 'xml').
- * @param {string} branchCode - The branch code to which the stock belongs.
+ * @param {string} fromBranchCode - The branch code from which the stock is being assigned.
+ * @param {string} toBranchCode - The branch code to which the stock is being assigned.
  * @returns {Object} - Success status and any error messages.
  */
-export const bulkUploadStock = async (file, format, branchCode) => {
+export const bulkUploadStock = async (file, format, fromBranchCode, toBranchCode) => {
   try {
     let parsedData = [];
 
@@ -102,11 +303,12 @@ export const bulkUploadStock = async (file, format, branchCode) => {
       mrp: item.mrp ? parseFloat(item.mrp) : null,
       // Map 'name' to 'product_name'
       product_name: item.name ? item.name.trim() : "Unnamed Product",
-      hsn_code: item.hsn_code ? item.hsn_code.trim() : "9001",
+      hsn_code: item.hsn_code ? item.hsn_code.trim() : "9003",
       // Calculate total_value if needed
-      total_value: item.rate && !isNaN(item.rate) && !isNaN(item.quantity)
-        ? parseFloat(item.rate) * parseInt(item.quantity, 10)
-        : null,
+      total_value:
+        item.rate && !isNaN(item.rate) && !isNaN(item.quantity)
+          ? parseFloat(item.rate) * parseInt(item.quantity, 10)
+          : null,
     }));
 
     // Step 3: Resolve duplicates within the uploaded data
@@ -121,7 +323,7 @@ export const bulkUploadStock = async (file, format, branchCode) => {
         acc[item.product_id].mrp = item.mrp || acc[item.product_id].mrp;
         acc[item.product_id].total_value =
           acc[item.product_id].rate && acc[item.product_id].quantity
-            ? acc[item.product_id].rate * acc[item.product_id].quantity
+            ? parseFloat(acc[item.product_id].rate) * parseInt(acc[item.product_id].quantity, 10)
             : acc[item.product_id].total_value;
       }
       return acc;
@@ -133,7 +335,7 @@ export const bulkUploadStock = async (file, format, branchCode) => {
     const productIds = uniqueProducts.map((p) => p.product_id);
     const { data: existingProducts, error: fetchError } = await supabase
       .from("products")
-      .select("id, product_id, rate, mrp")
+      .select("id, product_id, rate, mrp, hsn_code")
       .in("product_id", productIds);
 
     if (fetchError) throw fetchError;
@@ -150,7 +352,6 @@ export const bulkUploadStock = async (file, format, branchCode) => {
       hsn_code: item.hsn_code,
       rate: item.rate,
       mrp: item.mrp,
-      total_value: item.total_value,
       // Additional fields can be added here
       // Assuming 'product_id' is a unique constraint
     }));
@@ -178,7 +379,7 @@ export const bulkUploadStock = async (file, format, branchCode) => {
       .from("stock")
       .select("product_id, quantity")
       .in("product_id", internalProductIds)
-      .eq("branch_code", branchCode);
+      .eq("branch_code", fromBranchCode);
 
     if (fetchStockError) throw fetchStockError;
 
@@ -191,8 +392,9 @@ export const bulkUploadStock = async (file, format, branchCode) => {
     // Step 9: Prepare stock entries with updated quantities
     const stockEntries = uniqueProducts.map((item) => ({
       product_id: allProductsMap[item.product_id],
-      branch_code: branchCode,
+      branch_code: fromBranchCode,
       quantity: (existingStockMap[allProductsMap[item.product_id]] || 0) + item.quantity,
+      // Note: 'hsn_code' is NOT inserted into 'stock' table
       updated_at: new Date().toISOString(),
     }));
 
@@ -203,7 +405,29 @@ export const bulkUploadStock = async (file, format, branchCode) => {
 
     if (upsertStockError) throw upsertStockError;
 
-    return { success: true };
+    // Step 11: Record assignments in stock_assignments table (if exists)
+    // Assuming you have a 'stock_assignments' table defined
+    // If not, you can skip this step or create the table as per your requirements
+    /*
+    const assignmentsToRecord = uniqueProducts.map((item) => ({
+      product_id: allProductsMap[item.product_id],
+      from_branch_code: fromBranchCode,
+      to_branch_code: toBranchCode,
+      quantity: item.quantity,
+      notes: "", // Optional
+      rate: item.rate || 0.00,
+      mrp: item.mrp || 0.00,
+      // 'hsn_code' should not be inserted here as it's part of 'products'
+    }));
+
+    const { error: recordAssignmentsError } = await supabase
+      .from("stock_assignments")
+      .insert(assignmentsToRecord);
+
+    if (recordAssignmentsError) throw recordAssignmentsError;
+    */
+
+    return { success: true, error: null, insertedProducts: upsertedProducts };
   } catch (error) {
     console.error("Error during bulk stock upload:", error);
     return { success: false, error: error.message };
@@ -305,8 +529,6 @@ export const signOut = async () => {
   }
 };
 
-
-
 /**
  * Adds a new product to the 'products' table.
  * @param {Object} productData - The product details.
@@ -323,8 +545,7 @@ export const addNewProduct = async (productData) => {
       .eq("product_id", product_id)
       .single();
 
-    if (fetchError && fetchError.code !== "PGRST116") {
-      // PGRST116: No rows found, which is acceptable
+    if (fetchError && fetchError.code !== "PGRST116") { // PGRST116: No rows found
       throw fetchError;
     }
 
@@ -344,9 +565,7 @@ export const addNewProduct = async (productData) => {
           hsn_code: hsn_code || "9001",
           purchase_from, // Include the new purchase_from field
         },
-      ],
-        
-      )
+      ])
       .select("id"); // Select the inserted product's ID
 
     if (error) {
@@ -362,7 +581,6 @@ export const addNewProduct = async (productData) => {
     return { success: false, error: error.message };
   }
 };
-
 /**
  * Updates the stock quantity and optionally Rate and MRP for an existing product in a specific branch.
  * @param {number} productId - The internal ID of the product.
@@ -454,211 +672,54 @@ export const updateExistingProduct = async (productId, branchCode, quantity, rat
   }
 };
 
-/**
- * Function to add or update stock manually
- */
-export const addOrUpdateStock = async (productId, branchCode, quantity, rate = null, mrp = null) => {
-  try {
-    // Normalize input and log
-    const normalizedProductId = String(productId).trim().toUpperCase();
-    console.log('Normalized Product ID:', normalizedProductId);
-
-    // Fetch the internal numeric product ID from the products table
-    const { data: product, error: productError } = await supabase
-      .from('products')
-      .select('id')
-      .eq('id', normalizedProductId)
-      .maybeSingle();
-
-    if (productError || !product) {
-      console.error('Error fetching product:', productError);
-      throw new Error('Error fetching product from the database');
-    }
-
-    const internalProductId = product.id;
-
-    // Fetch existing stock details for this product and branch
-    const { data: stock, error: stockError } = await supabase
-      .from('stock')
-      .select('quantity')
-      .eq('product_id', internalProductId)
-      .eq('branch_code', branchCode)
-      .maybeSingle();
-
-    if (stockError) {
-      console.error('Error fetching stock:', stockError);
-      throw new Error('Error fetching stock data');
-    }
-
-    // Calculate new quantity (default existingQuantity to 0 if no record exists)
-    const existingQuantity = stock?.quantity || 0;
-    const newQuantity = existingQuantity + quantity;
-
-    console.log(
-      `Updating stock for product ${internalProductId} at branch ${branchCode}. New quantity: ${newQuantity}`
-    );
-
-    // Upsert the stock entry
-    const { error: upsertError } = await supabase
-      .from('stock')
-      .upsert(
-        {
-          product_id: internalProductId,
-          branch_code: branchCode,
-          quantity: newQuantity,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: ['product_id', 'branch_code'] }
-      );
-
-    if (upsertError) {
-      console.error('Error during upsert:', upsertError);
-      throw new Error('Error adding/updating stock');
-    }
-
-    return { success: true };
-  } catch (error) {
-    console.error('Error adding/updating stock:', error.message);
-    return { success: false, error: error.message };
-  }
-};
 
 /**
- * Function to edit stock details
+ * Edit a stock entry.
+ * @param {number} productId - The integer ID of the product.
+ * @param {string} branchCode - The branch code.
+ * @param {number} quantity - The updated quantity.
+ * @param {number|null} rate - The updated rate (optional).
+ * @param {number|null} mrp - The updated MRP (optional).
+ * @returns {Object} - { success: boolean, error: string | null }
  */
-export const editStock = async (
-  productId, // Alphanumeric product_id (e.g., "22T32")
-  branchCode,
-  newQuantity,
-  newRate = null,
-  newMrp = null
-) => {
+export const editStock = async (productId, branchCode, quantity, rate, mrp) => {
   try {
-    // Validate inputs
-    if (!productId || !branchCode) {
-      throw new Error('Product ID or Branch Code is missing.');
-    }
-
-    // Fetch the internal numeric product ID from the products table
-    const { data: product, error: productError } = await supabase
-      .from('products')
-      .select('id, mrp, rate')
-      .eq('product_id', productId)
-      .maybeSingle();
-
-    if (productError || !product) {
-      throw new Error(`Product with ID ${productId} not found.`);
-    }
-
-    const internalProductId = product.id;
-
-    // Replace stock quantity in the `stock` table
-    const { error: stockUpdateError } = await supabase
-      .from('stock')
-      .upsert(
-        {
-          product_id: internalProductId,
-          branch_code: branchCode,
-          quantity: newQuantity, // Replace with new quantity
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: ['product_id', 'branch_code'] }
-      );
-
-    if (stockUpdateError) throw stockUpdateError;
-
-    // Update `mrp` and `rate` in the `products` table if provided
-    if (newRate !== null || newMrp !== null) {
-      const productUpdate = {};
-      if (newRate !== null) productUpdate.rate = newRate;
-      if (newMrp !== null) productUpdate.mrp = newMrp;
-
-      const { error: productUpdateError } = await supabase
-        .from('products')
-        .update(productUpdate)
-        .eq('id', internalProductId);
-
-      if (productUpdateError) throw productUpdateError;
-    }
-
-    return { success: true };
-  } catch (error) {
-    console.error('Error editing stock:', error.message);
-    return { success: false, error: error.message };
-  }
-};
-
-/**
- * Function to deduct stock for multiple products
- */
-export async function deductStockForMultipleProducts(products, branchCode) {
-  try {
-    // Step 1: Filter out invalid products
-    const validProducts = products.filter(
-      (product) => product.product_id && product.purchase_quantity > 0
-    );
-
-    if (validProducts.length === 0) {
-      console.error("No valid products to process for stock deduction");
-      return { success: false, error: "No valid products to process" };
-    }
-
-    // Step 2: Fetch internal IDs for the external product_ids
-    const productIds = validProducts.map((product) => product.product_id);
-    const { data: productData, error: productError } = await supabase
-      .from("products")
-      .select("id, product_id")
-      .in("product_id", productIds);
-
-    if (productError || !productData) {
-      console.error("Error fetching product IDs:", productError);
-      return { success: false, error: "Failed to fetch product data" };
-    }
-
-    // Create a map of external product_id to internal id
-    const productMap = productData.reduce((acc, product) => {
-      acc[product.product_id] = product.id;
-      return acc;
-    }, {});
-
-    // Step 3: Prepare stock updates using internal IDs
-    const updates = validProducts.map((product) => {
-      const internalProductId = productMap[product.product_id];
-      if (!internalProductId) {
-        console.error(`Product ID ${product.product_id} not found`);
-        return null;
-      }
-      return {
-        product_id: internalProductId,
-        branch_code: branchCode,
-        quantity: -product.purchase_quantity,
-      };
-    }).filter(update => update !== null);
-
-    if (updates.length === 0) {
-      console.error("No valid stock updates to process");
-      return { success: false, error: "No valid stock updates" };
-    }
-
-    // Step 4: Perform the batch update
-    const { error: updateError } = await supabase
+    // Update the stock quantity
+    const { data, error } = await supabase
       .from("stock")
-      .upsert(updates, { onConflict: ["product_id", "branch_code"] });
+      .update({
+        quantity: quantity,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("product_id", productId)
+      .eq("branch_code", branchCode);
+    
+    if (error) throw error;
 
-    if (updateError) {
-      console.error("Error updating stock:", updateError);
-      return { success: false, error: "Failed to update stock" };
+    // Optionally, update rate and MRP in the products table if provided
+    if (rate !== null || mrp !== null) {
+      const updateFields = {};
+      if (rate !== null) updateFields.rate = rate;
+      if (mrp !== null) updateFields.mrp = mrp;
+
+      const { data: productData, error: productError } = await supabase
+        .from("products")
+        .update(updateFields)
+        .eq("id", productId);
+
+      if (productError) throw productError;
     }
 
-    return { success: true };
-  } catch (err) {
-    console.error("Unexpected error during stock deduction:", err);
-    return { success: false, error: err.message };
+    return { success: true, error: null };
+  } catch (error) {
+    console.error("Error in editStock:", error.message);
+    return { success: false, error: error.message };
   }
-}
+};
+
 
 /**
- * Function to fetch stock by external product_id and branch_code
+ * Function to fetch stock by external product_id and branch_code using RPC
  */
 export const fetchStockByProductCode = async (productId, branchCode) => {
   try {
@@ -722,16 +783,17 @@ const hashPin = async (plainTextPin) => {
 /**
  * Function to verify PIN
  */
-const verifyPin = async () => {
-  setError(""); // Reset error message
-  setSuccessMessage(""); // Reset success message
-
-  if (pin.length !== 4) {
-    setError("PIN must be exactly 4 digits.");
-    return;
-  }
-
+export const verifyPin = async (employee, pin, onVerify) => {
   try {
+    // Reset error and success messages
+    // Assuming setError and setSuccessMessage are managed in the component
+
+    if (pin.length !== 4) {
+      // setError("PIN must be exactly 4 digits.");
+      onVerify(false, "PIN must be exactly 4 digits.");
+      return;
+    }
+
     // Fetch the employee's hashed PIN from the database
     const { data, error } = await supabase
       .from("employees")
@@ -740,55 +802,130 @@ const verifyPin = async () => {
       .single(); // Ensure we fetch a single matching record
 
     if (error || !data || !data.pin) {
-      setError("Employee not found or no PIN set.");
-      onVerify(false);
+      // setError("Employee not found or no PIN set.");
+      onVerify(false, "Employee not found or no PIN set.");
       return;
     }
 
     // Verify the entered PIN against the stored hashed PIN
     const isValidPin = await bcrypt.compare(pin, data.pin);
     if (isValidPin) {
-      setSuccessMessage("PIN Verified Successfully!");
-      setError("");
-      onVerify(true);
+      // setSuccessMessage("PIN Verified Successfully!");
+      onVerify(true, "PIN Verified Successfully!");
     } else {
-      setError("Incorrect PIN. Please try again.");
-      onVerify(false);
+      // setError("Incorrect PIN. Please try again.");
+      onVerify(false, "Incorrect PIN. Please try again.");
     }
   } catch (err) {
     console.error("Error verifying PIN:", err);
-    setError("Failed to verify PIN. Please try again.");
-    onVerify(false);
+    // setError("Failed to verify PIN. Please try again.");
+    onVerify(false, "Failed to verify PIN. Please try again.");
   }
 };
 
+/**
+ * Function to add a purchase
+ */
 export const addPurchase = async (purchaseData) => {
   try {
-      const { data, error } = await supabase
-          .from("purchases")
-          .insert([
-              {
-                  product_id: purchaseData.product_id,
-                  branch_code: purchaseData.branch_code,
-                  quantity: purchaseData.quantity,
-                  rate: purchaseData.rate,
-                  mrp: purchaseData.mrp,
-                  purchase_from: purchaseData.purchase_from,
-                  bill_number: purchaseData.bill_number,
-                  bill_date: purchaseData.bill_date,
-                  employee_id: purchaseData.employee_id,
-                  employee_name: purchaseData.employee_name,
-              },
-          ]);
+    const { data, error } = await supabase
+      .from("purchases")
+      .insert([
+        {
+          product_id: purchaseData.product_id,
+          branch_code: purchaseData.branch_code,
+          quantity: purchaseData.quantity,
+          rate: purchaseData.rate,
+          mrp: purchaseData.mrp,
+          purchase_from: purchaseData.purchase_from,
+          bill_number: purchaseData.bill_number,
+          bill_date: purchaseData.bill_date,
+          employee_id: purchaseData.employee_id,
+          employee_name: purchaseData.employee_name,
+        },
+      ]);
 
-      if (error) {
-          console.error("Error adding purchase:", error);
-          return { success: false, error: error.message };
-      }
+    if (error) {
+      console.error("Error adding purchase:", error);
+      return { success: false, error: error.message };
+    }
 
-      return { success: true, data };
+    return { success: true, data };
   } catch (err) {
-      console.error("Unexpected error adding purchase:", err);
-      return { success: false, error: "An unexpected error occurred." };
+    console.error("Unexpected error adding purchase:", err);
+    return { success: false, error: "An unexpected error occurred." };
+  }
+};
+
+/**
+ * Function to deduct stock for multiple products
+ * @param {Array<Object>} products - Array of products to deduct.
+ * Each object should have product_id and purchase_quantity.
+ * @param {string} branchCode - The branch code from which to deduct stock.
+ * @returns {Object} - { success: boolean, error: string | null }
+ */
+export const deductStockForMultipleProducts = async (products, branchCode) => {
+  try {
+    // Filter out invalid products
+    const validProducts = products.filter(
+      (product) => product.product_id && product.purchase_quantity > 0
+    );
+
+    if (validProducts.length === 0) {
+      console.error("No valid products to process for stock deduction");
+      return { success: false, error: "No valid products to process" };
+    }
+
+    // Fetch internal IDs for the external product_ids
+    const productIds = validProducts.map((product) => product.product_id);
+    const { data: productData, error: productError } = await supabase
+      .from("products")
+      .select("id, product_id")
+      .in("product_id", productIds);
+
+    if (productError || !productData) {
+      console.error("Error fetching product IDs:", productError);
+      return { success: false, error: "Failed to fetch product data" };
+    }
+
+    // Create a map of external product_id to internal id
+    const productMap = productData.reduce((acc, product) => {
+      acc[product.product_id] = product.id;
+      return acc;
+    }, {});
+
+    // Prepare stock deductions
+    const deductions = validProducts.map((product) => {
+      const internalProductId = productMap[product.product_id];
+      if (!internalProductId) {
+        console.error(`Product ID ${product.product_id} not found`);
+        return null;
+      }
+      return {
+        product_id: internalProductId,
+        branch_code: branchCode,
+        quantity: -product.purchase_quantity, // Negative for deduction
+      };
+    }).filter(deduction => deduction !== null);
+
+    if (deductions.length === 0) {
+      console.error("No valid stock deductions to process");
+      return { success: false, error: "No valid stock deductions" };
+    }
+
+    // Perform the deductions
+    const { error: updateError } = await supabase
+      .from("stock")
+      .upsert(deductions, { onConflict: ["product_id", "branch_code"] });
+
+    if (updateError) {
+      console.error("Error updating stock:", updateError);
+      return { success: false, error: "Failed to update stock" };
+    }
+
+    return { success: true, error: null };
+  } catch (err) {
+    console.error("Unexpected error during stock deduction:", err);
+    return { success: false, error: err.message };
   }
 };

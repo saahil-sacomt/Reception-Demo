@@ -89,6 +89,8 @@ const defaultInitialState = {
     showWorkOrdersModal: false,
     showSalesModal: false,
     showPurchaseModal: false,
+    showAssignStockModal: false,
+    showEditStockModal: false,
   },
   // Add Selected Order States
   selectedWorkOrder: null,
@@ -151,6 +153,8 @@ const globalStateReducer = (state, action) => {
           showWorkOrdersModal: false,
           showSalesModal: false,
           showPurchaseModal: false,
+          showAssignStockModal: false,
+          showEditStockModal: false,
         },
         selectedWorkOrder: null,
         selectedSalesOrder: null,
