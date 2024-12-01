@@ -22,8 +22,8 @@ import logo from "../assets/sreenethraenglishisolated.png";
 import { useGlobalState } from "../context/GlobalStateContext";
 
 const today = new Date();
-const dd = String(today.getDate()).padStart(2, '0');
-const mm = String(today.getMonth() + 1).padStart(2, '0');
+const dd = String(today.getDate()).padStart(2, "0");
+const mm = String(today.getMonth() + 1).padStart(2, "0");
 const yyyy = today.getFullYear();
 
 const formattedDate = `${dd}/${mm}/${yyyy}`;
@@ -57,6 +57,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     customerAddress,
     customerAge,
     customerGender,
+    submitted,
     // modificationRequestId, // Removed modificationRequestId
     isSaving,
     allowPrint,
@@ -108,11 +109,11 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
 
       // Define default starting Work Order IDs per branch
       const branchDefaultIds = {
-        "TVR": 3701,  // Trivandrum
-        "NTA": 4701,  // Neyyantinkara
-        "KOT1": 5701, // Kottarakara 1
-        "KOT2": 6701, // Kottarakara 2
-        "KAT": 7701,  // Kattakada
+        TVR: 3701, // Trivandrum
+        NTA: 4701, // Neyyantinkara
+        KOT1: 5701, // Kottarakara 1
+        KOT2: 6701, // Kottarakara 2
+        KAT: 7701, // Kattakada
         // Add other branches as needed
       };
 
@@ -123,7 +124,10 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       }
 
       console.log("Current Branch:", branch);
-      console.log("Default Work Order ID for this branch:", branchDefaultIds[branch] || 1001);
+      console.log(
+        "Default Work Order ID for this branch:",
+        branchDefaultIds[branch] || 1001
+      );
 
       // Fetch the last Work Order ID for the current branch
       const { data: lastWorkOrders, error } = await supabase
@@ -231,54 +235,54 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   }, []);
 
   // Fetch product suggestions from Supabase based on user input
-  const fetchProductSuggestions = useCallback(
-    async (query, type, index) => {
-      if (!query) return [];
+  const fetchProductSuggestions = useCallback(async (query, type, index) => {
+    if (!query) return [];
 
-      try {
-        const column = type === "id" ? "product_id" : "product_name";
-        const { data, error } = await supabase
-          .from("products")
-          .select(`product_id, product_name, mrp, hsn_code`)
-          .ilike(column, `%${query}%`)
-          .limit(10);
+    try {
+      const column = type === "id" ? "product_id" : "product_name";
+      const { data, error } = await supabase
+        .from("products")
+        .select(`product_id, product_name, mrp, hsn_code`)
+        .ilike(column, `%${query}%`)
+        .limit(10);
 
-        if (error) {
-          console.error(`Error fetching ${type} suggestions:`, error.message);
-          return [];
-        }
-        return data || [];
-      } catch (err) {
-        console.error(`Unexpected error fetching ${type} suggestions:`, err);
+      if (error) {
+        console.error(`Error fetching ${type} suggestions:`, error.message);
         return [];
       }
-    },
-    []
-  );
+      return data || [];
+    } catch (err) {
+      console.error(`Unexpected error fetching ${type} suggestions:`, err);
+      return [];
+    }
+  }, []);
 
   // Fetch product details from Supabase
-  const fetchProductDetailsFromSupabase = useCallback(
-    async (value, type) => {
-      try {
-        const column = type === "id" ? "product_id" : "product_name";
-        const { data, error } = await supabase
-          .from("products")
-          .select("product_id, product_name, mrp, hsn_code")
-          .eq(column, value);
+  const fetchProductDetailsFromSupabase = useCallback(async (value, type) => {
+    try {
+      const column = type === "id" ? "product_id" : "product_name";
+      const { data, error } = await supabase
+        .from("products")
+        .select("product_id, product_name, mrp, hsn_code")
+        .eq(column, value);
 
-        if (error) {
-          console.error(`Error fetching product details by ${type}:`, error.message);
-          return null;
-        }
-
-        return data && data.length > 0 ? data[0] : null;
-      } catch (err) {
-        console.error(`Unexpected error fetching product details by ${type}:`, err);
+      if (error) {
+        console.error(
+          `Error fetching product details by ${type}:`,
+          error.message
+        );
         return null;
       }
-    },
-    []
-  );
+
+      return data && data.length > 0 ? data[0] : null;
+    } catch (err) {
+      console.error(
+        `Unexpected error fetching product details by ${type}:`,
+        err
+      );
+      return null;
+    }
+  }, []);
 
   // Handle product selection and fetch details
   const handleProductSelection = useCallback(
@@ -362,10 +366,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         errors[`productPrice-${index}`] = "Price is required";
       } else if (field === "quantity" && !productEntries[index].quantity) {
         errors[`productQuantity-${index}`] = "Quantity is required";
-      } else if (
-        field === "discount" &&
-        (isNaN(discount) || discount < 0)
-      ) {
+      } else if (field === "discount" && (isNaN(discount) || discount < 0)) {
         errors[`discount`] =
           "Enter a valid discount amount (cannot be negative)";
       } else {
@@ -397,6 +398,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     let cgst = 0;
     let sgst = 0;
     let totalAmount = 0;
+    let totalAmountWithGST = 0;
 
     // Calculate subtotal (price excluding GST)
     subtotal = entries.reduce((total, product) => {
@@ -406,9 +408,19 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       return total + basePrice * quantity;
     }, 0);
 
+    // Calculate total amount including GST (price * quantity)
+    totalAmountWithGST = entries.reduce((total, product) => {
+      const price = parseFloat(product.price) || 0; // MRP including GST
+      const quantity = parseInt(product.quantity) || 0;
+      return total + price * quantity;
+    }, 0);
+
     // Apply discount
     validDiscountAmount = Math.min(discountAmt || 0, subtotal);
-    discountedSubtotal = Math.max((subtotal * 1.12 - validDiscountAmount) / 1.12, 0); // Prevent negative subtotal
+    discountedSubtotal = Math.max(
+      (subtotal * 1.12 - validDiscountAmount) / 1.12,
+      0
+    ); // Prevent negative subtotal
 
     // Calculate GST amounts
     cgst = discountedSubtotal * 0.06;
@@ -424,6 +436,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       cgst,
       sgst,
       totalAmount,
+      totalAmountWithGST,
     };
   }, []);
 
@@ -495,9 +508,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       },
     });
     setTimeout(() => {
-      document
-        .getElementById(`productId-${productEntries.length}`)
-        ?.focus();
+      document.getElementById(`productId-${productEntries.length}`)?.focus();
     }, 0);
   }, [dispatch, productEntries]);
 
@@ -528,6 +539,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     cgst = 0,
     sgst = 0,
     totalAmount = 0,
+    totalAmountWithGST = 0,
   } = useMemo(
     () => calculateTotals(productEntries, parseFloat(discount)),
     [productEntries, discount, calculateTotals]
@@ -571,14 +583,12 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       } else if (hasMrNumber) {
         if (!mrNumber) errors.mrNumber = "MR Number is required.";
       } else {
-        if (!customerName)
-          errors.customerName = "Customer name is required.";
+        if (!customerName) errors.customerName = "Customer name is required.";
         if (!customerPhone)
           errors.customerPhone = "Customer phone number is required.";
         if (!customerAddress)
           errors.customerAddress = "Customer address is required.";
-        if (!customerAge)
-          errors.customerAge = "Customer age is required.";
+        if (!customerAge) errors.customerAge = "Customer age is required.";
         if (customerAge && parseInt(customerAge) < 0)
           errors.customerAge = "Age cannot be negative.";
         if (!customerGender)
@@ -588,8 +598,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       if (!employee) {
         errors.employee = "Employee selection is required.";
       } else if (!isPinVerified) {
-        errors.employeeVerification =
-          "Employee must be verified to proceed.";
+        errors.employeeVerification = "Employee must be verified to proceed.";
       }
       if (isB2B && !gstNumber) {
         errors.gstNumber = "GST Number is required for B2B orders.";
@@ -603,14 +612,17 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         errors.discountAmount =
           "Enter a valid discount amount that does not exceed the subtotal.";
       }
-      if (discount === subtotal && advanceDetails !== "0" && advanceDetails !== "") {
+      if (
+        discount === subtotal &&
+        advanceDetails !== "0" &&
+        advanceDetails !== ""
+      ) {
         errors.advanceDetails =
           "Advance cannot be collected when discount equals the total amount.";
       }
       if (!paymentMethod) errors.paymentMethod = "Payment method is required.";
       if (!advanceDetails && discount !== subtotal)
         errors.advanceDetails = "Advance details are required.";
-      
     }
 
     if (Object.keys(errors).length > 0) {
@@ -688,6 +700,11 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       return;
     }
 
+    if (submitted) {
+      alert("Work order submitted already");
+      return; // Prevent duplicate submissions
+    }
+
     dispatch({ type: "SET_WORK_ORDER_FORM", payload: { isSaving: true } });
 
     // Validate advance amount
@@ -721,7 +738,9 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       },
       {
         condition:
-          discount === subtotal && advanceDetails !== "0" && advanceDetails !== "",
+          discount === subtotal &&
+          advanceDetails !== "0" &&
+          advanceDetails !== "",
         errorKey: "advanceDetails",
         message:
           "Advance cannot be collected when discount equals the total amount.",
@@ -761,10 +780,10 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     // Step 3 Validation for MR number or customer details
     if (step === 3) {
       if (hasMrNumber === null) {
-        productErrors["hasMrNumber"] = "Please indicate if you have an MR Number.";
+        productErrors["hasMrNumber"] =
+          "Please indicate if you have an MR Number.";
       } else if (hasMrNumber) {
-        if (!mrNumber)
-          productErrors["mrNumber"] = "MR Number is required.";
+        if (!mrNumber) productErrors["mrNumber"] = "MR Number is required.";
       } else {
         if (!customerName)
           productErrors["customerName"] = "Customer name is required.";
@@ -846,7 +865,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
           return;
         }
 
-        customerId = null; 
+        customerId = null;
       } else {
         // Create new customer
         const { data: newCustomer, error: customerCreationError } =
@@ -863,9 +882,15 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
             .single();
 
         if (customerCreationError) {
-          console.error("Error creating customer:", customerCreationError.message);
+          console.error(
+            "Error creating customer:",
+            customerCreationError.message
+          );
           alert("Failed to create a new customer.");
-          dispatch({ type: "SET_WORK_ORDER_FORM", payload: { isSaving: false } });
+          dispatch({
+            type: "SET_WORK_ORDER_FORM",
+            payload: { isSaving: false },
+          });
           return;
         }
 
@@ -907,7 +932,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         discounted_subtotal: discountedSubtotal,
         cgst,
         sgst,
-        total_amount: totalAmount,
+        total_amount: totalAmountWithGST,
         is_b2b: isB2B,
         gst_number: isB2B ? gstNumber : null,
         updated_at: new Date().toISOString(),
@@ -928,14 +953,17 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
           alert("Work order updated successfully!");
           dispatch({
             type: "SET_WORK_ORDER_FORM",
-            payload: { allowPrint: true },
+            payload: { allowPrint: true, submitted: true },
           });
         }
       } else {
         // Ensure workOrderId is set before inserting
         if (!workOrderId) {
           alert("Work Order ID is not generated yet. Please wait.");
-          dispatch({ type: "SET_WORK_ORDER_FORM", payload: { isSaving: false } });
+          dispatch({
+            type: "SET_WORK_ORDER_FORM",
+            payload: { isSaving: false },
+          });
           return;
         }
         payload.work_order_id = workOrderId;
@@ -955,7 +983,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
           alert("Work order saved successfully!");
           dispatch({
             type: "SET_WORK_ORDER_FORM",
-            payload: { allowPrint: true },
+            payload: { allowPrint: true, submitted: true },
           });
         }
       }
@@ -971,6 +999,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     validateAdvanceAmount,
     employee,
     isB2B,
+    submitted,
     gstNumber,
     discount,
     subtotal,
@@ -1013,9 +1042,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     try {
       const { data, error } = await supabase
         .from("patients") // Correct table for MR number lookup
-        .select(
-          "id, age, mr_number, phone_number, name, gender, address"
-        ) // Ensure 'address' is fetched
+        .select("id, age, mr_number, phone_number, name, gender, address") // Ensure 'address' is fetched
         .eq("mr_number", mrNumber.trim())
         .single();
 
@@ -1024,10 +1051,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
           // No data found
           alert("No patient found with the provided MR Number.");
         } else {
-          console.error(
-            "Error fetching patient details:",
-            error.message
-          );
+          console.error("Error fetching patient details:", error.message);
           alert("Failed to fetch patient details.");
         }
         dispatch({
@@ -1057,13 +1081,8 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         }, 0);
       }
     } catch (err) {
-      console.error(
-        "Unexpected error fetching patient details:",
-        err
-      );
-      alert(
-        "An unexpected error occurred while fetching patient details."
-      );
+      console.error("Unexpected error fetching patient details:", err);
+      alert("An unexpected error occurred while fetching patient details.");
       dispatch({
         type: "SET_WORK_ORDER_FORM",
         payload: { patientDetails: null },
@@ -1076,7 +1095,10 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     (e) => {
       let value = e.target.value.replace(/^0+/, ""); // Remove leading zeros
       if (!value) value = ""; // Ensure empty string for invalid input
-      const numericValue = Math.min(Math.max(parseFloat(value) || 0, 0), subtotal); // Clamp value between 0 and subtotal
+      const numericValue = Math.min(
+        Math.max(parseFloat(value) || 0, 0),
+        subtotal
+      ); // Clamp value between 0 and subtotal
       dispatch({
         type: "SET_WORK_ORDER_FORM",
         payload: { discount: numericValue.toString() },
@@ -1110,7 +1132,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         .select("*")
         .eq("work_order_id", orderId)
         .single();
-  
+
       if (error) {
         console.error("Error fetching work order details:", error.message);
         alert("Failed to fetch work order details.");
@@ -1129,12 +1151,15 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
           type: "SET_WORK_ORDER_FORM",
           payload: {
             workOrderId: data.work_order_id,
-            productEntries: formattedProductEntries.length > 0 ? formattedProductEntries : [
-              { id: "", name: "", price: "", quantity: "", hsn_code: "" },
-            ],
+            productEntries:
+              formattedProductEntries.length > 0
+                ? formattedProductEntries
+                : [{ id: "", name: "", price: "", quantity: "", hsn_code: "" }],
             advanceDetails: data.advance_details || "",
             dueDate: data.due_date || "",
-            discount: data.discount_amount ? data.discount_amount.toString() : "",
+            discount: data.discount_amount
+              ? data.discount_amount.toString()
+              : "",
             paymentMethod: data.payment_method || "",
             isB2B: data.is_b2b || false,
             gstNumber: data.gst_number || "",
@@ -1158,7 +1183,10 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
               .single();
 
             if (patientError) {
-              console.error("Error fetching patient details:", patientError.message);
+              console.error(
+                "Error fetching patient details:",
+                patientError.message
+              );
               dispatch({
                 type: "SET_WORK_ORDER_FORM",
                 payload: { patientDetails: null },
@@ -1194,7 +1222,10 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
             .single();
 
           if (customerError) {
-            console.error("Error fetching customer details:", customerError.message);
+            console.error(
+              "Error fetching customer details:",
+              customerError.message
+            );
             dispatch({
               type: "SET_WORK_ORDER_FORM",
               payload: { customerDetails: null },
@@ -1206,7 +1237,9 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                 customerName: customerData.name,
                 customerPhone: customerData.phone_number,
                 customerAddress: customerData.address,
-                customerAge: customerData.age ? customerData.age.toString() : "",
+                customerAge: customerData.age
+                  ? customerData.age.toString()
+                  : "",
                 customerGender: customerData.gender || "",
               },
             });
@@ -1264,7 +1297,13 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         }
       }
     },
-    [productEntries, fetchProductDetailsFromSupabase, dispatch, validateField, nextStep]
+    [
+      productEntries,
+      fetchProductDetailsFromSupabase,
+      dispatch,
+      validateField,
+      nextStep,
+    ]
   );
 
   useEffect(() => {
@@ -1290,12 +1329,11 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   }, [isPrinted, resetForm]);
 
   return (
-
     <div
-      className={`transition-all duration-300 ${isCollapsed ? "mx-20" : "mx-20 px-20"
-        } justify-center mt-16 p-4 mx-auto`}
+      className={`transition-all duration-300 ${
+        isCollapsed ? "mx-20" : "mx-20 px-20"
+      } justify-center mt-16 p-4 mx-auto`}
     >
-
       <h1 className="text-2xl font-semibold text-gray-700 text-center mb-8">
         {isEditing ? "Edit Work Order" : "Work Order Generation"}
       </h1>
@@ -1305,8 +1343,9 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         {Array.from({ length: 5 }, (_, i) => (
           <div
             key={i}
-            className={`flex-1 h-2 rounded-xl mx-1 ${step > i + 1 ? "bg-[#5db76d]" : "bg-gray-300"
-              } transition-all duration-300`}
+            className={`flex-1 h-2 rounded-xl mx-1 ${
+              step > i + 1 ? "bg-[#5db76d]" : "bg-gray-300"
+            } transition-all duration-300`}
           />
         ))}
       </div>
@@ -1356,9 +1395,9 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                         } else if (e.key === "Enter") {
                           e.preventDefault();
 
-                          const selectedProduct = productSuggestions[index]?.find(
-                            (prod) => prod.product_id === product.id
-                          );
+                          const selectedProduct = productSuggestions[
+                            index
+                          ]?.find((prod) => prod.product_id === product.id);
 
                           // Fetch product details if a valid ID is entered or selected
                           if (selectedProduct) {
@@ -1367,10 +1406,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                               selectedProduct.product_id
                             );
                           } else if (product.id) {
-                            await handleProductSelection(
-                              index,
-                              product.id
-                            );
+                            await handleProductSelection(index, product.id);
                           }
                         }
                       }}
@@ -1381,17 +1417,15 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
 
                         // Fetch product details on blur if a valid ID exists
                         if (selectedProduct || product.id) {
-                          await handleProductSelection(
-                            index,
-                            product.id
-                          );
+                          await handleProductSelection(index, product.id);
                         }
                       }}
                       list={`productIdSuggestions-${index}`}
-                      className={`border border-gray-300 px-4 py-3 rounded-lg w-full ${validationErrors[`productId-${index}`]
-                        ? "border-red-500"
-                        : ""
-                        }`}
+                      className={`border border-gray-300 px-4 py-3 rounded-lg w-full ${
+                        validationErrors[`productId-${index}`]
+                          ? "border-red-500"
+                          : ""
+                      }`}
                       aria-label={`Product ID input ${index + 1}`}
                     />
                     <datalist id={`productIdSuggestions-${index}`}>
@@ -1441,10 +1475,11 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                         });
                       }}
                       onBlur={() => validateField(index, "price")} // Validate on blur
-                      className={`border border-gray-300 px-4 py-3 rounded-lg w-full text-center ${validationErrors[`productPrice-${index}`]
-                        ? "border-red-500"
-                        : ""
-                        }`}
+                      className={`border border-gray-300 px-4 py-3 rounded-lg w-full text-center ${
+                        validationErrors[`productPrice-${index}`]
+                          ? "border-red-500"
+                          : ""
+                      }`}
                       aria-label={`Product Price input ${index + 1}`}
                     />
                     {validationErrors[`productPrice-${index}`] && (
@@ -1485,10 +1520,11 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                         }
                       }}
                       onBlur={() => validateField(index, "quantity")}
-                      className={`border border-gray-300 px-4 py-3 rounded-lg w-full text-center ${validationErrors[`productQuantity-${index}`]
-                        ? "border-red-500"
-                        : ""
-                        }`}
+                      className={`border border-gray-300 px-4 py-3 rounded-lg w-full text-center ${
+                        validationErrors[`productQuantity-${index}`]
+                          ? "border-red-500"
+                          : ""
+                      }`}
                       aria-label={`Product Quantity input ${index + 1}`}
                     />
                     {validationErrors[`productQuantity-${index}`] && (
@@ -1545,8 +1581,9 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                 onKeyDown={(e) => handleEnterKey(e, nextButtonRef)}
                 ref={dueDateRef}
                 min={getTodayDate()} // Set minimum date to today
-                className={`border border-gray-300 w-full px-10 py-3 rounded-lg text-center appearance-none ${validationErrors.dueDate ? "border-red-500" : ""
-                  }`}
+                className={`border border-gray-300 w-full px-10 py-3 rounded-lg text-center appearance-none ${
+                  validationErrors.dueDate ? "border-red-500" : ""
+                }`}
                 aria-label="Select due date"
               />
               {validationErrors.dueDate && (
@@ -1587,10 +1624,11 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                   }, 0);
                 }}
                 ref={yesButtonRef}
-                className={`px-4 py-2 rounded-lg focus:outline-none ${hasMrNumber === true
-                  ? "bg-green-600 text-white"
-                  : "bg-green-500 text-white hover:bg-green-600"
-                  }`}
+                className={`px-4 py-2 rounded-lg focus:outline-none ${
+                  hasMrNumber === true
+                    ? "bg-green-600 text-white"
+                    : "bg-green-500 text-white hover:bg-green-600"
+                }`}
                 aria-pressed={hasMrNumber === true}
                 aria-label="Select Yes for MR Number"
               >
@@ -1613,10 +1651,11 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                   }, 0);
                 }}
                 ref={noButtonRef}
-                className={`px-4 py-2 rounded-lg focus:outline-none ${hasMrNumber === false
-                  ? "bg-red-600 text-white"
-                  : "bg-red-500 text-white hover:bg-red-600"
-                  }`}
+                className={`px-4 py-2 rounded-lg focus:outline-none ${
+                  hasMrNumber === false
+                    ? "bg-red-600 text-white"
+                    : "bg-red-500 text-white hover:bg-red-600"
+                }`}
                 aria-pressed={hasMrNumber === false}
                 aria-label="Select No for MR Number"
               >
@@ -1644,13 +1683,17 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                     onChange={(e) =>
                       dispatch({
                         type: "SET_WORK_ORDER_FORM",
-                        payload: { mrNumber: e.target.value, patientDetails: null },
+                        payload: {
+                          mrNumber: e.target.value,
+                          patientDetails: null,
+                        },
                       })
                     }
                     onKeyDown={(e) => handleEnterKey(e, fetchButtonRef)}
                     ref={mrNumberRef}
-                    className={`border border-gray-300 w-full px-4 py-3 rounded-lg ${validationErrors.mrNumber ? "border-red-500" : ""
-                      }`}
+                    className={`border border-gray-300 w-full px-4 py-3 rounded-lg ${
+                      validationErrors.mrNumber ? "border-red-500" : ""
+                    }`}
                     aria-label="Enter MR Number"
                   />
                   {validationErrors.mrNumber && (
@@ -1675,20 +1718,17 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                 {patientDetails && (
                   <div className="mt-4 bg-gray-100 p-4 rounded border border-gray-200">
                     <p>
-                      <strong>Name:</strong>{" "}
-                      {patientDetails.name || "N/A"}
+                      <strong>Name:</strong> {patientDetails.name || "N/A"}
                     </p>
                     <p>
-                      <strong>Age:</strong>{" "}
-                      {patientDetails.age || "N/A"}
+                      <strong>Age:</strong> {patientDetails.age || "N/A"}
                     </p>
                     <p>
                       <strong>Phone Number:</strong>{" "}
                       {patientDetails.phoneNumber || "N/A"}
                     </p>
                     <p>
-                      <strong>Gender:</strong>{" "}
-                      {patientDetails.gender || "N/A"}
+                      <strong>Gender:</strong> {patientDetails.gender || "N/A"}
                     </p>
                     <p>
                       <strong>Address:</strong>{" "}
@@ -1716,10 +1756,9 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                     }
                     onKeyDown={(e) => handleEnterKey(e, customerPhoneRef)}
                     ref={customerNameRef}
-                    className={`border border-gray-300 w-full px-4 py-3 rounded-lg ${validationErrors.customerName
-                      ? "border-red-500"
-                      : ""
-                      }`}
+                    className={`border border-gray-300 w-full px-4 py-3 rounded-lg ${
+                      validationErrors.customerName ? "border-red-500" : ""
+                    }`}
                     aria-label="Enter Customer Name"
                   />
                   {validationErrors.customerName && (
@@ -1743,14 +1782,11 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                         payload: { customerPhone: e.target.value },
                       })
                     }
-                    onKeyDown={(e) =>
-                      handleEnterKey(e, customerAddressRef)
-                    }
+                    onKeyDown={(e) => handleEnterKey(e, customerAddressRef)}
                     ref={customerPhoneRef}
-                    className={`border border-gray-300 w-full px-4 py-3 rounded-lg ${validationErrors.customerPhone
-                      ? "border-red-500"
-                      : ""
-                      }`}
+                    className={`border border-gray-300 w-full px-4 py-3 rounded-lg ${
+                      validationErrors.customerPhone ? "border-red-500" : ""
+                    }`}
                     aria-label="Enter Customer Phone Number"
                   />
                   {validationErrors.customerPhone && (
@@ -1774,14 +1810,11 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                         payload: { customerAddress: e.target.value },
                       })
                     }
-                    onKeyDown={(e) =>
-                      handleEnterKey(e, customerAgeRef)
-                    }
+                    onKeyDown={(e) => handleEnterKey(e, customerAgeRef)}
                     ref={customerAddressRef}
-                    className={`border border-gray-300 w-full px-4 py-3 rounded-lg ${validationErrors.customerAddress
-                      ? "border-red-500"
-                      : ""
-                      }`}
+                    className={`border border-gray-300 w-full px-4 py-3 rounded-lg ${
+                      validationErrors.customerAddress ? "border-red-500" : ""
+                    }`}
                     aria-label="Enter Customer Address"
                   />
                   {validationErrors.customerAddress && (
@@ -1805,14 +1838,11 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                         payload: { customerAge: e.target.value },
                       })
                     }
-                    onKeyDown={(e) =>
-                      handleEnterKey(e, customerGenderRef)
-                    }
+                    onKeyDown={(e) => handleEnterKey(e, customerGenderRef)}
                     ref={customerAgeRef}
-                    className={`border border-gray-300 w-full px-4 py-3 rounded-lg ${validationErrors.customerAge
-                      ? "border-red-500"
-                      : ""
-                      }`}
+                    className={`border border-gray-300 w-full px-4 py-3 rounded-lg ${
+                      validationErrors.customerAge ? "border-red-500" : ""
+                    }`}
                     aria-label="Enter Customer Age"
                   />
                   {validationErrors.customerAge && (
@@ -1836,10 +1866,9 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                     }
                     onKeyDown={(e) => handleEnterKey(e, nextButtonRef)}
                     ref={customerGenderRef}
-                    className={`border border-gray-300 w-full px-4 py-3 rounded-lg ${validationErrors.customerGender
-                      ? "border-red-500"
-                      : ""
-                      }`}
+                    className={`border border-gray-300 w-full px-4 py-3 rounded-lg ${
+                      validationErrors.customerGender ? "border-red-500" : ""
+                    }`}
                     aria-label="Select Customer Gender"
                   >
                     <option value="" disabled>
@@ -1877,8 +1906,9 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
               }
               ref={employeeRef}
               onBlur={validateEmployeeSelection}
-              className={`border border-gray-300 w-full px-4 py-3 rounded-lg focus:outline-none focus:border-green-500 ${validationErrors.employee ? "border-red-500" : ""
-                }`}
+              className={`border border-gray-300 w-full px-4 py-3 rounded-lg focus:outline-none focus:border-green-500 ${
+                validationErrors.employee ? "border-red-500" : ""
+              }`}
               aria-label="Select Employee"
             >
               <option value="" disabled>
@@ -1940,12 +1970,14 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                     aria-label="Toggle B2B Order"
                   />
                   <div
-                    className={`w-11 h-6 rounded-full transition-colors duration-300 ${isB2B ? "bg-green-500" : "bg-gray-300"
-                      }`}
+                    className={`w-11 h-6 rounded-full transition-colors duration-300 ${
+                      isB2B ? "bg-green-500" : "bg-gray-300"
+                    }`}
                   ></div>
                   <div
-                    className={`absolute w-5 h-5 bg-white rounded-full top-0.5 left-0.5 transform transition-transform duration-300 ${isB2B ? "translate-x-5" : "translate-x-0"
-                      }`}
+                    className={`absolute w-5 h-5 bg-white rounded-full top-0.5 left-0.5 transform transition-transform duration-300 ${
+                      isB2B ? "translate-x-5" : "translate-x-0"
+                    }`}
                   ></div>
                 </div>
               </label>
@@ -1969,8 +2001,9 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                   }
                   onKeyDown={(e) => handleEnterKey(e, nextButtonRef)}
                   ref={gstNumberRef}
-                  className={`border border-gray-300 w-full px-4 py-3 rounded-lg ${validationErrors.gstNumber ? "border-red-500" : ""
-                    }`}
+                  className={`border border-gray-300 w-full px-4 py-3 rounded-lg ${
+                    validationErrors.gstNumber ? "border-red-500" : ""
+                  }`}
                   aria-label="Enter GST Number"
                 />
                 {validationErrors.gstNumber && (
@@ -1987,24 +2020,25 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         {step === 5 && (
           <>
             {/* Printable Area */}
-            <div
-              className=" bg-white rounded-lg text-gray-800"
-
-            >
-              <div
-                className="printable-area print:mt-20 print:block print:absolute print:inset-0 print:w-full bg-white p-4 print:m-0 print:p-0 w-full"
-              >
+            <div className=" bg-white rounded-lg text-gray-800">
+              <div className="printable-area print:mt-20 print:block print:absolute print:inset-0 print:w-full bg-white p-4 print:m-0 print:p-0 w-full">
                 {/* Header Information */}
                 <div className=" flex justify-between items-center mb-6">
                   <div className="flex items-center">
                     <h2 className="text-3xl font-bold">Work Order</h2>
                   </div>
                   <div className="text-right">
-                    <p><strong>Work Order ID:</strong> {workOrderId}</p>
-                    <p><strong>Date: {formattedDate}</strong></p>
+                    <p>
+                      Work Order ID:<strong> {workOrderId}</strong>
+                    </p>
+                    <p>
+                      Date: <strong>{formattedDate}</strong>
+                    </p>
                     {hasMrNumber && (
                       <>
-                        <p><strong>MR Number:</strong> {mrNumber}</p>
+                        <p>
+                          MR Number:<strong> {mrNumber}</strong>
+                        </p>
                       </>
                     )}
                   </div>
@@ -2012,9 +2046,37 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
 
                 {/* Customer Details */}
                 <div className="mb-6">
-                  <p>Customer Name: <strong> {hasMrNumber ? `${patientDetails?.name || 'N/A'} | ${patientDetails?.age || 'N/A'} | ${patientDetails?.gender || 'N/A'}` : `${customerName || 'N/A'} | ${customerAge || 'N/A'} | ${customerGender || 'N/A'}`}</strong></p>
-                  <p><strong>Address:</strong> {hasMrNumber ? (patientDetails?.address || 'N/A') : (customerAddress || 'N/A')}</p>
-                  <p><strong>Phone Number:</strong> {hasMrNumber ? (patientDetails?.phoneNumber || 'N/A') : (customerPhone || 'N/A')}</p>
+                  <p>
+                    Customer Name:{" "}
+                    <strong>
+                      {" "}
+                      {hasMrNumber
+                        ? `${patientDetails?.name || "N/A"} | ${
+                            patientDetails?.age || "N/A"
+                          } | ${patientDetails?.gender || "N/A"}`
+                        : `${customerName || "N/A"} | ${
+                            customerAge || "N/A"
+                          } | ${customerGender || "N/A"}`}
+                    </strong>
+                  </p>
+                  <p>
+                    Address:
+                    <strong>
+                      {" "}
+                      {hasMrNumber
+                        ? patientDetails?.address || "N/A"
+                        : customerAddress || "N/A"}
+                    </strong>
+                  </p>
+                  <p>
+                    Phone Number:
+                    <strong>
+                      {" "}
+                      {hasMrNumber
+                        ? patientDetails?.phoneNumber || "N/A"
+                        : customerPhone || "N/A"}
+                    </strong>
+                  </p>
                 </div>
 
                 {/* Product Table */}
@@ -2033,16 +2095,31 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                   <tbody>
                     {productEntries.map((product, index) => {
                       const adjustedPrice = parseFloat(product.price) || 0;
-                      const adjustedSubtotal = adjustedPrice * (parseInt(product.quantity) || 0);
+                      const adjustedSubtotal =
+                        adjustedPrice * (parseInt(product.quantity) || 0);
                       return (
                         <tr key={index}>
-                          <td className="border px-4 py-2 text-center">{index + 1}</td>
-                          <td className="border px-4 py-2 text-center">{product.id || 'N/A'}</td>
-                          <td className="border px-4 py-2">{product.name || 'N/A'}</td>
-                          <td className="border px-4 py-2 text-center">{product.hsn_code || 'N/A'}</td>
-                          <td className="border px-4 py-2 text-center">₹{adjustedPrice.toFixed(2)}</td>
-                          <td className="border px-4 py-2 text-center">{product.quantity || 'N/A'}</td>
-                          <td className="border px-4 py-2 text-center">₹{adjustedSubtotal.toFixed(2)}</td>
+                          <td className="border px-4 py-2 text-center">
+                            {index + 1}
+                          </td>
+                          <td className="border px-4 py-2 text-center">
+                            {product.id || "N/A"}
+                          </td>
+                          <td className="border px-4 py-2">
+                            {product.name || "N/A"}
+                          </td>
+                          <td className="border px-4 py-2 text-center">
+                            {product.hsn_code || "N/A"}
+                          </td>
+                          <td className="border px-4 py-2 text-center">
+                            ₹{adjustedPrice.toFixed(2)}
+                          </td>
+                          <td className="border px-4 py-2 text-center">
+                            {product.quantity || "N/A"}
+                          </td>
+                          <td className="border px-4 py-2 text-center">
+                            ₹{adjustedSubtotal.toFixed(2)}
+                          </td>
                         </tr>
                       );
                     })}
@@ -2052,27 +2129,54 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                 {/* Financial Summary */}
                 <div className="flex justify-between mb-6 space-x-8">
                   <div>
-                    <p><strong>Subtotal:</strong> ₹{subtotal.toFixed(2)}</p>
-                    
-                    <p><strong>CGST (6%):</strong> ₹{cgst.toFixed(2)}</p>
-                    <p><strong>SGST (6%):</strong> ₹{sgst.toFixed(2)}</p>
-                    <p><strong>Payment Method:</strong> {paymentMethod.charAt(0).toUpperCase() + paymentMethod.slice(1)}</p>
-                    
+                    <p>
+                      Subtotal:<strong> ₹{subtotal.toFixed(2)}</strong>
+                    </p>
+
+                    <p>
+                      Discounted Subtotal:
+                      <strong> ₹{discountedSubtotal.toFixed(2)}</strong>
+                    </p>
+
+                    <p>
+                      CGST (6%):<strong> ₹{cgst.toFixed(2)}</strong>
+                    </p>
+                    <p>
+                      SGST (6%):<strong> ₹{sgst.toFixed(2)}</strong>
+                    </p>
+                    <p>
+                      Payment Method:
+                      <strong>
+                        {" "}
+                        {paymentMethod.charAt(0).toUpperCase() +
+                          paymentMethod.slice(1)}
+                      </strong>
+                    </p>
                   </div>
-                  <div>
-                    <p><strong>Total Amount:</strong> ₹{totalAmount.toFixed(2)}</p>
-                    <p><strong>Discount Amount:</strong> ₹{validDiscountAmount.toFixed(2)}</p>
-                    <p><strong>Discounted Subtotal:</strong> ₹{discountedSubtotal.toFixed(2)}</p>
-                    <p><strong>Advance Paying:</strong> ₹{advance.toFixed(2)}</p>
-                    <p className="text-xl">Final Amount: <strong>₹{balanceDue.toFixed(2)}</strong></p>
-                    
-                      {/* <p className="text-red-500">
+                  <div className="text-right">
+                    <p>
+                      Total Amount (Incl. GST):
+                      <strong> ₹{totalAmountWithGST.toFixed(2)}</strong>
+                    </p>
+                    <p>
+                      Discount Amount:
+                      <strong> ₹{validDiscountAmount.toFixed(2)}</strong>
+                    </p>
+                    <p>
+                      Advance Paying:<strong> ₹{advance.toFixed(2)}</strong>
+                    </p>
+                    <p className="text-xl">
+                      <strong>Amount Due: ₹{balanceDue.toFixed(2)}</strong>
+                    </p>
+
+                    {/* <p className="text-red-500">
                         Advance paid exceeds the total amount by ₹{excessAmount.toFixed(2)}.
                       </p> */}
-                    
 
                     <div className="mt-10 space-x-8">
-                      <p><strong>Billed by:</strong> {employee || 'N/A'}</p>
+                      <p>
+                        <strong>Billed by:</strong> {employee || "N/A"}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -2080,19 +2184,23 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                 <div className="print:hidden flex flex-col md:flex-row items-center justify-between my-6 space-x-4">
                   {/* Discount Input Field */}
                   <div className="w-full print:w-1/3 mb-4 md:mb-0">
-                    <label htmlFor="discount" className="block font-semibold mb-1">
+                    <label
+                      htmlFor="discount"
+                      className="block font-semibold mb-1"
+                    >
                       Discount:
                     </label>
                     <input
                       type="number"
                       id="discount"
                       placeholder="Enter discount Amount"
-                      value={discount}
+                      value={discount || ""}
                       onChange={handleDiscountInput}
                       onKeyDown={(e) => handleEnterKey(e, paymentMethodRef)}
                       ref={discountRef}
-                      className={`border border-gray-300 w-full px-4 py-3 rounded-lg ${validationErrors.discount ? "border-red-500" : ""
-                        }`}
+                      className={`border border-gray-300 w-full px-4 py-3 rounded-lg ${
+                        validationErrors.discount ? "border-red-500" : ""
+                      }`}
                       aria-label="Enter Discount Amount"
                     />
                     {validationErrors.discount && (
@@ -2102,10 +2210,12 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                     )}
                   </div>
 
-
                   {/* Payment Method */}
                   <div className="w-full print:w-1/3 mb-4 md:mb-0">
-                    <label htmlFor="paymentMethod" className="block font-semibold mb-1">
+                    <label
+                      htmlFor="paymentMethod"
+                      className="block font-semibold mb-1"
+                    >
                       Payment Method:
                     </label>
                     <select
@@ -2119,8 +2229,9 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                       }
                       ref={paymentMethodRef}
                       onKeyDown={(e) => handleEnterKey(e, advanceDetailsRef)}
-                      className={`border border-gray-300 w-full px-4 py-3 rounded-lg ${validationErrors.paymentMethod ? "border-red-500" : ""
-                        }`}
+                      className={`border border-gray-300 w-full px-4 py-3 rounded-lg ${
+                        validationErrors.paymentMethod ? "border-red-500" : ""
+                      }`}
                       aria-label="Select Payment Method"
                     >
                       <option value="" disabled>
@@ -2140,7 +2251,10 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
 
                   {/* Advance Details */}
                   <div className="w-full print:w-1/3 mb-4 md:mb-0">
-                    <label htmlFor="advanceDetails" className="block font-semibold mb-1">
+                    <label
+                      htmlFor="advanceDetails"
+                      className="block font-semibold mb-1"
+                    >
                       Advance Paying:
                     </label>
                     <input
@@ -2156,8 +2270,9 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                       }
                       onKeyDown={(e) => handleEnterKey(e, saveButtonRef)}
                       ref={advanceDetailsRef}
-                      className={`border border-gray-300 w-full px-4 py-3 rounded-lg ${validationErrors.advanceDetails ? "border-red-500" : ""
-                        }`}
+                      className={`border border-gray-300 w-full px-4 py-3 rounded-lg ${
+                        validationErrors.advanceDetails ? "border-red-500" : ""
+                      }`}
                       aria-label="Enter Advance Amount"
                     />
 
@@ -2172,21 +2287,26 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                 {/* Footer Section */}
                 <div className="flex-col justify-start mx-auto items-start text-left text-md">
                   <p className="mt-2 text-md">
-                    <strong>Delivery On:</strong> {dueDate || 'N/A'}
+                    Delivery On:<strong> {dueDate || "N/A"}</strong>
                   </p>
 
                   {isB2B && (
-                    <p><strong>GST Number of work assigning:</strong> {gstNumber || 'N/A'}</p>
+                    <p>
+                      <strong>GST Number of work assigning:</strong>{" "}
+                      {gstNumber || "N/A"}
+                    </p>
                   )}
                   <p className="mt-2 text-xs">
                     Terms and Conditions:
                     <ol className="list-decimal list-inside">
                       <li>Work order valid only for two months.</li>
-                      <li>Branded Frames/Lenses – 12 Months warranty for manufacturing defects/peeling off.</li>
+                      <li>
+                        Branded Frames/Lenses – 12 Months warranty for
+                        manufacturing defects/peeling off.
+                      </li>
                     </ol>
                   </p>
                 </div>
-
               </div>
             </div>
 
@@ -2195,7 +2315,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
               <button
                 type="button"
                 onClick={() => {
-                  if (!isSaving) saveWorkOrder();
+                  if (!isSaving && !submitted) saveWorkOrder();
                 }}
                 ref={saveButtonRef}
                 onKeyDown={(e) => {
@@ -2211,10 +2331,14 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                   }
                 }}
                 className="flex items-center justify-center w-44 h-12 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition"
-                disabled={isSaving}
+                disabled={isSaving || submitted}
                 aria-label="Save Work Order"
               >
-                {isSaving ? "Saving..." : "Save Work Order"}
+                {isSaving
+                  ? "Saving..."
+                  : submitted
+                  ? "Order Submitted"
+                  : "Save Work Order"}
               </button>
 
               {allowPrint && (

@@ -399,6 +399,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     isFetchingWorkOrders,
     isLoading,
     workOrderDiscount,
+    submitted,
   } = salesOrderForm;
 
   // Local states
@@ -1527,6 +1528,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
       ];
     }
 
+    
+
     updateSalesOrderForm({
       validationErrors: {
         ...errors,
@@ -1706,7 +1709,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
   const handleOrderCompletion = async () => {
     console.log("Submit handler triggered");
     const currentUTCDateTime = getCurrentUTCDateTime();
-    if (isSaving) return; // Prevent duplicate clicks
+    if (isSaving) return;
+    if (submitted) return; // Prevent duplicate clicks
     updateSalesOrderForm({ isSaving: true }); // Set isSaving to true
     updateSalesOrderForm({
       validationErrors: {
@@ -1973,7 +1977,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
               generalError: "Failed to update stock levels.",
             },
           });
-          updateSalesOrderForm({ isSaving: false });
+          updateSalesOrderForm({ isSaving: false, submitted: true });
           return;
         }
 
@@ -1996,7 +2000,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         },
       });
     } finally {
-      updateSalesOrderForm({ isSaving: false }); // Set isSaving to false
+      updateSalesOrderForm({ isSaving: false, submitted: true }); // Set isSaving to false
     }
   };
 
@@ -3526,7 +3530,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                       </p>
                       {hasMrNumber && (
                         <p>
-                          MR Number:<strong> {mrNumber}</strong>
+                          MR Number:<strong> {mrNumber || "NA"}</strong>
                         </p>
                       )}
                     </div>
@@ -3535,26 +3539,35 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                   {/* Customer Details */}
                   <div className="mb-6">
                     <p>
-                      <strong>Customer Name:</strong>{" "}
-                      {hasMrNumber === "yes"
-                        ? `${patientDetails?.name || "N/A"} | ${
-                            patientDetails?.age || "N/A"
-                          } | ${patientDetails?.gender || "N/A"}`
-                        : `${customerName || "N/A"} | ${
-                            parseInt(age) || "N/A"
-                          } | ${gender || "N/A"}`}
+                      Customer Name:
+                      <strong>
+                        {" "}
+                        {hasMrNumber === "yes"
+                          ? `${patientDetails?.name || "N/A"} | ${
+                              patientDetails?.age || "N/A"
+                            } | ${patientDetails?.gender || "N/A"}`
+                          : `${customerName || "N/A"} | ${
+                              parseInt(age) || "N/A"
+                            } | ${gender || "N/A"}`}
+                      </strong>
                     </p>
                     <p>
-                      <strong>Address:</strong>{" "}
-                      {hasMrNumber === "yes"
-                        ? `${patientDetails?.address || "N/A"}`
-                        : `${address || "N/A"}`}
+                      Address:
+                      <strong>
+                        {" "}
+                        {hasMrNumber === "yes"
+                          ? `${patientDetails?.address || "N/A"}`
+                          : `${address || "N/A"}`}
+                      </strong>
                     </p>
                     <p>
-                      <strong>Phone Number:</strong>{" "}
-                      {hasMrNumber === "yes"
-                        ? `${patientDetails?.phone_number || "N/A"}`
-                        : `${customerPhone || "N/A"}`}
+                      Phone Number:
+                      <strong>
+                        {" "}
+                        {hasMrNumber === "yes"
+                          ? `${patientDetails?.phone_number || "N/A"}`
+                          : `${customerPhone || "N/A"}`}
+                      </strong>
                     </p>
                   </div>
 
@@ -3608,63 +3621,76 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                     <div>
                       {/* Subtotal Including GST */}
                       <p>
-                        <strong>Subtotal (Incl. GST):</strong> ₹
-                        {parseFloat(subtotalWithGST).toFixed(2)}
+                        Subtotal (Incl. GST):
+                        <strong>
+                          {" "}
+                          ₹{parseFloat(subtotalWithGST).toFixed(2)}
+                        </strong>
                       </p>
 
                       {/* Work Order and Sales Discounts */}
                       <p>
-                        <strong>Work Order Discount:</strong> ₹
-                        {parseFloat(workOrderDiscount).toFixed(2)}
+                        Work Order Discount:
+                        <strong>
+                          {" "}
+                          ₹{parseFloat(workOrderDiscount).toFixed(2)}
+                        </strong>
                       </p>
                       <p>
-                        <strong>Sales Discount:</strong> ₹
-                        {parseFloat(discount).toFixed(2)}
+                        Sales Discount:
+                        <strong> ₹{parseFloat(discount || 0).toFixed(2)}</strong>
                       </p>
                       <p>
-                        <strong>Total Discount:</strong> ₹
-                        {parseFloat(totalDiscount).toFixed(2)}
+                        Total Discount:
+                        <strong>
+                          {" "}
+                          ₹{parseFloat(totalDiscount).toFixed(2)}
+                        </strong>
                       </p>
 
                       {/* Amount After Discounts */}
 
                       <p>
-                        <strong>CGST (6%):</strong> ₹
-                        {parseFloat(cgstAmount).toFixed(2)}
+                        CGST (6%):
+                        <strong> ₹{parseFloat(cgstAmount).toFixed(2)}</strong>
                       </p>
                       <p>
-                        <strong>SGST (6%):</strong> ₹
-                        {parseFloat(sgstAmount).toFixed(2)}
+                        SGST (6%):
+                        <strong> ₹{parseFloat(sgstAmount).toFixed(2)}</strong>
                       </p>
                     </div>
 
                     <div>
-                      <p className="text-xl">
-                        <strong>Amount After Discounts:</strong> ₹
-                        {parseFloat(amountAfterDiscount).toFixed(2)}
+                      <p className="text-lg">
+                        <strong>
+                          Amount After Discounts: ₹
+                          {parseFloat(amountAfterDiscount).toFixed(2)}
+                        </strong>
                       </p>
                       {/* Taxable Value and GST Breakdown */}
                       <p>
-                        <strong>Taxable Value:</strong> ₹
-                        {parseFloat(taxableValue).toFixed(2)}
+                        Taxable Value:
+                        <strong> ₹{parseFloat(taxableValue).toFixed(2)}</strong>
                       </p>
                       {/* Advance Paid */}
                       <p>
-                        <strong>Advance Paid:</strong> ₹
-                        {parseFloat(advance).toFixed(2)}
+                        Advance Paid:
+                        <strong> ₹{parseFloat(advance).toFixed(2)}</strong>
                       </p>
                       {/* Final Amount Due */}
                       <p className="text-xl">
-                        <strong>Final Amount Due:</strong>{" "}
-                        <span className="text-xl">
-                          ₹{parseFloat(balanceDue).toFixed(2)}
-                        </span>
+                        <strong>
+                          Final Amount Due:{" "}
+                          <span className="text-xl">
+                            ₹{parseFloat(balanceDue).toFixed(2)}
+                          </span>
+                        </strong>
                       </p>
                       {/* Billed By */}
                       <div className="mt-4">
                         <div className="mt-10 space-x-8">
                           <p>
-                            <strong>Billed by:</strong> {employee || "N/A"}
+                            Billed by:<strong> {employee || "N/A"}</strong>
                           </p>
                         </div>
                       </div>
@@ -3796,10 +3822,15 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                     !paymentMethod ||
                     isLoading ||
                     isSaving ||
+                    submitted ||
                     parseFloat(state.salesOrderForm.discount) > subtotalWithGST
                   }
                 >
-                  {isEditing ? "Update Order" : "Submit Order"}{" "}
+                  {submitted
+                    ? "Order Submitted"
+                    : isEditing
+                    ? "Update Order"
+                    : "Submit Order"}{" "}
                   {privilegeCard && privilegeCardDetails
                     ? "& Update Loyalty Points"
                     : ""}
