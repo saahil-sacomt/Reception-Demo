@@ -938,7 +938,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
             age: parseInt(customerAge, 10),
             gender: customerGender,
           },
-        employee,
+        employee: workOrderForm.employee,
         payment_method: paymentMethod,
         subtotal,
         discount_amount: validDiscountAmount,
