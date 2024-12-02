@@ -3674,7 +3674,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                       {/* <p className="text-lg">
                         <strong>
                           Amount After Discounts: ₹
-                          {parseFloat(amountAfterDiscount).toFixed(2)}
+                          {parseFloat(subtotalWithGST).toFixed(2)}
                         </strong>
                       </p> */}
                       {/* Taxable Value and GST Breakdown */}
@@ -3700,7 +3700,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                         Total Paid (Incl. GST):
                         
                           {" "}
-                          ₹{parseFloat(subtotalWithGST).toFixed(2)}
+                          ₹{parseFloat(amountAfterDiscount).toFixed(2)}
                         </strong>
                       </p>
                       
