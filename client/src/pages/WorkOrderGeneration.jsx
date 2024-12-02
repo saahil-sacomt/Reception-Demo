@@ -109,7 +109,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
 
       // Define default starting Work Order IDs per branch
       const branchDefaultIds = {
-        TVR: 3701, // Trivandrum
+        TVR: 3742, // Trivandrum
         NTA: 4701, // Neyyantinkara
         KOT1: 5701, // Kottarakara 1
         KOT2: 6701, // Kottarakara 2
