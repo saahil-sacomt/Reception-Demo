@@ -2940,8 +2940,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                     <option value="" disabled>
                       Select Gender
                     </option>
-                    <option value="Male">Male</option>
-                    <option value="Female">Female</option>
+                    <option value="M">Male</option>
+                    <option value="F">Female</option>
                     <option value="Other">Other</option>
                   </select>
 
@@ -3523,7 +3523,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                     <h2 className="text-3xl font-bold">Tax Invoice</h2>
                     <div className="text-right">
                       <p>
-                        Sales ID:<strong> {salesOrderId}</strong>
+                        Invoice No:<strong> {salesOrderId}</strong>
                       </p>
                       <p>
                         Date:<strong> {formattedDate}</strong>
@@ -3657,6 +3657,15 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                         </strong>
                         </p>
 
+                        <p>
+                      Payment Method:
+                      <strong>
+                        {" "}
+                        {paymentMethod.charAt(0).toUpperCase() +
+                          paymentMethod.slice(1)}
+                      </strong>
+                    </p>
+
                       
                     </div>
 
@@ -3669,7 +3678,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                       </p> */}
                       {/* Taxable Value and GST Breakdown */}
                       <p>
-                        Subtotal (Excl. GST):
+                        Amt. after discount:
                         <strong> ₹{parseFloat(taxableValue).toFixed(2)}</strong>
                       </p>
                       <p>
@@ -3777,7 +3786,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                           Select Payment Method
                         </option>
                         <option value="cash">Cash</option>
-                        <option value="credit">Card</option>
+                        <option value="card">Card</option>
                         <option value="online">UPI (Paytm/PhonePe/GPay)</option>
                       </select>
                       {validationErrors.paymentMethod && (

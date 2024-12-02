@@ -1871,8 +1871,8 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                     <option value="" disabled>
                       Select Gender
                     </option>
-                    <option value="Male">Male</option>
-                    <option value="Female">Female</option>
+                    <option value="M">Male</option>
+                    <option value="F">Female</option>
                     <option value="Other">Other</option>
                   </select>
                   {validationErrors.customerGender && (
@@ -2022,7 +2022,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                   </div>
                   <div className="text-right">
                     <p>
-                      Work Order ID:<strong> {workOrderId}</strong>
+                      Work Order No:<strong> {workOrderId}</strong>
                     </p>
                     <p>
                       Date: <strong>{formattedDate}</strong>
@@ -2060,7 +2060,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                     </strong>
                   </p>
                   <p>
-                    Phone Number:
+                    Phone:
                     <strong>
                       {" "}
                       {hasMrNumber
@@ -2121,7 +2121,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                 <div className="flex justify-between mb-6 space-x-8">
                   <div>
                     <p>
-                      Subtotal:<strong> ₹{subtotal.toFixed(2)}</strong>
+                      Amt. after discount:<strong> ₹{subtotal.toFixed(2)}</strong>
                     </p>
 
                     {/* <p>
@@ -2155,7 +2155,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                     </p> */}
                     
                     <p>
-                      Advance Paying:<strong> ₹{advance.toFixed(2)}</strong>
+                      Advance Paid:<strong> ₹{advance.toFixed(2)}</strong>
                     </p>
                     <p className="text-xl">
                     <strong>Total Amount (Incl. GST):{" "}
@@ -2232,7 +2232,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                         Select Payment Method
                       </option>
                       <option value="cash">Cash</option>
-                      <option value="credit">Card</option>
+                      <option value="card">Card</option>
                       <option value="online">UPI (Paytm/PhonePe/GPay)</option>
                     </select>
 
