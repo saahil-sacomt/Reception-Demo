@@ -588,16 +588,16 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       } else if (hasMrNumber) {
         if (!mrNumber) errors.mrNumber = "MR Number is required.";
       } else {
-        if (!customerName) errors.customerName = "Customer name is required.";
+        if (!customerName) errors.customerName = " name is required.";
         if (!customerPhone)
-          errors.customerPhone = "Customer phone number is required.";
+          errors.customerPhone = " phone number is required.";
         if (!customerAddress)
-          errors.customerAddress = "Customer address is required.";
-        if (!customerAge) errors.customerAge = "Customer age is required.";
+          errors.customerAddress = " address is required.";
+        if (!customerAge) errors.customerAge = " age is required.";
         if (customerAge && parseInt(customerAge) < 0)
           errors.customerAge = "Age cannot be negative.";
         if (!customerGender)
-          errors.customerGender = "Customer gender is required.";
+          errors.customerGender = " gender is required.";
       }
     } else if (step === 4) {
       if (!employee) {
@@ -791,17 +791,17 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         if (!mrNumber) productErrors["mrNumber"] = "MR Number is required.";
       } else {
         if (!customerName)
-          productErrors["customerName"] = "Customer name is required.";
+          productErrors["customerName"] = " name is required.";
         if (!customerPhone)
-          productErrors["customerPhone"] = "Customer phone number is required.";
+          productErrors["customerPhone"] = " phone number is required.";
         if (!customerAddress)
-          productErrors["customerAddress"] = "Customer address is required.";
+          productErrors["customerAddress"] = " address is required.";
         if (!customerAge)
-          productErrors["customerAge"] = "Customer age is required.";
+          productErrors["customerAge"] = " age is required.";
         if (customerAge && parseInt(customerAge) < 0)
           productErrors["customerAge"] = "Age cannot be negative.";
         if (!customerGender)
-          productErrors["customerGender"] = "Customer gender is required.";
+          productErrors["customerGender"] = " gender is required.";
       }
     }
 
@@ -1744,11 +1744,11 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                 {/* Customer Name Input */}
                 <div>
                   <label className="block text-gray-700 font-medium mb-1">
-                    Customer Name
+                    Name
                   </label>
                   <input
                     type="text"
-                    placeholder="Enter Customer Name"
+                    placeholder="Enter Name"
                     value={customerName}
                     onChange={(e) =>
                       dispatch({
@@ -1760,7 +1760,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                     ref={customerNameRef}
                     className={`border border-gray-300 w-full px-4 py-3 rounded-lg ${validationErrors.customerName ? "border-red-500" : ""
                       }`}
-                    aria-label="Enter Customer Name"
+                    aria-label="Enter Name"
                   />
                   {validationErrors.customerName && (
                     <p className="text-red-500 text-xs mt-1">
@@ -1771,11 +1771,11 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                 {/* Customer Phone Number Input */}
                 <div>
                   <label className="block text-gray-700 font-medium mb-1">
-                    Customer Phone Number
+                    Phone Number
                   </label>
                   <input
                     type="text"
-                    placeholder="Enter Customer Phone Number"
+                    placeholder="Enter Phone Number"
                     value={customerPhone}
                     onChange={(e) =>
                       dispatch({
@@ -1787,7 +1787,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                     ref={customerPhoneRef}
                     className={`border border-gray-300 w-full px-4 py-3 rounded-lg ${validationErrors.customerPhone ? "border-red-500" : ""
                       }`}
-                    aria-label="Enter Customer Phone Number"
+                    aria-label="Enter Phone Number"
                   />
                   {validationErrors.customerPhone && (
                     <p className="text-red-500 text-xs mt-1">
@@ -1798,11 +1798,11 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                 {/* Customer Address Input */}
                 <div>
                   <label className="block text-gray-700 font-medium mb-1">
-                    Customer Address
+                    Address
                   </label>
                   <input
                     type="text"
-                    placeholder="Enter Customer Address"
+                    placeholder="Enter Address"
                     value={customerAddress}
                     onChange={(e) =>
                       dispatch({
@@ -1825,11 +1825,11 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                 {/* Customer Age Input */}
                 <div>
                   <label className="block text-gray-700 font-medium mb-1">
-                    Customer Age
+                    Age
                   </label>
                   <input
                     type="number"
-                    placeholder="Enter Customer Age"
+                    placeholder="Enter Age"
                     value={customerAge}
                     onChange={(e) =>
                       dispatch({
@@ -1841,7 +1841,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                     ref={customerAgeRef}
                     className={`border border-gray-300 w-full px-4 py-3 rounded-lg ${validationErrors.customerAge ? "border-red-500" : ""
                       }`}
-                    aria-label="Enter Customer Age"
+                    aria-label="Ente Age"
                   />
                   {validationErrors.customerAge && (
                     <p className="text-red-500 text-xs mt-1">
@@ -1852,7 +1852,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                 {/* Customer Gender Input */}
                 <div>
                   <label className="block text-gray-700 font-medium mb-1">
-                    Customer Gender
+                    Gender
                   </label>
                   <select
                     value={customerGender}
@@ -1866,7 +1866,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                     ref={customerGenderRef}
                     className={`border border-gray-300 w-full px-4 py-3 rounded-lg ${validationErrors.customerGender ? "border-red-500" : ""
                       }`}
-                    aria-label="Select Customer Gender"
+                    aria-label="Select Gender"
                   >
                     <option value="" disabled>
                       Select Gender
@@ -2040,7 +2040,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                 {/* Customer Details */}
                 <div className="mb-6">
                   <p>
-                    Customer Name:{" "}
+                    Name:{" "}
                     <strong>
                       {" "}
                       {hasMrNumber

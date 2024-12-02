@@ -1581,18 +1581,18 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         }
       } else if (hasMrNumber === "no") {
         if (!customerName.trim()) {
-          errors.customerName = "Customer name is required";
+          errors.customerName = "Name is required";
         }
         if (!customerPhone.trim()) {
-          errors.customerPhone = "Customer phone number is required";
+          errors.customerPhone = "Phone number is required";
         } else if (!/^\d{10}$/.test(customerPhone)) {
           errors.customerPhone = "Please enter a valid 10-digit phone number";
         }
-        if (!address.trim()) errors.address = "Customer address is required.";
-        if (!age) errors.customerAge = "Customer age is required.";
+        if (!address.trim()) errors.address = "Address is required.";
+        if (!age) errors.customerAge = "Age is required.";
         if (age && parseInt(age) < 0)
           errors.customerAge = "Age cannot be negative.";
-        if (!gender) errors.customerGender = "Customer gender is required.";
+        if (!gender) errors.customerGender = "Gender is required.";
       }
     } else if (step === 3 && privilegeCard) {
       if (redeemOption === "phone") {
@@ -1727,16 +1727,16 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         // Validate Customer Details
         const customerErrors = {};
         if (!customerName.trim())
-          customerErrors.customerName = "Customer name is required.";
+          customerErrors.customerName = "Name is required.";
         if (!customerPhone.trim()) {
-          customerErrors.customerPhone = "Customer phone number is required.";
+          customerErrors.customerPhone = "Phone number is required.";
         }
         if (!address.trim())
-          customerErrors.address = "Customer address is required.";
+          customerErrors.address = "Address is required.";
         if (!age || parseInt(age, 10) <= 0)
           customerErrors.customerAge = "Age must be a positive number.";
         if (!gender)
-          customerErrors.customerGender = "Customer gender is required.";
+          customerErrors.customerGender = "Gender is required.";
 
         if (Object.keys(customerErrors).length > 0) {
           updateSalesOrderForm({
@@ -2829,11 +2829,11 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
               {hasMrNumber === "no" && (
                 <>
                   <label className="block text-gray-700 font-medium mb-1">
-                    Enter Customer Name
+                    Enter Name
                   </label>
                   <input
                     type="text"
-                    placeholder="Enter Customer Name"
+                    placeholder="Enter Name"
                     value={customerName}
                     onChange={(e) =>
                       updateSalesOrderForm({ customerName: e.target.value })
@@ -2855,7 +2855,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                   )}
 
                   <label className="block text-gray-700 font-medium mb-1">
-                    Enter Customer Phone Number
+                    Enter Phone Number
                   </label>
                   <input
                     type="text"
@@ -3306,7 +3306,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                     state.salesOrderForm.privilegeCardDetails && (
                       <div className="mt-6 bg-gray-100 p-4 rounded border">
                         <p>
-                          <strong>Customer Name:</strong>{" "}
+                          <strong>Name:</strong>{" "}
                           {
                             state.salesOrderForm.privilegeCardDetails
                               .customer_name
@@ -3539,7 +3539,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                   {/* Customer Details */}
                   <div className="mb-6">
                     <p>
-                      Customer Name:
+                      Name:
                       <strong>
                         {" "}
                         {hasMrNumber === "yes"
