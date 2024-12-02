@@ -55,7 +55,7 @@ const defaultInitialState = {
     fetchMethod: "work_order_id",
     searchQuery: "",
     workOrderDiscount: 0,
-    submitted:false,
+    submitted: false,
     workOrders: [],
   },
   workOrderForm: {
@@ -82,7 +82,7 @@ const defaultInitialState = {
     modificationRequestId: null,
     isSaving: false,
     allowPrint: false,
-    submitted:false,
+    submitted: false,
   },
   // Add Modal States
   modals: {
@@ -100,6 +100,18 @@ const defaultInitialState = {
     action: null,
     content: null,
   },
+  stockAssignmentForm: {
+    selectedBranch: null,
+    fromBranch: "",
+    toBranch: "",
+    selectedProduct: null,
+    quantity: 0,
+    rate: 0,
+    mrp: 0,
+    productSuggestions: [],
+  },
+  // Add isUploading flag for state reset handling
+  isUploading: false,
 };
 
 // Deep merge defaultInitialState with savedState
@@ -214,6 +226,21 @@ const globalStateReducer = (state, action) => {
         selectedSalesOrder: null,
       };
 
+    case "SET_STOCK_ASSIGNMENT_FORM":
+      return {
+        ...state,
+        stockAssignmentForm: { ...state.stockAssignmentForm, ...action.payload },
+      };
+    case "RESET_STOCK_ASSIGNMENT_FORM":
+      return {
+        ...state,
+        stockAssignmentForm: defaultInitialState.stockAssignmentForm,
+      };
+
+    // Uploading State Actions
+    case "SET_IS_UPLOADING":
+      return { ...state, isUploading: action.payload };
+
     default:
       return state;
   }
@@ -235,11 +262,16 @@ export const GlobalStateProvider = ({ children }) => {
     dispatch({ type: "RESET_MODAL_STATES" });
     dispatch({ type: "RESET_SELECTED_WORK_ORDER" });
     dispatch({ type: "RESET_SELECTED_SALES_ORDER" });
+    dispatch({ type: "RESET_PURCHASE_MODAL" });
+    dispatch({ type: "RESET_STOCK_ASSIGNMENT_FORM" });
+    dispatch({ type: "SET_IS_UPLOADING", payload: false });
   };
 
   useEffect(() => {
     const handlePageRefresh = () => {
-      resetState();
+      if (state.isUploading) {
+        resetState();
+      }
     };
 
     window.addEventListener("beforeunload", handlePageRefresh);
@@ -247,7 +279,7 @@ export const GlobalStateProvider = ({ children }) => {
     return () => {
       window.removeEventListener("beforeunload", handlePageRefresh);
     };
-  }, []);
+  }, [state.isUploading]); // Add isUploading to dependencies
 
   return (
     <GlobalStateContext.Provider value={{ state, dispatch, resetState }}>

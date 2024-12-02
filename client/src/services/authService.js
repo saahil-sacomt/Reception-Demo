@@ -94,7 +94,7 @@ export const addOrUpdateStock = async (productId, branchCode, quantity, rate = n
           product_id: productId,
           branch_code: branchCode,
           quantity: quantity,
-          hsn_code: "", // You can set a default or fetch from product
+          // Removed hsn_code as it doesn't exist in stock table
         },
       ]);
 
@@ -122,10 +122,6 @@ export const addOrUpdateStock = async (productId, branchCode, quantity, rate = n
   }
 };
 
-// client/src/services/authService.js
-
-// client/src/services/authService.js
-
 /**
  * Assign stock from one branch to another.
  * @param {Array<Object>} assignments - Array of assignment objects.
@@ -136,6 +132,14 @@ export const assignStock = async (assignments) => {
   try {
     for (let assignment of assignments) {
       const { product_id, from_branch_code, to_branch_code, quantity, notes } = assignment;
+
+      if (!product_id || !from_branch_code || !to_branch_code || !quantity) {
+        throw new Error("Invalid assignment data. Ensure all fields are provided.");
+      }
+
+      if (from_branch_code === to_branch_code) {
+        throw new Error("Source and destination branches cannot be the same.");
+      }
 
       // **Step 1: Verify Sufficient Stock in Source Branch**
       const { data: sourceStock, error: sourceError } = await supabase
@@ -250,17 +254,15 @@ export const assignStock = async (assignments) => {
   }
 };
 
-
-
 /**
  * Bulk uploads stock data from a CSV or XML file.
  * @param {File} file - The uploaded file (CSV or XML).
  * @param {string} format - The file format ('csv' or 'xml').
  * @param {string} fromBranchCode - The branch code from which the stock is being assigned.
- * @param {string} toBranchCode - The branch code to which the stock is being assigned.
+ * @param {string|null} toBranchCode - The branch code to which the stock is being assigned (optional for single branch uploads).
  * @returns {Object} - Success status and any error messages.
  */
-export const bulkUploadStock = async (file, format, fromBranchCode, toBranchCode) => {
+export const bulkUploadStock = async (file, format, fromBranchCode, toBranchCode = null) => {
   try {
     let parsedData = [];
 
@@ -370,62 +372,127 @@ export const bulkUploadStock = async (file, format, fromBranchCode, toBranchCode
       return acc;
     }, {});
 
-    // Step 8: Fetch existing stock entries for these products and branch
-    const internalProductIds = uniqueProducts.map(
-      (item) => allProductsMap[item.product_id]
-    );
+    if (toBranchCode) {
+      // === Bulk Assign Logic ===
 
-    const { data: existingStocks, error: fetchStockError } = await supabase
-      .from("stock")
-      .select("product_id, quantity")
-      .in("product_id", internalProductIds)
-      .eq("branch_code", fromBranchCode);
+      // Step 8: Fetch existing stock entries for these products in both branches
+      const internalProductIds = uniqueProducts.map(
+        (item) => allProductsMap[item.product_id]
+      );
 
-    if (fetchStockError) throw fetchStockError;
+      const { data: existingStocks, error: fetchStockError } = await supabase
+        .from("stock")
+        .select("product_id, branch_code, quantity")
+        .in("product_id", internalProductIds)
+        .in("branch_code", [fromBranchCode, toBranchCode]);
 
-    // Create a map from product_id to existing quantity
-    const existingStockMap = existingStocks.reduce((acc, stock) => {
-      acc[stock.product_id] = stock.quantity;
-      return acc;
-    }, {});
+      if (fetchStockError) throw fetchStockError;
 
-    // Step 9: Prepare stock entries with updated quantities
-    const stockEntries = uniqueProducts.map((item) => ({
-      product_id: allProductsMap[item.product_id],
-      branch_code: fromBranchCode,
-      quantity: (existingStockMap[allProductsMap[item.product_id]] || 0) + item.quantity,
-      // Note: 'hsn_code' is NOT inserted into 'stock' table
-      updated_at: new Date().toISOString(),
-    }));
+      // Create a map from product_id and branch_code to quantity
+      const existingStockMap = {};
+      existingStocks.forEach((stock) => {
+        existingStockMap[`${stock.product_id}_${stock.branch_code}`] = stock.quantity;
+      });
 
-    // Step 10: Bulk upsert stock entries
-    const { error: upsertStockError } = await supabase
-      .from("stock")
-      .upsert(stockEntries, { onConflict: ["product_id", "branch_code"] });
+      // Step 9: Prepare stock entries - deduct from fromBranchCode
+      const stockEntriesFrom = uniqueProducts.map((item) => ({
+        product_id: allProductsMap[item.product_id],
+        branch_code: fromBranchCode,
+        quantity:
+          (existingStockMap[`${allProductsMap[item.product_id]}_${fromBranchCode}`] || 0) -
+          item.quantity,
+        updated_at: new Date().toISOString(),
+      }));
 
-    if (upsertStockError) throw upsertStockError;
+      // Ensure that quantities don't go negative
+      for (let entry of stockEntriesFrom) {
+        if (entry.quantity < 0) {
+          throw new Error(
+            `Insufficient stock for product ID ${entry.product_id} in branch ${fromBranchCode}.`
+          );
+        }
+      }
 
-    // Step 11: Record assignments in stock_assignments table (if exists)
-    // Assuming you have a 'stock_assignments' table defined
-    // If not, you can skip this step or create the table as per your requirements
-    /*
-    const assignmentsToRecord = uniqueProducts.map((item) => ({
-      product_id: allProductsMap[item.product_id],
-      from_branch_code: fromBranchCode,
-      to_branch_code: toBranchCode,
-      quantity: item.quantity,
-      notes: "", // Optional
-      rate: item.rate || 0.00,
-      mrp: item.mrp || 0.00,
-      // 'hsn_code' should not be inserted here as it's part of 'products'
-    }));
+      // Step 10: Deduct stock from fromBranchCode
+      const { error: upsertStockFromError } = await supabase
+        .from("stock")
+        .upsert(stockEntriesFrom, { onConflict: ["product_id", "branch_code"] });
 
-    const { error: recordAssignmentsError } = await supabase
-      .from("stock_assignments")
-      .insert(assignmentsToRecord);
+      if (upsertStockFromError) throw upsertStockFromError;
 
-    if (recordAssignmentsError) throw recordAssignmentsError;
-    */
+      // Step 11: Prepare stock entries - add to toBranchCode
+      const stockEntriesTo = uniqueProducts.map((item) => ({
+        product_id: allProductsMap[item.product_id],
+        branch_code: toBranchCode,
+        quantity:
+          (existingStockMap[`${allProductsMap[item.product_id]}_${toBranchCode}`] || 0) +
+          item.quantity,
+        updated_at: new Date().toISOString(),
+      }));
+
+      // Step 12: Add stock to toBranchCode
+      const { error: upsertStockToError } = await supabase
+        .from("stock")
+        .upsert(stockEntriesTo, { onConflict: ["product_id", "branch_code"] });
+
+      if (upsertStockToError) throw upsertStockToError;
+
+      // Step 13: Record assignments in stock_assignments table
+      // It's recommended to handle this via an RPC for atomicity
+      // For now, ensure each insert is handled correctly
+      const assignmentsToRecord = uniqueProducts.map((item) => ({
+        product_id: allProductsMap[item.product_id],
+        from_branch_code: fromBranchCode,
+        to_branch_code: toBranchCode,
+        quantity: item.quantity,
+        notes: "", // Optional
+        rate: item.rate || 0.0,
+        mrp: item.mrp || 0.0,
+      }));
+
+      const { error: recordAssignmentsError } = await supabase
+        .from("stock_assignments")
+        .insert(assignmentsToRecord);
+
+      if (recordAssignmentsError) throw recordAssignmentsError;
+    } else {
+      // === Bulk Upload Logic ===
+
+      // Step 8: Fetch existing stock entries for these products in fromBranchCode
+      const internalProductIds = uniqueProducts.map(
+        (item) => allProductsMap[item.product_id]
+      );
+
+      const { data: existingStocks, error: fetchStockError } = await supabase
+        .from("stock")
+        .select("product_id, quantity")
+        .in("product_id", internalProductIds)
+        .eq("branch_code", fromBranchCode);
+
+      if (fetchStockError) throw fetchStockError;
+
+      // Create a map from product_id to existing quantity
+      const existingStockMap = existingStocks.reduce((acc, stock) => {
+        acc[stock.product_id] = stock.quantity;
+        return acc;
+      }, {});
+
+      // Step 9: Prepare stock entries - add to fromBranchCode
+      const stockEntries = uniqueProducts.map((item) => ({
+        product_id: allProductsMap[item.product_id],
+        branch_code: fromBranchCode,
+        quantity:
+          (existingStockMap[allProductsMap[item.product_id]] || 0) + item.quantity,
+        updated_at: new Date().toISOString(),
+      }));
+
+      // Step 10: Bulk upsert stock entries
+      const { error: upsertStockError } = await supabase
+        .from("stock")
+        .upsert(stockEntries, { onConflict: ["product_id", "branch_code"] });
+
+      if (upsertStockError) throw upsertStockError;
+    }
 
     return { success: true, error: null, insertedProducts: upsertedProducts };
   } catch (error) {
@@ -463,12 +530,15 @@ export const signUp = async (
     const hashedPin = await bcrypt.hash(pin, 10);
 
     // Step 2: Insert additional details into the 'employees' table
-    const { data: existingUser } = await supabase
+    const { data: existingUser, error: existingUserError } = await supabase
       .from('employees')
       .select('id')
-      .eq('email', email);
+      .eq('email', email)
+      .single();
 
-    if (existingUser && existingUser.length > 0) {
+    if (existingUser) {
+      // If employee already exists, delete the created Auth user
+      await supabase.auth.admin.deleteUser(userId);
       return { data: null, error: new Error('Email already exists') };
     }
 
@@ -581,6 +651,7 @@ export const addNewProduct = async (productData) => {
     return { success: false, error: error.message };
   }
 };
+
 /**
  * Updates the stock quantity and optionally Rate and MRP for an existing product in a specific branch.
  * @param {number} productId - The internal ID of the product.
@@ -589,7 +660,7 @@ export const addNewProduct = async (productData) => {
  * @param {number} rate - The new rate (optional).
  * @param {number} mrp - The new MRP (optional).
  * @param {string} purchaseFrom - The source of purchase (optional).
- * @returns {Object} - Success status and any error message.
+ * @returns {Object} - { success: boolean, error: string | null }
  */
 export const updateExistingProduct = async (productId, branchCode, quantity, rate, mrp, purchaseFrom) => {
   try {
@@ -672,7 +743,6 @@ export const updateExistingProduct = async (productId, branchCode, quantity, rat
   }
 };
 
-
 /**
  * Edit a stock entry.
  * @param {number} productId - The integer ID of the product.
@@ -716,7 +786,6 @@ export const editStock = async (productId, branchCode, quantity, rate, mrp) => {
     return { success: false, error: error.message };
   }
 };
-
 
 /**
  * Function to fetch stock by external product_id and branch_code using RPC
@@ -927,5 +996,72 @@ export const deductStockForMultipleProducts = async (products, branchCode) => {
   } catch (err) {
     console.error("Unexpected error during stock deduction:", err);
     return { success: false, error: err.message };
+  }
+};
+
+/**
+ * Function to bulk upload stock for a single branch
+ * @param {File} file - The uploaded file (CSV or XML).
+ * @param {string} format - The file format ('csv' or 'xml').
+ * @param {string} branchCode - The branch code to which the stock is being uploaded.
+ * @returns {Object} - Success status and any error messages.
+ */
+export const bulkUploadStockForBranch = async (file, format, branchCode) => {
+  try {
+    let parsedData = [];
+
+    // Step 1: Parse the file
+    if (format === "csv") {
+      parsedData = await parseCSV(file);
+    } else if (format === "xml") {
+      parsedData = await parseXML(file);
+    } else {
+      throw new Error("Unsupported file format.");
+    }
+
+    if (!parsedData.length) {
+      throw new Error("The uploaded file contains no data.");
+    }
+
+    // Step 2: Normalize and validate data
+    parsedData = parsedData.map((item) => ({
+      product_id: item.product_id.trim().toUpperCase(),
+      quantity: parseInt(item.quantity, 10) || 0,
+    }));
+
+    // Step 3: Fetch existing stock for the branch
+    const productIds = parsedData.map((item) => item.product_id);
+    const { data: existingStock, error: stockError } = await supabase
+      .from("stock")
+      .select("product_id, quantity")
+      .in("product_id", productIds)
+      .eq("branch_code", branchCode);
+
+    if (stockError) throw stockError;
+
+    // Create a map from product_id to existing quantity
+    const stockMap = existingStock.reduce((acc, stock) => {
+      acc[stock.product_id] = stock.quantity;
+      return acc;
+    }, {});
+
+    // Step 4: Prepare upsert data
+    const stockEntries = parsedData.map((item) => ({
+      product_id: item.product_id,
+      branch_code: branchCode,
+      quantity: (stockMap[item.product_id] || 0) + item.quantity,
+    }));
+
+    // Step 5: Upsert stock entries
+    const { error: upsertError } = await supabase
+      .from("stock")
+      .upsert(stockEntries, { onConflict: ["product_id", "branch_code"] });
+
+    if (upsertError) throw upsertError;
+
+    return { success: true, error: null };
+  } catch (error) {
+    console.error("Error in bulkUploadStockForBranch:", error.message);
+    return { success: false, error: error.message };
   }
 };

@@ -1,10 +1,14 @@
 // client/src/components/EditStockModal.jsx
 
-import React, { useState } from "react";
+import React, { useState,useEffect } from "react";
 import { ClipLoader } from "react-spinners";
 import { editStock } from "../services/authService";
 
 const EditStockModal = ({ isOpen, onClose, stockEntry, refreshStockData }) => {
+  useEffect(() => {
+    console.log("Received stockEntry in EditStockModal:", stockEntry);
+  }, [stockEntry]);
+
   const [quantity, setQuantity] = useState(stockEntry.quantity);
   const [rate, setRate] = useState(stockEntry.product.rate || "");
   const [mrp, setMrp] = useState(stockEntry.product.mrp || "");
@@ -13,6 +17,8 @@ const EditStockModal = ({ isOpen, onClose, stockEntry, refreshStockData }) => {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
+  const productId = stockEntry.product.id;
+
   if (!isOpen) return null;
 
   const handleSubmit = async (e) => {
@@ -20,8 +26,24 @@ const EditStockModal = ({ isOpen, onClose, stockEntry, refreshStockData }) => {
     setError("");
     setSuccess("");
 
-    if (!quantity || quantity < 0) {
+    // Validation
+    if (quantity === "" || quantity < 0) {
       setError("Please enter a valid quantity.");
+      return;
+    }
+
+    if (rate === "" || rate < 0) {
+      setError("Please enter a valid rate.");
+      return;
+    }
+
+    if (mrp === "" || mrp < 0) {
+      setError("Please enter a valid MRP.");
+      return;
+    }
+
+    if (hsnCode.trim() === "") {
+      setError("HSN Code cannot be empty.");
       return;
     }
 
@@ -31,8 +53,8 @@ const EditStockModal = ({ isOpen, onClose, stockEntry, refreshStockData }) => {
         stockEntry.product.id, // Integer ID
         stockEntry.branch_code,
         parseInt(quantity, 10),
-        rate ? parseFloat(rate) : null,
-        mrp ? parseFloat(mrp) : null
+        parseFloat(rate),
+        parseFloat(mrp)
       );
 
       if (response.success) {
@@ -156,7 +178,7 @@ const EditStockModal = ({ isOpen, onClose, stockEntry, refreshStockData }) => {
               value={hsnCode}
               onChange={(e) => setHsnCode(e.target.value)}
               className="w-full p-2 border rounded"
-              required
+              
             />
           </div>
 

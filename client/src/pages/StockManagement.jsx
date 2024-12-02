@@ -12,19 +12,20 @@ import {
   bulkUploadStock,
   assignStock,
   editStock,
-} from "../services/authService"; // Ensure editStock is imported
-import EditStockModal from "../components/EditStockModal"; // Ensure this component exists
-import { toast, ToastContainer } from "react-toastify"; // Import Toast components
+} from "../services/authService";
+import EditStockModal from "../components/EditStockModal";
+import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
 const StockManagement = ({ isCollapsed }) => {
   const { user, role } = useAuth();
-  const { state, dispatch } = useGlobalState();
   const [branches, setBranches] = useState([]);
   const [products, setProducts] = useState([]);
-  const [selectedBranch, setSelectedBranch] = useState("");
+  const { state, dispatch } = useGlobalState();
 
+  // ============================
   // Add/Update Stock States
+  // ============================
   const [searchProductAdd, setSearchProductAdd] = useState("");
   const [productSuggestionsAdd, setProductSuggestionsAdd] = useState([]);
   const [selectedProductAdd, setSelectedProductAdd] = useState("");
@@ -32,8 +33,11 @@ const StockManagement = ({ isCollapsed }) => {
   const [rateAdd, setRateAdd] = useState("");
   const [mrpAdd, setMrpAdd] = useState("");
   const [showSuggestionsAdd, setShowSuggestionsAdd] = useState(false);
+  const [selectedBranchAdd, setSelectedBranchAdd] = useState("");
 
+  // ============================
   // Assign Stock States
+  // ============================
   const [searchProductAssign, setSearchProductAssign] = useState("");
   const [productSuggestionsAssign, setProductSuggestionsAssign] = useState([]);
   const [selectedProductAssign, setSelectedProductAssign] = useState("");
@@ -45,32 +49,46 @@ const StockManagement = ({ isCollapsed }) => {
   const [toBranchAssign, setToBranchAssign] = useState("");
   const [showSuggestionsAssign, setShowSuggestionsAssign] = useState(false);
 
-  // Bulk Assign Stock States
-  const [bulkFromBranch, setBulkFromBranch] = useState("");
-  const [bulkToBranch, setBulkToBranch] = useState("");
-  const [uploadFormat, setUploadFormat] = useState("csv");
-  const [file, setFile] = useState(null);
+  // ============================
+  // Bulk Upload Stock States
+  // ============================
+  const [bulkBranchUpload, setBulkBranchUpload] = useState("");
+  const [uploadFormatUpload, setUploadFormatUpload] = useState("csv");
+  const [fileUpload, setFileUpload] = useState(null);
 
+  // ============================
+  // Bulk Assign Stock States
+  // ============================
+  const [bulkFromBranchAssign, setBulkFromBranchAssign] = useState("");
+  const [bulkToBranchAssign, setBulkToBranchAssign] = useState("");
+  const [uploadFormatAssign, setUploadFormatAssign] = useState("csv");
+  const [fileAssign, setFileAssign] = useState(null);
+
+  // ============================
   // Lookup Stock States
+  // ============================
   const [lookupSearchProduct, setLookupSearchProduct] = useState("");
   const [lookupProductSuggestions, setLookupProductSuggestions] = useState([]);
   const [showSuggestionsLookup, setShowSuggestionsLookup] = useState(false);
   const [lookupResults, setLookupResults] = useState([]);
+  const [lookupBranch, setLookupBranch] = useState("");
 
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [stockToEdit, setStockToEdit] = useState(null);
-
-  const fileInputRef = useRef(null);
+  const isLoadingRef = useRef(false);
+  const fileUploadRef = useRef(null);
+  const fileAssignRef = useRef(null);
   const isUploadingRef = useRef(false);
+  const [stockToEdit, setStockToEdit] = useState(null); // State for editing stock
 
+  // ============================
   // Pagination States
+  // ============================
   const [filteredStocks, setFilteredStocks] = useState([]);
   const [currentPage, setCurrentPage] = useState(0);
   const itemsPerPage = 10;
 
-  // Warn user before unloading the page during upload
+  // ============================
+  // Warn user before unloading during upload
+  // ============================
   useEffect(() => {
     const handleBeforeUnload = (e) => {
       if (isUploadingRef.current) {
@@ -81,12 +99,15 @@ const StockManagement = ({ isCollapsed }) => {
     };
 
     window.addEventListener("beforeunload", handleBeforeUnload);
+
     return () => {
       window.removeEventListener("beforeunload", handleBeforeUnload);
     };
   }, []);
 
-  // Fetch branches and products on component mount
+  // ============================
+  // Fetch branches and products on mount
+  // ============================
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -96,7 +117,7 @@ const StockManagement = ({ isCollapsed }) => {
           .select("*");
 
         if (branchesError) {
-          setError("Failed to fetch branches.");
+          toast.error("Failed to fetch branches.");
           return;
         }
 
@@ -108,22 +129,23 @@ const StockManagement = ({ isCollapsed }) => {
           .select("*");
 
         if (productsError) {
-          setError("Failed to fetch products.");
+          toast.error("Failed to fetch products.");
           return;
         }
 
         setProducts(productsData);
       } catch (err) {
         console.error("Error fetching data:", err);
-        setError("An unexpected error occurred while fetching data.");
-        toast.error(err.message);
+        toast.error("An unexpected error occurred while fetching data.");
       }
     };
 
     fetchData();
   }, []);
 
+  // ============================
   // Fetch product suggestions for Add/Update Stock with debounce
+  // ============================
   const fetchProductSuggestionsAdd = useCallback(
     debounce(async (query) => {
       if (query.length < 1) {
@@ -133,7 +155,7 @@ const StockManagement = ({ isCollapsed }) => {
       try {
         const { data, error } = await supabase
           .from("products")
-          .select("id, product_name, product_id, rate, mrp, hsn_code")
+          .select("id, product_name, product_id, rate, mrp")
           .or(`product_name.ilike.%${query}%,product_id.ilike.%${query}%`)
           .limit(20);
 
@@ -152,7 +174,9 @@ const StockManagement = ({ isCollapsed }) => {
     []
   );
 
+  // ============================
   // Fetch product suggestions for Assign Stock with debounce
+  // ============================
   const fetchProductSuggestionsAssign = useCallback(
     debounce(async (query) => {
       if (query.length < 1) {
@@ -181,7 +205,9 @@ const StockManagement = ({ isCollapsed }) => {
     []
   );
 
+  // ============================
   // Fetch product suggestions for Lookup with debounce
+  // ============================
   const fetchProductSuggestionsLookup = useCallback(
     debounce(async (query) => {
       if (query.length < 1) {
@@ -210,7 +236,9 @@ const StockManagement = ({ isCollapsed }) => {
     []
   );
 
+  // ============================
   // Handlers for Add/Update Stock Form
+  // ============================
   const handleProductInputAdd = (e) => {
     const query = e.target.value;
     setSearchProductAdd(query);
@@ -224,12 +252,14 @@ const StockManagement = ({ isCollapsed }) => {
     setProductSuggestionsAdd([]);
     setShowSuggestionsAdd(false);
 
-    // Set Rate, MRP, and HSN Code based on selected product
+    // Set Rate and MRP based on selected product
     setRateAdd(product.rate !== null ? product.rate.toFixed(2) : "");
     setMrpAdd(product.mrp !== null ? product.mrp.toFixed(2) : "");
   };
 
+  // ============================
   // Handlers for Assign Stock Form
+  // ============================
   const handleProductInputAssign = (e) => {
     const query = e.target.value;
     setSearchProductAssign(query);
@@ -249,7 +279,9 @@ const StockManagement = ({ isCollapsed }) => {
     setHsnCodeAssign(product.hsn_code || "");
   };
 
+  // ============================
   // Handlers for Lookup Stock Form
+  // ============================
   const handleLookupProductInput = (e) => {
     const query = e.target.value;
     setLookupSearchProduct(query);
@@ -262,7 +294,7 @@ const StockManagement = ({ isCollapsed }) => {
     setLookupProductSuggestions([]);
     setShowSuggestionsLookup(false);
 
-    // Fetch stock for this specific product and selectedBranch
+    // Fetch stock for this specific product and lookupBranch
     const fetchLookupStock = async () => {
       try {
         const { data, error } = await supabase
@@ -271,39 +303,49 @@ const StockManagement = ({ isCollapsed }) => {
             quantity,
             product:products(id, product_name, product_id, rate, mrp, hsn_code)
           `)
-          .eq("branch_code", selectedBranch)
+          .eq("branch_code", lookupBranch)
           .eq("product_id", product.id)
-          .single(); // Assuming unique per branch and product
+          .single(); // Ensure unique stock entry
 
         if (error || !data) {
           setLookupResults([]);
+          toast.info("No stock found for the selected product.");
         } else {
-          setLookupResults([data]); // Wrap in array
+          setLookupResults([data]); // Wrap in array for consistency
         }
       } catch (err) {
         console.error("Error fetching lookup stock:", err);
         setLookupResults([]);
+        toast.error("Failed to fetch stock details.");
       }
     };
 
     fetchLookupStock();
   };
 
+  
+
+  
+
+  
+
+  // ============================
   // Function to refresh stock data
+  // ============================
   const refreshStockData = useCallback(async () => {
-    if (!selectedBranch) return;
+    if (!lookupBranch) return;
 
     try {
       const { data, error } = await supabase
         .from("stock")
         .select(`
           quantity,
-          product:products(id, product_name, product_id, rate, mrp, hsn_code)
+          product:products(product_name, product_id, rate, mrp)
         `)
-        .eq("branch_code", selectedBranch);
+        .eq("branch_code", lookupBranch);
 
       if (error) {
-        setError("Failed to refresh stock data.");
+        toast.error("Failed to refresh stock data.");
         return;
       }
 
@@ -321,14 +363,67 @@ const StockManagement = ({ isCollapsed }) => {
       setCurrentPage(0); // Reset to first page on data refresh
     } catch (err) {
       console.error("Error refreshing stock data:", err);
-      setError("An unexpected error occurred while refreshing stock data.");
+      toast.error("An unexpected error occurred while refreshing stock data.");
     }
-  }, [selectedBranch, searchProductAdd]);
+  }, [lookupBranch, searchProductAdd]);
 
-  // Fetch stock data based on selectedBranch and searchProductAdd
+  // ============================
+  // Handler for Bulk Upload to a Single Branch
+  // ============================
+  const handleBulkUploadToBranch = useCallback(
+    async (e) => {
+      e.preventDefault();
+      if (!bulkBranchUpload || !fileUpload) {
+        toast.error("Please select a branch and upload a file.");
+        return;
+      }
+
+      // Validate file type
+      const allowedExtensions = ["csv"];
+      const fileExtension = fileUpload.name.split(".").pop().toLowerCase();
+
+      if (!allowedExtensions.includes(fileExtension)) {
+        toast.error("Invalid file format. Please upload a CSV file.");
+        return;
+      }
+
+      isLoadingRef.current = true;
+      isUploadingRef.current = true;
+
+      try {
+        const response = await bulkUploadStock(
+          fileUpload,
+          uploadFormatUpload,
+          bulkBranchUpload
+        );
+
+        if (response.success) {
+          toast.success("Bulk stock upload successful.");
+          setFileUpload(null);
+          setBulkBranchUpload("");
+          setUploadFormatUpload("csv");
+          if (fileUploadRef.current) fileUploadRef.current.value = "";
+          refreshStockData();
+        } else {
+          toast.error(response.error || "Bulk upload failed.");
+        }
+      } catch (err) {
+        console.error("Error during bulk upload:", err);
+        toast.error("An unexpected error occurred during bulk upload.");
+      } finally {
+        isUploadingRef.current = false;
+        isLoadingRef.current = false;
+      }
+    },
+    [bulkBranchUpload, fileUpload, uploadFormatUpload, bulkUploadStock, refreshStockData]
+  );
+
+  // ============================
+  // Fetch stock data based on lookupBranch and searchProductAdd
+  // ============================
   useEffect(() => {
     const fetchStockData = async () => {
-      if (!selectedBranch) {
+      if (!lookupBranch) {
         setFilteredStocks([]);
         return;
       }
@@ -338,12 +433,12 @@ const StockManagement = ({ isCollapsed }) => {
           .from("stock")
           .select(`
             quantity,
-            product:products(id, product_name, product_id, rate, mrp, hsn_code)
+            product:products(product_name, product_id, rate, mrp)
           `)
-          .eq("branch_code", selectedBranch);
+          .eq("branch_code", lookupBranch);
 
         if (error) {
-          setError("Failed to fetch stock data.");
+          toast.error("Failed to fetch stock data.");
           return;
         }
 
@@ -361,43 +456,163 @@ const StockManagement = ({ isCollapsed }) => {
         setCurrentPage(0); // Reset to first page on data fetch
       } catch (err) {
         console.error("Error fetching stock data:", err);
-        setError("An unexpected error occurred while fetching stock data.");
+        toast.error("An unexpected error occurred while fetching stock data.");
       }
     };
 
     fetchStockData();
-  }, [selectedBranch, searchProductAdd]);
+  }, [lookupBranch, searchProductAdd]);
 
-  // Handler for manual stock addition
+  // ============================
+  // Handler for file selection in Bulk Upload
+  // ============================
+  const handleFileChangeUpload = useCallback((e) => {
+    const uploadedFile = e.target.files[0];
+    if (uploadedFile) {
+      setFileUpload(uploadedFile);
+    } else {
+      setFileUpload(null);
+    }
+  }, []);
+
+  // ============================
+  // Handler for file selection in Bulk Assign
+  // ============================
+  const handleFileChangeAssign = useCallback((e) => {
+    const uploadedFile = e.target.files[0];
+    if (uploadedFile) {
+      setFileAssign(uploadedFile);
+    } else {
+      setFileAssign(null);
+    }
+  }, []);
+
+  // ============================
+  // Handler for Bulk Assign Stock
+  // ============================
+  const handleBulkAssign = useCallback(
+    async (e) => {
+      e.preventDefault();
+
+      if (!bulkFromBranchAssign || !bulkToBranchAssign || !fileAssign) {
+        toast.error("Please select both source and destination branches and upload a file.");
+        return;
+      }
+
+      if (bulkFromBranchAssign === bulkToBranchAssign) {
+        toast.error("From and To branches cannot be the same.");
+        return;
+      }
+
+      // Validate file type based on uploadFormatAssign
+      const allowedExtensions = ["csv"]; // Add "xml" if needed
+      const fileExtension = fileAssign.name.split(".").pop().toLowerCase();
+
+      if (!allowedExtensions.includes(fileExtension)) {
+        toast.error(
+          `Invalid file format. Please upload a ${
+            uploadFormatAssign === "csv" ? "CSV" : "XML"
+          } file.`
+        );
+        return;
+      }
+
+      isLoadingRef.current = true;
+      isUploadingRef.current = true;
+
+      try {
+        const response = await bulkUploadStock(
+          fileAssign,
+          uploadFormatAssign,
+          bulkFromBranchAssign,
+          bulkToBranchAssign
+        );
+
+        if (response.success) {
+          let message = "Bulk stock assign successful.";
+
+          if (response.insertedProducts && response.insertedProducts.length > 0) {
+            message += ` Inserted ${response.insertedProducts.length} new product(s).`;
+          }
+
+          toast.success(message);
+          setFileAssign(null);
+          setUploadFormatAssign("csv");
+          setBulkFromBranchAssign("");
+          setBulkToBranchAssign("");
+          if (fileAssignRef.current) fileAssignRef.current.value = "";
+          refreshStockData();
+        } else {
+          toast.error(response.error || "Bulk assign failed.");
+        }
+      } catch (err) {
+        console.error("Error during bulk assign:", err);
+        toast.error("An unexpected error occurred during bulk assign.");
+      } finally {
+        isUploadingRef.current = false;
+        isLoadingRef.current = false;
+      }
+    },
+    [
+      bulkFromBranchAssign,
+      bulkToBranchAssign,
+      fileAssign,
+      uploadFormatAssign,
+      bulkUploadStock,
+      refreshStockData,
+    ]
+  );
+
+  // ============================
+  // Pagination handlers
+  // ============================
+  const handlePageClick = (selectedItem) => {
+    setCurrentPage(selectedItem.selected);
+  };
+
+  // ============================
+  // Calculate the items to display on the current page
+  // ============================
+  const offset = currentPage * itemsPerPage;
+  const currentItems =
+    lookupResults.length > 0
+      ? lookupResults.slice(offset, offset + itemsPerPage)
+      : filteredStocks.slice(offset, offset + itemsPerPage);
+  const pageCount = Math.ceil(
+    (lookupResults.length > 0 ? lookupResults.length : filteredStocks.length) / itemsPerPage
+  );
+
+  // ============================
+  // Handler for Manual Stock Addition
+  // ============================
   const handleAddUpdateStock = useCallback(
     async (e) => {
       e.preventDefault();
-      setError("");
-      setSuccess("");
 
-      if (!selectedBranch || !selectedProductAdd || !quantityAdd) {
-        setError("Please fill in all required fields.");
+      if (!selectedBranchAdd || !selectedProductAdd || !quantityAdd) {
+        toast.error("Please fill in all required fields.");
         return;
       }
 
       const product = products.find((p) => p.id === parseInt(selectedProductAdd, 10));
 
       if (!product) {
-        setError("Selected product does not exist.");
+        toast.error("Selected product does not exist.");
         return;
       }
 
       const qty = parseInt(quantityAdd, 10);
       if (isNaN(qty) || qty < 0) {
-        setError("Please enter a valid quantity.");
+        toast.error("Please enter a valid quantity.");
         return;
       }
 
-      setIsLoading(true);
+      isLoadingRef.current = true;
+
       try {
         const response = await addOrUpdateStock(
           product.id,
-          selectedBranch,
+          selectedBranchAdd,
           qty,
           rateAdd ? parseFloat(rateAdd) : null,
           mrpAdd ? parseFloat(mrpAdd) : null
@@ -405,9 +620,7 @@ const StockManagement = ({ isCollapsed }) => {
 
         if (response.success) {
           toast.success("Stock updated successfully.");
-          setSuccess("Stock updated successfully.");
           // Reset form
-          setSelectedBranch("");
           setSelectedProductAdd("");
           setSearchProductAdd("");
           setQuantityAdd("");
@@ -418,17 +631,17 @@ const StockManagement = ({ isCollapsed }) => {
           // Refresh stock data
           refreshStockData();
         } else {
-          setError(response.error);
+          toast.error(response.error || "Failed to update stock.");
         }
       } catch (err) {
         console.error("Error updating stock:", err);
-        setError("An unexpected error occurred.");
+        toast.error("An unexpected error occurred.");
       } finally {
-        setIsLoading(false);
+        isLoadingRef.current = false;
       }
     },
     [
-      selectedBranch,
+      selectedBranchAdd,
       selectedProductAdd,
       quantityAdd,
       rateAdd,
@@ -438,198 +651,96 @@ const StockManagement = ({ isCollapsed }) => {
       refreshStockData,
     ]
   );
-  
 
-const handleAssignStock = useCallback(
+  // ============================
+  // Handler for Assigning Stock
+  // ============================
+  const handleAssignStock = useCallback(
     async (e) => {
       e.preventDefault();
-      setError("");
-      setSuccess("");
 
-      const form = e.target;
-      const fromBranch = form.fromBranchAssign.value;
-      const toBranch = form.toBranchAssign.value;
-      const productInput = form.assignProduct.value;
-      const quantityAssignValue = form.quantityAssign.value;
-
-      if (!fromBranch || !toBranch || !productInput || !quantityAssignValue) {
-        setError("All fields are required.");
+      if (!fromBranchAssign || !toBranchAssign || !selectedProductAssign || !quantityAssign) {
+        toast.error("Please fill in all required fields.");
         return;
       }
 
-      if (fromBranch === toBranch) {
-        setError("From and To branches cannot be the same.");
+      if (fromBranchAssign === toBranchAssign) {
+        toast.error("From and To branches cannot be the same.");
         return;
       }
 
-      // Extract product ID from selected product (Assuming format: "Product Name (PRODUCT_ID)")
-      const productIdMatch = productInput.match(/\(([^)]+)\)$/);
-      if (!productIdMatch) {
-        setError("Invalid product selected.");
+      // Fetch the product's internal ID using the selected product
+      const product = products.find((p) => p.id === parseInt(selectedProductAssign, 10));
+
+      if (!product) {
+        toast.error("Selected product does not exist.");
         return;
       }
-      const productIdStr = productIdMatch[1].trim().toUpperCase(); // e.g., "22T2645"
 
-      // Fetch the product's internal ID using the product_id string
+      const qty = parseInt(quantityAssign, 10);
+      if (isNaN(qty) || qty <= 0) {
+        toast.error("Please enter a valid quantity.");
+        return;
+      }
+
+      // Ensure rate and mrp are available
+      if (rateAssign === "" || mrpAssign === "") {
+        toast.error("Rate and MRP must be available for the selected product.");
+        return;
+      }
+
+      isLoadingRef.current = true;
+
       try {
-        const { data: productData, error: productError } = await supabase
-          .from("products")
-          .select("id, rate, mrp, hsn_code")
-          .eq("product_id", productIdStr)
-          .single();
-
-        if (productError || !productData) {
-          setError("Selected product does not exist.");
-          return;
-        }
-
-        const productId = productData.id;
-        const rate = productData.rate;
-        const mrp = productData.mrp;
-        const hsn_code = productData.hsn_code;
-
-        const qty = parseInt(quantityAssignValue, 10);
-        if (isNaN(qty) || qty <= 0) {
-          setError("Please enter a valid quantity.");
-          return;
-        }
-
-        // Ensure rate and mrp are available
-        if (rate === null || mrp === null) {
-          setError("Rate and MRP must be available for the selected product.");
-          return;
-        }
-
-        setIsLoading(true);
-
-        // Prepare the assignment object
         const assignments = [
           {
-            product_id: productId, // Use internal product ID (integer)
-            from_branch_code: fromBranch,
-            to_branch_code: toBranch,
+            product_id: product.id, // Use internal product ID (integer)
+            from_branch_code: fromBranchAssign,
+            to_branch_code: toBranchAssign,
             quantity: qty,
             notes: "", // Optional: Modify to accept user input if needed
           },
         ];
 
-        // Call the assignStock function from authService.js
         const response = await assignStock(assignments);
 
         if (response.success) {
-          setSuccess("Stock assigned successfully.");
           toast.success("Stock assigned successfully.");
           // Reset form
-          form.reset();
-          setSearchProductAssign("");
-          setProductSuggestionsAssign([]);
-          setShowSuggestionsAssign(false);
+          setFromBranchAssign("");
+          setToBranchAssign("");
           setSelectedProductAssign("");
+          setSearchProductAssign("");
           setRateAssign("");
           setMrpAssign("");
           setHsnCodeAssign("");
-          setFromBranchAssign("");
-          setToBranchAssign("");
+          setQuantityAssign("");
+          setProductSuggestionsAssign([]);
+          setShowSuggestionsAssign(false);
           // Refresh stock data
           refreshStockData();
         } else {
-          setError(response.error || "Failed to assign stock.");
+          toast.error(response.error || "Failed to assign stock.");
         }
       } catch (err) {
         console.error("Error assigning stock:", err);
-        setError("An unexpected error occurred.");
+        toast.error("An unexpected error occurred.");
       } finally {
-        setIsLoading(false);
+        isLoadingRef.current = false;
       }
     },
-    [assignStock, refreshStockData]
+    [
+      fromBranchAssign,
+      toBranchAssign,
+      selectedProductAssign,
+      quantityAssign,
+      rateAssign,
+      mrpAssign,
+      products,
+      assignStock,
+      refreshStockData,
+    ]
   );
-
-
-  // Handler for bulk assign
-  const handleBulkAssign = useCallback(
-    async (e) => {
-      e.preventDefault();
-      setError("");
-      setSuccess("");
-
-      if (!bulkFromBranch || !bulkToBranch || !file) {
-        setError("Please select both source and destination branches and upload a file.");
-        return;
-      }
-
-      if (bulkFromBranch === bulkToBranch) {
-        setError("From and To branches cannot be the same.");
-        return;
-      }
-
-      // Validate file type based on uploadFormat
-      const allowedExtensions = uploadFormat === "csv" ? ["csv"] : ["xml"];
-      const fileExtension = file.name.split(".").pop().toLowerCase();
-
-      if (!allowedExtensions.includes(fileExtension)) {
-        setError(
-          `Invalid file format. Please upload a ${
-            uploadFormat === "csv" ? "CSV" : "XML"
-          } file.`
-        );
-        return;
-      }
-
-      setIsLoading(true);
-      isUploadingRef.current = true;
-
-      try {
-        const response = await bulkUploadStock(file, uploadFormat, bulkFromBranch, bulkToBranch);
-
-        if (response.success) {
-          let message = "Bulk stock upload successful.";
-
-          if (response.insertedProducts && response.insertedProducts.length > 0) {
-            message += `\nInserted ${response.insertedProducts.length} new product(s).`;
-          }
-
-          setSuccess(message);
-          setFile(null);
-          setUploadFormat("csv");
-          if (fileInputRef.current) fileInputRef.current.value = "";
-          setBulkFromBranch("");
-          setBulkToBranch("");
-          // Refresh stock data
-          refreshStockData();
-        } else {
-          setError(response.error || "Bulk upload failed.");
-        }
-      } catch (err) {
-        console.error("Error during bulk upload:", err);
-        setError("An unexpected error occurred during bulk upload.");
-      } finally {
-        isUploadingRef.current = false;
-        setIsLoading(false);
-      }
-    },
-    [bulkFromBranch, bulkToBranch, file, uploadFormat, bulkUploadStock, refreshStockData]
-  );
-
-  // Handler for file selection
-  const handleFileChange = useCallback((e) => {
-    const uploadedFile = e.target.files[0];
-    if (uploadedFile) {
-      setFile(uploadedFile);
-    } else {
-      setFile(null);
-    }
-  }, []);
-
-  // Pagination handlers
-  const handlePageClick = (selectedItem) => {
-    setCurrentPage(selectedItem.selected);
-  };
-
-  // Calculate the items to display on the current page
-  const offset = currentPage * itemsPerPage;
-  const currentItems = lookupResults.length > 0 ? lookupResults.slice(offset, offset + itemsPerPage) : filteredStocks.slice(offset, offset + itemsPerPage);
-  const pageCount = Math.ceil((lookupResults.length > 0 ? lookupResults.length : filteredStocks.length) / itemsPerPage);
 
   return (
     <div
@@ -637,53 +748,11 @@ const handleAssignStock = useCallback(
         isCollapsed ? "mx-20" : "mx-20 px-20"
       } justify-center my-20 p-8 rounded-xl mx-auto max-w-4xl bg-green-50 shadow-inner`}
     >
-      <h1 className="text-2xl font-semibold mb-6 text-center">
-        Stock Management
-      </h1>
-
-      {/* Display Error and Success Messages */}
-      {error && (
-        <div className="flex items-center text-red-500 mb-4 whitespace-pre-line">
-          <svg
-            className="w-5 h-5 mr-2"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-            />
-          </svg>
-          <span>{error}</span>
-        </div>
-      )}
-      {success && (
-        <div className="flex items-center text-green-500 mb-4 whitespace-pre-line">
-          <svg
-            className="w-5 h-5 mr-2"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M5 13l4 4L19 7"
-            />
-          </svg>
-          <span>{success}</span>
-        </div>
-      )}
+      <h1 className="text-2xl font-semibold mb-6 text-center">Stock Management</h1>
 
       {/* ======= Add/Update Stock Manually ======= */}
       <form onSubmit={handleAddUpdateStock} className="mb-8">
-        <h2 className="text-xl font-semibold mb-4">
-          Add or Update Stock Manually
-        </h2>
+        <h2 className="text-xl font-semibold mb-4">Add or Update Stock Manually</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Branch Selection */}
           <div>
@@ -692,8 +761,8 @@ const handleAssignStock = useCallback(
             </label>
             <select
               id="branchAdd"
-              value={selectedBranch}
-              onChange={(e) => setSelectedBranch(e.target.value)}
+              value={selectedBranchAdd}
+              onChange={(e) => setSelectedBranchAdd(e.target.value)}
               className="w-full p-2 border rounded"
               required
             >
@@ -793,19 +862,101 @@ const handleAssignStock = useCallback(
         <button
           type="submit"
           className={`mt-4 w-full p-2 text-white rounded flex items-center justify-center ${
-            isLoading
+            isLoadingRef.current
               ? "bg-blue-500 cursor-not-allowed"
               : "bg-green-500 hover:bg-green-600"
           }`}
-          disabled={isLoading}
+          disabled={isLoadingRef.current}
         >
-          {isLoading ? (
+          {isLoadingRef.current ? (
             <>
               <ClipLoader size={20} color="#ffffff" />
               <span className="ml-2">Updating...</span>
             </>
           ) : (
             "Add/Update Stock"
+          )}
+        </button>
+      </form>
+
+      {/* ======= Bulk Upload to a Single Branch ======= */}
+      <form onSubmit={handleBulkUploadToBranch} className="mb-8">
+        <h2 className="text-xl font-semibold mb-4">Bulk Upload Stock to a Branch</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Branch Selection */}
+          <div>
+            <label htmlFor="bulkBranchUpload" className="block mb-2 font-medium">
+              Select Branch/Godown
+            </label>
+            <select
+              id="bulkBranchUpload"
+              value={bulkBranchUpload}
+              onChange={(e) => setBulkBranchUpload(e.target.value)}
+              className="w-full p-2 border rounded"
+              required
+            >
+              <option value="" disabled>
+                Select Branch
+              </option>
+              {branches.map((branch) => (
+                <option key={branch.branch_code} value={branch.branch_code}>
+                  {branch.branch_name} {branch.type === "godown" ? "(Godown)" : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* File Format Selection */}
+          <div>
+            <label htmlFor="uploadFormatUpload" className="block mb-2 font-medium">
+              File Format
+            </label>
+            <select
+              id="uploadFormatUpload"
+              value={uploadFormatUpload}
+              onChange={(e) => setUploadFormatUpload(e.target.value)}
+              className="w-full p-2 border rounded"
+              required
+            >
+              <option value="csv">CSV</option>
+              {/* Add XML option if needed */}
+              {/* <option value="xml">XML</option> */}
+            </select>
+          </div>
+        </div>
+
+        {/* File Input */}
+        <div className="mt-4">
+          <label htmlFor="bulkBranchFile" className="block mb-2 font-medium">
+            Upload CSV File
+          </label>
+          <input
+            type="file"
+            id="bulkBranchFile"
+            accept=".csv"
+            onChange={handleFileChangeUpload}
+            className="w-full p-2 border rounded"
+            required
+            ref={fileUploadRef}
+          />
+        </div>
+
+        <button
+          type="submit"
+          className={`mt-4 w-full p-2 text-white rounded flex items-center justify-center ${
+            isLoadingRef.current
+              ? "bg-blue-500 cursor-not-allowed"
+              : "bg-green-500 hover:bg-green-600"
+          }`}
+          disabled={isLoadingRef.current}
+        >
+          {isLoadingRef.current ? (
+            <>
+              <ClipLoader size={20} color="#ffffff" />
+              <span className="ml-2">Uploading... Please wait</span>
+            </>
+          ) : (
+            "Upload Bulk Stock"
           )}
         </button>
       </form>
@@ -874,7 +1025,7 @@ const handleAssignStock = useCallback(
               value={searchProductAssign}
               onChange={handleProductInputAssign}
               onFocus={() => setShowSuggestionsAssign(true)}
-              onBlur={() => setTimeout(() => setShowSuggestionsAssign(false), 200)}
+              onBlur={() => setTimeout(() => setShowSuggestionsAssign(false), 200)} // Delay to allow click
               placeholder="Type product name or ID"
               className="w-full p-2 border rounded"
               required
@@ -912,7 +1063,7 @@ const handleAssignStock = useCallback(
               min="0"
               step="0.01"
               required
-              disabled={!selectedProductAssign || isLoading}
+              disabled={!selectedProductAssign || isLoadingRef.current}
             />
           </div>
           <div>
@@ -928,7 +1079,7 @@ const handleAssignStock = useCallback(
               min="0"
               step="0.01"
               required
-              disabled={!selectedProductAssign || isLoading}
+              disabled={!selectedProductAssign || isLoadingRef.current}
             />
           </div>
           <div>
@@ -942,7 +1093,7 @@ const handleAssignStock = useCallback(
               onChange={(e) => setHsnCodeAssign(e.target.value)}
               className="w-full p-2 border rounded"
               required
-              disabled={!selectedProductAssign || isLoading}
+              disabled={!selectedProductAssign || isLoadingRef.current}
             />
           </div>
         </div>
@@ -961,20 +1112,20 @@ const handleAssignStock = useCallback(
             className="w-full p-2 border rounded"
             min="1"
             required
-            disabled={isLoading}
+            disabled={isLoadingRef.current}
           />
         </div>
 
         <button
           type="submit"
           className={`mt-4 w-full p-2 text-white rounded flex items-center justify-center ${
-            isLoading
+            isLoadingRef.current
               ? "bg-blue-500 cursor-not-allowed"
               : "bg-green-500 hover:bg-green-600"
           }`}
-          disabled={isLoading}
+          disabled={isLoadingRef.current}
         >
-          {isLoading ? (
+          {isLoadingRef.current ? (
             <>
               <ClipLoader size={20} color="#ffffff" />
               <span className="ml-2">Assigning...</span>
@@ -991,13 +1142,13 @@ const handleAssignStock = useCallback(
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* From Branch Selection */}
           <div>
-            <label htmlFor="bulkFromBranch" className="block mb-2 font-medium">
+            <label htmlFor="bulkFromBranchAssign" className="block mb-2 font-medium">
               From Branch/Godown
             </label>
             <select
-              id="bulkFromBranch"
-              value={bulkFromBranch}
-              onChange={(e) => setBulkFromBranch(e.target.value)}
+              id="bulkFromBranchAssign"
+              value={bulkFromBranchAssign}
+              onChange={(e) => setBulkFromBranchAssign(e.target.value)}
               className="w-full p-2 border rounded"
               required
             >
@@ -1014,13 +1165,13 @@ const handleAssignStock = useCallback(
 
           {/* To Branch Selection */}
           <div>
-            <label htmlFor="bulkToBranch" className="block mb-2 font-medium">
+            <label htmlFor="bulkToBranchAssign" className="block mb-2 font-medium">
               To Branch/Godown
             </label>
             <select
-              id="bulkToBranch"
-              value={bulkToBranch}
-              onChange={(e) => setBulkToBranch(e.target.value)}
+              id="bulkToBranchAssign"
+              value={bulkToBranchAssign}
+              onChange={(e) => setBulkToBranchAssign(e.target.value)}
               className="w-full p-2 border rounded"
               required
             >
@@ -1037,13 +1188,13 @@ const handleAssignStock = useCallback(
 
           {/* File Format Selection */}
           <div>
-            <label htmlFor="bulkFormat" className="block mb-2 font-medium">
+            <label htmlFor="uploadFormatAssign" className="block mb-2 font-medium">
               File Format
             </label>
             <select
-              id="bulkFormat"
-              value={uploadFormat}
-              onChange={(e) => setUploadFormat(e.target.value)}
+              id="uploadFormatAssign"
+              value={uploadFormatAssign}
+              onChange={(e) => setUploadFormatAssign(e.target.value)}
               className="w-full p-2 border rounded"
               required
             >
@@ -1056,30 +1207,30 @@ const handleAssignStock = useCallback(
 
         {/* File Input */}
         <div className="mt-4">
-          <label htmlFor="bulkFile" className="block mb-2 font-medium">
+          <label htmlFor="bulkAssignFile" className="block mb-2 font-medium">
             Upload CSV File
           </label>
           <input
             type="file"
-            id="bulkFile"
+            id="bulkAssignFile"
             accept=".csv"
-            onChange={handleFileChange}
+            onChange={handleFileChangeAssign}
             className="w-full p-2 border rounded"
             required
-            ref={fileInputRef}
+            ref={fileAssignRef}
           />
         </div>
 
         <button
           type="submit"
           className={`mt-4 w-full p-2 text-white rounded flex items-center justify-center ${
-            isLoading
+            isLoadingRef.current
               ? "bg-blue-500 cursor-not-allowed"
               : "bg-green-500 hover:bg-green-600"
           }`}
-          disabled={isLoading}
+          disabled={isLoadingRef.current}
         >
-          {isLoading ? (
+          {isLoadingRef.current ? (
             <>
               <ClipLoader size={20} color="#ffffff" />
               <span className="ml-2">Uploading... Please wait</span>
@@ -1101,9 +1252,9 @@ const handleAssignStock = useCallback(
             </label>
             <select
               id="lookupBranch"
-              value={selectedBranch}
+              value={lookupBranch}
               onChange={(e) => {
-                setSelectedBranch(e.target.value);
+                setLookupBranch(e.target.value);
                 setLookupResults([]); // Clear previous lookup results
               }}
               className="w-full p-2 border rounded"
@@ -1155,7 +1306,7 @@ const handleAssignStock = useCallback(
         </div>
 
         {/* Stock Details Table */}
-        {selectedBranch && (
+        {lookupBranch && (
           <div className="mt-6 overflow-x-auto">
             <table className="min-w-full bg-white">
               <thead>
@@ -1165,42 +1316,30 @@ const handleAssignStock = useCallback(
                   <th className="py-2 px-4 border-b">Quantity</th>
                   <th className="py-2 px-4 border-b">Rate</th>
                   <th className="py-2 px-4 border-b">MRP</th>
-                  <th className="py-2 px-4 border-b">HSN Code</th>
                   <th className="py-2 px-4 border-b">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {lookupResults.length > 0
                   ? lookupResults.map((stock) => (
-                      <tr key={`${stock.product.product_id}-${selectedBranch}`}>
+                      <tr key={`${stock.product.product_id}-${lookupBranch}`}>
                         <td className="py-2 px-4 border-b text-center">
                           {stock.product.product_id}
                         </td>
-                        <td className="py-2 px-4 border-b">
-                          {stock.product.product_name}
+                        <td className="py-2 px-4 border-b">{stock.product.product_name}</td>
+                        <td className="py-2 px-4 border-b text-center">{stock.quantity}</td>
+                        <td className="py-2 px-4 border-b text-center">
+                          {stock.product.rate !== null ? stock.product.rate.toFixed(2) : "N/A"}
                         </td>
                         <td className="py-2 px-4 border-b text-center">
-                          {stock.quantity}
-                        </td>
-                        <td className="py-2 px-4 border-b text-center">
-                          {stock.product.rate !== null
-                            ? stock.product.rate.toFixed(2)
-                            : "N/A"}
-                        </td>
-                        <td className="py-2 px-4 border-b text-center">
-                          {stock.product.mrp !== null
-                            ? stock.product.mrp.toFixed(2)
-                            : "N/A"}
-                        </td>
-                        <td className="py-2 px-4 border-b text-center">
-                          {stock.product.hsn_code || "N/A"}
+                          {stock.product.mrp !== null ? stock.product.mrp.toFixed(2) : "N/A"}
                         </td>
                         <td className="py-2 px-4 border-b text-center">
                           <button
                             onClick={() => {
                               setStockToEdit({
                                 ...stock,
-                                branch_code: selectedBranch,
+                                branch_code: lookupBranch,
                               });
                               dispatch({
                                 type: "SET_MODAL_STATE",
@@ -1215,35 +1354,24 @@ const handleAssignStock = useCallback(
                       </tr>
                     ))
                   : currentItems.map((stock) => (
-                      <tr key={`${stock.product.product_id}-${selectedBranch}`}>
+                      <tr key={`${stock.product.product_id}-${lookupBranch}`}>
                         <td className="py-2 px-4 border-b text-center">
                           {stock.product.product_id}
                         </td>
-                        <td className="py-2 px-4 border-b">
-                          {stock.product.product_name}
+                        <td className="py-2 px-4 border-b">{stock.product.product_name}</td>
+                        <td className="py-2 px-4 border-b text-center">{stock.quantity}</td>
+                        <td className="py-2 px-4 border-b text-center">
+                          {stock.product.rate !== null ? stock.product.rate.toFixed(2) : "N/A"}
                         </td>
                         <td className="py-2 px-4 border-b text-center">
-                          {stock.quantity}
-                        </td>
-                        <td className="py-2 px-4 border-b text-center">
-                          {stock.product.rate !== null
-                            ? stock.product.rate.toFixed(2)
-                            : "N/A"}
-                        </td>
-                        <td className="py-2 px-4 border-b text-center">
-                          {stock.product.mrp !== null
-                            ? stock.product.mrp.toFixed(2)
-                            : "N/A"}
-                        </td>
-                        <td className="py-2 px-4 border-b text-center">
-                          {stock.product.hsn_code || "N/A"}
+                          {stock.product.mrp !== null ? stock.product.mrp.toFixed(2) : "N/A"}
                         </td>
                         <td className="py-2 px-4 border-b text-center">
                           <button
                             onClick={() => {
                               setStockToEdit({
                                 ...stock,
-                                branch_code: selectedBranch,
+                                branch_code: lookupBranch,
                               });
                               dispatch({
                                 type: "SET_MODAL_STATE",
@@ -1259,7 +1387,7 @@ const handleAssignStock = useCallback(
                     ))}
                 {currentItems.length === 0 && lookupResults.length === 0 && (
                   <tr>
-                    <td colSpan="7" className="py-4 text-center">
+                    <td colSpan="6" className="py-4 text-center">
                       No stock entries found.
                     </td>
                   </tr>
@@ -1305,6 +1433,19 @@ const handleAssignStock = useCallback(
           refreshStockData={refreshStockData}
         />
       )}
+
+      {/* ======= Toast Container ======= */}
+      <ToastContainer
+        position="top-right"
+        autoClose={5000}
+        hideProgressBar={false}
+        newestOnTop
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+      />
     </div>
   );
 };
