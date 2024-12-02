@@ -2029,12 +2029,13 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                     <h2 className="text-3xl font-bold">Work Order</h2>
                   </div>
                   <div className="text-right">
+                  <p>
+                      Date: <strong>{formattedDate}</strong>
+                    </p>
                     <p>
                       Work Order No:<strong> {workOrderId}</strong>
                     </p>
-                    <p>
-                      Date: <strong>{formattedDate}</strong>
-                    </p>
+                    
                     {hasMrNumber && (
                       <>
                         <p>

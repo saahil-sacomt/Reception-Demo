@@ -3522,12 +3522,13 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                   <div className="flex justify-between items-center mb-6">
                     <h2 className="text-3xl font-bold">Tax Invoice</h2>
                     <div className="text-right">
+                    <p>
+                        Date:<strong> {formattedDate}</strong>
+                      </p>
                       <p>
                         Invoice No:<strong> {salesOrderId}</strong>
                       </p>
-                      <p>
-                        Date:<strong> {formattedDate}</strong>
-                      </p>
+                      
                       {hasMrNumber && (
                         <p>
                           MR Number:<strong> {mrNumber || "NA"}</strong>
