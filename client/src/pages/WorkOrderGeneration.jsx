@@ -28,6 +28,14 @@ const yyyy = today.getFullYear();
 
 const formattedDate = `${dd}/${mm}/${yyyy}`;
 
+const formatDate = (date) => {
+  const d = new Date(date);
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  return `${dd}/${mm}/${yyyy}`;
+};
+
 const WorkOrderGeneration = ({ isCollapsed }) => {
   const { branch } = useAuth();
   const { orderId } = useParams(); // Get orderId from route params
@@ -2280,7 +2288,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                 {/* Footer Section */}
                 <div className="flex-col justify-start mx-auto items-start text-left text-md">
                   <p className="mt-2 text-md">
-                    Delivery On:<strong> {dueDate || "N/A"}</strong>
+                    Delivery On:<strong> {dueDate ? formatDate(dueDate) : "N/A"}</strong>
                   </p>
 
                   {isB2B && (
