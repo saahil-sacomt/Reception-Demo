@@ -93,14 +93,14 @@ const getColumnStyles = (reportType, isEmployee = false) => {
       return {
         0: { halign: 'center', cellWidth: 25 }, // Sales Order ID
         1: { halign: 'center', cellWidth: 25 }, // Work Order ID
-        2: { halign: 'center', cellWidth: 25 }, // MR Number
+        2: { halign: 'center', cellWidth: 20 }, // MR Number
         3: { halign: 'center', cellWidth: 25 }, // Total Amount
-        4: { halign: 'center', cellWidth: 25 }, // Total GST
-        5: { halign: 'center', cellWidth: 25 }, // Advance Collected
-        6: { halign: 'center', cellWidth: 25 }, // Balance Collected
+        4: { halign: 'center', cellWidth: 20 }, // Total GST
+        5: { halign: 'center', cellWidth: 20 }, // Advance Collected
+        6: { halign: 'center', cellWidth: 20 }, // Balance Collected
         7: { halign: 'center', cellWidth: 25 }, // Total Collected (Replaced)
-        8: { halign: 'center', cellWidth: 25 }, // Patient/Customer Name (New Column)
-        9: { halign: 'center', cellWidth: 25 }, // Branch
+        8: { halign: 'center', cellWidth: 30 }, // Patient/Customer Name (New Column)
+        9: { halign: 'center', cellWidth: 15 }, // Branch
         10: { halign: 'center', cellWidth: 25 }, // Created At
         11: { halign: 'center', cellWidth: 25 }, // Updated At
       };
@@ -617,124 +617,81 @@ const ReportGenerator = ({ isCollapsed }) => {
             .select('sales_order_id, work_order_id, mr_number, final_amount, cgst, sgst, total_amount, created_at, updated_at, branch, customer_id')
             .gte('created_at', startDate.toISOString())
             .lte('created_at', endDate.toISOString());
-
+        
           if (!isCombined) {
             salesQuery.in('branch', branchesToReport);
           }
-
+        
           const { data: salesData, error: salesError } = await salesQuery;
           if (salesError) throw salesError;
-
-          // Fetch work_orders
-          const workQuery = supabase
-            .from('work_orders')
-            .select('work_order_id, mr_number, sgst, cgst, total_amount, advance_details, created_at, updated_at, branch')
-            .gte('created_at', startDate.toISOString())
-            .lte('created_at', endDate.toISOString());
-
-          if (!isCombined) {
-            workQuery.in('branch', branchesToReport);
-          }
-
-          const { data: workData, error: workError } = await workQuery;
-          if (workError) throw workError;
-
-          // Create a mapping of work orders by work_order_id
-          const workOrdersMap = {};
-          workData.forEach(work => {
-            workOrdersMap[work.work_order_id] = work;
-          });
-
+        
+          // Fetch MR numbers and customer IDs for mapping
+          const mrNumbers = salesData.map(sale => sale.mr_number).filter(mr => mr !== null);
+          const customerIds = salesData.map(sale => sale.customer_id).filter(id => id !== null);
+        
+          // Fetch patients based on MR numbers
+          const { data: patientsData, error: patientsError } = await supabase
+            .from('patients')
+            .select('mr_number, name')
+            .in('mr_number', mrNumbers);
+        
+          if (patientsError) throw patientsError;
+        
+          // Fetch customers based on customer IDs
+          const { data: customersData, error: customersError } = await supabase
+            .from('customers')
+            .select('customer_id, name')
+            .in('customer_id', customerIds);
+        
+          if (customersError) throw customersError;
+        
+          // Map MR numbers to patient names
+          const patientMap = Object.fromEntries(patientsData.map(p => [p.mr_number, p.name]));
+        
+          // Map customer IDs to customer names
+          const customerMap = Object.fromEntries(customersData.map(c => [c.customer_id, c.name]));
+        
           // Consolidate data based on work_order_id
           const consolidatedData = salesData.map(sale => {
-            const relatedWork = workOrdersMap[sale.work_order_id] || {};
-
-            // Calculate Total GST
-            const totalGST = (parseFloat(sale.cgst) || 0) + (parseFloat(sale.sgst) || 0) + (parseFloat(relatedWork.cgst) || 0) + (parseFloat(relatedWork.sgst) || 0);
-
-            // Total Amount is from Work Order Total Amount
-            const totalAmount = parseFloat(relatedWork.total_amount) || 0;
-
-            // Advance Collected from Work Order
-            const advanceCollected = parseFloat(relatedWork.advance_details) || 0;
-
-            // Balance Collected from Sales Order (Final Amount)
-            const balanceCollected = parseFloat(sale.final_amount) || 0;
-
-            // Total Collected (Advance + Balance)
-            const totalCollected = advanceCollected + balanceCollected;
-
-            // Determine Patient/Customer Name with trimming and case-insensitive matching
+            // Determine Patient Name
+            let patientName = patientMap[sale.mr_number] || 'N/A';
+        
+            // Determine Customer Name
+            let customerName = customerMap[sale.customer_id] || 'N/A';
+        
+            // Combine Patient and Customer Names
             let patientCustomerName = 'N/A';
-            if (sale.mr_number && typeof sale.mr_number === 'string') {
-              const trimmedMrNumber = sale.mr_number.trim().toLowerCase();
-              const patient = patients.find(p => p.mr_number.trim().toLowerCase() === trimmedMrNumber);
-              if (patient) {
-                patientCustomerName = patient.name;
-              }
+            if (patientName !== 'N/A' && customerName !== 'N/A') {
+              patientCustomerName = `${patientName} / ${customerName}`;
+            } else if (patientName !== 'N/A') {
+              patientCustomerName = patientName;
+            } else if (customerName !== 'N/A') {
+              patientCustomerName = customerName;
             }
-            if (patientCustomerName === 'N/A' && sale.customer_id && typeof sale.customer_id === 'string') {
-              const trimmedCustomerId = sale.customer_id.trim().toLowerCase();
-              const customer = customers.find(c => c.customer_id.trim().toLowerCase() === trimmedCustomerId);
-              if (customer) {
-                patientCustomerName = customer.name;
-              }
-            }
-
+        
+            // Total GST calculation
+            const totalGST = (parseFloat(sale.cgst) || 0) + (parseFloat(sale.sgst) || 0);
+        
             return {
               sales_order_id: sale.sales_order_id || 'N/A',
               work_order_id: sale.work_order_id || 'N/A',
-              mr_number: sale.mr_number || relatedWork.mr_number || 'N/A',
-              total_amount: totalAmount,
+              mr_number: sale.mr_number || 'N/A',
+              total_amount: parseFloat(sale.total_amount) || 0,
               total_gst: totalGST,
-              advance_collected: advanceCollected,
-              balance_collected: balanceCollected,
-              total_collected: totalCollected, // Replaced 'amount_left_to_collect'
-              patient_customer_name: patientCustomerName, // New Field
-              branch: sale.branch || relatedWork.branch || 'N/A',
-              created_at: sale.created_at ? convertUTCToIST(sale.created_at, 'dd-MM-yyyy hh:mm a') : (relatedWork.created_at ? convertUTCToIST(relatedWork.created_at, 'dd-MM-yyyy hh:mm a') : 'N/A'),
-              updated_at: sale.updated_at ? convertUTCToIST(sale.updated_at, 'dd-MM-yyyy hh:mm a') : (relatedWork.updated_at ? convertUTCToIST(relatedWork.updated_at, 'dd-MM-yyyy hh:mm a') : 'N/A'),
+              advance_collected: parseFloat(sale.advance_details) || 0,
+              balance_collected: parseFloat(sale.final_amount) || 0,
+              total_collected: (parseFloat(sale.advance_details) || 0) + (parseFloat(sale.final_amount) || 0),
+              patient_customer_name: patientCustomerName,
+              branch: sale.branch || 'N/A',
+              created_at: sale.created_at ? convertUTCToIST(sale.created_at, 'dd-MM-yyyy hh:mm a') : 'N/A',
+              updated_at: sale.updated_at ? convertUTCToIST(sale.updated_at, 'dd-MM-yyyy hh:mm a') : 'N/A',
             };
           });
-
-          // For work orders without corresponding sales orders
-          const additionalWorkOrders = workData.filter(work => !salesData.some(sale => sale.work_order_id === work.work_order_id));
-          additionalWorkOrders.forEach(work => {
-            // Determine Patient/Customer Name with trimming and case-insensitive matching
-            let patientCustomerName = 'N/A';
-            if (work.mr_number && typeof work.mr_number === 'string') {
-              const trimmedMrNumber = work.mr_number.trim().toLowerCase();
-              const patient = patients.find(p => p.mr_number.trim().toLowerCase() === trimmedMrNumber);
-              if (patient) {
-                patientCustomerName = patient.name;
-              }
-            }
-
-            const totalGST = (parseFloat(work.cgst) || 0) + (parseFloat(work.sgst) || 0);
-            const totalAmount = parseFloat(work.total_amount) || 0;
-            const advanceCollected = parseFloat(work.advance_details) || 0;
-            const balanceCollected = 0; // Since no sales order
-            const totalCollected = advanceCollected + balanceCollected;
-
-            consolidatedData.push({
-              sales_order_id: 'N/A',
-              work_order_id: work.work_order_id || 'N/A',
-              mr_number: work.mr_number || 'N/A',
-              total_amount: totalAmount,
-              total_gst: totalGST,
-              advance_collected: advanceCollected,
-              balance_collected: balanceCollected,
-              total_collected: totalCollected, // Replaced 'amount_left_to_collect'
-              patient_customer_name: patientCustomerName, // New Field
-              branch: work.branch || 'N/A',
-              created_at: work.created_at ? convertUTCToIST(work.created_at, 'dd-MM-yyyy hh:mm a') : 'N/A',
-              updated_at: work.updated_at ? convertUTCToIST(work.updated_at, 'dd-MM-yyyy hh:mm a') : 'N/A',
-            });
-          });
-
+        
           fetchedData = consolidatedData;
           break;
         }
+
         case 'stock_report': {
           // Fetch products
           const { data: productsData, error: productsError } = await supabase
@@ -1186,12 +1143,13 @@ const ReportGenerator = ({ isCollapsed }) => {
           record.advance_collected ? Number(record.advance_collected).toFixed(2) : '0.00',
           record.balance_collected ? Number(record.balance_collected).toFixed(2) : '0.00',
           record.total_collected ? Number(record.total_collected).toFixed(2) : '0.00', // Total Collected
-          record.patient_customer_name || 'N/A', // New Column
+          record.patient_customer_name || 'N/A', // Updated Column
           record.branch || 'N/A',
           record.created_at || 'N/A',
           record.updated_at || 'N/A',
         ]);
         break;
+
       case 'stock_report':
         tableRows = data.map((item) => [
           item.product_id || 'N/A',
@@ -1537,8 +1495,8 @@ const ReportGenerator = ({ isCollapsed }) => {
                     reportPeriod === 'daily'
                       ? dateRef
                       : reportPeriod === 'monthly'
-                      ? monthYearRef
-                      : fromDateRef
+                        ? monthYearRef
+                        : fromDateRef
                   )
                 }
                 className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
@@ -1563,11 +1521,10 @@ const ReportGenerator = ({ isCollapsed }) => {
                   type="button"
                   onClick={() => toggleReportScope('branch')}
                   onKeyDown={(e) => handleKeyDown(e, isCombined ? generateButtonRef : branchSelectionRef)}
-                  className={`px-4 py-2 rounded-md border ${
-                    !isCombined
-                      ? 'bg-green-500 text-white border-green-500'
-                      : 'bg-white text-gray-700 border-gray-300'
-                  } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500`}
+                  className={`px-4 py-2 rounded-md border ${!isCombined
+                    ? 'bg-green-500 text-white border-green-500'
+                    : 'bg-white text-gray-700 border-gray-300'
+                    } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500`}
                   aria-label="Select Branch-wise Report Scope"
                 >
                   Branch-wise
@@ -1577,11 +1534,10 @@ const ReportGenerator = ({ isCollapsed }) => {
                   type="button"
                   onClick={() => toggleReportScope('combined')}
                   onKeyDown={(e) => handleKeyDown(e, generateButtonRef)}
-                  className={`px-4 py-2 rounded-md border ${
-                    isCombined
-                      ? 'bg-green-500 text-white border-green-500'
-                      : 'bg-white text-gray-700 border-gray-300'
-                  } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500`}
+                  className={`px-4 py-2 rounded-md border ${isCombined
+                    ? 'bg-green-500 text-white border-green-500'
+                    : 'bg-white text-gray-700 border-gray-300'
+                    } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500`}
                   aria-label="Select Combined Report Scope"
                 >
                   Combined (All Branches)
@@ -1603,11 +1559,10 @@ const ReportGenerator = ({ isCollapsed }) => {
                     type="button"
                     onClick={() => toggleBranch(branch.code)}
                     onKeyDown={(e) => handleKeyDown(e, e.target.nextSibling || generateButtonRef)}
-                    className={`px-4 py-2 rounded-md border ${
-                      selectedBranches.includes(branch.code)
-                        ? 'bg-green-500 text-white border-green-500'
-                        : 'bg-white text-gray-700 border-gray-300'
-                    } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500`}
+                    className={`px-4 py-2 rounded-md border ${selectedBranches.includes(branch.code)
+                      ? 'bg-green-500 text-white border-green-500'
+                      : 'bg-white text-gray-700 border-gray-300'
+                      } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500`}
                     aria-label={`Toggle branch ${branch.name}`}
                   >
                     {branch.name}
@@ -1697,9 +1652,8 @@ const ReportGenerator = ({ isCollapsed }) => {
                   handleGenerateReport();
                 }
               }}
-              className={`w-full sm:w-1/2 px-4 py-2 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-md flex items-center justify-center transition ${
-                loading || (!isCombined && !isEmployee && selectedBranches.length === 0) ? 'opacity-50 cursor-not-allowed' : ''
-              }`}
+              className={`w-full sm:w-1/2 px-4 py-2 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-md flex items-center justify-center transition ${loading || (!isCombined && !isEmployee && selectedBranches.length === 0) ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
               disabled={loading || (!isCombined && !isEmployee && selectedBranches.length === 0)}
               aria-label="Generate Report"
             >
