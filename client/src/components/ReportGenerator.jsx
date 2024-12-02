@@ -94,15 +94,16 @@ const getColumnStyles = (reportType, isEmployee = false) => {
         0: { halign: 'center', cellWidth: 25 }, // Sales Order ID
         1: { halign: 'center', cellWidth: 25 }, // Work Order ID
         2: { halign: 'center', cellWidth: 20 }, // MR Number
-        3: { halign: 'center', cellWidth: 25 }, // Total Amount
+        3: { halign: 'center', cellWidth: 20 }, // Total Amount
         4: { halign: 'center', cellWidth: 20 }, // Total GST
-        5: { halign: 'center', cellWidth: 20 }, // Advance Collected
-        6: { halign: 'center', cellWidth: 20 }, // Balance Collected
-        7: { halign: 'center', cellWidth: 25 }, // Total Collected (Replaced)
-        8: { halign: 'center', cellWidth: 30 }, // Patient/Customer Name (New Column)
-        9: { halign: 'center', cellWidth: 15 }, // Branch
-        10: { halign: 'center', cellWidth: 25 }, // Created At
-        11: { halign: 'center', cellWidth: 25 }, // Updated At
+        5: { halign: 'center', cellWidth: 20 }, // Discount
+        6: { halign: 'center', cellWidth: 20 }, // Advance Collected
+        7: { halign: 'center', cellWidth: 20 }, // Balance Collected
+        8: { halign: 'center', cellWidth: 20 }, // Total Collected (Replaced)
+        9: { halign: 'center', cellWidth: 30 }, // Patient/Customer Name (New Column)
+        10: { halign: 'center', cellWidth: 15 }, // Branch
+        11: { halign: 'center', cellWidth: 25 }, // Created At
+        12: { halign: 'center', cellWidth: 25 }, // Updated At
       };
     case 'stock_report':
       return {
@@ -614,7 +615,7 @@ const ReportGenerator = ({ isCollapsed }) => {
           // Fetch sales_orders with necessary fields
           const salesQuery = supabase
             .from('sales_orders')
-            .select('sales_order_id, work_order_id, mr_number, final_amount, cgst, sgst, total_amount, created_at, updated_at, branch, customer_id')
+            .select('sales_order_id, work_order_id, mr_number, final_amount, cgst, sgst, total_amount, created_at, updated_at, branch, customer_id,discount,advance_details')
             .gte('created_at', startDate.toISOString())
             .lte('created_at', endDate.toISOString());
         
@@ -678,6 +679,7 @@ const ReportGenerator = ({ isCollapsed }) => {
               mr_number: sale.mr_number || 'N/A',
               total_amount: parseFloat(sale.total_amount) || 0,
               total_gst: totalGST,
+              discount: parseFloat(sale.discount) || 0,
               advance_collected: parseFloat(sale.advance_details) || 0,
               balance_collected: parseFloat(sale.final_amount) || 0,
               total_collected: (parseFloat(sale.advance_details) || 0) + (parseFloat(sale.final_amount) || 0),
@@ -966,6 +968,7 @@ const ReportGenerator = ({ isCollapsed }) => {
           'MR Number',
           'Total Amount',
           'Total GST',
+          'Discount',
           'Advance Collected',
           'Balance Collected',
           'Total Collected', // Replaced 'Amount Left to Collect'
@@ -1140,6 +1143,7 @@ const ReportGenerator = ({ isCollapsed }) => {
           record.mr_number || 'N/A',
           record.total_amount ? Number(record.total_amount).toFixed(2) : '0.00',
           record.total_gst ? Number(record.total_gst).toFixed(2) : '0.00',
+          record.discount ? Number(record.discount).toFixed(2) : '0.00',
           record.advance_collected ? Number(record.advance_collected).toFixed(2) : '0.00',
           record.balance_collected ? Number(record.balance_collected).toFixed(2) : '0.00',
           record.total_collected ? Number(record.total_collected).toFixed(2) : '0.00', // Total Collected
@@ -1297,6 +1301,7 @@ const ReportGenerator = ({ isCollapsed }) => {
       case 'consolidated': {
         const totalAmount = data.reduce((acc, curr) => acc + (parseFloat(curr.total_amount) || 0), 0);
         const totalGST = data.reduce((acc, curr) => acc + (parseFloat(curr.total_gst) || 0), 0);
+        const totalDiscount = data.reduce((acc, curr) => acc + (parseFloat(curr.discount) || 0), 0);
         const totalAdvanceCollected = data.reduce((acc, curr) => acc + (parseFloat(curr.advance_collected) || 0), 0);
         const totalBalanceCollected = data.reduce((acc, curr) => acc + (parseFloat(curr.balance_collected) || 0), 0);
         const totalCollected = data.reduce((acc, curr) => acc + (parseFloat(curr.total_collected) || 0), 0);
@@ -1304,6 +1309,7 @@ const ReportGenerator = ({ isCollapsed }) => {
         summaryTable = [
           ['Total Amount', totalAmount.toFixed(2)],
           ['Total GST Collected', totalGST.toFixed(2)],
+          ['Total Discount', totalDiscount.toFixed(2)],
           ['Total Advance Collected', totalAdvanceCollected.toFixed(2)],
           ['Total Balance Collected', totalBalanceCollected.toFixed(2)],
           ['Total Collected', totalCollected.toFixed(2)], // Updated summary

@@ -5,13 +5,12 @@ import React, {
   useEffect,
   useRef,
   useCallback,
-  useMemo,
 } from "react";
 import {
   addOrUpdateStock,
   addNewProduct,
   updateExistingProduct,
-  addPurchase,
+  addPurchase, // Ensure this is exported from authService
 } from "../services/authService";
 import supabase from "../supabaseClient";
 import { useAuth } from "../context/AuthContext";
@@ -19,7 +18,7 @@ import { useGlobalState } from "../context/GlobalStateContext";
 import { debounce } from "lodash";
 import Modal from "react-modal";
 import EmployeeVerification from "../components/EmployeeVerification";
-
+import { toast } from "react-toastify";
 
 Modal.setAppElement("#root");
 
@@ -38,6 +37,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
   const [newBillNumber, setNewBillNumber] = useState("");
   const [newBillDate, setNewBillDate] = useState("");
   const [newEmployeeId, setNewEmployeeId] = useState(null);
+  const [newHsnCode, setNewHsnCode] = useState("9003"); // Default as per table
 
   // State for Update Existing Product
   const [updateSearchQuery, setUpdateSearchQuery] = useState("");
@@ -50,6 +50,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
   const [updateBillNumber, setUpdateBillNumber] = useState("");
   const [updateBillDate, setUpdateBillDate] = useState("");
   const [updateEmployeeId, setUpdateEmployeeId] = useState(null);
+  const [updateHsnCode, setUpdateHsnCode] = useState("");
 
   // State for Current Stock Search
   const [stockSearchQuery, setStockSearchQuery] = useState("");
@@ -58,8 +59,6 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
   const [employees, setEmployees] = useState([]);
 
   // Common States
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
   // Pagination States
@@ -95,6 +94,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
 
       if (error) {
         console.error("Error fetching employees:", error);
+        toast.error("Failed to fetch employees.");
         setEmployees([]);
         return;
       }
@@ -102,6 +102,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
       setEmployees(data || []);
     } catch (err) {
       console.error("Error fetching employees:", err);
+      toast.error("An unexpected error occurred while fetching employees.");
       setEmployees([]);
     }
   }, [branch]);
@@ -123,6 +124,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
 
       if (error) {
         console.error("Error fetching suggestions:", error);
+        toast.error("Failed to fetch product suggestions.");
         setProductSuggestions([]);
         return;
       }
@@ -130,6 +132,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
       setProductSuggestions(data || []);
     } catch (err) {
       console.error("Error fetching product suggestions:", err);
+      toast.error("An unexpected error occurred while fetching suggestions.");
     }
   }, []);
 
@@ -141,8 +144,6 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
   const handleModeSelection = (selectedMode) => {
     setMode(selectedMode);
     // Reset all states when mode changes
-    setError("");
-    setSuccess("");
     setNewProductName("");
     setNewProductId("");
     setNewRate("");
@@ -152,6 +153,8 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
     setNewBillNumber("");
     setNewBillDate("");
     setNewEmployeeId(null);
+    setNewHsnCode("9003"); // Reset to default
+
     setUpdateSearchQuery("");
     setProductSuggestions([]);
     setSelectedProduct(null);
@@ -162,7 +165,10 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
     setUpdateBillNumber("");
     setUpdateBillDate("");
     setUpdateEmployeeId(null);
+    setUpdateHsnCode("");
+
     setStockSearchQuery("");
+    toast.dismiss(); // Dismiss any existing toasts
   };
 
   // Function to generate a unique bill number per branch
@@ -177,6 +183,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
 
       if (error) {
         console.error("Error fetching last bill number:", error);
+        toast.error("Failed to generate bill number.");
         return "";
       }
 
@@ -194,6 +201,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
       return newBillNumber;
     } catch (error) {
       console.error("Error generating bill number:", error);
+      toast.error("An unexpected error occurred while generating bill number.");
       return "";
     }
   }, [branch]);
@@ -221,14 +229,13 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
   // Handler for Add New Product Form Submission
   const handleAddNewProduct = async (e) => {
     e.preventDefault();
-    setError("");
-    setSuccess("");
 
     const trimmedProductName = newProductName.trim();
     const trimmedProductId = newProductId.trim();
     const trimmedPurchaseFrom = newPurchaseFrom.trim();
     const trimmedBillNumber = newBillNumber.trim();
     const trimmedBillDate = newBillDate.trim();
+    const trimmedHsnCode = newHsnCode.trim();
 
     // Collect missing fields
     const missingFields = [];
@@ -240,10 +247,11 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
     if (!trimmedPurchaseFrom) missingFields.push("Purchase From");
     if (!trimmedBillNumber) missingFields.push("Bill Number");
     if (!trimmedBillDate) missingFields.push("Bill Date");
+    if (!trimmedHsnCode) missingFields.push("HSN Code");
     if (!newEmployeeId) missingFields.push("Employee");
 
     if (missingFields.length > 0) {
-      setError(`Please enter the following fields: ${missingFields.join(", ")}`);
+      toast.error(`Please enter the following fields: ${missingFields.join(", ")}`);
       return;
     }
 
@@ -252,22 +260,22 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
     const mrp = parseFloat(newMrp);
 
     if (isNaN(quantity) || quantity <= 0) {
-      setError("Please enter a valid quantity greater than 0.");
+      toast.error("Please enter a valid quantity greater than 0.");
       return;
     }
 
-    if (isNaN(rate) || rate < 0) {
-      setError("Please enter a valid rate greater than 0.");
+    if (isNaN(rate) || rate <= 0) {
+      toast.error("Please enter a valid rate greater than 0.");
       return;
     }
 
-    if (isNaN(mrp) || mrp < 0) {
-      setError("Please enter a valid MRP greater than 0.");
+    if (isNaN(mrp) || mrp <= 0) {
+      toast.error("Please enter a valid MRP greater than 0.");
       return;
     }
 
     if (!branch) {
-      setError("Branch is not set. Cannot proceed.");
+      toast.error("Branch is not set. Cannot proceed.");
       return;
     }
 
@@ -282,16 +290,16 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
         .eq("product_id", trimmedProductId)
         .single();
 
-      if (fetchError && fetchError.code !== "PGRST116") {
+      if (fetchError && fetchError.code !== "PGRST116") { // PGRST116 is no data found
         console.error("Error checking existing product:", fetchError);
-        setError("Failed to verify Product ID.");
+        toast.error("Failed to verify Product ID.");
         setIsLoading(false);
         isUploadingRef.current = false;
         return;
       }
 
       if (existingProduct) {
-        setError(
+        toast.error(
           "Product ID already exists. Please use the 'Update Existing Product' section to update stock."
         );
         setIsLoading(false);
@@ -312,6 +320,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
         product_id: trimmedProductId,
         rate,
         mrp,
+        hsn_code: trimmedHsnCode, // Include HSN Code
         quantity,
         purchase_from: trimmedPurchaseFrom,
       };
@@ -327,7 +336,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
       });
     } catch (error) {
       console.error("Error during add new product:", error);
-      setError("An unexpected error occurred.");
+      toast.error("An unexpected error occurred.");
       setIsLoading(false);
       isUploadingRef.current = false;
     }
@@ -336,12 +345,11 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
   // Handler for Update Existing Product Form Submission
   const handleUpdateExistingProduct = async (e) => {
     e.preventDefault();
-    setError("");
-    setSuccess("");
 
     const trimmedPurchaseFrom = updatePurchaseFrom.trim();
     const trimmedBillNumber = updateBillNumber.trim();
     const trimmedBillDate = updateBillDate.trim();
+    const trimmedHsnCode = updateHsnCode.trim();
 
     // Validation
     const missingFields = [];
@@ -352,15 +360,16 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
     if (!trimmedPurchaseFrom) missingFields.push("Purchase From");
     if (!trimmedBillNumber) missingFields.push("Bill Number");
     if (!trimmedBillDate) missingFields.push("Bill Date");
+    if (!trimmedHsnCode) missingFields.push("HSN Code");
     if (!updateEmployeeId) missingFields.push("Employee");
 
     if (missingFields.length > 0) {
-      setError(`Please enter the following fields: ${missingFields.join(", ")}`);
+      toast.error(`Please enter the following fields: ${missingFields.join(", ")}`);
       return;
     }
 
     if (!selectedProduct) {
-      setError(
+      toast.error(
         "No product selected. Please search and select a product to update."
       );
       return;
@@ -371,22 +380,22 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
     const mrp = parseFloat(updateMrp);
 
     if (isNaN(quantity) || quantity < 0) {
-      setError("Please enter a valid quantity greater than 0.");
+      toast.error("Please enter a valid quantity greater than or equal to 0.");
       return;
     }
 
-    if (isNaN(rate) || rate < -1) {
-      setError("Please enter a valid rate greater than 0.");
+    if (isNaN(rate) || rate <= 0) {
+      toast.error("Please enter a valid rate greater than 0.");
       return;
     }
 
-    if (isNaN(mrp) || mrp < -1) {
-      setError("Please enter a valid MRP greater than 0.");
+    if (isNaN(mrp) || mrp <= 0) {
+      toast.error("Please enter a valid MRP greater than 0.");
       return;
     }
 
     if (!branch) {
-      setError("Branch is not set. Cannot proceed.");
+      toast.error("Branch is not set. Cannot proceed.");
       return;
     }
 
@@ -407,6 +416,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
         product_id: selectedProduct.product_id,
         rate,
         mrp,
+        hsn_code: trimmedHsnCode, // Include HSN Code
         quantity,
         purchase_from: trimmedPurchaseFrom,
       };
@@ -422,7 +432,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
       });
     } catch (error) {
       console.error("Error during update existing product:", error);
-      setError("An unexpected error occurred.");
+      toast.error("An unexpected error occurred.");
       setIsLoading(false);
       isUploadingRef.current = false;
     }
@@ -434,7 +444,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
     const previewData = state.purchaseModal.content;
 
     if (!previewData) {
-      setError("No purchase data to process.");
+      toast.error("No purchase data to process.");
       setIsLoading(false);
       isUploadingRef.current = false;
       return;
@@ -445,6 +455,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
       product_id,
       rate,
       mrp,
+      hsn_code,
       quantity,
       purchase_from,
       bill_number,
@@ -460,12 +471,13 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
         product_id: product_id.trim(),
         rate: parseFloat(rate),
         mrp: parseFloat(mrp),
-        hsn_code: "9001",
+        hsn_code: hsn_code.trim(), // Include HSN Code
+        total_value: parseFloat(rate) * parseInt(quantity, 10), // Example calculation
         purchase_from: purchase_from.trim(),
       });
 
       if (!addProductResponse.success) {
-        setError(addProductResponse.error);
+        toast.error(addProductResponse.error);
         dispatch({ type: "RESET_PURCHASE_MODAL" });
         return;
       }
@@ -481,7 +493,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
       );
 
       if (!updateStockResponse.success) {
-        setError(updateStockResponse.error);
+        toast.error(updateStockResponse.error);
         dispatch({ type: "RESET_PURCHASE_MODAL" });
         return;
       }
@@ -501,19 +513,19 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
       });
 
       if (!addPurchaseResponse.success) {
-        setError(addPurchaseResponse.error);
+        toast.error(addPurchaseResponse.error);
         dispatch({ type: "RESET_PURCHASE_MODAL" });
         return;
       }
 
-      setSuccess("New product added and stock updated successfully.");
+      toast.success("New product added and stock updated successfully.");
       // Reset form
       handleModeSelection("add");
       // Refresh stock data
       fetchStockData();
     } catch (error) {
       console.error("Error processing add new product:", error);
-      setError("An unexpected error occurred.");
+      toast.error("An unexpected error occurred.");
     } finally {
       dispatch({ type: "RESET_PURCHASE_MODAL" });
       setIsLoading(false);
@@ -527,7 +539,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
     const previewData = state.purchaseModal.content;
 
     if (!previewData) {
-      setError("No purchase data to process.");
+      toast.error("No purchase data to process.");
       setIsLoading(false);
       isUploadingRef.current = false;
       return;
@@ -538,6 +550,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
       product_id,
       rate,
       mrp,
+      hsn_code,
       quantity,
       purchase_from,
       bill_number,
@@ -547,8 +560,20 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
     } = previewData;
 
     try {
+      // Update Product HSN Code if needed
+      const updateProductResponse = await updateExistingProductDetails({
+        id: selectedProduct.id,
+        hsn_code: hsn_code.trim(),
+      });
+
+      if (!updateProductResponse.success) {
+        toast.error(updateProductResponse.error);
+        dispatch({ type: "RESET_PURCHASE_MODAL" });
+        return;
+      }
+
       // Update Stock for the Branch
-      const updateStockResponse = await updateExistingProduct(
+      const updateStockResponse = await addOrUpdateStock(
         selectedProduct.id,
         branch,
         parseInt(quantity, 10),
@@ -558,7 +583,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
       );
 
       if (!updateStockResponse.success) {
-        setError(updateStockResponse.error);
+        toast.error(updateStockResponse.error);
         dispatch({ type: "RESET_PURCHASE_MODAL" });
         return;
       }
@@ -578,19 +603,19 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
       });
 
       if (!addPurchaseResponse.success) {
-        setError(addPurchaseResponse.error);
+        toast.error(addPurchaseResponse.error);
         dispatch({ type: "RESET_PURCHASE_MODAL" });
         return;
       }
 
-      setSuccess("Stock updated successfully and purchase recorded.");
+      toast.success("Stock updated successfully and purchase recorded.");
       // Reset form
       handleModeSelection("update");
       // Refresh stock data
       fetchStockData();
     } catch (error) {
       console.error("Error processing update existing product:", error);
-      setError("An unexpected error occurred.");
+      toast.error("An unexpected error occurred.");
     } finally {
       dispatch({ type: "RESET_PURCHASE_MODAL" });
       setIsLoading(false);
@@ -628,6 +653,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
     setUpdateRate(product.rate !== null ? product.rate.toString() : "");
     setUpdateMrp(product.mrp !== null ? product.mrp.toString() : "");
     setUpdatePurchaseFrom(product.purchase_from || "");
+    setUpdateHsnCode(product.hsn_code || ""); // Set HSN Code
 
     // Generate bill details for update
     const setupBillDetails = async () => {
@@ -655,21 +681,21 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
         .select(
           `
                 quantity,
-                product:products(id, product_name, product_id, rate, mrp, purchase_from)
+                product:products(id, product_name, product_id, rate, mrp, purchase_from, hsn_code)
             `
         )
         .eq("branch_code", branch);
 
       if (error) {
         console.error("Error fetching stock data:", error);
-        setError("Failed to fetch stock data.");
+        toast.error("Failed to fetch stock data.");
         return;
       }
 
       setFilteredStocks(data || []);
     } catch (err) {
       console.error("Error fetching stock data:", err);
-      setError("An unexpected error occurred while fetching stock data.");
+      toast.error("An unexpected error occurred while fetching stock data.");
     }
   }, [branch]);
 
@@ -681,7 +707,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
   const [filteredStocks, setFilteredStocks] = useState([]);
 
   // Memoized filtered and sorted stock based on search query
-  const allFilteredStocks = useMemo(() => {
+  const allFilteredStocks = useCallback(() => {
     return filteredStocks
       .filter((stock) => {
         const searchTerm = stockSearchQuery.toLowerCase();
@@ -696,22 +722,21 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
       );
   }, [filteredStocks, stockSearchQuery]);
 
+  const filteredStocksMemo = allFilteredStocks();
+
   // Calculate total pages based on filtered stock
-  const totalPages = useMemo(() => {
-    return Math.ceil(allFilteredStocks.length / itemsPerPage);
-  }, [allFilteredStocks.length, itemsPerPage]);
+  const totalPages = Math.ceil(filteredStocksMemo.length / itemsPerPage);
 
   // Get current page's stocks
-  const displayedStocks = useMemo(() => {
-    const indexOfLastItem = currentPage * itemsPerPage;
-    const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-    return allFilteredStocks.slice(indexOfFirstItem, indexOfLastItem);
-  }, [allFilteredStocks, currentPage, itemsPerPage]);
+  const displayedStocks = filteredStocksMemo.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   // Reset currentPage to 1 when search query or allFilteredStocks changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [stockSearchQuery, allFilteredStocks]);
+  }, [stockSearchQuery, filteredStocksMemo]);
 
   // Handler for Confirming in Modal
   const handleConfirmModal = () => {
@@ -726,17 +751,15 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
   // Handler for Cancelling in Modal
   const handleCancelModal = () => {
     dispatch({ type: "RESET_PURCHASE_MODAL" });
-    setError("");
-    setSuccess("");
     setIsLoading(false);
     isUploadingRef.current = false;
+    toast.dismiss(); // Dismiss any existing toasts
   };
 
   return (
     <div
-      className={`transition-all duration-300 ${
-        isCollapsed ? "mx-20" : "mx-20 px-20"
-      } justify-center my-20 p-8 rounded-xl mx-auto max-w-4xl bg-green-50 shadow-inner`}
+      className={`transition-all duration-300 ${isCollapsed ? "mx-20" : "mx-20 px-20"
+        } justify-center my-20 p-8 rounded-xl mx-auto max-w-4xl bg-green-50 shadow-inner`}
     >
       <h1 className="text-2xl font-semibold mb-6 text-center">
         Product Purchase
@@ -746,63 +769,23 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
       <div className="flex justify-center mb-6 text-lg font-semibold">
         <button
           onClick={() => handleModeSelection("add")}
-          className={`mx-2 px-4 py-2 rounded ${
-            mode === "add"
+          className={`mx-2 px-4 py-2 rounded ${mode === "add"
               ? "bg-green-500 text-white shadow-2xl"
               : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-          }`}
+            }`}
         >
           Add New Product
         </button>
         <button
           onClick={() => handleModeSelection("update")}
-          className={`mx-2 px-4 py-2 rounded ${
-            mode === "update"
+          className={`mx-2 px-4 py-2 rounded ${mode === "update"
               ? "bg-green-500 text-white shadow-2xl"
               : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-          }`}
+            }`}
         >
           Update Existing Product
         </button>
       </div>
-
-      {/* Display Error and Success Messages */}
-      {error && (
-        <div className="flex items-center text-red-500 mb-4">
-          <svg
-            className="w-5 h-5 mr-2"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-            />
-          </svg>
-          <span>{error}</span>
-        </div>
-      )}
-      {success && (
-        <div className="flex items-center text-green-500 mb-4">
-          <svg
-            className="w-5 h-5 mr-2"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M5 13l4 4L19 7"
-            />
-          </svg>
-          <span>{success}</span>
-        </div>
-      )}
 
       {/* Add New Product Form */}
       {mode === "add" && (
@@ -917,7 +900,23 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
             </div>
           </div>
 
+          {/* HSN Code */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            {/* HSN Code */}
+            <div>
+              <label htmlFor="newHsnCode" className="block mb-2 font-medium">
+                HSN Code<span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                id="newHsnCode"
+                value={newHsnCode}
+                onChange={(e) => setNewHsnCode(e.target.value)}
+                className="w-full p-2 border rounded"
+                required
+              />
+            </div>
+
             {/* Rate */}
             <div>
               <label htmlFor="newRate" className="block mb-2 font-medium">
@@ -951,8 +950,10 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
                 required
               />
             </div>
+          </div>
 
-            {/* Quantity */}
+          {/* Quantity */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
             <div>
               <label htmlFor="newQuantity" className="block mb-2 font-medium">
                 Quantity<span className="text-red-500">*</span>
@@ -971,11 +972,10 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
 
           <button
             type="submit"
-            className={`mt-4 w-full p-2 text-white rounded ${
-              isLoading
+            className={`mt-4 w-full p-2 text-white rounded ${isLoading
                 ? "bg-blue-500 cursor-not-allowed"
                 : "bg-green-500 hover:bg-green-600"
-            }`}
+              }`}
             disabled={isLoading}
           >
             {isLoading ? "Preparing..." : "Add New Product"}
@@ -1151,7 +1151,26 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
                 </div>
               </div>
 
+              {/* HSN Code */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                {/* HSN Code */}
+                <div>
+                  <label
+                    htmlFor="updateHsnCode"
+                    className="block mb-2 font-medium"
+                  >
+                    HSN Code<span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    id="updateHsnCode"
+                    value={updateHsnCode}
+                    onChange={(e) => setUpdateHsnCode(e.target.value)}
+                    className="w-full p-2 border rounded"
+                    required
+                  />
+                </div>
+
                 {/* Rate */}
                 <div>
                   <label
@@ -1188,8 +1207,10 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
                     required
                   />
                 </div>
+              </div>
 
-                {/* Quantity */}
+              {/* Quantity */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                 <div>
                   <label
                     htmlFor="updateQuantity"
@@ -1214,11 +1235,10 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
           {selectedProduct && (
             <button
               type="submit"
-              className={`mt-4 w-full p-2 text-white rounded ${
-                isLoading
+              className={`mt-4 w-full p-2 text-white rounded ${isLoading
                   ? "bg-blue-500 cursor-not-allowed"
                   : "bg-green-500 hover:bg-green-600"
-              }`}
+                }`}
               disabled={isLoading}
             >
               {isLoading ? "Preparing..." : "Update Stock"}
@@ -1255,6 +1275,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
                     <th className="py-2 px-4 border-b">Party Rate</th>
                   )}
                   <th className="py-2 px-4 border-b">MRP</th>
+                  <th className="py-2 px-4 border-b">HSN Code</th> {/* New Column */}
                   <th className="py-2 px-4 border-b">Actions</th>
                 </tr>
               </thead>
@@ -1283,6 +1304,9 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
                         : "N/A"}
                     </td>
                     <td className="py-2 px-4 border-b text-center">
+                      {stock.product.hsn_code || "N/A"}
+                    </td>
+                    <td className="py-2 px-4 border-b text-center">
                       <button
                         onClick={() => handleSelectProduct(stock.product)}
                         className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded"
@@ -1295,7 +1319,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
                 {displayedStocks.length === 0 && (
                   <tr>
                     <td
-                      colSpan={role !== "employee" ? "6" : "5"}
+                      colSpan={role !== "employee" ? "7" : "6"}
                       className="py-4 text-center"
                     >
                       No stock entries found.
@@ -1312,11 +1336,10 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
               <button
                 onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
                 disabled={currentPage === 1}
-                className={`px-3 py-1 rounded ${
-                  currentPage === 1
+                className={`px-3 py-1 rounded ${currentPage === 1
                     ? "bg-gray-300 cursor-not-allowed"
                     : "bg-blue-500 text-white hover:bg-blue-600"
-                }`}
+                  }`}
               >
                 Previous
               </button>
@@ -1328,11 +1351,10 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
                   setCurrentPage((prev) => Math.min(prev + 1, totalPages))
                 }
                 disabled={currentPage === totalPages}
-                className={`px-3 py-1 rounded ${
-                  currentPage === totalPages
+                className={`px-3 py-1 rounded ${currentPage === totalPages
                     ? "bg-gray-300 cursor-not-allowed"
                     : "bg-blue-500 text-white hover:bg-blue-600"
-                }`}
+                  }`}
               >
                 Next
               </button>
@@ -1393,6 +1415,13 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
                 </div>
 
                 <div>
+                  <span className="font-medium">HSN Code:</span>
+                </div>
+                <div>
+                  <span>{state.purchaseModal.content.hsn_code}</span>
+                </div>
+
+                <div>
                   <span className="font-medium">Rate:</span>
                 </div>
                 <div>
@@ -1446,44 +1475,6 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
               />
             </div>
 
-            {/* Error and Success Messages within Modal */}
-            {error && (
-              <div className="flex items-center text-red-500 mt-4">
-                <svg
-                  className="w-5 h-5 mr-2"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-                <span>{error}</span>
-              </div>
-            )}
-            {success && (
-              <div className="flex items-center text-green-500 mt-4">
-                <svg
-                  className="w-5 h-5 mr-2"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M5 13l4 4L19 7"
-                  />
-                </svg>
-                <span>{success}</span>
-              </div>
-            )}
-
             <div className="flex justify-end space-x-4 mt-6">
               <button
                 onClick={handleCancelModal}
@@ -1493,11 +1484,12 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
               </button>
               <button
                 onClick={handleConfirmModal}
-                className={`px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 ${
-                  !state.purchaseModal.content.isEmployeeVerified
+                className={`px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 ${!state.purchaseModal.content.isEmployeeVerified
                     ? "opacity-50 cursor-not-allowed"
                     : ""
-                }`}
+                  }`}
+
+
                 disabled={!state.purchaseModal.content.isEmployeeVerified}
               >
                 Confirm
