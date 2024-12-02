@@ -247,7 +247,7 @@ const StockManagement = ({ isCollapsed }) => {
   };
 
   const handleProductSelectAdd = (product) => {
-    setSelectedProductAdd(product.id);
+    setSelectedProductAdd(product.id); // Internal ID
     setSearchProductAdd(`${product.product_name} (${product.product_id})`);
     setProductSuggestionsAdd([]);
     setShowSuggestionsAdd(false);
@@ -268,7 +268,7 @@ const StockManagement = ({ isCollapsed }) => {
   };
 
   const handleProductSelectAssign = (product) => {
-    setSelectedProductAssign(product.id);
+    setSelectedProductAssign(product.id); // Internal ID
     setSearchProductAssign(`${product.product_name} (${product.product_id})`);
     setProductSuggestionsAssign([]);
     setShowSuggestionsAssign(false);
@@ -304,7 +304,7 @@ const StockManagement = ({ isCollapsed }) => {
             product:products(id, product_name, product_id, rate, mrp, hsn_code)
           `)
           .eq("branch_code", lookupBranch)
-          .eq("product_id", product.id)
+          .eq("product_id", product.id) // Internal ID
           .single(); // Ensure unique stock entry
 
         if (error || !data) {
@@ -323,12 +323,6 @@ const StockManagement = ({ isCollapsed }) => {
     fetchLookupStock();
   };
 
-  
-
-  
-
-  
-
   // ============================
   // Function to refresh stock data
   // ============================
@@ -340,7 +334,7 @@ const StockManagement = ({ isCollapsed }) => {
         .from("stock")
         .select(`
           quantity,
-          product:products(product_name, product_id, rate, mrp)
+          product:products(id, product_name, product_id, rate, mrp, hsn_code)
         `)
         .eq("branch_code", lookupBranch);
 
@@ -433,7 +427,7 @@ const StockManagement = ({ isCollapsed }) => {
           .from("stock")
           .select(`
             quantity,
-            product:products(product_name, product_id, rate, mrp)
+            product:products(id, product_name, product_id, rate, mrp, hsn_code)
           `)
           .eq("branch_code", lookupBranch);
 
@@ -694,11 +688,11 @@ const StockManagement = ({ isCollapsed }) => {
       try {
         const assignments = [
           {
-            product_id: product.id, // Use internal product ID (integer)
+            product_id: product.id, // Internal ID
             from_branch_code: fromBranchAssign,
             to_branch_code: toBranchAssign,
             quantity: qty,
-            notes: "", // Optional: Modify to accept user input if needed
+            notes: "", // Optional
           },
         ];
 
@@ -1322,7 +1316,7 @@ const StockManagement = ({ isCollapsed }) => {
               <tbody>
                 {lookupResults.length > 0
                   ? lookupResults.map((stock) => (
-                      <tr key={`${stock.product.product_id}-${lookupBranch}`}>
+                      <tr key={`${stock.product.id}-${lookupBranch}`}>
                         <td className="py-2 px-4 border-b text-center">
                           {stock.product.product_id}
                         </td>
@@ -1354,7 +1348,7 @@ const StockManagement = ({ isCollapsed }) => {
                       </tr>
                     ))
                   : currentItems.map((stock) => (
-                      <tr key={`${stock.product.product_id}-${lookupBranch}`}>
+                      <tr key={`${stock.product.id}-${lookupBranch}`}>
                         <td className="py-2 px-4 border-b text-center">
                           {stock.product.product_id}
                         </td>
