@@ -29,6 +29,7 @@ import EmployeeActionRequired from "./pages/EmployeeActionRequired";
 import StockManagement from "./pages/StockManagement";
 import { supabase } from './supabaseClient'
 import EmployeeStockManagement from "./pages/EmployeeStockManagement";
+import NotesReport from "./pages/Notes";
 
 const App = () => {
   const location = useLocation();
@@ -147,6 +148,10 @@ const App = () => {
               <Route
                 path="/reportgenerator"
                 element={<ReportGenerator isCollapsed={isCollapsed} />}
+              />
+              <Route
+                path="/notes"
+                element={<NotesReport isCollapsed={isCollapsed} />}
               />
 
               <Route

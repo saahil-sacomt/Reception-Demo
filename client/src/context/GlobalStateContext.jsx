@@ -3,9 +3,7 @@
 import React, { createContext, useContext, useReducer, useEffect } from "react";
 import merge from "lodash.merge";
 
-const savedState = localStorage.getItem("globalState")
-  ? JSON.parse(localStorage.getItem("globalState"))
-  : {};
+const savedState = {}; // Remove localStorage retrieval
 
 // Create a context
 const GlobalStateContext = createContext();
@@ -109,9 +107,28 @@ const defaultInitialState = {
     rate: 0,
     mrp: 0,
     productSuggestions: [],
+    // branches removed from here
   },
   // Add isUploading flag for state reset handling
   isUploading: false,
+
+  // **New: Notes Form State**
+  notesForm: {
+    order_id: "",
+    order_type: "", // 'sales' or 'work'
+    product_search: "",
+    selected_product: null,
+    branch_code: "",
+    quantity: "",
+    client_name: "",
+    client_address: "",
+    date: new Date(),
+    reason: "",
+    note_type: "debit", // Default value added
+  },
+
+  // **New: Branches**
+  branches: [], // Initialize branches as an empty array
 };
 
 // Deep merge defaultInitialState with savedState
@@ -174,6 +191,17 @@ const globalStateReducer = (state, action) => {
           action: null,
           content: null,
         },
+      };
+
+    case "SET_NOTES_FORM":
+      return {
+        ...state,
+        notesForm: { ...state.notesForm, ...action.payload },
+      };
+    case "RESET_NOTES_FORM":
+      return {
+        ...state,
+        notesForm: { ...defaultInitialState.notesForm },
       };
 
     // Purchase Modal Actions
@@ -241,6 +269,13 @@ const globalStateReducer = (state, action) => {
     case "SET_IS_UPLOADING":
       return { ...state, isUploading: action.payload };
 
+    // **New: Set Branches**
+    case "SET_BRANCHES":
+      return {
+        ...state,
+        branches: action.payload,
+      };
+
     default:
       return state;
   }
@@ -250,11 +285,14 @@ const globalStateReducer = (state, action) => {
 export const GlobalStateProvider = ({ children }) => {
   const [state, dispatch] = useReducer(globalStateReducer, initialState);
 
-  // Persist state in localStorage
+  // **Remove localStorage persistence to reset state on refresh**
+  /*
   useEffect(() => {
     localStorage.setItem("globalState", JSON.stringify(state));
   }, [state]);
+  */
 
+  /*
   const resetState = () => {
     localStorage.removeItem("globalState");
     dispatch({ type: "RESET_SALES_ORDER_FORM" });
@@ -264,9 +302,12 @@ export const GlobalStateProvider = ({ children }) => {
     dispatch({ type: "RESET_SELECTED_SALES_ORDER" });
     dispatch({ type: "RESET_PURCHASE_MODAL" });
     dispatch({ type: "RESET_STOCK_ASSIGNMENT_FORM" });
+    dispatch({ type: "RESET_NOTES_FORM" });
     dispatch({ type: "SET_IS_UPLOADING", payload: false });
   };
+  */
 
+  /*
   useEffect(() => {
     const handlePageRefresh = () => {
       if (state.isUploading) {
@@ -280,9 +321,13 @@ export const GlobalStateProvider = ({ children }) => {
       window.removeEventListener("beforeunload", handlePageRefresh);
     };
   }, [state.isUploading]); // Add isUploading to dependencies
+  */
+
+  // **Optionally, reset state on every render by not persisting**
+  // This ensures state resets on every refresh
 
   return (
-    <GlobalStateContext.Provider value={{ state, dispatch, resetState }}>
+    <GlobalStateContext.Provider value={{ state, dispatch }}>
       {children}
     </GlobalStateContext.Provider>
   );

@@ -10,7 +10,9 @@ import {
   WrenchScrewdriverIcon,
   XMarkIcon,
   ArrowLeftIcon,
-  ArchiveBoxArrowDownIcon
+  ArchiveBoxArrowDownIcon,
+  AdjustmentsHorizontalIcon,
+  BanknotesIcon
 } from '@heroicons/react/24/outline';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -548,6 +550,7 @@ const Home = ({ isCollapsed }) => {
                   <CircleStackIcon className='h-36 w-36 text-green-500 mr-2' />
                   <h2 className="text-xl text-gray-800 mt-4">Stock Management</h2>
                 </div>
+                
               </div>
             )}
 
@@ -567,7 +570,7 @@ const Home = ({ isCollapsed }) => {
 
             {/* Reports and Stock Management Section for Admin */}
             {role === 'admin' && (
-              <div className="flex flex-col w-1/2">
+              <div className="flex flex-col lg:flex-row lg:space-x-6 mt-10 lg:mt-0 w-full lg:w-1/2">
                 {/* Purchase Stock Container */}
                 <div
                   className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 w-1/2"
@@ -576,12 +579,19 @@ const Home = ({ isCollapsed }) => {
                   <ArchiveBoxArrowDownIcon className='h-36 w-36 text-green-500 mr-2' />
                   <h2 className="text-xl text-gray-800 mt-4">Purchase Stock</h2>
                 </div>
+                <div
+                  className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 w-1/2 mt-6 lg:mt-0"
+                  onClick={() => navigate('/notes')}
+                >
+                  <BanknotesIcon className='h-36 w-36 text-green-500 mr-2' />
+                  <h2 className="text-xl text-gray-800 mt-4">Credit and Debit Notes</h2>
+                </div>
               </div>
             )}
           </div>
           {/* Reports and Stock Management Section for Employee */}
           {role === 'employee' && (
-            <div className="flex flex-col lg:flex-row lg:space-x-6 mt-10 px-6 lg:mt-0 w-full lg:w-1/2">
+            <div className="flex flex-col lg:flex-row lg:space-x-6 mt-10 px-6 lg:mt-0 w-full lg:w-full">
                 {/* Reports Container */}
                 <div
                   className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 w-full"
@@ -598,6 +608,14 @@ const Home = ({ isCollapsed }) => {
                 >
                   <ArchiveBoxArrowDownIcon className='h-36 w-36 text-green-500 mr-2' />
                   <h2 className="text-xl text-gray-800 mt-4">Purchase Section</h2>
+                </div>
+                {/* Stock Management Container */}
+                <div
+                  className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 w-full mt-6 lg:mt-0"
+                  onClick={() => navigate('/notes')}
+                >
+                  <BanknotesIcon className='h-36 w-36 text-green-500 mr-2' />
+                  <h2 className="text-xl text-gray-800 mt-4">Credit and Debit Notes</h2>
                 </div>
               </div>
             )}

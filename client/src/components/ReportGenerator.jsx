@@ -179,6 +179,22 @@ const getColumnStyles = (reportType, isEmployee = false) => {
         7: { halign: 'center', cellWidth: 20 }, // MRP
         8: { halign: 'center', cellWidth: 25 }, // Assigned At
       };
+    case 'credit_debit_notes':
+      return {
+        0: { halign: 'center', cellWidth: 15 }, // Note ID
+        1: { halign: 'center', cellWidth: 15 }, // Note Type (Credit/Debit)
+        2: { halign: 'center', cellWidth: 20 }, // Product ID
+        3: { halign: 'center', cellWidth: 30 }, // Product Name
+        4: { halign: 'center', cellWidth: 15 }, // Branch Code
+        5: { halign: 'center', cellWidth: 20 }, // Quantity
+        6: { halign: 'center', cellWidth: 25 }, // Client Name
+        7: { halign: 'center', cellWidth: 25 }, // Client Address
+        8: { halign: 'center', cellWidth: 20 }, // Date
+        9: { halign: 'center', cellWidth: 35 }, // Reason
+        10: { halign: 'center', cellWidth: 20 }, // Order ID
+        11: { halign: 'center', cellWidth: 20 }, // Created At
+        12: { halign: 'center', cellWidth: 20 }, // Updated At
+      };
     default:
       return {};
   }
@@ -673,15 +689,15 @@ const ReportGenerator = ({ isCollapsed }) => {
 
           // Fetch MR numbers and customer IDs for mapping
           // Fetch MR numbers and customer IDs from both salesData and workData
-const mrNumbers = [
-  ...salesData.map(sale => sale.mr_number),
-  ...workData.map(work => work.mr_number)
-].filter(mr => mr !== null && mr !== '');
+          const mrNumbers = [
+            ...salesData.map(sale => sale.mr_number),
+            ...workData.map(work => work.mr_number)
+          ].filter(mr => mr !== null && mr !== '');
 
-const customerIds = [
-  ...salesData.map(sale => sale.customer_id),
-  ...workData.map(work => work.customer_id)
-].filter(id => id !== null && id !== '');
+          const customerIds = [
+            ...salesData.map(sale => sale.customer_id),
+            ...workData.map(work => work.customer_id)
+          ].filter(id => id !== null && id !== '');
 
 
           // Fetch patients based on MR numbers
@@ -908,6 +924,25 @@ const customerIds = [
           fetchedData = data;
           break;
         }
+        case 'credit_debit_notes': {
+          const query = supabase
+            .from('notes')
+            .select(`
+              *,
+              products (product_name)
+            `)
+            .gte('date', startDate.toISOString())
+            .lte('date', endDate.toISOString());
+
+          if (!isCombined) {
+            query.in('branch_code', branchesToReport);
+          }
+
+          ({ data, error } = await query);
+          if (error) throw error;
+          fetchedData = data;
+          break;
+        }
         default:
           setError('Invalid report type selected.');
           setLoading(false);
@@ -953,6 +988,8 @@ const customerIds = [
         return 'Purchase Report';
       case 'stock_assignments':
         return 'Stock Assignments';
+      case 'credit_debit_notes':
+        return 'Credit and Debit Note';
       default:
         return '';
     }
@@ -1143,6 +1180,23 @@ const customerIds = [
           'Rate',
           'MRP',
           'Assigned At',
+        ];
+        break;
+        case 'credit_debit_notes':
+        tableColumn = [
+          'Note ID',
+          'Note Type',
+          'Product ID',
+          'Product Name',
+          'Branch Code',
+          'Quantity',
+          'Client Name',
+          'Client Address',
+          'Date',
+          'Reason',
+          'Order ID',
+          'Created At',
+          'Updated At',
         ];
         break;
       default:
@@ -1336,6 +1390,23 @@ const customerIds = [
         ]);
         break;
       }
+      case 'credit_debit_notes':
+        tableRows = data.map((record) => [
+          record.id || 'N/A',
+          capitalizeFirstLetter(record.note_type) || 'N/A',
+          record.product_id || 'N/A',
+          record.products ? record.products.product_name || 'N/A' : 'N/A', // Assuming product_name is fetched via foreign key
+          record.branch_code || 'N/A',
+          record.quantity || 0,
+          record.client_name || 'N/A',
+          record.client_address || 'N/A',
+          record.date ? convertUTCToIST(record.date, 'dd-MM-yyyy') : 'N/A',
+          record.reason || 'N/A',
+          record.order_id || 'N/A',
+          record.created_at ? convertUTCToIST(record.created_at, 'dd-MM-yyyy hh:mm a') : 'N/A',
+          record.updated_at ? convertUTCToIST(record.updated_at, 'dd-MM-yyyy hh:mm a') : 'N/A',
+        ]);
+        break;
       default:
         tableRows = [];
     }
@@ -1500,6 +1571,21 @@ const customerIds = [
         ];
         break;
       }
+      case 'credit_debit_notes': {
+        const totalNotes = data.length;
+        const totalCredit = data
+          .filter(note => note.note_type.toLowerCase() === 'credit')
+          .reduce((acc, curr) => acc + (curr.quantity || 0), 0);
+        const totalDebit = data
+          .filter(note => note.note_type.toLowerCase() === 'debit')
+          .reduce((acc, curr) => acc + (curr.quantity || 0), 0);
+        summaryTable = [
+          ['Total Notes', totalNotes],
+          ['Total Credit Quantity', totalCredit],
+          ['Total Debit Quantity', totalDebit],
+        ];
+        break;
+      }
       default:
         summaryTable = [];
     }
@@ -1581,7 +1667,8 @@ const customerIds = [
     { value: 'consolidated', label: 'Consolidated' },
     { value: 'stock_report', label: 'Stock Report' },
     { value: 'purchase_report', label: 'Purchase Report' }, // Added Purchase Report for admins
-    { value: 'stock_assignments', label: 'Stock Assignments' }, // Added Stock Assignments for admins
+    { value: 'stock_assignments', label: 'Stock Assignments' },
+    { value: 'credit_debit_notes', label: 'Credit and Debit Note' }, // Added Stock Assignments for admins
   ];
 
   // Ensure reportType is valid for the current role
