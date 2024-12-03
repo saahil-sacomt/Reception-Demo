@@ -89,22 +89,41 @@ const getColumnStyles = (reportType, isEmployee = false) => {
         8: { halign: 'center', cellWidth: 25 }, // Created At
         9: { halign: 'center', cellWidth: 25 }, // Updated At
       };
-    case 'consolidated':
-      return {
-        0: { halign: 'center', cellWidth: 25 }, // Sales Order ID
-        1: { halign: 'center', cellWidth: 25 }, // Work Order ID
-        2: { halign: 'center', cellWidth: 20 }, // MR Number
-        3: { halign: 'center', cellWidth: 20 }, // Total Amount
-        4: { halign: 'center', cellWidth: 20 }, // Total GST
-        5: { halign: 'center', cellWidth: 20 }, // Discount
-        6: { halign: 'center', cellWidth: 20 }, // Advance Collected
-        7: { halign: 'center', cellWidth: 20 }, // Balance Collected
-        8: { halign: 'center', cellWidth: 20 }, // Total Collected (Replaced)
-        9: { halign: 'center', cellWidth: 30 }, // Patient/Customer Name (New Column)
-        10: { halign: 'center', cellWidth: 15 }, // Branch
-        11: { halign: 'center', cellWidth: 25 }, // Created At
-        12: { halign: 'center', cellWidth: 25 }, // Updated At
-      };
+    case 'consolidated': {
+      if (isEmployee) {
+        return {
+          0: { halign: 'center', cellWidth: 25 }, // Sales Order ID
+          1: { halign: 'center', cellWidth: 25 }, // Work Order ID
+          2: { halign: 'center', cellWidth: 20 }, // MR Number
+          3: { halign: 'center', cellWidth: 20 }, // Total Amount
+          4: { halign: 'center', cellWidth: 20 }, // Total GST
+          5: { halign: 'center', cellWidth: 20 }, // Discount
+          6: { halign: 'center', cellWidth: 20 }, // Advance Collected
+          7: { halign: 'center', cellWidth: 20 }, // Balance Collected
+          8: { halign: 'center', cellWidth: 20 }, // Total Collected (Replaced)
+          9: { halign: 'center', cellWidth: 30 }, // Patient/Customer Name (New Column)
+          10: { halign: 'center', cellWidth: 15 }, // Branch
+          11: { halign: 'center', cellWidth: 25 }, // Created At
+          12: { halign: 'center', cellWidth: 25 }, // Updated At
+        };
+      } else {
+        return {
+          0: { halign: 'center', cellWidth: 25 }, // Sales Order ID
+          1: { halign: 'center', cellWidth: 25 }, // Work Order ID
+          2: { halign: 'center', cellWidth: 20 }, // MR Number
+          3: { halign: 'center', cellWidth: 20 }, // Total Amount
+          4: { halign: 'center', cellWidth: 20 }, // Total GST
+          5: { halign: 'center', cellWidth: 20 }, // Discount
+          6: { halign: 'center', cellWidth: 20 }, // Advance Collected
+          7: { halign: 'center', cellWidth: 20 }, // Balance Collected
+          8: { halign: 'center', cellWidth: 20 }, // Total Collected (Replaced)
+          9: { halign: 'center', cellWidth: 30 }, // Patient/Customer Name (New Column)
+          10: { halign: 'center', cellWidth: 15 }, // Branch
+          // 11: { halign: 'center', cellWidth: 25 }, // Created At
+          // 12: { halign: 'center', cellWidth: 25 }, // Updated At
+        };
+      }
+    }
     case 'stock_report':
       return {
         0: { halign: 'center', cellWidth: 30 }, // Product ID
@@ -121,7 +140,7 @@ const getColumnStyles = (reportType, isEmployee = false) => {
           0: { halign: 'center', cellWidth: 20 }, // Purchase ID
           1: { halign: 'center', cellWidth: 20 }, // Product ID
           2: { halign: 'center', cellWidth: 30 }, // Branch Code
-          3: { halign: 'center', cellWidth: 15 }, // Quantity
+          3: { halign: 'center', cellWidth: 20 }, // Quantity
           // Rate column omitted for employees
           4: { halign: 'center', cellWidth: 25 }, // MRP
           5: { halign: 'center', cellWidth: 35 }, // Purchase From
@@ -136,7 +155,7 @@ const getColumnStyles = (reportType, isEmployee = false) => {
           0: { halign: 'center', cellWidth: 20 }, // Purchase ID
           1: { halign: 'center', cellWidth: 20 }, // Product ID
           2: { halign: 'center', cellWidth: 30 }, // Branch Code
-          3: { halign: 'center', cellWidth: 15 }, // Quantity
+          3: { halign: 'center', cellWidth: 20 }, // Quantity
           4: { halign: 'center', cellWidth: 15 }, // Rate
           5: { halign: 'center', cellWidth: 25 }, // MRP
           6: { halign: 'center', cellWidth: 35 }, // Purchase From
@@ -144,10 +163,22 @@ const getColumnStyles = (reportType, isEmployee = false) => {
           8: { halign: 'center', cellWidth: 20 }, // Bill Date
           9: { halign: 'center', cellWidth: 25 }, // Created At
           10: { halign: 'center', cellWidth: 25 }, // Updated At
-          11: { halign: 'center', cellWidth: 25 }, // Employee Name
+          11: { halign: 'center', cellWidth: 20 }, // Employee Name
         };
       }
     }
+    case 'stock_assignments': // Added stock_assignments
+      return {
+        0: { halign: 'center', cellWidth: 25 }, // Product ID
+        1: { halign: 'center', cellWidth: 35 }, // Product Name
+        2: { halign: 'center', cellWidth: 20 }, // From Branch
+        3: { halign: 'center', cellWidth: 20 }, // To Branch
+        4: { halign: 'center', cellWidth: 20 }, // Quantity
+        5: { halign: 'center', cellWidth: 25 }, // Notes
+        6: { halign: 'center', cellWidth: 20 }, // Rate
+        7: { halign: 'center', cellWidth: 20 }, // MRP
+        8: { halign: 'center', cellWidth: 25 }, // Assigned At
+      };
     default:
       return {};
   }
@@ -444,7 +475,7 @@ const ReportGenerator = ({ isCollapsed }) => {
         case 'sales_orders': {
           const query = supabase
             .from('sales_orders')
-            .select('*') // Ensure 'final_amount' is included
+            .select('*') // Ensure all necessary fields are included
             .gte('created_at', startDate.toISOString())
             .lte('created_at', endDate.toISOString());
 
@@ -546,7 +577,7 @@ const ReportGenerator = ({ isCollapsed }) => {
             const items = sale.items || [];
             items.forEach(item => {
               const pid = item.id; // Assuming 'id' refers to 'product_id' (integer)
-              const quantity = parseInt(item.quantity) || 0;
+              const quantity = parseInt(item.quantity, 10) || 0;
               if (!salesAggregated[pid]) {
                 salesAggregated[pid] = 0;
               }
@@ -559,7 +590,7 @@ const ReportGenerator = ({ isCollapsed }) => {
             const products = work.product_entries || [];
             products.forEach(product => {
               const pid = product.id; // Assuming 'id' refers to 'product_id' (integer)
-              const quantity = parseInt(product.quantity) || 0;
+              const quantity = parseInt(product.quantity, 10) || 0;
               if (!salesAggregated[pid]) {
                 salesAggregated[pid] = 0;
               }
@@ -615,64 +646,74 @@ const ReportGenerator = ({ isCollapsed }) => {
           // Fetch sales_orders with necessary fields
           const salesQuery = supabase
             .from('sales_orders')
-            .select('sales_order_id, work_order_id, mr_number, final_amount, cgst, sgst, total_amount, created_at, updated_at, branch, customer_id,discount,advance_details')
+            .select('sales_order_id, work_order_id, mr_number, final_amount, cgst, sgst, total_amount, created_at, updated_at, branch, customer_id, discount, advance_details')
             .gte('created_at', startDate.toISOString())
             .lte('created_at', endDate.toISOString());
-        
+
           if (!isCombined) {
             salesQuery.in('branch', branchesToReport);
           }
-        
+
           const { data: salesData, error: salesError } = await salesQuery;
           if (salesError) throw salesError;
-        
+
+          // Fetch work_orders with necessary fields
+          const workQuery = supabase
+            .from('work_orders')
+            .select('work_order_id, mr_number, advance_details, created_at, updated_at, branch, customer_id')
+            .gte('created_at', startDate.toISOString())
+            .lte('created_at', endDate.toISOString());
+
+          if (!isCombined) {
+            workQuery.in('branch', branchesToReport);
+          }
+
+          const { data: workData, error: workError } = await workQuery;
+          if (workError) throw workError;
+
           // Fetch MR numbers and customer IDs for mapping
-          const mrNumbers = salesData.map(sale => sale.mr_number).filter(mr => mr !== null);
-          const customerIds = salesData.map(sale => sale.customer_id).filter(id => id !== null);
-        
+          // Fetch MR numbers and customer IDs from both salesData and workData
+const mrNumbers = [
+  ...salesData.map(sale => sale.mr_number),
+  ...workData.map(work => work.mr_number)
+].filter(mr => mr !== null && mr !== '');
+
+const customerIds = [
+  ...salesData.map(sale => sale.customer_id),
+  ...workData.map(work => work.customer_id)
+].filter(id => id !== null && id !== '');
+
+
           // Fetch patients based on MR numbers
           const { data: patientsData, error: patientsError } = await supabase
             .from('patients')
             .select('mr_number, name')
             .in('mr_number', mrNumbers);
-        
+
           if (patientsError) throw patientsError;
-        
+
           // Fetch customers based on customer IDs
           const { data: customersData, error: customersError } = await supabase
             .from('customers')
             .select('customer_id, name')
             .in('customer_id', customerIds);
-        
+
           if (customersError) throw customersError;
-        
+
           // Map MR numbers to patient names
           const patientMap = Object.fromEntries(patientsData.map(p => [p.mr_number, p.name]));
-        
+
           // Map customer IDs to customer names
           const customerMap = Object.fromEntries(customersData.map(c => [c.customer_id, c.name]));
-        
-          // Consolidate data based on work_order_id
-          const consolidatedData = salesData.map(sale => {
-            // Determine Patient Name
-            let patientName = patientMap[sale.mr_number] || 'N/A';
-        
+
+          // Consolidate sales_orders data
+          const consolidatedSales = salesData.map(sale => {
             // Determine Customer Name
             let customerName = customerMap[sale.customer_id] || 'N/A';
-        
-            // Combine Patient and Customer Names
-            let patientCustomerName = 'N/A';
-            if (patientName !== 'N/A' && customerName !== 'N/A') {
-              patientCustomerName = `${patientName} / ${customerName}`;
-            } else if (patientName !== 'N/A') {
-              patientCustomerName = patientName;
-            } else if (customerName !== 'N/A') {
-              patientCustomerName = customerName;
-            }
-        
-            // Total GST calculation
+
+            // Total GST calculation (only from sales_orders)
             const totalGST = (parseFloat(sale.cgst) || 0) + (parseFloat(sale.sgst) || 0);
-        
+
             return {
               sales_order_id: sale.sales_order_id || 'N/A',
               work_order_id: sale.work_order_id || 'N/A',
@@ -680,20 +721,46 @@ const ReportGenerator = ({ isCollapsed }) => {
               total_amount: parseFloat(sale.total_amount) || 0,
               total_gst: totalGST,
               discount: parseFloat(sale.discount) || 0,
-              advance_collected: parseFloat(sale.advance_details) || 0,
+              advance_collected: 0, // No advance from sales_orders
               balance_collected: parseFloat(sale.final_amount) || 0,
-              total_collected: (parseFloat(sale.advance_details) || 0) + (parseFloat(sale.final_amount) || 0),
-              patient_customer_name: patientCustomerName,
+              total_collected: parseFloat(sale.final_amount) || 0, // Only from sales_orders
+              patient_customer_name: patientMap[sale.mr_number] || customerName || 'N/A',
+
               branch: sale.branch || 'N/A',
               created_at: sale.created_at ? convertUTCToIST(sale.created_at, 'dd-MM-yyyy hh:mm a') : 'N/A',
               updated_at: sale.updated_at ? convertUTCToIST(sale.updated_at, 'dd-MM-yyyy hh:mm a') : 'N/A',
             };
           });
-        
+
+          // Consolidate work_orders data
+          const consolidatedWork = workData.map(work => {
+            // Determine Customer Name
+            let customerName = customerMap[work.customer_id] || 'N/A';
+
+            return {
+              sales_order_id: 'N/A', // No sales_order_id in work_orders
+              work_order_id: work.work_order_id || 'N/A',
+              mr_number: work.mr_number || 'N/A',
+              total_amount: 0, // No total_amount from work_orders
+              total_gst: 0, // Exclude GST from work_orders
+              discount: 0, // No discount from work_orders
+              advance_collected: parseFloat(work.advance_details) || 0,
+              balance_collected: 0, // No balance collected from work_orders
+              total_collected: parseFloat(work.advance_details) || 0, // Only advance from work_orders
+              patient_customer_name: patientMap[work.mr_number] || customerName || 'N/A',
+
+              branch: work.branch || 'N/A',
+              created_at: work.created_at ? convertUTCToIST(work.created_at, 'dd-MM-yyyy hh:mm a') : 'N/A',
+              updated_at: work.updated_at ? convertUTCToIST(work.updated_at, 'dd-MM-yyyy hh:mm a') : 'N/A',
+            };
+          });
+
+          // Combine both sales and work data
+          const consolidatedData = [...consolidatedSales, ...consolidatedWork];
+
           fetchedData = consolidatedData;
           break;
         }
-
         case 'stock_report': {
           // Fetch products
           const { data: productsData, error: productsError } = await supabase
@@ -768,7 +835,7 @@ const ReportGenerator = ({ isCollapsed }) => {
             const items = sale.items || [];
             items.forEach(item => {
               const pid = item.id; // Assuming 'id' refers to 'product_id' (integer)
-              const quantity = parseInt(item.quantity) || 0;
+              const quantity = parseInt(item.quantity, 10) || 0;
               if (!salesAggregated[pid]) {
                 salesAggregated[pid] = 0;
               }
@@ -781,7 +848,7 @@ const ReportGenerator = ({ isCollapsed }) => {
             const products = work.product_entries || [];
             products.forEach(product => {
               const pid = product.id; // Assuming 'id' refers to 'product_id' (integer)
-              const quantity = parseInt(product.quantity) || 0;
+              const quantity = parseInt(product.quantity, 10) || 0;
               if (!salesAggregated[pid]) {
                 salesAggregated[pid] = 0;
               }
@@ -816,6 +883,27 @@ const ReportGenerator = ({ isCollapsed }) => {
           }
 
           ({ data, error } = await purchaseQuery);
+          if (error) throw error;
+          fetchedData = data;
+          break;
+        }
+        case 'stock_assignments': { // Updated stock_assignments to include product_name
+          const query = supabase
+            .from('stock_assignments')
+            .select(`
+              *,
+              products(product_name)
+            `)
+            .gte('assigned_at', startDate.toISOString())
+            .lte('assigned_at', endDate.toISOString());
+
+          if (!isCombined) {
+            // Filter where from_branch_code OR to_branch_code is in selectedBranches
+            const branchesFilter = selectedBranches.map(branch => `"${branch}"`).join(',');
+            query.or(`from_branch_code.in.(${branchesFilter}),to_branch_code.in.(${branchesFilter})`);
+          }
+
+          ({ data, error } = await query);
           if (error) throw error;
           fetchedData = data;
           break;
@@ -863,6 +951,8 @@ const ReportGenerator = ({ isCollapsed }) => {
         return 'Stock Report';
       case 'purchase_report':
         return 'Purchase Report';
+      case 'stock_assignments':
+        return 'Stock Assignments';
       default:
         return '';
     }
@@ -961,23 +1051,42 @@ const ReportGenerator = ({ isCollapsed }) => {
           'Updated At',
         ];
         break;
-      case 'consolidated':
-        tableColumn = [
-          'Sales Order ID',
-          'Work Order ID',
-          'MR Number',
-          'Total Amount',
-          'Total GST',
-          'Discount',
-          'Advance Collected',
-          'Balance Collected',
-          'Total Collected', // Replaced 'Amount Left to Collect'
-          'Patient/Customer Name', // New Column
-          'Branch',
-          'Created At',
-          'Updated At',
-        ];
+      case 'consolidated': {
+        if (isEmployee) {
+          tableColumn = [
+            'Sales Order ID',
+            'Work Order ID',
+            'MR Number',
+            'Total Amount',
+            'Total GST',
+            'Discount',
+            'Advance Collected',
+            'Balance Collected',
+            'Total Collected', // Replaced 'Amount Left to Collect'
+            'Patient/Customer Name', // New Column
+            'Branch',
+            'Created At',
+            'Updated At',
+          ];
+        } else {
+          tableColumn = [
+            'Sales Order ID',
+            'Work Order ID',
+            'MR Number',
+            'Total Amount',
+            'Total GST',
+            'Discount',
+            'Advance Collected',
+            'Balance Collected',
+            'Total Collected', // Replaced 'Amount Left to Collect'
+            'Patient/Customer Name', // New Column
+            'Branch',
+            'Created At',
+            'Updated At',
+          ];
+        }
         break;
+      }
       case 'stock_report':
         tableColumn = [
           'Product ID',
@@ -996,7 +1105,7 @@ const ReportGenerator = ({ isCollapsed }) => {
             'Product ID',
             'Branch Code',
             'Quantity',
-            // 'Rate' column omitted for employees
+            // Rate column omitted for employees
             'MRP',
             'Purchase From',
             'Bill Number',
@@ -1023,6 +1132,19 @@ const ReportGenerator = ({ isCollapsed }) => {
         }
         break;
       }
+      case 'stock_assignments': // Added stock_assignments
+        tableColumn = [
+          'Product ID',
+          'Product Name',
+          'From Branch',
+          'To Branch',
+          'Quantity',
+          'Notes',
+          'Rate',
+          'MRP',
+          'Assigned At',
+        ];
+        break;
       default:
         tableColumn = [];
     }
@@ -1065,7 +1187,7 @@ const ReportGenerator = ({ isCollapsed }) => {
           record.advance_details
             ? Number(record.advance_details).toFixed(2)
             : '0.00',
-          record.due_date ? convertUTCToIST(record.due_date, 'dd-MM-yyyy') : 'N/A',
+          record.due_date ? convertUTCToIST(record.due_date.toISOString(), 'dd-MM-yyyy') : 'N/A',
           record.mr_number || 'N/A',
           record.employee || 'N/A',
           record.payment_method || 'N/A',
@@ -1137,23 +1259,24 @@ const ReportGenerator = ({ isCollapsed }) => {
         ]);
         break;
       case 'consolidated':
-        tableRows = data.map((record) => [
-          record.sales_order_id || 'N/A',
-          record.work_order_id || 'N/A',
-          record.mr_number || 'N/A',
-          record.total_amount ? Number(record.total_amount).toFixed(2) : '0.00',
-          record.total_gst ? Number(record.total_gst).toFixed(2) : '0.00',
-          record.discount ? Number(record.discount).toFixed(2) : '0.00',
-          record.advance_collected ? Number(record.advance_collected).toFixed(2) : '0.00',
-          record.balance_collected ? Number(record.balance_collected).toFixed(2) : '0.00',
-          record.total_collected ? Number(record.total_collected).toFixed(2) : '0.00', // Total Collected
-          record.patient_customer_name || 'N/A', // Updated Column
-          record.branch || 'N/A',
-          record.created_at || 'N/A',
-          record.updated_at || 'N/A',
-        ]);
+        {
+          tableRows = data.map((record) => [
+            record.sales_order_id || 'N/A',
+            record.work_order_id || 'N/A',
+            record.mr_number || 'N/A',
+            record.total_amount ? Number(record.total_amount).toFixed(2) : '0.00',
+            record.total_gst ? Number(record.total_gst).toFixed(2) : '0.00',
+            record.discount ? Number(record.discount).toFixed(2) : '0.00',
+            record.advance_collected ? Number(record.advance_collected).toFixed(2) : '0.00',
+            record.balance_collected ? Number(record.balance_collected).toFixed(2) : '0.00',
+            record.total_collected ? Number(record.total_collected).toFixed(2) : '0.00', // Total Collected
+            record.patient_customer_name || 'N/A', // Updated Column
+            record.branch || 'N/A',
+            record.created_at || 'N/A',
+            record.updated_at || 'N/A',
+          ]);
+        }
         break;
-
       case 'stock_report':
         tableRows = data.map((item) => [
           item.product_id || 'N/A',
@@ -1197,6 +1320,20 @@ const ReportGenerator = ({ isCollapsed }) => {
             record.employee_name || 'N/A',
           ]);
         }
+        break;
+      }
+      case 'stock_assignments': { // Updated stock_assignments to include product_name
+        tableRows = data.map((record) => [
+          record.product_id || 'N/A',
+          record.products ? record.products.product_name || 'N/A' : 'N/A', // Product Name from joined products
+          record.from_branch_code || 'N/A',
+          record.to_branch_code || 'N/A',
+          record.quantity || 0,
+          record.notes || 'N/A',
+          record.rate ? Number(record.rate).toFixed(2) : '0.00',
+          record.mrp ? Number(record.mrp).toFixed(2) : '0.00',
+          record.assigned_at ? convertUTCToIST(record.assigned_at, 'dd-MM-yyyy hh:mm a') : 'N/A',
+        ]);
         break;
       }
       default:
@@ -1299,15 +1436,27 @@ const ReportGenerator = ({ isCollapsed }) => {
         break;
       }
       case 'consolidated': {
-        const totalAmount = data.reduce((acc, curr) => acc + (parseFloat(curr.total_amount) || 0), 0);
-        const totalGST = data.reduce((acc, curr) => acc + (parseFloat(curr.total_gst) || 0), 0);
-        const totalDiscount = data.reduce((acc, curr) => acc + (parseFloat(curr.discount) || 0), 0);
-        const totalAdvanceCollected = data.reduce((acc, curr) => acc + (parseFloat(curr.advance_collected) || 0), 0);
-        const totalBalanceCollected = data.reduce((acc, curr) => acc + (parseFloat(curr.balance_collected) || 0), 0);
-        const totalCollected = data.reduce((acc, curr) => acc + (parseFloat(curr.total_collected) || 0), 0);
+        const totalAmountSales = data
+          .filter(record => record.total_amount)
+          .reduce((acc, curr) => acc + parseFloat(curr.total_amount), 0);
+        const totalGST = data
+          .filter(record => record.total_gst)
+          .reduce((acc, curr) => acc + parseFloat(curr.total_gst), 0);
+        const totalDiscount = data
+          .filter(record => record.discount)
+          .reduce((acc, curr) => acc + parseFloat(curr.discount), 0);
+        const totalAdvanceCollected = data
+          .filter(record => record.advance_collected)
+          .reduce((acc, curr) => acc + parseFloat(curr.advance_collected), 0);
+        const totalBalanceCollected = data
+          .filter(record => record.balance_collected)
+          .reduce((acc, curr) => acc + parseFloat(curr.balance_collected), 0);
+        const totalCollected = data
+          .filter(record => record.total_collected)
+          .reduce((acc, curr) => acc + parseFloat(curr.total_collected), 0);
 
         summaryTable = [
-          ['Total Amount', totalAmount.toFixed(2)],
+          ['Total Sales Amount', totalAmountSales.toFixed(2)],
           ['Total GST Collected', totalGST.toFixed(2)],
           ['Total Discount', totalDiscount.toFixed(2)],
           ['Total Advance Collected', totalAdvanceCollected.toFixed(2)],
@@ -1339,6 +1488,15 @@ const ReportGenerator = ({ isCollapsed }) => {
           ['Total Quantity', totalQuantity],
           ['Total MRP', totalMRP.toFixed(2)],
           ['Total Amount', totalAmount.toFixed(2)],
+        ];
+        break;
+      }
+      case 'stock_assignments': { // Added stock_assignments
+        const totalAssignments = data.length;
+        const totalQuantityAssigned = data.reduce((acc, curr) => acc + (curr.quantity || 0), 0);
+        summaryTable = [
+          ['Total Stock Assignments', totalAssignments],
+          ['Total Quantity Assigned', totalQuantityAssigned],
         ];
         break;
       }
@@ -1413,6 +1571,7 @@ const ReportGenerator = ({ isCollapsed }) => {
     { value: 'consolidated', label: 'Consolidated' },
     { value: 'stock_report', label: 'Stock Report' },
     { value: 'purchase_report', label: 'Purchase Report' }, // Added Purchase Report for employees
+    { value: 'stock_assignments', label: 'Stock Assignments' }, // Added Stock Assignments for employees
   ] : [
     { value: 'sales_orders', label: 'Sales Orders' },
     { value: 'work_orders', label: 'Work Orders' },
@@ -1422,6 +1581,7 @@ const ReportGenerator = ({ isCollapsed }) => {
     { value: 'consolidated', label: 'Consolidated' },
     { value: 'stock_report', label: 'Stock Report' },
     { value: 'purchase_report', label: 'Purchase Report' }, // Added Purchase Report for admins
+    { value: 'stock_assignments', label: 'Stock Assignments' }, // Added Stock Assignments for admins
   ];
 
   // Ensure reportType is valid for the current role
@@ -1646,6 +1806,7 @@ const ReportGenerator = ({ isCollapsed }) => {
               </div>
             </div>
           ) : null}
+
 
           {/* Generate Report Button */}
           <div className="mt-8 flex justify-center">

@@ -1,11 +1,6 @@
 // client/src/pages/EmployeeStockManagement.jsx
 
-import React, {
-  useState,
-  useEffect,
-  useRef,
-  useCallback,
-} from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   addOrUpdateStock,
   addNewProduct,
@@ -18,7 +13,8 @@ import { useGlobalState } from "../context/GlobalStateContext";
 import { debounce } from "lodash";
 import Modal from "react-modal";
 import EmployeeVerification from "../components/EmployeeVerification";
-import { toast } from "react-toastify";
+import { toast, ToastContainer } from "react-toastify";
+import 'react-toastify/dist/ReactToastify.css'; // Import CSS for toast notifications
 
 Modal.setAppElement("#root");
 
@@ -66,6 +62,13 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
   const itemsPerPage = 10;
 
   const isUploadingRef = useRef(false);
+
+  // // Initialize React Toastify
+  // useEffect(() => {
+  //   // This ensures that ToastContainer is rendered once
+  //   // If you already have it in a higher-level component, you can remove this
+  //   toast.configure();
+  // }, []);
 
   // Warn user before unloading the page during upload
   useEffect(() => {
@@ -118,27 +121,53 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
     try {
       const { data, error } = await supabase
         .from("products")
-        .select("id, product_name, product_id, rate, mrp, purchase_from")
+        .select("id, product_name, product_id, rate, mrp, purchase_from, hsn_code") // Added hsn_code
         .or(`product_name.ilike.%${query}%,product_id.ilike.%${query}%`)
         .limit(20);
-
+  
       if (error) {
         console.error("Error fetching suggestions:", error);
         toast.error("Failed to fetch product suggestions.");
         setProductSuggestions([]);
         return;
       }
-
+  
       setProductSuggestions(data || []);
     } catch (err) {
       console.error("Error fetching product suggestions:", err);
       toast.error("An unexpected error occurred while fetching suggestions.");
     }
   }, []);
+  
 
-  const debouncedFetchSuggestions = useRef(
-    debounce(fetchProductSuggestions, 300)
-  ).current;
+  // Debounced fetchProductSuggestions to limit API calls
+const debouncedFetchSuggestions = useRef(
+  debounce(async (query) => {
+    try {
+      const { data, error } = await supabase
+        .from("products")
+        .select("id, product_name, product_id, rate, mrp, purchase_from, hsn_code") // Added hsn_code
+        .or(`product_name.ilike.%${query}%,product_id.ilike.%${query}%`)
+        .limit(20);
+
+      if (error) throw error;
+
+      setProductSuggestions(data || []);
+    } catch (err) {
+      console.error("Error fetching product suggestions:", err);
+      toast.error("Failed to fetch product suggestions.");
+    }
+  }, 300)
+).current;
+
+// Cleanup debounce on unmount
+useEffect(() => {
+  return () => {
+    debouncedFetchSuggestions.cancel();
+  };
+}, []);
+
+  
 
   // Handler for Mode Selection
   const handleModeSelection = (selectedMode) => {
@@ -472,13 +501,14 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
         rate: parseFloat(rate),
         mrp: parseFloat(mrp),
         hsn_code: hsn_code.trim(), // Include HSN Code
-        total_value: parseFloat(rate) * parseInt(quantity, 10), // Example calculation
         purchase_from: purchase_from.trim(),
       });
 
       if (!addProductResponse.success) {
         toast.error(addProductResponse.error);
         dispatch({ type: "RESET_PURCHASE_MODAL" });
+        setIsLoading(false);
+        isUploadingRef.current = false;
         return;
       }
 
@@ -488,13 +518,14 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
         branch,
         parseInt(quantity, 10),
         parseFloat(rate),
-        parseFloat(mrp),
-        purchase_from.trim()
+        parseFloat(mrp)
       );
 
       if (!updateStockResponse.success) {
         toast.error(updateStockResponse.error);
         dispatch({ type: "RESET_PURCHASE_MODAL" });
+        setIsLoading(false);
+        isUploadingRef.current = false;
         return;
       }
 
@@ -515,6 +546,8 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
       if (!addPurchaseResponse.success) {
         toast.error(addPurchaseResponse.error);
         dispatch({ type: "RESET_PURCHASE_MODAL" });
+        setIsLoading(false);
+        isUploadingRef.current = false;
         return;
       }
 
@@ -560,33 +593,27 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
     } = previewData;
 
     try {
-      // Update Product HSN Code if needed
-      const updateProductResponse = await updateExistingProductDetails({
-        id: selectedProduct.id,
-        hsn_code: hsn_code.trim(),
-      });
+      // Update Existing Product with new details
+      const updateProductResponse = await updateExistingProduct(
+        selectedProduct.id,            // productId
+        branch,                        // branchCode
+        parseInt(quantity, 10),        // quantity
+        parseFloat(rate),              // rate
+        parseFloat(mrp),               // mrp
+        purchase_from.trim(),          // purchaseFrom
+        hsn_code.trim()                // hsn_code
+      );
 
       if (!updateProductResponse.success) {
         toast.error(updateProductResponse.error);
         dispatch({ type: "RESET_PURCHASE_MODAL" });
+        setIsLoading(false);
+        isUploadingRef.current = false;
         return;
       }
 
-      // Update Stock for the Branch
-      const updateStockResponse = await addOrUpdateStock(
-        selectedProduct.id,
-        branch,
-        parseInt(quantity, 10),
-        parseFloat(rate),
-        parseFloat(mrp),
-        purchase_from.trim()
-      );
-
-      if (!updateStockResponse.success) {
-        toast.error(updateStockResponse.error);
-        dispatch({ type: "RESET_PURCHASE_MODAL" });
-        return;
-      }
+      // **Removed the redundant addOrUpdateStock call**
+      // Previously, this redundant call was causing the quantity to double.
 
       // Add to Purchases Table
       const addPurchaseResponse = await addPurchase({
@@ -605,6 +632,8 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
       if (!addPurchaseResponse.success) {
         toast.error(addPurchaseResponse.error);
         dispatch({ type: "RESET_PURCHASE_MODAL" });
+        setIsLoading(false);
+        isUploadingRef.current = false;
         return;
       }
 
@@ -679,9 +708,8 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
       const { data, error } = await supabase
         .from("stock")
         .select(
-          `
-                quantity,
-                product:products(id, product_name, product_id, rate, mrp, purchase_from, hsn_code)
+          `quantity,
+          product:products(id, product_name, product_id, rate, mrp, purchase_from, hsn_code)
             `
         )
         .eq("branch_code", branch);
@@ -707,14 +735,13 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
   const [filteredStocks, setFilteredStocks] = useState([]);
 
   // Memoized filtered and sorted stock based on search query
-  const allFilteredStocks = useCallback(() => {
+  const allFilteredStocks = useMemo(() => {
     return filteredStocks
       .filter((stock) => {
         const searchTerm = stockSearchQuery.toLowerCase();
-        const productName = stock.product.product_name.toLowerCase();
-        const productId = stock.product.product_id.toLowerCase();
         return (
-          productName.includes(searchTerm) || productId.includes(searchTerm)
+          stock.product.product_name.toLowerCase().includes(searchTerm) ||
+          stock.product.product_id.toLowerCase().includes(searchTerm)
         );
       })
       .sort((a, b) =>
@@ -722,16 +749,19 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
       );
   }, [filteredStocks, stockSearchQuery]);
 
-  const filteredStocksMemo = allFilteredStocks();
+  const filteredStocksMemo = allFilteredStocks; // Correct usage
+
 
   // Calculate total pages based on filtered stock
   const totalPages = Math.ceil(filteredStocksMemo.length / itemsPerPage);
 
   // Get current page's stocks
-  const displayedStocks = filteredStocksMemo.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
+  const displayedStocks = useMemo(() => {
+    return allFilteredStocks.slice(
+      (currentPage - 1) * itemsPerPage,
+      currentPage * itemsPerPage
+    );
+  }, [allFilteredStocks, currentPage]);
 
   // Reset currentPage to 1 when search query or allFilteredStocks changes
   useEffect(() => {
@@ -740,27 +770,38 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
 
   // Handler for Confirming in Modal
   const handleConfirmModal = () => {
-    setIsLoading(true);
     if (state.purchaseModal.action === "add") {
       processAddNewProduct();
     } else if (state.purchaseModal.action === "update") {
       processUpdateExistingProduct();
     }
   };
-
-  // Handler for Cancelling in Modal
+  
   const handleCancelModal = () => {
     dispatch({ type: "RESET_PURCHASE_MODAL" });
     setIsLoading(false);
     isUploadingRef.current = false;
-    toast.dismiss(); // Dismiss any existing toasts
+    toast.dismiss(); // Clear lingering toasts
   };
+  
 
   return (
     <div
-      className={`transition-all duration-300 ${isCollapsed ? "mx-20" : "mx-20 px-20"
-        } justify-center my-20 p-8 rounded-xl mx-auto max-w-4xl bg-green-50 shadow-inner`}
+      className={`transition-all duration-300 ${
+        isCollapsed ? "mx-20" : "mx-20 px-20"
+      } justify-center my-20 p-8 rounded-xl mx-auto max-w-4xl bg-green-50 shadow-inner`}
     >
+    <ToastContainer
+  position="top-right"
+  autoClose={8000} // Increased duration
+  hideProgressBar={false}
+  newestOnTop={true} // Ensure latest toast shows on top
+  closeOnClick
+  pauseOnFocusLoss
+  draggable
+  pauseOnHover
+  theme="colored"
+/>
       <h1 className="text-2xl font-semibold mb-6 text-center">
         Product Purchase
       </h1>
@@ -769,19 +810,21 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
       <div className="flex justify-center mb-6 text-lg font-semibold">
         <button
           onClick={() => handleModeSelection("add")}
-          className={`mx-2 px-4 py-2 rounded ${mode === "add"
+          className={`mx-2 px-4 py-2 rounded ${
+            mode === "add"
               ? "bg-green-500 text-white shadow-2xl"
               : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-            }`}
+          }`}
         >
           Add New Product
         </button>
         <button
           onClick={() => handleModeSelection("update")}
-          className={`mx-2 px-4 py-2 rounded ${mode === "update"
+          className={`mx-2 px-4 py-2 rounded ${
+            mode === "update"
               ? "bg-green-500 text-white shadow-2xl"
               : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-            }`}
+          }`}
         >
           Update Existing Product
         </button>
@@ -972,10 +1015,11 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
 
           <button
             type="submit"
-            className={`mt-4 w-full p-2 text-white rounded ${isLoading
+            className={`mt-4 w-full p-2 text-white rounded ${
+              isLoading
                 ? "bg-blue-500 cursor-not-allowed"
                 : "bg-green-500 hover:bg-green-600"
-              }`}
+            }`}
             disabled={isLoading}
           >
             {isLoading ? "Preparing..." : "Add New Product"}
@@ -1235,10 +1279,11 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
           {selectedProduct && (
             <button
               type="submit"
-              className={`mt-4 w-full p-2 text-white rounded ${isLoading
+              className={`mt-4 w-full p-2 text-white rounded ${
+                isLoading
                   ? "bg-blue-500 cursor-not-allowed"
                   : "bg-green-500 hover:bg-green-600"
-                }`}
+              }`}
               disabled={isLoading}
             >
               {isLoading ? "Preparing..." : "Update Stock"}
@@ -1336,10 +1381,11 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
               <button
                 onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
                 disabled={currentPage === 1}
-                className={`px-3 py-1 rounded ${currentPage === 1
+                className={`px-3 py-1 rounded ${
+                  currentPage === 1
                     ? "bg-gray-300 cursor-not-allowed"
                     : "bg-blue-500 text-white hover:bg-blue-600"
-                  }`}
+                }`}
               >
                 Previous
               </button>
@@ -1351,10 +1397,11 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
                   setCurrentPage((prev) => Math.min(prev + 1, totalPages))
                 }
                 disabled={currentPage === totalPages}
-                className={`px-3 py-1 rounded ${currentPage === totalPages
+                className={`px-3 py-1 rounded ${
+                  currentPage === totalPages
                     ? "bg-gray-300 cursor-not-allowed"
                     : "bg-blue-500 text-white hover:bg-blue-600"
-                  }`}
+                }`}
               >
                 Next
               </button>
@@ -1456,20 +1503,25 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
               <h3 className="text-lg font-medium mb-2">Verify Employee</h3>
               <EmployeeVerification
                 employee={state.purchaseModal.content.employee}
-                onVerify={(isVerified) => {
+                onVerify={(isVerified, message) => {
                   if (isVerified) {
-                    // Enable confirm button
+                    // Enable confirm button by updating the modal content
                     dispatch({
                       type: "SET_PURCHASE_MODAL",
                       payload: {
-                        action: state.purchaseModal.action,
+                        ...state.purchaseModal,
                         content: {
                           ...state.purchaseModal.content,
                           isEmployeeVerified: true,
+                          verificationMessage: message,
                         },
                         showModal: true,
                       },
                     });
+                    toast.success(message);
+                  } else {
+                    // Display verification failure message
+                    toast.error(message);
                   }
                 }}
               />
@@ -1484,12 +1536,11 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
               </button>
               <button
                 onClick={handleConfirmModal}
-                className={`px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 ${!state.purchaseModal.content.isEmployeeVerified
+                className={`px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 ${
+                  !state.purchaseModal.content.isEmployeeVerified
                     ? "opacity-50 cursor-not-allowed"
                     : ""
-                  }`}
-
-
+                }`}
                 disabled={!state.purchaseModal.content.isEmployeeVerified}
               >
                 Confirm

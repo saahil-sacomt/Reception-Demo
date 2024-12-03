@@ -645,20 +645,22 @@ export const addNewProduct = async (productData) => {
 };
 
 /**
- * Updates the stock quantity and optionally Rate and MRP for an existing product in a specific branch.
+ * Updates the stock quantity and optionally Rate, MRP, Purchase From, and HSN Code for an existing product in a specific branch.
  * @param {number} productId - The internal ID of the product.
  * @param {string} branchCode - The branch code.
  * @param {number} quantity - The quantity to add.
- * @param {number} rate - The new rate (optional).
- * @param {number} mrp - The new MRP (optional).
- * @param {string} purchaseFrom - The source of purchase (optional).
+ * @param {number|null} rate - The new rate (optional).
+ * @param {number|null} mrp - The new MRP (optional).
+ * @param {string|null} purchaseFrom - The source of purchase (optional).
+ * @param {string|null} hsn_code - The HSN Code (optional).
  * @returns {Object} - { success: boolean, error: string | null }
  */
-export const updateExistingProduct = async (productId, branchCode, quantity, rate, mrp, purchaseFrom) => {
+export const updateExistingProduct = async (productId, branchCode, quantity, rate, mrp, purchaseFrom, hsn_code = null) => {
   try {
     // Log inputs to verify correctness
-    console.log(`Updating product ID: ${productId} for branch: ${branchCode} with quantity: ${quantity}, rate: ${rate}, mrp: ${mrp}, purchaseFrom: ${purchaseFrom}`);
+    console.log(`Updating product ID: ${productId} for branch: ${branchCode} with quantity: ${quantity}, rate: ${rate}, mrp: ${mrp}, purchaseFrom: ${purchaseFrom}, hsn_code: ${hsn_code}`);
 
+    // Step 1: Update stock quantity
     // Fetch existing stock for the product and branch
     const { data: existingStock, error: stockError } = await supabase
       .from("stock")
@@ -667,8 +669,7 @@ export const updateExistingProduct = async (productId, branchCode, quantity, rat
       .eq("branch_code", branchCode)
       .single();
 
-    if (stockError && stockError.code !== "PGRST116") {
-      // PGRST116: No stock entry found, which is acceptable
+    if (stockError && stockError.code !== "PGRST116") { // PGRST116: No stock entry found, which is acceptable
       throw stockError;
     }
 
@@ -704,31 +705,42 @@ export const updateExistingProduct = async (productId, branchCode, quantity, rat
       }
     }
 
-    // Optionally, update Rate and MRP if provided
-    if (rate !== null && mrp !== null) {
-      const productUpdateData = {
-        rate: rate,
-        mrp: mrp,
-        updated_at: new Date().toISOString(),
-      };
-
-      // Include purchase_from if provided
-      if (purchaseFrom) {
-        productUpdateData.purchase_from = purchaseFrom;
-      }
+    // Step 2: Optionally update Rate and MRP in products table
+    if (rate !== null || mrp !== null) {
+      const updateData = {};
+      if (rate !== null) updateData.rate = rate;
+      if (mrp !== null) updateData.mrp = mrp;
 
       const { error: productUpdateError } = await supabase
         .from("products")
-        .update(productUpdateData)
+        .update(updateData)
         .eq("id", productId);
 
       if (productUpdateError) {
-        console.error("Error updating product rate, MRP, and purchase_from:", productUpdateError.message);
+        console.error("Error updating product rate and MRP:", productUpdateError.message);
         return { success: false, error: productUpdateError.message };
       }
     }
 
-    return { success: true };
+    // Step 3: Optionally update HSN Code and Purchase From in products table
+    if (hsn_code || purchaseFrom) {
+      const updateProductData = {};
+      if (hsn_code) updateProductData.hsn_code = hsn_code;
+      if (purchaseFrom) updateProductData.purchase_from = purchaseFrom;
+      updateProductData.updated_at = new Date().toISOString();
+
+      const { error: productDetailUpdateError } = await supabase
+        .from("products")
+        .update(updateProductData)
+        .eq("id", productId);
+
+      if (productDetailUpdateError) {
+        console.error("Error updating product HSN Code and Purchase From:", productDetailUpdateError.message);
+        return { success: false, error: productDetailUpdateError.message };
+      }
+    }
+
+    return { success: true, error: null };
   } catch (error) {
     console.error("Error in updateExistingProduct:", error.message);
     return { success: false, error: error.message };
