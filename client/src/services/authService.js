@@ -244,9 +244,10 @@ export const assignStock = async (assignments) => {
  * @param {string} format - The file format ('csv' or 'xml').
  * @param {string} fromBranchCode - The branch code from which the stock is being assigned.
  * @param {string|null} toBranchCode - The branch code to which the stock is being assigned (optional for single branch uploads).
+ * @param {string} mode - The upload mode ('add' or 'rewrite').
  * @returns {Object} - Success status and any error messages.
  */
-export const bulkUploadStock = async (file, format, fromBranchCode, toBranchCode = null) => {
+export const bulkUploadStock = async (file, format, fromBranchCode, toBranchCode = null, mode = "add") => {
   try {
     let parsedData = [];
 
@@ -395,14 +396,28 @@ export const bulkUploadStock = async (file, format, fromBranchCode, toBranchCode
         return acc;
       }, {});
 
-      // Step 9: Prepare stock entries - add to fromBranchCode
-      const stockEntries = uniqueProducts.map((item) => ({
-        product_id: allProductsMap[item.product_id],
-        branch_code: fromBranchCode,
-        quantity:
-          (existingStockMap[allProductsMap[item.product_id]] || 0) + item.quantity,
-        updated_at: new Date().toISOString(),
-      }));
+      // Step 9: Prepare stock entries based on mode
+      let stockEntries;
+      if (mode === "add") {
+        // Add to existing stock
+        stockEntries = uniqueProducts.map((item) => ({
+          product_id: allProductsMap[item.product_id],
+          branch_code: fromBranchCode,
+          quantity:
+            (existingStockMap[allProductsMap[item.product_id]] || 0) + item.quantity,
+          updated_at: new Date().toISOString(),
+        }));
+      } else if (mode === "rewrite") {
+        // Rewrite existing stock
+        stockEntries = uniqueProducts.map((item) => ({
+          product_id: allProductsMap[item.product_id],
+          branch_code: fromBranchCode,
+          quantity: item.quantity, // Overwrite with new quantity
+          updated_at: new Date().toISOString(),
+        }));
+      } else {
+        throw new Error("Invalid upload mode.");
+      }
 
       // Step 10: Bulk upsert stock entries
       const { error: upsertStockError } = await supabase
@@ -418,6 +433,7 @@ export const bulkUploadStock = async (file, format, fromBranchCode, toBranchCode
     return { success: false, error: error.message };
   }
 };
+
 
 /**
  * Adds or updates a single stock entry.

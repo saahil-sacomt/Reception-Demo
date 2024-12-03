@@ -55,6 +55,7 @@ const StockManagement = ({ isCollapsed }) => {
   const [bulkBranchUpload, setBulkBranchUpload] = useState("");
   const [uploadFormatUpload, setUploadFormatUpload] = useState("csv");
   const [fileUpload, setFileUpload] = useState(null);
+  const [bulkUploadMode, setBulkUploadMode] = useState("add"); // New state for upload mode
 
   // ============================
   // Bulk Assign Stock States
@@ -388,7 +389,9 @@ const StockManagement = ({ isCollapsed }) => {
         const response = await bulkUploadStock(
           fileUpload,
           uploadFormatUpload,
-          bulkBranchUpload
+          bulkBranchUpload,
+          null, // toBranchCode is null for single branch upload
+          bulkUploadMode // Pass the selected mode
         );
 
         if (response.success) {
@@ -396,6 +399,7 @@ const StockManagement = ({ isCollapsed }) => {
           setFileUpload(null);
           setBulkBranchUpload("");
           setUploadFormatUpload("csv");
+          setBulkUploadMode("add"); // Reset to default mode
           if (fileUploadRef.current) fileUploadRef.current.value = "";
           refreshStockData();
         } else {
@@ -409,7 +413,7 @@ const StockManagement = ({ isCollapsed }) => {
         isLoadingRef.current = false;
       }
     },
-    [bulkBranchUpload, fileUpload, uploadFormatUpload, bulkUploadStock, refreshStockData]
+    [bulkBranchUpload, fileUpload, uploadFormatUpload, bulkUploadMode, bulkUploadStock, refreshStockData]
   );
 
   // ============================
@@ -504,8 +508,7 @@ const StockManagement = ({ isCollapsed }) => {
 
       if (!allowedExtensions.includes(fileExtension)) {
         toast.error(
-          `Invalid file format. Please upload a ${
-            uploadFormatAssign === "csv" ? "CSV" : "XML"
+          `Invalid file format. Please upload a ${uploadFormatAssign === "csv" ? "CSV" : "XML"
           } file.`
         );
         return;
@@ -519,7 +522,8 @@ const StockManagement = ({ isCollapsed }) => {
           fileAssign,
           uploadFormatAssign,
           bulkFromBranchAssign,
-          bulkToBranchAssign
+          bulkToBranchAssign,
+          "add" // Assuming assign operations are always 'add'
         );
 
         if (response.success) {
@@ -738,9 +742,8 @@ const StockManagement = ({ isCollapsed }) => {
 
   return (
     <div
-      className={`transition-all duration-300 ${
-        isCollapsed ? "mx-20" : "mx-20 px-20"
-      } justify-center my-20 p-8 rounded-xl mx-auto max-w-4xl bg-green-50 shadow-inner`}
+      className={`transition-all duration-300 ${isCollapsed ? "mx-20" : "mx-20 px-20"
+        } justify-center my-20 p-8 rounded-xl mx-auto max-w-4xl bg-green-50 shadow-inner`}
     >
       <h1 className="text-2xl font-semibold mb-6 text-center">Stock Management</h1>
 
@@ -855,11 +858,10 @@ const StockManagement = ({ isCollapsed }) => {
 
         <button
           type="submit"
-          className={`mt-4 w-full p-2 text-white rounded flex items-center justify-center ${
-            isLoadingRef.current
+          className={`mt-4 w-full p-2 text-white rounded flex items-center justify-center ${isLoadingRef.current
               ? "bg-blue-500 cursor-not-allowed"
               : "bg-green-500 hover:bg-green-600"
-          }`}
+            }`}
           disabled={isLoadingRef.current}
         >
           {isLoadingRef.current ? (
@@ -886,7 +888,7 @@ const StockManagement = ({ isCollapsed }) => {
               id="bulkBranchUpload"
               value={bulkBranchUpload}
               onChange={(e) => setBulkBranchUpload(e.target.value)}
-              className="w-full p-2 border rounded"
+              className="w-full p-2 mt-2 border rounded"
               required
             >
               <option value="" disabled>
@@ -909,7 +911,7 @@ const StockManagement = ({ isCollapsed }) => {
               id="uploadFormatUpload"
               value={uploadFormatUpload}
               onChange={(e) => setUploadFormatUpload(e.target.value)}
-              className="w-full p-2 border rounded"
+              className="w-full p-2 mt-2 border rounded"
               required
             >
               <option value="csv">CSV</option>
@@ -917,6 +919,35 @@ const StockManagement = ({ isCollapsed }) => {
               {/* <option value="xml">XML</option> */}
             </select>
           </div>
+
+          {/* Upload Mode Selection */}
+          {/* Step Selection Buttons */}
+          <div className="mb-4">
+            <h2 className="font-semibold mb-4">Select Upload Mode</h2>
+            <div className="flex space-x-4">
+              <button
+                type="button"
+                className={`px-4 py-2 rounded ${bulkUploadMode === "add"
+                    ? "bg-green-500 text-white shadow-xl"
+                    : "bg-gray-200 text-gray-700"
+                  }`}
+                onClick={() => setBulkUploadMode("add")}
+              >
+                Update Stock
+              </button>
+              <button
+                type="button"
+                className={`px-4 py-2 rounded ${bulkUploadMode === "rewrite"
+                    ? "bg-green-500 text-white shadow-xl"
+                    : "bg-gray-200 text-gray-700"
+                  }`}
+                onClick={() => setBulkUploadMode("rewrite")}
+              >
+                Rewrite Stock
+              </button>
+            </div>
+          </div>
+
         </div>
 
         {/* File Input */}
@@ -937,11 +968,10 @@ const StockManagement = ({ isCollapsed }) => {
 
         <button
           type="submit"
-          className={`mt-4 w-full p-2 text-white rounded flex items-center justify-center ${
-            isLoadingRef.current
+          className={`mt-4 w-full p-2 text-white rounded flex items-center justify-center ${isLoadingRef.current
               ? "bg-blue-500 cursor-not-allowed"
               : "bg-green-500 hover:bg-green-600"
-          }`}
+            }`}
           disabled={isLoadingRef.current}
         >
           {isLoadingRef.current ? (
@@ -1112,11 +1142,10 @@ const StockManagement = ({ isCollapsed }) => {
 
         <button
           type="submit"
-          className={`mt-4 w-full p-2 text-white rounded flex items-center justify-center ${
-            isLoadingRef.current
+          className={`mt-4 w-full p-2 text-white rounded flex items-center justify-center ${isLoadingRef.current
               ? "bg-blue-500 cursor-not-allowed"
               : "bg-green-500 hover:bg-green-600"
-          }`}
+            }`}
           disabled={isLoadingRef.current}
         >
           {isLoadingRef.current ? (
@@ -1217,11 +1246,10 @@ const StockManagement = ({ isCollapsed }) => {
 
         <button
           type="submit"
-          className={`mt-4 w-full p-2 text-white rounded flex items-center justify-center ${
-            isLoadingRef.current
+          className={`mt-4 w-full p-2 text-white rounded flex items-center justify-center ${isLoadingRef.current
               ? "bg-blue-500 cursor-not-allowed"
               : "bg-green-500 hover:bg-green-600"
-          }`}
+            }`}
           disabled={isLoadingRef.current}
         >
           {isLoadingRef.current ? (
@@ -1310,78 +1338,85 @@ const StockManagement = ({ isCollapsed }) => {
                   <th className="py-2 px-4 border-b">Quantity</th>
                   <th className="py-2 px-4 border-b">Rate</th>
                   <th className="py-2 px-4 border-b">MRP</th>
+                  <th className="py-2 px-4 border-b">HSN Code</th>
                   <th className="py-2 px-4 border-b">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {lookupResults.length > 0
                   ? lookupResults.map((stock) => (
-                      <tr key={`${stock.product.id}-${lookupBranch}`}>
-                        <td className="py-2 px-4 border-b text-center">
-                          {stock.product.product_id}
-                        </td>
-                        <td className="py-2 px-4 border-b">{stock.product.product_name}</td>
-                        <td className="py-2 px-4 border-b text-center">{stock.quantity}</td>
-                        <td className="py-2 px-4 border-b text-center">
-                          {stock.product.rate !== null ? stock.product.rate.toFixed(2) : "N/A"}
-                        </td>
-                        <td className="py-2 px-4 border-b text-center">
-                          {stock.product.mrp !== null ? stock.product.mrp.toFixed(2) : "N/A"}
-                        </td>
-                        <td className="py-2 px-4 border-b text-center">
-                          <button
-                            onClick={() => {
-                              setStockToEdit({
-                                ...stock,
-                                branch_code: lookupBranch,
-                              });
-                              dispatch({
-                                type: "SET_MODAL_STATE",
-                                payload: { showEditStockModal: true },
-                              });
-                            }}
-                            className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded"
-                          >
-                            Edit
-                          </button>
-                        </td>
-                      </tr>
-                    ))
+                    <tr key={`${stock.product.id}-${lookupBranch}`}>
+                      <td className="py-2 px-4 border-b text-center">
+                        {stock.product.product_id}
+                      </td>
+                      <td className="py-2 px-4 border-b">{stock.product.product_name}</td>
+                      <td className="py-2 px-4 border-b text-center">{stock.quantity}</td>
+                      <td className="py-2 px-4 border-b text-center">
+                        {stock.product.rate !== null ? stock.product.rate.toFixed(2) : "N/A"}
+                      </td>
+                      <td className="py-2 px-4 border-b text-center">
+                        {stock.product.mrp !== null ? stock.product.mrp.toFixed(2) : "N/A"}
+                      </td>
+                      <td className="py-2 px-4 border-b text-center">
+                        {stock.product.hsn_code || "N/A"}
+                      </td>
+                      <td className="py-2 px-4 border-b text-center">
+                        <button
+                          onClick={() => {
+                            setStockToEdit({
+                              ...stock,
+                              branch_code: lookupBranch,
+                            });
+                            dispatch({
+                              type: "SET_MODAL_STATE",
+                              payload: { showEditStockModal: true },
+                            });
+                          }}
+                          className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded"
+                        >
+                          Edit
+                        </button>
+                      </td>
+                    </tr>
+                  ))
                   : currentItems.map((stock) => (
-                      <tr key={`${stock.product.id}-${lookupBranch}`}>
-                        <td className="py-2 px-4 border-b text-center">
-                          {stock.product.product_id}
-                        </td>
-                        <td className="py-2 px-4 border-b">{stock.product.product_name}</td>
-                        <td className="py-2 px-4 border-b text-center">{stock.quantity}</td>
-                        <td className="py-2 px-4 border-b text-center">
-                          {stock.product.rate !== null ? stock.product.rate.toFixed(2) : "N/A"}
-                        </td>
-                        <td className="py-2 px-4 border-b text-center">
-                          {stock.product.mrp !== null ? stock.product.mrp.toFixed(2) : "N/A"}
-                        </td>
-                        <td className="py-2 px-4 border-b text-center">
-                          <button
-                            onClick={() => {
-                              setStockToEdit({
-                                ...stock,
-                                branch_code: lookupBranch,
-                              });
-                              dispatch({
-                                type: "SET_MODAL_STATE",
-                                payload: { showEditStockModal: true },
-                              });
-                            }}
-                            className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded"
-                          >
-                            Edit
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
+                    <tr key={`${stock.product.id}-${lookupBranch}`}>
+                      <td className="py-2 px-4 border-b text-center">
+                        {stock.product.product_id}
+                      </td>
+                      <td className="py-2 px-4 border-b">{stock.product.product_name}</td>
+                      <td className="py-2 px-4 border-b text-center">{stock.quantity}</td>
+                      <td className="py-2 px-4 border-b text-center">
+                        {stock.product.rate !== null ? stock.product.rate.toFixed(2) : "N/A"}
+                      </td>
+                      <td className="py-2 px-4 border-b text-center">
+                        {stock.product.mrp !== null ? stock.product.mrp.toFixed(2) : "N/A"}
+                      </td>
+                      <td className="py-2 px-4 border-b text-center">
+                        {stock.product.hsn_code || "N/A"}
+                      </td>
+                      <td className="py-2 px-4 border-b text-center">
+                        <button
+                          onClick={() => {
+                            setStockToEdit({
+                              ...stock,
+                              branch_code: lookupBranch,
+                            });
+                            dispatch({
+                              type: "SET_MODAL_STATE",
+                              payload: { showEditStockModal: true },
+                            });
+                          }}
+                          className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded"
+                        >
+                          Edit
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
                 {currentItems.length === 0 && lookupResults.length === 0 && (
                   <tr>
-                    <td colSpan="6" className="py-4 text-center">
+                    <td colSpan="7" className="py-4 text-center">
                       No stock entries found.
                     </td>
                   </tr>
