@@ -1241,7 +1241,8 @@ const ReportGenerator = ({ isCollapsed }) => {
           record.advance_details
             ? Number(record.advance_details).toFixed(2)
             : '0.00',
-          record.due_date ? convertUTCToIST(record.due_date.toISOString(), 'dd-MM-yyyy') : 'N/A',
+            record.due_date ? convertUTCToIST(new Date(record.due_date).toISOString(), 'dd-MM-yyyy') : 'N/A',
+
           record.mr_number || 'N/A',
           record.employee || 'N/A',
           record.payment_method || 'N/A',
@@ -1379,7 +1380,10 @@ const ReportGenerator = ({ isCollapsed }) => {
       case 'stock_assignments': { // Updated stock_assignments to include product_name
         tableRows = data.map((record) => [
           record.product_id || 'N/A',
-          record.products ? record.products.product_name || 'N/A' : 'N/A', // Product Name from joined products
+          record.products && record.products.product_name 
+  ? record.products.product_name 
+  : 'N/A',
+ // Product Name from joined products
           record.from_branch_code || 'N/A',
           record.to_branch_code || 'N/A',
           record.quantity || 0,
@@ -1395,12 +1399,16 @@ const ReportGenerator = ({ isCollapsed }) => {
           record.id || 'N/A',
           capitalizeFirstLetter(record.note_type) || 'N/A',
           record.product_id || 'N/A',
-          record.products ? record.products.product_name || 'N/A' : 'N/A', // Assuming product_name is fetched via foreign key
+          record.products && record.products.product_name 
+  ? record.products.product_name 
+  : 'N/A',
+ // Assuming product_name is fetched via foreign key
           record.branch_code || 'N/A',
           record.quantity || 0,
           record.client_name || 'N/A',
           record.client_address || 'N/A',
-          record.date ? convertUTCToIST(record.date, 'dd-MM-yyyy') : 'N/A',
+          record.date ? convertUTCToIST(new Date(record.date).toISOString(), 'dd-MM-yyyy') : 'N/A',
+
           record.reason || 'N/A',
           record.order_id || 'N/A',
           record.created_at ? convertUTCToIST(record.created_at, 'dd-MM-yyyy hh:mm a') : 'N/A',
