@@ -36,25 +36,45 @@ export const formatDateToIST = (date, format = "dd-MM-yyyy hh:mm a") => {
   return formatInTimeZone(new Date(date), "Asia/Kolkata", format);
 };
 
+// Function to format date as dd/mm/yyyy or dd/mm/yyyy hh:mm a
+export const formatDateDDMMYYYY = (dateString, withTime = false) => {
+  if (!dateString) return 'N/A';
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return 'N/A';
 
-// Utility functions assumed to be defined in ../utils/dateUtils.js
-// Example implementations:
-export const convertUTCToIST = (utcDate, format = 'dd-MM-yyyy') => {
-  const date = new Date(utcDate);
-  const offset = 330; // IST offset in minutes
-  const localTime = new Date(date.getTime() + offset * 60 * 1000);
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0'); // Months are zero-based
+  const year = date.getFullYear();
 
-  if (format === 'dd-MM-yyyy') {
-    return `${localTime.getDate().toString().padStart(2, '0')}-${(localTime.getMonth() + 1)
-      .toString()
-      .padStart(2, '0')}-${localTime.getFullYear()}`;
+  if (withTime) {
+    let hours = date.getHours();
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12;
+    hours = hours ? hours : 12; // the hour '0' should be '12'
+    const formattedHours = String(hours).padStart(2, '0');
+    return `${day}/${month}/${year} ${formattedHours}:${minutes} ${ampm}`;
   }
 
-  // Default fallback for date and time
-  return `${localTime.getDate().toString().padStart(2, '0')}-${(localTime.getMonth() + 1)
-    .toString()
-    .padStart(2, '0')}-${localTime.getFullYear()} ${localTime
-    .toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`;
+  return `${day}/${month}/${year}`;
+};
+
+// Optional: If you have other date-related utilities, export them as needed
+export const convertUTCToIST = (utcDateString, format) => {
+  if (!utcDateString) return 'N/A';
+  const date = new Date(utcDateString);
+  if (isNaN(date.getTime())) return 'N/A';
+  
+  // Implement timezone conversion logic here if needed
+  // Then format the date
+  // Example using formatDateDDMMYYYY
+  if (format === 'dd/MM/yyyy hh:mm a') {
+    return formatDateDDMMYYYY(date.toISOString(), true);
+  }
+  if (format === 'dd/MM/yyyy') {
+    return formatDateDDMMYYYY(date.toISOString(), false);
+  }
+  return formatDateDDMMYYYY(date.toISOString(), false); // default
 };
 
 

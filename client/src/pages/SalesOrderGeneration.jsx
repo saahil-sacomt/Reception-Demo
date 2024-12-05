@@ -1840,7 +1840,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
             })),
             mr_number: hasMrNumber === "yes" ? mrNumber : null,
             patient_phone:
-              hasMrNumber === "yes" ? patientDetails.phone_number : null,
+              hasMrNumber === "yes" ? patientDetails.phone_number : customerPhone,
             customer_id: customerId, // Associate with customer_id
             employee: employee,
             payment_method: paymentMethod,
