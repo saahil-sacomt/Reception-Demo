@@ -1631,6 +1631,8 @@ const ReportGenerator = ({ isCollapsed }) => {
         tableRows = [];
     }
 
+    setReportData([tableColumn, ...tableRows]);
+
     // Generate the main table
     doc.autoTable({
       head: [tableColumn],
@@ -2151,6 +2153,17 @@ const ReportGenerator = ({ isCollapsed }) => {
                 'Generate Report'
               )}
             </button>
+            {/* CSV Download Link: Only show if we have data */}
+            {reportData.length > 0 && (
+              <CSVLink
+                data={reportData}
+                filename={`${reportType}-report.csv`}
+                className="w-full sm:w-auto mx-4 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-md flex items-center justify-center transition"
+                aria-label="Download CSV"
+              >
+                Download CSV
+              </CSVLink>
+            )}
           </div>
         </div>
       </div>
