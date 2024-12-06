@@ -34,6 +34,7 @@ const Home = ({ isCollapsed }) => {
   const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
   const [pendingWorkOrdersCount, setPendingWorkOrdersCount] = useState(0);
   const [salesTodayCount, setSalesTodayCount] = useState(0);
+  const [branchName, setBranchName] = useState('');
 
   // Search State Variables
   const [workOrderSearchTerm, setWorkOrderSearchTerm] = useState('');
@@ -198,6 +199,27 @@ const Home = ({ isCollapsed }) => {
     console.error("Error fetching employee action requests count:", error.message);
     return 0;
   };
+
+  useEffect(() => {
+    const fetchBranchName = async () => {
+      if (branch) {
+        const { data, error } = await supabase
+          .from('branches')
+          .select('branch_name')
+          .eq('branch_code', branch)
+          .single();
+
+        if (!error && data) {
+          setBranchName(data.branch_name || '');
+        } else {
+          console.error('Error fetching branch name:', error?.message);
+          setBranchName('Branch'); // fallback if error
+        }
+      }
+    };
+
+    fetchBranchName();
+  }, [branch]);
 
   // Fetch work order details by ID
   const fetchWorkOrderDetails = async (workOrderId) => {
@@ -487,14 +509,18 @@ const Home = ({ isCollapsed }) => {
 
   // Define role-based welcome messages
   const getWelcomeMessage = () => {
-    const welcomeMessages = {
-      admin: `Welcome Accounts Admin`,
-      employee: `Welcome, Opticals Trivandrum`,
-      super_admin: `Welcome Ashad Sivaraman`,
-      // Add more roles and their corresponding messages here
-    };
-
-    return welcomeMessages[role] || `Welcome, ${name || 'User'}!`;
+    if (role === 'admin') {
+      return 'Welcome Accounts Admin';
+    } else if (role === 'employee') {
+      // If branchName is fetched, use it; else fallback to a default
+      return branchName
+        ? `Welcome, Opticals ${branchName}`
+        : 'Welcome, Opticals Branch';
+    } else if (role === 'super_admin') {
+      return 'Welcome Ashad Sivaraman';
+    } else {
+      return `Welcome, ${name || 'User'}!`;
+    }
   };
 
   // Search Handlers

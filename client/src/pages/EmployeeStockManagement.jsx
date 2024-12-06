@@ -5,7 +5,7 @@ import {
   addOrUpdateStock,
   addNewProduct,
   updateExistingProduct,
-  addPurchase, // Ensure this is exported from authService
+  addPurchase,
 } from "../services/authService";
 import supabase from "../supabaseClient";
 import { useAuth } from "../context/AuthContext";
@@ -14,80 +14,79 @@ import { debounce } from "lodash";
 import Modal from "react-modal";
 import EmployeeVerification from "../components/EmployeeVerification";
 import { toast, ToastContainer } from "react-toastify";
-import 'react-toastify/dist/ReactToastify.css'; // Import CSS for toast notifications
+import 'react-toastify/dist/ReactToastify.css';
 
 Modal.setAppElement("#root");
 
 const EmployeeStockManagement = ({ isCollapsed }) => {
   const { user, role, branch } = useAuth();
   const { state, dispatch } = useGlobalState();
+
   const [mode, setMode] = useState("update");
+  const [isLoading, setIsLoading] = useState(false);
+  const isUploadingRef = useRef(false);
+  const [currentPage, setCurrentPage] = useState(1);
 
-  // State for Add New Product
-  const [newProductName, setNewProductName] = useState("");
-  const [newProductId, setNewProductId] = useState("");
-  const [newRate, setNewRate] = useState("");
-  const [newMrp, setNewMrp] = useState("");
-  const [newQuantity, setNewQuantity] = useState("");
-  const [newPurchaseFrom, setNewPurchaseFrom] = useState("");
-  const [newBillNumber, setNewBillNumber] = useState("");
-  const [newBillDate, setNewBillDate] = useState("");
-  const [newEmployeeId, setNewEmployeeId] = useState(null);
-  const [newHsnCode, setNewHsnCode] = useState("9003"); // Default as per table
+  const itemsPerPage = 10;
 
-  // State for Update Existing Product
-  const [updateSearchQuery, setUpdateSearchQuery] = useState("");
-  const [productSuggestions, setProductSuggestions] = useState([]);
-  const [selectedProduct, setSelectedProduct] = useState(null);
-  const [updateQuantity, setUpdateQuantity] = useState("");
-  const [updateRate, setUpdateRate] = useState("");
-  const [updateMrp, setUpdateMrp] = useState("");
-  const [updatePurchaseFrom, setUpdatePurchaseFrom] = useState("");
+  // For Add New Products (Multiple)
+  const [addProducts, setAddProducts] = useState([{
+    productName: "",
+    productId: "",
+    rate: "",
+    mrp: "",
+    quantity: "",
+    hsnCode: "9003",
+  }]);
+  const [addBillNumber, setAddBillNumber] = useState("");
+  const [addBillDate, setAddBillDate] = useState("");
+  const [addEmployeeId, setAddEmployeeId] = useState(null);
+  const [addPurchaseFrom, setAddPurchaseFrom] = useState("");
+
+  // For Update Existing Products (Multiple)
+  const [updateProducts, setUpdateProducts] = useState([{
+    searchQuery: "",
+    selectedProduct: null,
+    rate: "",
+    mrp: "",
+    quantity: "",
+    hsnCode: "",
+  }]);
   const [updateBillNumber, setUpdateBillNumber] = useState("");
   const [updateBillDate, setUpdateBillDate] = useState("");
   const [updateEmployeeId, setUpdateEmployeeId] = useState(null);
-  const [updateHsnCode, setUpdateHsnCode] = useState("");
+  const [updatePurchaseFrom, setUpdatePurchaseFrom] = useState("");
 
-  // State for Current Stock Search
+  // Current Stock Search
   const [stockSearchQuery, setStockSearchQuery] = useState("");
 
-  // State for Employees Dropdown
+  // Employees & Purchase From Lists
   const [employees, setEmployees] = useState([]);
+  const [purchaseFromList, setPurchaseFromList] = useState([]);
 
-  // Common States
-  const [isLoading, setIsLoading] = useState(false);
+  // Product Suggestions for Update Mode
+  const [productSuggestions, setProductSuggestions] = useState([]);
 
-  // Pagination States
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  // Stock Data
+  const [filteredStocks, setFilteredStocks] = useState([]);
 
-  const isUploadingRef = useRef(false);
-
-  // // Initialize React Toastify
-  // useEffect(() => {
-  //   // This ensures that ToastContainer is rendered once
-  //   // If you already have it in a higher-level component, you can remove this
-  //   toast.configure();
-  // }, []);
-
-  // Warn user before unloading the page during upload
+  // Warn user before unloading if upload in progress
   useEffect(() => {
     const handleBeforeUnload = (e) => {
       if (isUploadingRef.current) {
         e.preventDefault();
-        e.returnValue =
-          "A stock update is in progress. Are you sure you want to leave?";
+        e.returnValue = "A stock update is in progress. Are you sure you want to leave?";
       }
     };
-
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => {
       window.removeEventListener("beforeunload", handleBeforeUnload);
     };
   }, []);
 
-  // Fetch Employees for Dropdown (Branch-wise)
+  // Fetch Employees
   const fetchEmployees = useCallback(async () => {
+    if (!branch) return;
     try {
       const { data, error } = await supabase
         .from("employees")
@@ -101,7 +100,6 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
         setEmployees([]);
         return;
       }
-
       setEmployees(data || []);
     } catch (err) {
       console.error("Error fetching employees:", err);
@@ -111,97 +109,101 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
   }, [branch]);
 
   useEffect(() => {
-    if (branch) {
-      fetchEmployees();
-    }
-  }, [fetchEmployees, branch]);
+    fetchEmployees();
+  }, [fetchEmployees]);
 
-  // Debounced fetchProductSuggestions to limit API calls
-  const fetchProductSuggestions = useCallback(async (query) => {
+  // Fetch unique purchase_from values
+  const fetchPurchaseFromOptions = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from("products")
-        .select("id, product_name, product_id, rate, mrp, purchase_from, hsn_code") // Added hsn_code
-        .or(`product_name.ilike.%${query}%,product_id.ilike.%${query}%`)
-        .limit(20);
-  
+        .select("purchase_from", { distinct: true });
+
       if (error) {
-        console.error("Error fetching suggestions:", error);
-        toast.error("Failed to fetch product suggestions.");
+        console.error("Error fetching purchase_from options:", error);
+        return;
+      }
+
+      // Ensure unique values by using a Set
+      const uniquePlaces = Array.from(
+        new Set((data || []).map(d => d.purchase_from).filter(Boolean))
+      );
+      setPurchaseFromList(uniquePlaces);
+    } catch (err) {
+      console.error("Error fetching purchase_from options:", err);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchPurchaseFromOptions();
+  }, [fetchPurchaseFromOptions]);
+
+  // Debounced product suggestions
+  const debouncedFetchSuggestions = useRef(
+    debounce(async (query) => {
+      if (query.length < 3) {
         setProductSuggestions([]);
         return;
       }
-  
-      setProductSuggestions(data || []);
-    } catch (err) {
-      console.error("Error fetching product suggestions:", err);
-      toast.error("An unexpected error occurred while fetching suggestions.");
-    }
+      try {
+        const { data, error } = await supabase
+          .from("products")
+          .select("id, product_name, product_id, rate, mrp, purchase_from, hsn_code")
+          .or(`product_name.ilike.%${query}%,product_id.ilike.%${query}%`)
+          .limit(20);
+
+        if (error) throw error;
+        setProductSuggestions(data || []);
+      } catch (err) {
+        console.error("Error fetching product suggestions:", err);
+        toast.error("Failed to fetch product suggestions.");
+      }
+    }, 300)
+  ).current;
+
+  useEffect(() => {
+    return () => {
+      debouncedFetchSuggestions.cancel();
+    };
   }, []);
-  
 
-  // Debounced fetchProductSuggestions to limit API calls
-const debouncedFetchSuggestions = useRef(
-  debounce(async (query) => {
-    try {
-      const { data, error } = await supabase
-        .from("products")
-        .select("id, product_name, product_id, rate, mrp, purchase_from, hsn_code") // Added hsn_code
-        .or(`product_name.ilike.%${query}%,product_id.ilike.%${query}%`)
-        .limit(20);
-
-      if (error) throw error;
-
-      setProductSuggestions(data || []);
-    } catch (err) {
-      console.error("Error fetching product suggestions:", err);
-      toast.error("Failed to fetch product suggestions.");
-    }
-  }, 300)
-).current;
-
-// Cleanup debounce on unmount
-useEffect(() => {
-  return () => {
-    debouncedFetchSuggestions.cancel();
-  };
-}, []);
-
-  
-
-  // Handler for Mode Selection
+  // Mode change handler
   const handleModeSelection = (selectedMode) => {
     setMode(selectedMode);
-    // Reset all states when mode changes
-    setNewProductName("");
-    setNewProductId("");
-    setNewRate("");
-    setNewMrp("");
-    setNewQuantity("");
-    setNewPurchaseFrom("");
-    setNewBillNumber("");
-    setNewBillDate("");
-    setNewEmployeeId(null);
-    setNewHsnCode("9003"); // Reset to default
+    // Reset Add mode states
+    setAddProducts([{
+      productName: "",
+      productId: "",
+      rate: "",
+      mrp: "",
+      quantity: "",
+      hsnCode: "9003",
+    }]);
+    setAddBillNumber("");
+    setAddBillDate("");
+    setAddEmployeeId(null);
+    setAddPurchaseFrom("");
 
-    setUpdateSearchQuery("");
-    setProductSuggestions([]);
-    setSelectedProduct(null);
-    setUpdateQuantity("");
-    setUpdateRate("");
-    setUpdateMrp("");
-    setUpdatePurchaseFrom("");
+    // Reset Update mode states
+    setUpdateProducts([{
+      searchQuery: "",
+      selectedProduct: null,
+      rate: "",
+      mrp: "",
+      quantity: "",
+      hsnCode: "",
+    }]);
     setUpdateBillNumber("");
     setUpdateBillDate("");
     setUpdateEmployeeId(null);
-    setUpdateHsnCode("");
+    setUpdatePurchaseFrom("");
 
     setStockSearchQuery("");
-    toast.dismiss(); // Dismiss any existing toasts
+    toast.dismiss();
   };
 
-  // Function to generate a unique bill number per branch
   const generateBillNumber = useCallback(async () => {
+    if (!branch) return "BILL-0001";
     try {
       const { data, error } = await supabase
         .from("purchases")
@@ -213,7 +215,7 @@ useEffect(() => {
       if (error) {
         console.error("Error fetching last bill number:", error);
         toast.error("Failed to generate bill number.");
-        return "";
+        return "BILL-0001";
       }
 
       let newBillNumber = "BILL-0001";
@@ -226,85 +228,107 @@ useEffect(() => {
           newBillNumber = `BILL-${newNumber}`;
         }
       }
-
       return newBillNumber;
     } catch (error) {
       console.error("Error generating bill number:", error);
       toast.error("An unexpected error occurred while generating bill number.");
-      return "";
+      return "BILL-0001";
     }
   }, [branch]);
 
-  // Generate bill numbers when branch changes or mode changes
   useEffect(() => {
     const setupBillDetails = async () => {
       const billNumber = await generateBillNumber();
       const currentDate = new Date().toISOString().split("T")[0];
 
       if (mode === "add") {
-        setNewBillNumber(billNumber);
-        setNewBillDate(currentDate);
+        setAddBillNumber(billNumber);
+        setAddBillDate(currentDate);
       } else if (mode === "update") {
         setUpdateBillNumber(billNumber);
         setUpdateBillDate(currentDate);
       }
     };
-
     if (branch) {
       setupBillDetails();
     }
   }, [branch, mode, generateBillNumber]);
 
-  // Handler for Add New Product Form Submission
-  const handleAddNewProduct = async (e) => {
+  // Add another product entry for Add mode
+  const handleAddProductEntry = () => {
+    setAddProducts([...addProducts, {
+      productName: "",
+      productId: "",
+      rate: "",
+      mrp: "",
+      quantity: "",
+      hsnCode: "9003",
+    }]);
+  };
+
+  const handleRemoveAddProductEntry = (index) => {
+    const updated = [...addProducts];
+    updated.splice(index, 1);
+    setAddProducts(updated);
+  };
+
+  // Add another product entry for Update mode
+  const handleAddUpdateProductEntry = () => {
+    setUpdateProducts([...updateProducts, {
+      searchQuery: "",
+      selectedProduct: null,
+      rate: "",
+      mrp: "",
+      quantity: "",
+      hsnCode: "",
+    }]);
+  };
+
+  const handleRemoveUpdateProductEntry = (index) => {
+    const updated = [...updateProducts];
+    updated.splice(index, 1);
+    setUpdateProducts(updated);
+  };
+
+  // Handle Add New Products Submission
+  const handleAddNewProducts = async (e) => {
     e.preventDefault();
-
-    const trimmedProductName = newProductName.trim();
-    const trimmedProductId = newProductId.trim();
-    const trimmedPurchaseFrom = newPurchaseFrom.trim();
-    const trimmedBillNumber = newBillNumber.trim();
-    const trimmedBillDate = newBillDate.trim();
-    const trimmedHsnCode = newHsnCode.trim();
-
-    // Collect missing fields
-    const missingFields = [];
-    if (!trimmedProductName) missingFields.push("Product Name");
-    if (!trimmedProductId) missingFields.push("Product ID");
-    if (!newRate) missingFields.push("Rate");
-    if (!newMrp) missingFields.push("MRP");
-    if (!newQuantity) missingFields.push("Quantity");
-    if (!trimmedPurchaseFrom) missingFields.push("Purchase From");
-    if (!trimmedBillNumber) missingFields.push("Bill Number");
-    if (!trimmedBillDate) missingFields.push("Bill Date");
-    if (!trimmedHsnCode) missingFields.push("HSN Code");
-    if (!newEmployeeId) missingFields.push("Employee");
-
-    if (missingFields.length > 0) {
-      toast.error(`Please enter the following fields: ${missingFields.join(", ")}`);
+    if (!addBillNumber || !addBillDate || !addEmployeeId || !addPurchaseFrom.trim()) {
+      toast.error("Please fill Bill Number, Bill Date, Employee and Purchase From.");
       return;
     }
 
-    const quantity = parseInt(newQuantity, 10);
-    const rate = parseFloat(newRate);
-    const mrp = parseFloat(newMrp);
+    for (let i = 0; i < addProducts.length; i++) {
+      const p = addProducts[i];
+      const missingFields = [];
+      if (!p.productName.trim()) missingFields.push(`Product Name (#${i+1})`);
+      if (!p.productId.trim()) missingFields.push(`Product ID (#${i+1})`);
+      if (!p.rate) missingFields.push(`Rate (#${i+1})`);
+      if (!p.mrp) missingFields.push(`MRP (#${i+1})`);
+      if (!p.quantity) missingFields.push(`Quantity (#${i+1})`);
 
-    if (isNaN(quantity) || quantity <= 0) {
-      toast.error("Please enter a valid quantity greater than 0.");
-      return;
-    }
+      if (missingFields.length > 0) {
+        toast.error(`Please fill: ${missingFields.join(", ")}`);
+        return;
+      }
 
-    if (isNaN(rate) || rate <= 0) {
-      toast.error("Please enter a valid rate greater than 0.");
-      return;
-    }
-
-    if (isNaN(mrp) || mrp <= 0) {
-      toast.error("Please enter a valid MRP greater than 0.");
-      return;
+      const q = parseInt(p.quantity, 10), r = parseFloat(p.rate), m = parseFloat(p.mrp);
+      if (isNaN(q) || q <= 0) {
+        toast.error(`Invalid quantity for product #${i+1}`);
+        return;
+      }
+      if (isNaN(r) || r <= 0) {
+        toast.error(`Invalid rate for product #${i+1}`);
+        return;
+      }
+      if (isNaN(m) || m <= 0) {
+        toast.error(`Invalid MRP for product #${i+1}`);
+        return;
+      }
     }
 
     if (!branch) {
-      toast.error("Branch is not set. Cannot proceed.");
+      toast.error("Branch not set");
       return;
     }
 
@@ -312,49 +336,24 @@ useEffect(() => {
     isUploadingRef.current = true;
 
     try {
-      // Check if product ID already exists
-      const { data: existingProduct, error: fetchError } = await supabase
-        .from("products")
-        .select("id")
-        .eq("product_id", trimmedProductId)
-        .single();
-
-      if (fetchError && fetchError.code !== "PGRST116") { // PGRST116 is no data found
-        console.error("Error checking existing product:", fetchError);
-        toast.error("Failed to verify Product ID.");
-        setIsLoading(false);
-        isUploadingRef.current = false;
-        return;
-      }
-
-      if (existingProduct) {
-        toast.error(
-          "Product ID already exists. Please use the 'Update Existing Product' section to update stock."
-        );
-        setIsLoading(false);
-        isUploadingRef.current = false;
-        return;
-      }
-
-      // Prepare data for preview
-      const employeeName =
-        employees.find((emp) => emp.id === newEmployeeId)?.name || "Unknown";
+      const employeeName = employees.find(emp => emp.id === addEmployeeId)?.name || "Unknown";
       const previewData = {
-        mode: "Add New Product",
-        bill_date: newBillDate,
-        bill_number: newBillNumber,
+        mode: "Add New Products",
+        bill_date: addBillDate,
+        bill_number: addBillNumber,
         employee: employeeName,
-        employee_id: newEmployeeId,
-        product_name: trimmedProductName,
-        product_id: trimmedProductId,
-        rate,
-        mrp,
-        hsn_code: trimmedHsnCode, // Include HSN Code
-        quantity,
-        purchase_from: trimmedPurchaseFrom,
+        employee_id: addEmployeeId,
+        products: addProducts.map(p => ({
+          product_name: p.productName.trim(),
+          product_id: p.productId.trim(),
+          rate: parseFloat(p.rate),
+          mrp: parseFloat(p.mrp),
+          hsn_code: p.hsnCode.trim(),
+          quantity: parseInt(p.quantity, 10),
+          purchase_from: addPurchaseFrom.trim(),
+        })),
       };
 
-      // Dispatch to set purchase modal content
       dispatch({
         type: "SET_PURCHASE_MODAL",
         payload: {
@@ -363,68 +362,56 @@ useEffect(() => {
           showModal: true,
         },
       });
-    } catch (error) {
-      console.error("Error during add new product:", error);
+    } catch (err) {
+      console.error("Error preparing add new products:", err);
       toast.error("An unexpected error occurred.");
       setIsLoading(false);
       isUploadingRef.current = false;
     }
   };
 
-  // Handler for Update Existing Product Form Submission
-  const handleUpdateExistingProduct = async (e) => {
+  // Handle Update Existing Products Submission
+  const handleUpdateExistingProducts = async (e) => {
     e.preventDefault();
-
-    const trimmedPurchaseFrom = updatePurchaseFrom.trim();
-    const trimmedBillNumber = updateBillNumber.trim();
-    const trimmedBillDate = updateBillDate.trim();
-    const trimmedHsnCode = updateHsnCode.trim();
-
-    // Validation
-    const missingFields = [];
-    if (!updateSearchQuery) missingFields.push("Product Search");
-    if (!updateQuantity) missingFields.push("Quantity to Add");
-    if (!updateRate) missingFields.push("Rate");
-    if (!updateMrp) missingFields.push("MRP");
-    if (!trimmedPurchaseFrom) missingFields.push("Purchase From");
-    if (!trimmedBillNumber) missingFields.push("Bill Number");
-    if (!trimmedBillDate) missingFields.push("Bill Date");
-    if (!trimmedHsnCode) missingFields.push("HSN Code");
-    if (!updateEmployeeId) missingFields.push("Employee");
-
-    if (missingFields.length > 0) {
-      toast.error(`Please enter the following fields: ${missingFields.join(", ")}`);
+    if (!updateBillNumber || !updateBillDate || !updateEmployeeId || !updatePurchaseFrom.trim()) {
+      toast.error("Please fill Bill Number, Bill Date, Employee and Purchase From.");
       return;
     }
 
-    if (!selectedProduct) {
-      toast.error(
-        "No product selected. Please search and select a product to update."
-      );
-      return;
-    }
+    for (let i = 0; i < updateProducts.length; i++) {
+      const p = updateProducts[i];
+      const missingFields = [];
+      if (!p.searchQuery) missingFields.push(`Product Search (#${i+1})`);
+      if (!p.quantity) missingFields.push(`Quantity (#${i+1})`);
+      if (!p.rate) missingFields.push(`Rate (#${i+1})`);
+      if (!p.mrp) missingFields.push(`MRP (#${i+1})`);
+      if (!p.selectedProduct) {
+        toast.error(`No product selected for #${i+1}`);
+        return;
+      }
 
-    const quantity = parseInt(updateQuantity, 10);
-    const rate = parseFloat(updateRate);
-    const mrp = parseFloat(updateMrp);
+      if (missingFields.length > 0) {
+        toast.error(`Please fill: ${missingFields.join(", ")}`);
+        return;
+      }
 
-    if (isNaN(quantity) || quantity < 0) {
-      toast.error("Please enter a valid quantity greater than or equal to 0.");
-      return;
-    }
-
-    if (isNaN(rate) || rate <= 0) {
-      toast.error("Please enter a valid rate greater than 0.");
-      return;
-    }
-
-    if (isNaN(mrp) || mrp <= 0) {
-      toast.error("Please enter a valid MRP greater than 0.");
-      return;
+      const q = parseInt(p.quantity, 10), r = parseFloat(p.rate), m = parseFloat(p.mrp);
+      if (isNaN(q) || q <= 0) {
+        toast.error(`Invalid quantity for product #${i+1}`);
+        return;
+      }
+      if (isNaN(r) || r <= 0) {
+        toast.error(`Invalid rate for product #${i+1}`);
+        return;
+      }
+      if (isNaN(m) || m <= 0) {
+        toast.error(`Invalid MRP for product #${i+1}`);
+        return;
+      }
     }
 
     if (!branch) {
-      toast.error("Branch is not set. Cannot proceed.");
+      toast.error("Branch not set");
       return;
     }
 
@@ -432,25 +419,25 @@ useEffect(() => {
     isUploadingRef.current = true;
 
     try {
-      // Prepare data for preview
-      const employeeName =
-        employees.find((emp) => emp.id === updateEmployeeId)?.name || "Unknown";
+      const employeeName = employees.find(emp => emp.id === updateEmployeeId)?.name || "Unknown";
       const previewData = {
-        mode: "Update Existing Product",
+        mode: "Update Existing Products",
         bill_date: updateBillDate,
         bill_number: updateBillNumber,
         employee: employeeName,
         employee_id: updateEmployeeId,
-        product_name: selectedProduct.product_name,
-        product_id: selectedProduct.product_id,
-        rate,
-        mrp,
-        hsn_code: trimmedHsnCode, // Include HSN Code
-        quantity,
-        purchase_from: trimmedPurchaseFrom,
+        products: updateProducts.map(p => ({
+          product_name: p.selectedProduct.product_name,
+          product_id: p.selectedProduct.product_id,
+          product_id_db: p.selectedProduct.id,
+          rate: parseFloat(p.rate),
+          mrp: parseFloat(p.mrp),
+          hsn_code: p.hsnCode.trim(),
+          quantity: parseInt(p.quantity, 10),
+          purchase_from: updatePurchaseFrom.trim(),
+        })),
       };
 
-      // Dispatch to set purchase modal content
       dispatch({
         type: "SET_PURCHASE_MODAL",
         payload: {
@@ -459,19 +446,16 @@ useEffect(() => {
           showModal: true,
         },
       });
-    } catch (error) {
-      console.error("Error during update existing product:", error);
+    } catch (err) {
+      console.error("Error preparing update existing products:", err);
       toast.error("An unexpected error occurred.");
       setIsLoading(false);
       isUploadingRef.current = false;
     }
   };
 
-  // Function to process Add New Product after confirmation
-  const processAddNewProduct = async () => {
-    // Retrieve modal content from global state
+  const processAddNewProducts = async () => {
     const previewData = state.purchaseModal.content;
-
     if (!previewData) {
       toast.error("No purchase data to process.");
       setIsLoading(false);
@@ -479,85 +463,62 @@ useEffect(() => {
       return;
     }
 
-    const {
-      product_name,
-      product_id,
-      rate,
-      mrp,
-      hsn_code,
-      quantity,
-      purchase_from,
-      bill_number,
-      bill_date,
-      employee_id,
-      employee,
-    } = previewData;
+    const { products, bill_number, bill_date, employee_id, employee } = previewData;
 
     try {
-      // Add New Product
-      const addProductResponse = await addNewProduct({
-        product_name: product_name.trim(),
-        product_id: product_id.trim(),
-        rate: parseFloat(rate),
-        mrp: parseFloat(mrp),
-        hsn_code: hsn_code.trim(), // Include HSN Code
-        purchase_from: purchase_from.trim(),
-      });
+      for (let p of products) {
+        const resAdd = await addNewProduct({
+          product_name: p.product_name,
+          product_id: p.product_id,
+          rate: p.rate,
+          mrp: p.mrp,
+          hsn_code: p.hsn_code,
+          purchase_from: p.purchase_from,
+        });
 
-      if (!addProductResponse.success) {
-        toast.error(addProductResponse.error);
-        dispatch({ type: "RESET_PURCHASE_MODAL" });
-        setIsLoading(false);
-        isUploadingRef.current = false;
-        return;
+        if (!resAdd.success) {
+          toast.error(`Failed to add ${p.product_id}: ${resAdd.error}`);
+          continue;
+        }
+
+        const resStock = await addOrUpdateStock(
+          resAdd.data.id,
+          branch,
+          p.quantity,
+          p.rate,
+          p.mrp
+        );
+        if (!resStock.success) {
+          toast.error(`Failed to update stock for ${p.product_id}: ${resStock.error}`);
+          continue;
+        }
+
+        const resPurchase = await addPurchase({
+          product_id: resAdd.data.id,
+          branch_code: branch,
+          quantity: p.quantity,
+          rate: p.rate,
+          mrp: p.mrp,
+          purchase_from: p.purchase_from,
+          bill_number,
+          bill_date,
+          employee_id,
+          employee_name: employee,
+        });
+
+        if (!resPurchase.success) {
+          toast.error(`Failed to record purchase for ${p.product_id}: ${resPurchase.error}`);
+          continue;
+        }
+
+        toast.success(`Product ${p.product_id} added successfully.`);
       }
 
-      // Update Stock for the Branch
-      const updateStockResponse = await addOrUpdateStock(
-        addProductResponse.data.id,
-        branch,
-        parseInt(quantity, 10),
-        parseFloat(rate),
-        parseFloat(mrp)
-      );
-
-      if (!updateStockResponse.success) {
-        toast.error(updateStockResponse.error);
-        dispatch({ type: "RESET_PURCHASE_MODAL" });
-        setIsLoading(false);
-        isUploadingRef.current = false;
-        return;
-      }
-
-      // Add to Purchases Table
-      const addPurchaseResponse = await addPurchase({
-        product_id: addProductResponse.data.id,
-        branch_code: branch,
-        quantity: parseInt(quantity, 10),
-        rate: parseFloat(rate),
-        mrp: parseFloat(mrp),
-        purchase_from: purchase_from.trim(),
-        bill_number: bill_number.trim(),
-        bill_date: bill_date,
-        employee_id: employee_id,
-        employee_name: employee,
-      });
-
-      if (!addPurchaseResponse.success) {
-        toast.error(addPurchaseResponse.error);
-        dispatch({ type: "RESET_PURCHASE_MODAL" });
-        setIsLoading(false);
-        isUploadingRef.current = false;
-        return;
-      }
-
-      toast.success("New product added and stock updated successfully.");
-      // Reset form
       handleModeSelection("add");
-      // Refresh stock data
+      await fetchPurchaseFromOptions();
       fetchStockData();
-    } catch (error) {
-      console.error("Error processing add new product:", error);
+    } catch (err) {
+      console.error("Error processing add new products:", err);
       toast.error("An unexpected error occurred.");
     } finally {
       dispatch({ type: "RESET_PURCHASE_MODAL" });
@@ -566,11 +527,8 @@ useEffect(() => {
     }
   };
 
-  // Function to process Update Existing Product after confirmation
-  const processUpdateExistingProduct = async () => {
-    // Retrieve modal content from global state
+  const processUpdateExistingProducts = async () => {
     const previewData = state.purchaseModal.content;
-
     if (!previewData) {
       toast.error("No purchase data to process.");
       setIsLoading(false);
@@ -578,72 +536,50 @@ useEffect(() => {
       return;
     }
 
-    const {
-      product_name,
-      product_id,
-      rate,
-      mrp,
-      hsn_code,
-      quantity,
-      purchase_from,
-      bill_number,
-      bill_date,
-      employee_id,
-      employee,
-    } = previewData;
-
+    const { products, bill_number, bill_date, employee_id, employee } = previewData;
     try {
-      // Update Existing Product with new details
-      const updateProductResponse = await updateExistingProduct(
-        selectedProduct.id,            // productId
-        branch,                        // branchCode
-        parseInt(quantity, 10),        // quantity
-        parseFloat(rate),              // rate
-        parseFloat(mrp),               // mrp
-        purchase_from.trim(),          // purchaseFrom
-        hsn_code.trim()                // hsn_code
-      );
+      for (let p of products) {
+        const resUpdate = await updateExistingProduct(
+          p.product_id_db,
+          branch,
+          p.quantity,
+          p.rate,
+          p.mrp,
+          p.purchase_from,
+          p.hsn_code
+        );
 
-      if (!updateProductResponse.success) {
-        toast.error(updateProductResponse.error);
-        dispatch({ type: "RESET_PURCHASE_MODAL" });
-        setIsLoading(false);
-        isUploadingRef.current = false;
-        return;
+        if (!resUpdate.success) {
+          toast.error(`Failed to update ${p.product_id}: ${resUpdate.error}`);
+          continue;
+        }
+
+        const resPurchase = await addPurchase({
+          product_id: p.product_id_db,
+          branch_code: branch,
+          quantity: p.quantity,
+          rate: p.rate,
+          mrp: p.mrp,
+          purchase_from: p.purchase_from,
+          bill_number,
+          bill_date,
+          employee_id,
+          employee_name: employee,
+        });
+
+        if (!resPurchase.success) {
+          toast.error(`Failed to record purchase for ${p.product_id}: ${resPurchase.error}`);
+          continue;
+        }
+
+        toast.success(`Product ${p.product_id} updated successfully.`);
       }
 
-      // **Removed the redundant addOrUpdateStock call**
-      // Previously, this redundant call was causing the quantity to double.
-
-      // Add to Purchases Table
-      const addPurchaseResponse = await addPurchase({
-        product_id: selectedProduct.id,
-        branch_code: branch,
-        quantity: parseInt(quantity, 10),
-        rate: parseFloat(rate),
-        mrp: parseFloat(mrp),
-        purchase_from: purchase_from.trim(),
-        bill_number: bill_number.trim(),
-        bill_date: bill_date,
-        employee_id: employee_id,
-        employee_name: employee,
-      });
-
-      if (!addPurchaseResponse.success) {
-        toast.error(addPurchaseResponse.error);
-        dispatch({ type: "RESET_PURCHASE_MODAL" });
-        setIsLoading(false);
-        isUploadingRef.current = false;
-        return;
-      }
-
-      toast.success("Stock updated successfully and purchase recorded.");
-      // Reset form
       handleModeSelection("update");
-      // Refresh stock data
+      await fetchPurchaseFromOptions();
       fetchStockData();
-    } catch (error) {
-      console.error("Error processing update existing product:", error);
+    } catch (err) {
+      console.error("Error processing update existing products:", err);
       toast.error("An unexpected error occurred.");
     } finally {
       dispatch({ type: "RESET_PURCHASE_MODAL" });
@@ -652,52 +588,75 @@ useEffect(() => {
     }
   };
 
-  // Handler for Update Existing Product Search Input Change
-  const handleUpdateSearchInputChange = (e) => {
+  const handleConfirmModal = () => {
+    if (state.purchaseModal.action === "add") {
+      processAddNewProducts();
+    } else if (state.purchaseModal.action === "update") {
+      processUpdateExistingProducts();
+    }
+  };
+
+  const handleCancelModal = () => {
+    dispatch({ type: "RESET_PURCHASE_MODAL" });
+    setIsLoading(false);
+    isUploadingRef.current = false;
+    toast.dismiss();
+  };
+
+  const handleUpdateSearchInputChange = (e, index = 0) => {
     const query = e.target.value.trim();
-    setUpdateSearchQuery(query);
+    const updated = [...updateProducts];
+    updated[index].searchQuery = query;
+    setUpdateProducts(updated);
 
     if (query.length > 2) {
       debouncedFetchSuggestions(query);
     } else {
       setProductSuggestions([]);
-      setSelectedProduct(null);
+      updated[index].selectedProduct = null;
+      setUpdateProducts(updated);
     }
   };
 
-  // Handler for Current Stock Search Input Change
+  const handleSelectProduct = (product, index = null) => {
+    if (mode === "update") {
+      const updated = [...updateProducts];
+      const i = index !== null ? index : 0;
+      updated[i].selectedProduct = product;
+      updated[i].searchQuery = `${product.product_name} (${product.product_id})`;
+      updated[i].rate = product.rate !== null ? product.rate.toString() : "";
+      updated[i].mrp = product.mrp !== null ? product.mrp.toString() : "";
+      updated[i].hsnCode = product.hsn_code || "";
+      setUpdateProducts(updated);
+      setProductSuggestions([]);
+    }
+  };
+
+  const allFilteredStocks = useMemo(() => {
+    return filteredStocks
+      .filter((stock) => {
+        const searchTerm = stockSearchQuery.toLowerCase();
+        return (
+          stock.product.product_name.toLowerCase().includes(searchTerm) ||
+          stock.product.product_id.toLowerCase().includes(searchTerm)
+        );
+      })
+      .sort((a, b) => a.product.product_name.localeCompare(b.product.product_name));
+  }, [filteredStocks, stockSearchQuery]);
+
+  const totalPages = Math.ceil(allFilteredStocks.length / itemsPerPage);
+  const displayedStocks = useMemo(() => {
+    return allFilteredStocks.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  }, [allFilteredStocks, currentPage, itemsPerPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [stockSearchQuery, allFilteredStocks]);
+
   const handleStockSearchInputChange = (e) => {
-    const query = e.target.value;
-    setStockSearchQuery(query);
+    setStockSearchQuery(e.target.value);
   };
 
-  // Handler for Selecting a Product from Suggestions
-  const handleSelectProduct = (product) => {
-    setSelectedProduct(product);
-
-    setUpdateSearchQuery(`${product.product_name} (${product.product_id})`);
-    setProductSuggestions([]);
-
-    // Populate fields with the selected product's details
-    setUpdateRate(product.rate !== null ? product.rate.toString() : "");
-    setUpdateMrp(product.mrp !== null ? product.mrp.toString() : "");
-    setUpdatePurchaseFrom(product.purchase_from || "");
-    setUpdateHsnCode(product.hsn_code || ""); // Set HSN Code
-
-    // Generate bill details for update
-    const setupBillDetails = async () => {
-      const billNumber = await generateBillNumber();
-      const currentDate = new Date().toISOString().split("T")[0];
-      setUpdateBillNumber(billNumber);
-      setUpdateBillDate(currentDate);
-    };
-
-    if (branch) {
-      setupBillDetails();
-    }
-  };
-
-  // Fetch current stock data when component mounts or branch changes
   const fetchStockData = useCallback(async () => {
     if (!branch) {
       setFilteredStocks([]);
@@ -709,8 +668,7 @@ useEffect(() => {
         .from("stock")
         .select(
           `quantity,
-          product:products(id, product_name, product_id, rate, mrp, purchase_from, hsn_code)
-            `
+           product:products(id, product_name, product_id, rate, mrp, purchase_from, hsn_code)`
         )
         .eq("branch_code", branch);
 
@@ -731,77 +689,24 @@ useEffect(() => {
     fetchStockData();
   }, [fetchStockData]);
 
-  // State for displaying current stock
-  const [filteredStocks, setFilteredStocks] = useState([]);
-
-  // Memoized filtered and sorted stock based on search query
-  const allFilteredStocks = useMemo(() => {
-    return filteredStocks
-      .filter((stock) => {
-        const searchTerm = stockSearchQuery.toLowerCase();
-        return (
-          stock.product.product_name.toLowerCase().includes(searchTerm) ||
-          stock.product.product_id.toLowerCase().includes(searchTerm)
-        );
-      })
-      .sort((a, b) =>
-        a.product.product_name.localeCompare(b.product.product_name)
-      );
-  }, [filteredStocks, stockSearchQuery]);
-
-  const filteredStocksMemo = allFilteredStocks; // Correct usage
-
-
-  // Calculate total pages based on filtered stock
-  const totalPages = Math.ceil(filteredStocksMemo.length / itemsPerPage);
-
-  // Get current page's stocks
-  const displayedStocks = useMemo(() => {
-    return allFilteredStocks.slice(
-      (currentPage - 1) * itemsPerPage,
-      currentPage * itemsPerPage
-    );
-  }, [allFilteredStocks, currentPage]);
-
-  // Reset currentPage to 1 when search query or allFilteredStocks changes
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [stockSearchQuery, filteredStocksMemo]);
-
-  // Handler for Confirming in Modal
-  const handleConfirmModal = () => {
-    if (state.purchaseModal.action === "add") {
-      processAddNewProduct();
-    } else if (state.purchaseModal.action === "update") {
-      processUpdateExistingProduct();
-    }
-  };
-  
-  const handleCancelModal = () => {
-    dispatch({ type: "RESET_PURCHASE_MODAL" });
-    setIsLoading(false);
-    isUploadingRef.current = false;
-    toast.dismiss(); // Clear lingering toasts
-  };
-  
-
   return (
     <div
       className={`transition-all duration-300 ${
         isCollapsed ? "mx-20" : "mx-20 px-20"
       } justify-center my-20 p-8 rounded-xl mx-auto max-w-4xl bg-green-50 shadow-inner`}
     >
-    <ToastContainer
-  position="top-right"
-  autoClose={8000} // Increased duration
-  hideProgressBar={false}
-  newestOnTop={true} // Ensure latest toast shows on top
-  closeOnClick
-  pauseOnFocusLoss
-  draggable
-  pauseOnHover
-  theme="colored"
-/>
+      <ToastContainer
+        position="top-right"
+        autoClose={8000}
+        hideProgressBar={false}
+        newestOnTop
+        closeOnClick
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="colored"
+      />
+
       <h1 className="text-2xl font-semibold mb-6 text-center">
         Product Purchase
       </h1>
@@ -816,7 +721,7 @@ useEffect(() => {
               : "bg-gray-200 text-gray-700 hover:bg-gray-300"
           }`}
         >
-          Add New Product
+          Add New Products
         </button>
         <button
           onClick={() => handleModeSelection("update")}
@@ -826,192 +731,215 @@ useEffect(() => {
               : "bg-gray-200 text-gray-700 hover:bg-gray-300"
           }`}
         >
-          Update Existing Product
+          Update Existing Products
         </button>
       </div>
 
-      {/* Add New Product Form */}
       {mode === "add" && (
-        <form onSubmit={handleAddNewProduct} className="mb-8">
-          <h2 className="text-xl font-semibold mb-4">Add New Product</h2>
+        <form onSubmit={handleAddNewProducts} className="mb-8">
+          <h2 className="text-xl font-semibold mb-4">Add New Products</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-            {/* Bill Date */}
             <div>
-              <label htmlFor="newBillDate" className="block mb-2 font-medium">
+              <label htmlFor="addBillDate" className="block mb-2 font-medium">
                 Bill Date<span className="text-red-500">*</span>
               </label>
               <input
                 type="date"
-                id="newBillDate"
-                value={newBillDate}
-                onChange={(e) => setNewBillDate(e.target.value)}
+                id="addBillDate"
+                value={addBillDate}
+                onChange={(e) => setAddBillDate(e.target.value)}
                 className="w-full p-2 border rounded"
                 required
               />
             </div>
 
-            {/* Bill Number */}
             <div>
-              <label htmlFor="newBillNumber" className="block mb-2 font-medium">
+              <label htmlFor="addBillNumber" className="block mb-2 font-medium">
                 Bill Number<span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
-                id="newBillNumber"
-                value={newBillNumber}
-                onChange={(e) => setNewBillNumber(e.target.value)}
+                id="addBillNumber"
+                value={addBillNumber}
+                onChange={(e) => setAddBillNumber(e.target.value)}
                 className="w-full p-2 border rounded"
                 required
               />
             </div>
 
-            {/* Employee Selection */}
             <div>
-              <label htmlFor="newEmployee" className="block mb-2 font-medium">
+              <label htmlFor="addEmployee" className="block mb-2 font-medium">
                 Employee<span className="text-red-500">*</span>
               </label>
               <select
-                id="newEmployee"
-                value={newEmployeeId || ""}
-                onChange={(e) => setNewEmployeeId(parseInt(e.target.value, 10))}
+                id="addEmployee"
+                value={addEmployeeId || ""}
+                onChange={(e) => setAddEmployeeId(parseInt(e.target.value, 10))}
                 className="w-full p-2 border rounded"
                 required
               >
-                <option value="" disabled>
-                  Select Employee
-                </option>
+                <option value="" disabled>Select Employee</option>
                 {employees.map((emp) => (
-                  <option key={emp.id} value={emp.id}>
-                    {emp.name}
-                  </option>
+                  <option key={emp.id} value={emp.id}>{emp.name}</option>
                 ))}
               </select>
             </div>
           </div>
 
-          {/* Product Details */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-            {/* Purchase From */}
             <div>
-              <label
-                htmlFor="newPurchaseFrom"
-                className="block mb-2 font-medium"
-              >
+              <label className="block mb-2 font-medium">
                 Purchase From<span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
-                id="newPurchaseFrom"
-                value={newPurchaseFrom}
-                onChange={(e) => setNewPurchaseFrom(e.target.value)}
+                list="purchaseFromList"
+                value={addPurchaseFrom}
+                onChange={(e) => setAddPurchaseFrom(e.target.value)}
                 className="w-full p-2 border rounded"
                 required
               />
-            </div>
-
-            {/* Product Name */}
-            <div>
-              <label
-                htmlFor="newProductName"
-                className="block mb-2 font-medium"
-              >
-                Product Name<span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                id="newProductName"
-                value={newProductName}
-                onChange={(e) => setNewProductName(e.target.value)}
-                className="w-full p-2 border rounded"
-                required
-              />
-            </div>
-
-            {/* Product ID */}
-            <div>
-              <label htmlFor="newProductId" className="block mb-2 font-medium">
-                Product ID<span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                id="newProductId"
-                value={newProductId}
-                onChange={(e) => setNewProductId(e.target.value)}
-                className="w-full p-2 border rounded"
-                required
-              />
+              <datalist id="purchaseFromList">
+                {purchaseFromList.map((pf, idx) => (
+                  <option key={idx} value={pf} />
+                ))}
+              </datalist>
             </div>
           </div>
 
-          {/* HSN Code */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-            {/* HSN Code */}
-            <div>
-              <label htmlFor="newHsnCode" className="block mb-2 font-medium">
-                HSN Code<span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                id="newHsnCode"
-                value={newHsnCode}
-                onChange={(e) => setNewHsnCode(e.target.value)}
-                className="w-full p-2 border rounded"
-                required
-              />
-            </div>
+          {addProducts.map((prod, i) => (
+            <div key={i} className="border p-4 mb-4 rounded-lg bg-white relative">
+              {addProducts.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => handleRemoveAddProductEntry(i)}
+                  className="absolute top-2 right-2 text-red-500 hover:text-red-700"
+                  title="Remove Product"
+                >
+                  &times;
+                </button>
+              )}
+              <h3 className="text-lg font-medium mb-2">Product {i + 1}</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div>
+                  <label className="block mb-2 font-medium">
+                    Product Name<span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={prod.productName}
+                    onChange={(e) => {
+                      const updated = [...addProducts];
+                      updated[i].productName = e.target.value;
+                      setAddProducts(updated);
+                    }}
+                    className="w-full p-2 border rounded"
+                    required
+                  />
+                </div>
 
-            {/* Rate */}
-            <div>
-              <label htmlFor="newRate" className="block mb-2 font-medium">
-                Party Rate<span className="text-red-500">*</span>
-              </label>
-              <input
-                type="number"
-                id="newRate"
-                value={newRate}
-                onChange={(e) => setNewRate(e.target.value)}
-                className="w-full p-2 border rounded"
-                min="0.01"
-                step="0.01"
-                required
-              />
-            </div>
+                <div>
+                  <label className="block mb-2 font-medium">
+                    Product ID<span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={prod.productId}
+                    onChange={(e) => {
+                      const updated = [...addProducts];
+                      updated[i].productId = e.target.value;
+                      setAddProducts(updated);
+                    }}
+                    className="w-full p-2 border rounded"
+                    required
+                  />
+                </div>
+              </div>
 
-            {/* MRP */}
-            <div>
-              <label htmlFor="newMrp" className="block mb-2 font-medium">
-                MRP<span className="text-red-500">*</span>
-              </label>
-              <input
-                type="number"
-                id="newMrp"
-                value={newMrp}
-                onChange={(e) => setNewMrp(e.target.value)}
-                className="w-full p-2 border rounded"
-                min="0.01"
-                step="0.01"
-                required
-              />
-            </div>
-          </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div>
+                  <label className="block mb-2 font-medium">
+                    HSN Code<span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={prod.hsnCode}
+                    onChange={(e) => {
+                      const updated = [...addProducts];
+                      updated[i].hsnCode = e.target.value;
+                      setAddProducts(updated);
+                    }}
+                    className="w-full p-2 border rounded"
+                    required
+                  />
+                </div>
 
-          {/* Quantity */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-            <div>
-              <label htmlFor="newQuantity" className="block mb-2 font-medium">
-                Quantity<span className="text-red-500">*</span>
-              </label>
-              <input
-                type="number"
-                id="newQuantity"
-                value={newQuantity}
-                onChange={(e) => setNewQuantity(e.target.value)}
-                className="w-full p-2 border rounded"
-                min="1"
-                required
-              />
+                <div>
+                  <label className="block mb-2 font-medium">
+                    Party Rate<span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    value={prod.rate}
+                    onChange={(e) => {
+                      const updated = [...addProducts];
+                      updated[i].rate = e.target.value;
+                      setAddProducts(updated);
+                    }}
+                    className="w-full p-2 border rounded"
+                    min="0.01" step="0.01"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block mb-2 font-medium">
+                    MRP<span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    value={prod.mrp}
+                    onChange={(e) => {
+                      const updated = [...addProducts];
+                      updated[i].mrp = e.target.value;
+                      setAddProducts(updated);
+                    }}
+                    className="w-full p-2 border rounded"
+                    min="0.01" step="0.01"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div>
+                  <label className="block mb-2 font-medium">
+                    Quantity<span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    value={prod.quantity}
+                    onChange={(e) => {
+                      const updated = [...addProducts];
+                      updated[i].quantity = e.target.value;
+                      setAddProducts(updated);
+                    }}
+                    className="w-full p-2 border rounded"
+                    min="1"
+                    required
+                  />
+                </div>
+              </div>
             </div>
-          </div>
+          ))}
+
+          <button
+            type="button"
+            onClick={handleAddProductEntry}
+            className="mb-4 text-blue-500 hover:underline"
+          >
+            + Add Another Product
+          </button>
 
           <button
             type="submit"
@@ -1022,29 +950,23 @@ useEffect(() => {
             }`}
             disabled={isLoading}
           >
-            {isLoading ? "Preparing..." : "Add New Product"}
+            {isLoading ? "Preparing..." : "Add New Products"}
           </button>
         </form>
       )}
 
-      {/* Update Existing Product Form */}
       {mode === "update" && (
-        <form onSubmit={handleUpdateExistingProduct} className="mb-8">
+        <form onSubmit={handleUpdateExistingProducts} className="mb-8">
           <h2 className="text-xl font-semibold mb-4">
-            Update Existing Product
+            Update Existing Products
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-            {/* Bill Date */}
             <div>
-              <label
-                htmlFor="updateBillDate"
-                className="block mb-2 font-medium"
-              >
+              <label className="block mb-2 font-medium">
                 Bill Date<span className="text-red-500">*</span>
               </label>
               <input
                 type="date"
-                id="updateBillDate"
                 value={updateBillDate}
                 onChange={(e) => setUpdateBillDate(e.target.value)}
                 className="w-full p-2 border rounded"
@@ -1052,17 +974,12 @@ useEffect(() => {
               />
             </div>
 
-            {/* Bill Number */}
             <div>
-              <label
-                htmlFor="updateBillNumber"
-                className="block mb-2 font-medium"
-              >
+              <label className="block mb-2 font-medium">
                 Bill Number<span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
-                id="updateBillNumber"
                 value={updateBillNumber}
                 onChange={(e) => setUpdateBillNumber(e.target.value)}
                 className="w-full p-2 border rounded"
@@ -1070,26 +987,17 @@ useEffect(() => {
               />
             </div>
 
-            {/* Employee Selection */}
             <div>
-              <label
-                htmlFor="updateEmployee"
-                className="block mb-2 font-medium"
-              >
+              <label className="block mb-2 font-medium">
                 Employee<span className="text-red-500">*</span>
               </label>
               <select
-                id="updateEmployee"
                 value={updateEmployeeId || ""}
-                onChange={(e) =>
-                  setUpdateEmployeeId(parseInt(e.target.value, 10))
-                }
+                onChange={(e) => setUpdateEmployeeId(parseInt(e.target.value,10))}
                 className="w-full p-2 border rounded"
                 required
               >
-                <option value="" disabled>
-                  Select Employee
-                </option>
+                <option value="" disabled>Select Employee</option>
                 {employees.map((emp) => (
                   <option key={emp.id} value={emp.id}>
                     {emp.name}
@@ -1099,207 +1007,205 @@ useEffect(() => {
             </div>
           </div>
 
-          {/* Product Search */}
-          <div className="relative grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-            <div className="md:col-span-3">
-              <label htmlFor="searchProduct" className="block mb-2 font-medium">
-                Search Product by Name or ID<span className="text-red-500">*</span>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div>
+              <label className="block mb-2 font-medium">
+                Purchase From<span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
-                id="searchProduct"
-                value={updateSearchQuery}
-                onChange={handleUpdateSearchInputChange}
-                onFocus={() => {
-                  if (updateSearchQuery.length > 2) {
-                    debouncedFetchSuggestions(updateSearchQuery);
-                  }
-                }}
-                placeholder="Type product name or ID"
+                list="purchaseFromList"
+                value={updatePurchaseFrom}
+                onChange={(e) => setUpdatePurchaseFrom(e.target.value)}
                 className="w-full p-2 border rounded"
-                autoComplete="off"
                 required
               />
-
-              {/* Suggestion Dropdown */}
-              {productSuggestions.length > 0 && (
-                <ul className="absolute z-10 border rounded bg-white shadow-md max-h-60 overflow-y-auto w-full">
-                  {productSuggestions.map((product) => (
-                    <li
-                      key={product.id}
-                      onClick={() => handleSelectProduct(product)}
-                      className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
-                    >
-                      {product.product_name} ({product.product_id})
-                    </li>
-                  ))}
-                </ul>
-              )}
+              <datalist id="purchaseFromList">
+                {purchaseFromList.map((pf, idx) => (
+                  <option key={idx} value={pf} />
+                ))}
+              </datalist>
             </div>
           </div>
 
-          {/* Display Selected Product Details */}
-          {selectedProduct && (
-            <>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                {/* Purchase From */}
-                <div>
-                  <label
-                    htmlFor="updatePurchaseFrom"
-                    className="block mb-2 font-medium"
-                  >
-                    Purchase From<span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    id="updatePurchaseFrom"
-                    value={updatePurchaseFrom}
-                    onChange={(e) => setUpdatePurchaseFrom(e.target.value)}
-                    className="w-full p-2 border rounded"
-                    required
-                  />
-                </div>
+          {updateProducts.map((prod, i) => (
+            <div key={i} className="border p-4 mb-4 rounded-lg bg-white relative">
+              {updateProducts.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => handleRemoveUpdateProductEntry(i)}
+                  className="absolute top-2 right-2 text-red-500 hover:text-red-700"
+                  title="Remove Product"
+                >
+                  &times;
+                </button>
+              )}
+              <h3 className="text-lg font-medium mb-2">Product {i + 1}</h3>
+              <div className="md:col-span-3 mb-4">
+                <label className="block mb-2 font-medium">
+                  Search Product by Name or ID<span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={prod.searchQuery}
+                  onChange={(e) => handleUpdateSearchInputChange(e, i)}
+                  onFocus={() => {
+                    if (prod.searchQuery.length > 2) {
+                      debouncedFetchSuggestions(prod.searchQuery);
+                    }
+                  }}
+                  placeholder="Type product name or ID"
+                  className="w-full p-2 border rounded"
+                  autoComplete="off"
+                  required
+                />
 
-                {/* Product Name */}
-                <div>
-                  <label
-                    htmlFor="updateProductName"
-                    className="block mb-2 font-medium"
-                  >
-                    Product Name
-                  </label>
-                  <input
-                    type="text"
-                    id="updateProductName"
-                    value={selectedProduct.product_name}
-                    readOnly
-                    className="w-full p-2 border rounded bg-gray-100"
-                  />
-                </div>
-
-                {/* Product ID */}
-                <div>
-                  <label
-                    htmlFor="updateProductId"
-                    className="block mb-2 font-medium"
-                  >
-                    Product ID
-                  </label>
-                  <input
-                    type="text"
-                    id="updateProductId"
-                    value={selectedProduct.product_id}
-                    readOnly
-                    className="w-full p-2 border rounded bg-gray-100"
-                  />
-                </div>
+                {productSuggestions.length > 0 && (
+                  <ul className="absolute z-10 border rounded bg-white shadow-md max-h-60 overflow-y-auto w-[calc(100%-1rem)] mt-1">
+                    {productSuggestions.map((pSuggest) => (
+                      <li
+                        key={pSuggest.id}
+                        onClick={() => handleSelectProduct(pSuggest, i)}
+                        className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                      >
+                        {pSuggest.product_name} ({pSuggest.product_id})
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
 
-              {/* HSN Code */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                {/* HSN Code */}
-                <div>
-                  <label
-                    htmlFor="updateHsnCode"
-                    className="block mb-2 font-medium"
-                  >
-                    HSN Code<span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    id="updateHsnCode"
-                    value={updateHsnCode}
-                    onChange={(e) => setUpdateHsnCode(e.target.value)}
-                    className="w-full p-2 border rounded"
-                    required
-                  />
-                </div>
+              {prod.selectedProduct && (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    <div>
+                      <label className="block mb-2 font-medium">Product Name</label>
+                      <input
+                        type="text"
+                        value={prod.selectedProduct.product_name}
+                        readOnly
+                        className="w-full p-2 border rounded bg-gray-100"
+                      />
+                    </div>
 
-                {/* Rate */}
-                <div>
-                  <label
-                    htmlFor="updateRate"
-                    className="block mb-2 font-medium"
-                  >
-                    Party Rate<span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    id="updateRate"
-                    value={updateRate}
-                    onChange={(e) => setUpdateRate(e.target.value)}
-                    className="w-full p-2 border rounded"
-                    min="0.01"
-                    step="0.01"
-                    required
-                  />
-                </div>
+                    <div>
+                      <label className="block mb-2 font-medium">Product ID</label>
+                      <input
+                        type="text"
+                        value={prod.selectedProduct.product_id}
+                        readOnly
+                        className="w-full p-2 border rounded bg-gray-100"
+                      />
+                    </div>
+                  </div>
 
-                {/* MRP */}
-                <div>
-                  <label htmlFor="updateMrp" className="block mb-2 font-medium">
-                    MRP<span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    id="updateMrp"
-                    value={updateMrp}
-                    onChange={(e) => setUpdateMrp(e.target.value)}
-                    className="w-full p-2 border rounded"
-                    min="0.01"
-                    step="0.01"
-                    required
-                  />
-                </div>
-              </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    <div>
+                      <label className="block mb-2 font-medium">
+                        HSN Code<span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={prod.hsnCode}
+                        onChange={(e) => {
+                          const updated = [...updateProducts];
+                          updated[i].hsnCode = e.target.value;
+                          setUpdateProducts(updated);
+                        }}
+                        className="w-full p-2 border rounded"
+                        required
+                      />
+                    </div>
 
-              {/* Quantity */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                <div>
-                  <label
-                    htmlFor="updateQuantity"
-                    className="block mb-2 font-medium"
-                  >
-                    Quantity to Add<span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    id="updateQuantity"
-                    value={updateQuantity}
-                    onChange={(e) => setUpdateQuantity(e.target.value)}
-                    className="w-full p-2 border rounded"
-                    min="1"
-                    required
-                  />
-                </div>
-              </div>
-            </>
-          )}
+                    <div>
+                      <label className="block mb-2 font-medium">
+                        Party Rate<span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="number"
+                        value={prod.rate}
+                        onChange={(e) => {
+                          const updated = [...updateProducts];
+                          updated[i].rate = e.target.value;
+                          setUpdateProducts(updated);
+                        }}
+                        className="w-full p-2 border rounded"
+                        min="0.01" step="0.01"
+                        required
+                      />
+                    </div>
 
-          {selectedProduct && (
-            <button
-              type="submit"
-              className={`mt-4 w-full p-2 text-white rounded ${
-                isLoading
-                  ? "bg-blue-500 cursor-not-allowed"
-                  : "bg-green-500 hover:bg-green-600"
-              }`}
-              disabled={isLoading}
-            >
-              {isLoading ? "Preparing..." : "Update Stock"}
-            </button>
-          )}
+                    <div>
+                      <label className="block mb-2 font-medium">
+                        MRP<span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="number"
+                        value={prod.mrp}
+                        onChange={(e) => {
+                          const updated = [...updateProducts];
+                          updated[i].mrp = e.target.value;
+                          setUpdateProducts(updated);
+                        }}
+                        className="w-full p-2 border rounded"
+                        min="0.01" step="0.01"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    <div>
+                      <label className="block mb-2 font-medium">
+                        Quantity to Add<span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="number"
+                        value={prod.quantity}
+                        onChange={(e) => {
+                          const updated = [...updateProducts];
+                          updated[i].quantity = e.target.value;
+                          setUpdateProducts(updated);
+                        }}
+                        className="w-full p-2 border rounded"
+                        min="1"
+                        required
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          ))}
+
+          <button
+            type="button"
+            onClick={handleAddUpdateProductEntry}
+            className="mb-4 text-blue-500 hover:underline"
+          >
+            + Add Another Product
+          </button>
+
+          <button
+            type="submit"
+            className={`mt-4 w-full p-2 text-white rounded ${
+              isLoading
+                ? "bg-blue-500 cursor-not-allowed"
+                : "bg-green-500 hover:bg-green-600"
+            }`}
+            disabled={isLoading}
+          >
+            {isLoading ? "Preparing..." : "Update Products"}
+          </button>
         </form>
       )}
 
-      {/* Current Stock Section */}
       {branch && (
         <div className="mt-8">
           <h2 className="text-xl font-semibold mb-4">
             Current Stock for Branch: {branch}
           </h2>
 
-          {/* Search Bar */}
           <input
             type="text"
             placeholder="Search by Product ID or Name"
@@ -1308,7 +1214,6 @@ useEffect(() => {
             className="w-full p-2 border rounded mb-4"
           />
 
-          {/* Stock Table */}
           <div className="overflow-x-auto">
             <table className="min-w-full bg-white">
               <thead>
@@ -1316,57 +1221,66 @@ useEffect(() => {
                   <th className="py-2 px-4 border-b">Product ID</th>
                   <th className="py-2 px-4 border-b">Product Name</th>
                   <th className="py-2 px-4 border-b">Quantity</th>
-                  {role !== "employee" && (
-                    <th className="py-2 px-4 border-b">Party Rate</th>
-                  )}
+                  {role !== "employee" && <th className="py-2 px-4 border-b">Party Rate</th>}
                   <th className="py-2 px-4 border-b">MRP</th>
-                  <th className="py-2 px-4 border-b">HSN Code</th> {/* New Column */}
+                  <th className="py-2 px-4 border-b">HSN Code</th>
                   <th className="py-2 px-4 border-b">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {displayedStocks.map((stock) => (
                   <tr key={stock.product.product_id}>
-                    <td className="py-2 px-4 border-b text-center">
-                      {stock.product.product_id}
-                    </td>
-                    <td className="py-2 px-4 border-b">
-                      {stock.product.product_name}
-                    </td>
-                    <td className="py-2 px-4 border-b text-center">
-                      {stock.quantity}
-                    </td>
+                    <td className="py-2 px-4 border-b text-center">{stock.product.product_id}</td>
+                    <td className="py-2 px-4 border-b">{stock.product.product_name}</td>
+                    <td className="py-2 px-4 border-b text-center">{stock.quantity}</td>
                     {role !== "employee" && (
                       <td className="py-2 px-4 border-b text-center">
-                        {stock.product.rate !== null
-                          ? parseFloat(stock.product.rate).toFixed(2)
-                          : "N/A"}
+                        {stock.product.rate !== null ? parseFloat(stock.product.rate).toFixed(2) : "N/A"}
                       </td>
                     )}
                     <td className="py-2 px-4 border-b text-center">
-                      {stock.product.mrp !== null
-                        ? parseFloat(stock.product.mrp).toFixed(2)
-                        : "N/A"}
+                      {stock.product.mrp !== null ? parseFloat(stock.product.mrp).toFixed(2) : "N/A"}
                     </td>
+                    <td className="py-2 px-4 border-b text-center">{stock.product.hsn_code || "N/A"}</td>
                     <td className="py-2 px-4 border-b text-center">
-                      {stock.product.hsn_code || "N/A"}
-                    </td>
-                    <td className="py-2 px-4 border-b text-center">
-                      <button
-                        onClick={() => handleSelectProduct(stock.product)}
-                        className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded"
-                      >
-                        Select
-                      </button>
-                    </td>
+  <button
+    onClick={() => {
+      if (mode === "update") {
+        const product = stock.product;
+        const updated = [...updateProducts];
+
+        updated[0].selectedProduct = {
+          id: product.id,
+          product_name: product.product_name,
+          product_id: product.product_id,
+          rate: product.rate,
+          mrp: product.mrp,
+          purchase_from: product.purchase_from,
+          hsn_code: product.hsn_code
+        };
+
+        updated[0].searchQuery = `${product.product_name} (${product.product_id})`;
+        updated[0].rate = product.rate !== null ? product.rate.toString() : "";
+        updated[0].mrp = product.mrp !== null ? product.mrp.toString() : "";
+        updated[0].hsnCode = product.hsn_code || "";
+
+        setUpdateProducts(updated);
+        toast.success(`${product.product_name} selected for update.`);
+      } else {
+        toast.info("Select button action is only meaningful in update mode.");
+      }
+    }}
+    className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded"
+  >
+    Select
+  </button>
+</td>
+
                   </tr>
                 ))}
                 {displayedStocks.length === 0 && (
                   <tr>
-                    <td
-                      colSpan={role !== "employee" ? "7" : "6"}
-                      className="py-4 text-center"
-                    >
+                    <td colSpan={role !== "employee" ? "7" : "6"} className="py-4 text-center">
                       No stock entries found.
                     </td>
                   </tr>
@@ -1375,7 +1289,6 @@ useEffect(() => {
             </table>
           </div>
 
-          {/* Pagination Controls */}
           {totalPages > 1 && (
             <div className="flex justify-center items-center mt-4 space-x-4">
               <button
@@ -1389,13 +1302,9 @@ useEffect(() => {
               >
                 Previous
               </button>
-              <span>
-                Page {currentPage} of {totalPages}
-              </span>
+              <span>Page {currentPage} of {totalPages}</span>
               <button
-                onClick={() =>
-                  setCurrentPage((prev) => Math.min(prev + 1, totalPages))
-                }
+                onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
                 disabled={currentPage === totalPages}
                 className={`px-3 py-1 rounded ${
                   currentPage === totalPages
@@ -1410,12 +1319,11 @@ useEffect(() => {
         </div>
       )}
 
-      {/* Purchase Modal */}
       <Modal
         isOpen={state.modals.showPurchaseModal}
         onRequestClose={handleCancelModal}
         contentLabel="Preview Purchase"
-        className="max-w-4xl mx-auto mt-20 bg-white p-6 rounded shadow-lg outline-none"
+        className="max-w-4xl mx-auto mt-20 bg-white p-6 rounded shadow-lg outline-none max-h-screen overflow-auto"
         overlayClassName="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center"
       >
         {state.purchaseModal.content && (
@@ -1423,89 +1331,90 @@ useEffect(() => {
             <h2 className="text-xl font-semibold mb-4">
               Preview {state.purchaseModal.content.mode}
             </h2>
-            <div className="space-y-2">
-              {/* Display purchase details */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <span className="font-medium">Bill Date:</span>
-                </div>
-                <div>
-                  <span>{state.purchaseModal.content.bill_date}</span>
+
+            {state.purchaseModal.content.mode.includes("Products") ? (
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-4">
+                  <div><span className="font-medium">Bill Date:</span></div>
+                  <div>{state.purchaseModal.content.bill_date}</div>
+
+                  <div><span className="font-medium">Bill Number:</span></div>
+                  <div>{state.purchaseModal.content.bill_number || ""}</div>
+
+                  <div><span className="font-medium">Employee:</span></div>
+                  <div>{state.purchaseModal.content.employee}</div>
                 </div>
 
-                <div>
-                  <span className="font-medium">Bill Number:</span>
-                </div>
-                <div>
-                  <span>{state.purchaseModal.content.bill_number || ""}</span>
-                </div>
+                <h3 className="font-medium mt-4">Products:</h3>
+                <table className="min-w-full bg-gray-100">
+                  <thead>
+                    <tr>
+                      <th className="py-2 px-4 border-b">Product ID</th>
+                      <th className="py-2 px-4 border-b">Name</th>
+                      <th className="py-2 px-4 border-b">Qty</th>
+                      <th className="py-2 px-4 border-b">Rate</th>
+                      <th className="py-2 px-4 border-b">MRP</th>
+                      <th className="py-2 px-4 border-b">HSN</th>
+                      <th className="py-2 px-4 border-b">Purchase From</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {state.purchaseModal.content.products.map((p, idx) => (
+                      <tr key={idx}>
+                        <td className="py-2 px-4 border-b text-center">{p.product_id}</td>
+                        <td className="py-2 px-4 border-b">{p.product_name}</td>
+                        <td className="py-2 px-4 border-b text-center">{p.quantity}</td>
+                        <td className="py-2 px-4 border-b text-center">{p.rate.toFixed(2)}</td>
+                        <td className="py-2 px-4 border-b text-center">{p.mrp.toFixed(2)}</td>
+                        <td className="py-2 px-4 border-b text-center">{p.hsn_code}</td>
+                        <td className="py-2 px-4 border-b text-center">{p.purchase_from}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-4">
+                  <div><span className="font-medium">Bill Date:</span></div>
+                  <div><span>{state.purchaseModal.content.bill_date}</span></div>
 
-                <div>
-                  <span className="font-medium">Employee:</span>
-                </div>
-                <div>
-                  <span>{state.purchaseModal.content.employee}</span>
-                </div>
+                  <div><span className="font-medium">Bill Number:</span></div>
+                  <div><span>{state.purchaseModal.content.bill_number || ""}</span></div>
 
-                <div>
-                  <span className="font-medium">Product Name:</span>
-                </div>
-                <div>
-                  <span>{state.purchaseModal.content.product_name}</span>
-                </div>
+                  <div><span className="font-medium">Employee:</span></div>
+                  <div><span>{state.purchaseModal.content.employee}</span></div>
 
-                <div>
-                  <span className="font-medium">Product ID:</span>
-                </div>
-                <div>
-                  <span>{state.purchaseModal.content.product_id}</span>
-                </div>
+                  <div><span className="font-medium">Product Name:</span></div>
+                  <div><span>{state.purchaseModal.content.product_name}</span></div>
 
-                <div>
-                  <span className="font-medium">HSN Code:</span>
-                </div>
-                <div>
-                  <span>{state.purchaseModal.content.hsn_code}</span>
-                </div>
+                  <div><span className="font-medium">Product ID:</span></div>
+                  <div><span>{state.purchaseModal.content.product_id}</span></div>
 
-                <div>
-                  <span className="font-medium">Rate:</span>
-                </div>
-                <div>
-                  <span>{state.purchaseModal.content.rate.toFixed(2)}</span>
-                </div>
+                  <div><span className="font-medium">HSN Code:</span></div>
+                  <div><span>{state.purchaseModal.content.hsn_code}</span></div>
 
-                <div>
-                  <span className="font-medium">MRP:</span>
-                </div>
-                <div>
-                  <span>{state.purchaseModal.content.mrp.toFixed(2)}</span>
-                </div>
+                  <div><span className="font-medium">Rate:</span></div>
+                  <div><span>{state.purchaseModal.content.rate.toFixed(2)}</span></div>
 
-                <div>
-                  <span className="font-medium">Quantity:</span>
-                </div>
-                <div>
-                  <span>{state.purchaseModal.content.quantity}</span>
-                </div>
+                  <div><span className="font-medium">MRP:</span></div>
+                  <div><span>{state.purchaseModal.content.mrp.toFixed(2)}</span></div>
 
-                <div>
-                  <span className="font-medium">Purchase From:</span>
-                </div>
-                <div>
-                  <span>{state.purchaseModal.content.purchase_from}</span>
+                  <div><span className="font-medium">Quantity:</span></div>
+                  <div><span>{state.purchaseModal.content.quantity}</span></div>
+
+                  <div><span className="font-medium">Purchase From:</span></div>
+                  <div><span>{state.purchaseModal.content.purchase_from}</span></div>
                 </div>
               </div>
-            </div>
+            )}
 
-            {/* Employee Verification inside the modal */}
             <div className="mt-6">
               <h3 className="text-lg font-medium mb-2">Verify Employee</h3>
               <EmployeeVerification
                 employee={state.purchaseModal.content.employee}
                 onVerify={(isVerified, message) => {
                   if (isVerified) {
-                    // Enable confirm button by updating the modal content
                     dispatch({
                       type: "SET_PURCHASE_MODAL",
                       payload: {
@@ -1520,7 +1429,6 @@ useEffect(() => {
                     });
                     toast.success(message);
                   } else {
-                    // Display verification failure message
                     toast.error(message);
                   }
                 }}
