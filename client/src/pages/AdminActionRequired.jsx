@@ -6,7 +6,7 @@ import { CheckIcon, XMarkIcon } from "@heroicons/react/24/outline"; // Enhanced 
 import dayjs from 'dayjs'; // Import dayjs for date manipulation
 
 const AdminActionRequired = ({ isCollapsed }) => {
-  const { role } = useAuth();
+  const { role, user, name, branch } = useAuth(); // Added 'branch' if admin's branch is relevant
   const [salesRequests, setSalesRequests] = useState([]);
   const [workRequests, setWorkRequests] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -60,7 +60,7 @@ const AdminActionRequired = ({ isCollapsed }) => {
     try {
       const { error } = await supabase
         .from('modification_requests')
-        .update({ status: 'approved' })
+        .update({ status: 'approved', employee_name: name }) // Set verifier's name as admin's name
         .eq('request_id', requestId);
 
       if (!error) {
@@ -99,7 +99,7 @@ const AdminActionRequired = ({ isCollapsed }) => {
     try {
       const { error } = await supabase
         .from('modification_requests')
-        .update({ status: 'rejected', rejection_reason: reason }) // Ensure 'rejection_reason' column exists in your table
+        .update({ status: 'rejected', rejection_reason: reason, employee_name: name }) // Set verifier's name as admin's name
         .eq('request_id', requestId);
 
       if (!error) {
@@ -120,16 +120,6 @@ const AdminActionRequired = ({ isCollapsed }) => {
   };
 
   /**
-   * Fetches the pending modification requests when the component mounts or when the role changes.
-   */
-  useEffect(() => {
-    if (role === 'admin') {
-      fetchRequests();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [role]);
-
-  /**
    * Automatically hides notifications after 5 seconds.
    */
   useEffect(() => {
@@ -140,6 +130,16 @@ const AdminActionRequired = ({ isCollapsed }) => {
       return () => clearTimeout(timer);
     }
   }, [notification]);
+
+  /**
+   * Fetches the pending modification requests when the component mounts or when the role changes.
+   */
+  useEffect(() => {
+    if (role === 'admin') {
+      fetchRequests();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [role]);
 
   return (
     <div className={`transition-all duration-300 ${isCollapsed ? "mx-20" : "mx-20 px-20"} justify-center mt-20 p-20 rounded-xl mx-auto max-w-6xl`}>
@@ -181,6 +181,7 @@ const AdminActionRequired = ({ isCollapsed }) => {
                           <th className="py-3 px-6 bg-gray-100 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Employee</th>
                           <th className="py-3 px-6 bg-gray-100 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Modification Type</th>
                           <th className="py-3 px-6 bg-gray-100 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Reason</th>
+                          <th className="py-3 px-6 bg-gray-100 text-center text-xs font-medium text-gray-600 uppercase tracking-wider">Verified By</th>
                           <th className="py-3 px-6 bg-gray-100 text-center text-xs font-medium text-gray-600 uppercase tracking-wider">Actions</th>
                         </tr>
                       </thead>
@@ -192,6 +193,7 @@ const AdminActionRequired = ({ isCollapsed }) => {
                             <td className="py-4 px-6 text-sm text-gray-700">{request.employee_name}</td>
                             <td className="py-4 px-6 text-sm text-gray-700">{request.modification_type}</td>
                             <td className="py-4 px-6 text-sm text-gray-700">{request.modification_reason}</td>
+                            <td className="py-4 px-6 text-sm text-center">{request.employee_name}</td>
                             <td className="py-4 px-6 text-sm text-center">
                               <div className="flex justify-center space-x-2">
                                 <button
@@ -239,6 +241,7 @@ const AdminActionRequired = ({ isCollapsed }) => {
                           <th className="py-3 px-6 bg-gray-100 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Employee</th>
                           <th className="py-3 px-6 bg-gray-100 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Modification Type</th>
                           <th className="py-3 px-6 bg-gray-100 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Reason</th>
+                          <th className="py-3 px-6 bg-gray-100 text-center text-xs font-medium text-gray-600 uppercase tracking-wider">Verified By</th>
                           <th className="py-3 px-6 bg-gray-100 text-center text-xs font-medium text-gray-600 uppercase tracking-wider">Actions</th>
                         </tr>
                       </thead>
@@ -250,6 +253,7 @@ const AdminActionRequired = ({ isCollapsed }) => {
                             <td className="py-4 px-6 text-sm text-gray-700">{request.employee_name}</td>
                             <td className="py-4 px-6 text-sm text-gray-700">{request.modification_type}</td>
                             <td className="py-4 px-6 text-sm text-gray-700">{request.modification_reason}</td>
+                            <td className="py-4 px-6 text-sm text-center">{request.employee_name}</td>
                             <td className="py-4 px-6 text-sm text-center">
                               <div className="flex justify-center space-x-2">
                                 <button

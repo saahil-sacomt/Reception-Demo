@@ -66,7 +66,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     customerAge,
     customerGender,
     submitted,
-    // modificationRequestId, // Removed modificationRequestId
+    modificationRequestId,
     isSaving,
     allowPrint,
     employees,
@@ -307,12 +307,12 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
               productEntries: productEntries.map((entry, i) =>
                 i === index
                   ? {
-                    id: productDetails.product_id,
-                    name: productDetails.product_name,
-                    price: productDetails.mrp || "",
-                    quantity: entry.quantity || "",
-                    hsn_code: productDetails.hsn_code || "",
-                  }
+                      id: productDetails.product_id,
+                      name: productDetails.product_name,
+                      price: productDetails.mrp || "",
+                      quantity: entry.quantity || "",
+                      hsn_code: productDetails.hsn_code || "",
+                    }
                   : entry
               ),
             },
@@ -499,7 +499,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     } else {
       dispatch({ type: "SET_WORK_ORDER_FORM", payload: { isPrinted: false } });
     }
-  }, [isPrinted, resetForm, dispatch]);
+  }, [isPrinted, resetForm, resetState, dispatch]);
 
   // Implement handlePrint using window.print()
   const handlePrint = useCallback(() => {
@@ -596,16 +596,16 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       } else if (hasMrNumber) {
         if (!mrNumber) errors.mrNumber = "MR Number is required.";
       } else {
-        if (!customerName) errors.customerName = " name is required.";
+        if (!customerName) errors.customerName = "Name is required.";
         if (!customerPhone)
-          errors.customerPhone = " phone number is required.";
+          errors.customerPhone = "Phone number is required.";
         if (!customerAddress)
-          errors.customerAddress = " address is required.";
-        if (!customerAge) errors.customerAge = " age is required.";
+          errors.customerAddress = "Address is required.";
+        if (!customerAge) errors.customerAge = "Age is required.";
         if (customerAge && parseInt(customerAge) < 0)
           errors.customerAge = "Age cannot be negative.";
         if (!customerGender)
-          errors.customerGender = " gender is required.";
+          errors.customerGender = "Gender is required.";
       }
     } else if (step === 4) {
       if (!employee) {
@@ -702,7 +702,6 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     subtotal,
     advanceDetails,
     paymentMethod,
-    validateAdvanceAmount,
     dispatch,
   ]);
 
@@ -799,17 +798,17 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         if (!mrNumber) productErrors["mrNumber"] = "MR Number is required.";
       } else {
         if (!customerName)
-          productErrors["customerName"] = " name is required.";
+          productErrors["customerName"] = "Name is required.";
         if (!customerPhone)
-          productErrors["customerPhone"] = " phone number is required.";
+          productErrors["customerPhone"] = "Phone number is required.";
         if (!customerAddress)
-          productErrors["customerAddress"] = " address is required.";
+          productErrors["customerAddress"] = "Address is required.";
         if (!customerAge)
-          productErrors["customerAge"] = " age is required.";
+          productErrors["customerAge"] = "Age is required.";
         if (customerAge && parseInt(customerAge) < 0)
           productErrors["customerAge"] = "Age cannot be negative.";
         if (!customerGender)
-          productErrors["customerGender"] = " gender is required.";
+          productErrors["customerGender"] = "Gender is required.";
       }
     }
 
@@ -860,7 +859,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
 
     try {
       let customerId = null;
-
+  
       if (hasMrNumber) {
         // Fetch existing customer by MR number
         const { data: existingCustomer, error: customerError } = await supabase
@@ -868,7 +867,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
           .select("id")
           .eq("mr_number", mrNumber.trim())
           .single();
-
+  
         if (customerError) {
           alert("No valid customer found with the provided MR Number.");
           dispatch({
@@ -877,28 +876,24 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
           });
           return;
         }
-
-        customerId = null;
+  
+        customerId = null; // Assuming patient details are stored separately
       } else {
         // Create new customer
-        const { data: newCustomer, error: customerCreationError } =
-          await supabase
-            .from("customers")
-            .insert({
-              name: customerName.trim(),
-              phone_number: customerPhone.trim(),
-              address: customerAddress.trim(),
-              age: parseInt(customerAge, 10),
-              gender: customerGender,
-            })
-            .select("customer_id") // Correct field selection
-            .single();
-
+        const { data: newCustomer, error: customerCreationError } = await supabase
+          .from("customers")
+          .insert({
+            name: customerName.trim(),
+            phone_number: customerPhone.trim(),
+            address: customerAddress.trim(),
+            age: parseInt(customerAge, 10),
+            gender: customerGender,
+          })
+          .select("customer_id") // Ensure correct field selection
+          .single();
+  
         if (customerCreationError) {
-          console.error(
-            "Error creating customer:",
-            customerCreationError.message
-          );
+          console.error("Error creating customer:", customerCreationError.message);
           alert("Failed to create a new customer.");
           dispatch({
             type: "SET_WORK_ORDER_FORM",
@@ -906,10 +901,10 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
           });
           return;
         }
-
+  
         customerId = newCustomer?.customer_id;
       }
-
+  
       // Prepare the payload
       let payload = {
         product_entries: productEntries.map((entry) => ({
@@ -924,20 +919,20 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         mr_number: hasMrNumber ? mrNumber : null,
         patient_details: hasMrNumber
           ? {
-            mr_number: mrNumber.trim(),
-            name: patientDetails?.name || "",
-            age: patientDetails?.age || "",
-            phone_number: patientDetails?.phoneNumber || "",
-            gender: patientDetails?.gender || "",
-            address: patientDetails?.address || "",
-          }
+              mr_number: mrNumber.trim(),
+              name: patientDetails?.name || "",
+              age: patientDetails?.age || "",
+              phone_number: patientDetails?.phoneNumber || "",
+              gender: patientDetails?.gender || "",
+              address: patientDetails?.address || "",
+            }
           : {
-            name: customerName.trim(),
-            phone_number: customerPhone.trim(),
-            address: customerAddress.trim(),
-            age: parseInt(customerAge, 10),
-            gender: customerGender,
-          },
+              name: customerName.trim(),
+              phone_number: customerPhone.trim(),
+              address: customerAddress.trim(),
+              age: parseInt(customerAge, 10),
+              gender: customerGender,
+            },
         employee: workOrderForm.employee,
         payment_method: paymentMethod,
         subtotal,
@@ -952,14 +947,14 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         branch: branch,
         customer_id: customerId,
       };
-
+  
       if (isEditing) {
         payload.work_order_id = workOrderId;
         const { error } = await supabase
           .from("work_orders")
           .update(payload)
           .eq("work_order_id", workOrderId);
-
+  
         if (error) {
           if (error.status === 409) {
             alert("Work Order ID already exists. Generating a new ID...");
@@ -974,6 +969,51 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
             type: "SET_WORK_ORDER_FORM",
             payload: { allowPrint: true, submitted: true },
           });
+  
+          try {
+            const { data: modReqData, error: modReqError } = await supabase
+              .from("modification_requests")
+              .select("id")
+              .eq("order_id", workOrderId)
+              .eq("order_type", "work_order")
+              .eq("status", "approved")
+              .single();
+    
+            if (modReqError) {
+              console.error("Error fetching modification request:", modReqError);
+              // Optionally alert the user or handle the error as needed
+            } else if (modReqData) {
+              const modificationRequestId = modReqData.id;
+              console.log(
+                "Attempting to update modification_request with ID:",
+                modificationRequestId
+              );
+    
+              const { error: modificationError } = await supabase
+                .from("modification_requests")
+                .update({ status: "completed" })
+                .eq("id", modificationRequestId);
+    
+              if (modificationError) {
+                console.error(
+                  "Error updating modification request status:",
+                  modificationError
+                );
+                alert(
+                  "Work order was updated, but failed to update modification request status. Please contact support."
+                );
+              } else {
+                console.log("Modification request status updated to 'completed'.");
+              }
+            } else {
+              console.log("No pending modification request found for this work order.");
+            }
+          } catch (err) {
+            console.error("Unexpected error updating modification request:", err);
+            alert(
+              "An unexpected error occurred while updating modification request status."
+            );
+          }
         }
       } else {
         // Ensure workOrderId is set before inserting
@@ -987,9 +1027,9 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         }
         payload.work_order_id = workOrderId;
         payload.created_at = new Date().toISOString();
-
+  
         const { error } = await supabase.from("work_orders").insert(payload);
-
+  
         if (error) {
           if (error.status === 409) {
             alert("Work Order ID already exists. Please try saving again.");
@@ -1041,6 +1081,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     workOrderId,
     isEditing,
     generateNewWorkOrderId,
+    modificationRequestId,
   ]);
 
   // Navigate to the previous step
@@ -1184,6 +1225,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
             gstNumber: data.gst_number || "",
             employee: data.employee || "",
             hasMrNumber: data.mr_number ? true : false,
+            modificationRequestId: data.modification_request_id || null,
           },
         });
 
@@ -1293,12 +1335,12 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                 productEntries: productEntries.map((entry, i) =>
                   i === index
                     ? {
-                      id: productDetails.product_id,
-                      name: productDetails.product_name,
-                      price: productDetails.mrp || "",
-                      quantity: entry.quantity || "",
-                      hsn_code: productDetails.hsn_code || "",
-                    }
+                        id: productDetails.product_id,
+                        name: productDetails.product_name,
+                        price: productDetails.mrp || "",
+                        quantity: entry.quantity || "",
+                        hsn_code: productDetails.hsn_code || "",
+                      }
                     : entry
                 ),
               },
@@ -1331,6 +1373,13 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       generateNewWorkOrderId();
     }
   }, [branch, generateNewWorkOrderId, workOrderForm.isEditing, workOrderId]);
+
+  // Fetch existing work order details if editing
+  useEffect(() => {
+    if (isEditing) {
+      fetchWorkOrderDetails();
+    }
+  }, [isEditing, fetchWorkOrderDetails]);
 
   // Handle after print event
   useEffect(() => {
@@ -1849,7 +1898,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                     ref={customerAgeRef}
                     className={`border border-gray-300 w-full px-4 py-3 rounded-lg ${validationErrors.customerAge ? "border-red-500" : ""
                       }`}
-                    aria-label="Ente Age"
+                    aria-label="Enter Age"
                   />
                   {validationErrors.customerAge && (
                     <p className="text-red-500 text-xs mt-1">
@@ -2026,16 +2075,18 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                 {/* Header Information */}
                 <div className=" flex justify-between items-center mb-6">
                   <div className="flex items-center">
-                    <h2 className="text-3xl font-bold">Work Order</h2>
+                    <h2 className="text-3xl font-bold">
+                      {isEditing ? "Work Order (Modified)" : "Work Order"}
+                    </h2>
                   </div>
                   <div className="text-right">
-                  <p>
+                    <p>
                       Date: <strong>{formattedDate}</strong>
                     </p>
                     <p>
                       Work Order No:<strong> {workOrderId}</strong>
                     </p>
-                    
+
                     {hasMrNumber && (
                       <>
                         <p>
@@ -2162,13 +2213,13 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                       Discount Amount:
                       <strong> ₹{validDiscountAmount.toFixed(2)}</strong>
                     </p> */}
-                    
+
                     <p>
                       Advance Paid:<strong> ₹{advance.toFixed(2)}</strong>
                     </p>
                     <p className="text-xl">
-                    <strong>Total Amount (Incl. GST):{" "}
-                      ₹{discountedTotal.toFixed(2)}</strong>
+                      <strong>Total Amount (Incl. GST):{" "}
+                        ₹{discountedTotal.toFixed(2)}</strong>
                     </p>
                     <p className="text-xl">
                       <strong>Amount Due: ₹{balanceDue.toFixed(2)}</strong>
@@ -2403,7 +2454,20 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         </div>
       </form>
 
-      {/* Removed Hidden Bill Print Component */}
+      {/* Optional: Back to List Button */}
+      {isEditing && (
+        <div className="flex justify-center mt-4">
+          <button
+            onClick={() => navigate("/work-orders")}
+            ref={backToListButtonRef}
+            className="flex items-center justify-center w-44 h-12 bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition"
+            aria-label="Back to Work Orders List"
+          >
+            <ArrowLeftIcon className="w-5 h-5 mr-2" />
+            Back to List
+          </button>
+        </div>
+      )}
     </div>
   );
 };

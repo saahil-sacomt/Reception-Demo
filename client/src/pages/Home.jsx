@@ -800,7 +800,7 @@ const Home = ({ isCollapsed }) => {
 
                 {/* Work Orders List */}
                 {filteredWorkOrders.length > 0 ? (
-                  <div className="grid grid-cols-1 gap-4 max-h-96 overflow-y-auto">
+                  <div className="grid grid-cols-1 gap-4 overflow-y-auto">
                     {filteredWorkOrders.map((order) => (
                       <div key={order.work_order_id} className="bg-white rounded-lg p-4 flex flex-col">
                         <div className="flex justify-between items-center">
@@ -831,7 +831,7 @@ const Home = ({ isCollapsed }) => {
                       <p>No work orders found matching your search criteria.</p>
                     ) : (
                       state.pendingWorkOrdersCount > 0 ? (
-                        <div className="grid grid-cols-1 gap-4 max-h-96 overflow-y-auto">
+                        <div className="grid grid-cols-1 gap-4  overflow-y-auto">
                           {state.pendingWorkOrders.map((order) => (
                             <div key={order.work_order_id} className="bg-white shadow-md rounded-lg p-4 flex flex-col">
                               <div className="flex justify-between items-center">

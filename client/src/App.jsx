@@ -30,6 +30,7 @@ import StockManagement from "./pages/StockManagement";
 import { supabase } from './supabaseClient'
 import EmployeeStockManagement from "./pages/EmployeeStockManagement";
 import NotesReport from "./pages/Notes";
+import ModifyOrderWrapper from "./components/ModifyOrderWrapper";
 
 const App = () => {
   const location = useLocation();
@@ -85,9 +86,8 @@ const App = () => {
           />
         )}
         <div
-          className={`flex-grow transition-all duration-300 ${
-            hideHeaderAndSidebar ? "" : isCollapsed ? "ml-16" : "ml-48"
-          } min-h-screen`}
+          className={`flex-grow transition-all duration-300 ${hideHeaderAndSidebar ? "" : isCollapsed ? "ml-16" : "ml-48"
+            } min-h-screen`}
         >
           <Routes>
             {/* Public Routes */}
@@ -113,8 +113,8 @@ const App = () => {
                 element={<OrderGenerationPage isCollapsed={isCollapsed} />}
               />
               <Route
-                path="/work-order/:orderId"
-                element={<WorkOrderGeneration isCollapsed={isCollapsed} />}
+                path="/modify-order/:orderType/:orderId"
+                element={<ModifyOrderWrapper isCollapsed={isCollapsed} />}
               />
               <Route
                 path="/work-order"
@@ -122,10 +122,6 @@ const App = () => {
               />
               <Route
                 path="/sales-order"
-                element={<SalesOrderGeneration isCollapsed={isCollapsed} />}
-              />
-              <Route
-                path="/sales-order/:orderId"
                 element={<SalesOrderGeneration isCollapsed={isCollapsed} />}
               />
               <Route
@@ -161,14 +157,14 @@ const App = () => {
             </Route>
             {/* Employee Stock Management */}
             <Route
-                path="/employee-stock-management"
-                element={<EmployeeStockManagement isCollapsed={isCollapsed} />}
-              />
-              
+              path="/employee-stock-management"
+              element={<EmployeeStockManagement isCollapsed={isCollapsed} />}
+            />
+
             <Route
               element={<RequireAuth allowedRoles={["super_admin", "admin"]} />}
             >
-              
+
               <Route
                 path="/stock-manage"
                 element={<StockManagement isCollapsed={isCollapsed} />}

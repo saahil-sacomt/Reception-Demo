@@ -4,7 +4,7 @@ import supabase from '../supabaseClient';
 import { useAuth } from '../context/AuthContext';
 import Modal from 'react-modal';
 import EmployeeVerification from "../components/EmployeeVerification";
-import { PrinterIcon, TrashIcon, CheckCircleIcon, ExclamationCircleIcon, InformationCircleIcon, PencilIcon, XMarkIcon } from "@heroicons/react/24/outline"; // Enhanced Icons
+import { CheckCircleIcon, ExclamationCircleIcon, InformationCircleIcon, XMarkIcon } from "@heroicons/react/24/outline"; // Enhanced Icons
 import dayjs from 'dayjs'; // Import dayjs for date manipulation
 
 const RaiseRequest = ({ isCollapsed }) => {
@@ -32,58 +32,55 @@ const RaiseRequest = ({ isCollapsed }) => {
     'Other'
   ];
 
-  // Fetch Employees for Selection
+  // Fetch Employees for Selection (branch-wise)
   useEffect(() => {
     const fetchEmployees = async () => {
-      const { data, error } = await supabase.from('employees').select('name');
-      if (!error) setEmployees(data.map((emp) => emp.name));
+      const { data, error } = await supabase
+        .from('employees')
+        .select('name')
+        .eq('branch', branch); // Filter by branch
+
+      if (!error && data) {
+        setEmployees(data.map((emp) => emp.name));
+      } else {
+        console.error("Error fetching employees:", error);
+      }
     };
 
     fetchEmployees();
-  }, []);
+  }, [branch]);
 
   // Fetch Orders based on Order Type and Search Mode
   const fetchOrders = async () => {
     setIsLoading(true);
     setNotification({ type: '', message: '' });
 
-    let query = supabase.from('sales_orders').select('*').eq('branch', branch);
+    let query = null;
+    if (selectedOrderType === 'sales_order') {
+      query = supabase.from('sales_orders').select('*').eq('branch', branch);
+      if (searchModeSales === 'id' && orderId.trim()) {
+        query = query.ilike('sales_order_id', `%${orderId}%`);
+      }
+    } else if (selectedOrderType === 'work_order') {
+      query = supabase.from('work_orders').select('*').eq('branch', branch);
+      if (searchModeWork === 'id' && workOrderId.trim()) {
+        query = query.ilike('work_order_id', `%${workOrderId}%`);
+      }
+    }
 
-    if (searchModeSales === 'id' && orderId.trim()) {
-      query = query.ilike('sales_order_id', `%${orderId}%`);
+    if (!query) {
+      setNotification({ type: 'error', message: 'Please select an order type and search mode.' });
+      setIsLoading(false);
+      return;
     }
 
     const { data, error } = await query.order('created_at', { ascending: false });
 
     if (error) {
-      console.error("Error fetching sales orders:", error);
-      setNotification({ type: 'error', message: 'Failed to fetch sales orders. Please try again.' });
+      console.error(`Error fetching ${selectedOrderType === 'sales_order' ? 'sales' : 'work'} orders:`, error);
+      setNotification({ type: 'error', message: `Failed to fetch ${selectedOrderType === 'sales_order' ? 'sales' : 'work'} orders. Please try again.` });
     } else if (data.length === 0) {
-      setNotification({ type: 'info', message: 'No sales orders found.' });
-    } else {
-      setOrders(data);
-    }
-    setIsLoading(false);
-  };
-
-  // Fetch Work Orders based on Search Mode
-  const fetchWorkOrders = async () => {
-    setIsLoading(true);
-    setNotification({ type: '', message: '' });
-
-    let query = supabase.from('work_orders').select('*').eq('branch', branch);
-
-    if (searchModeWork === 'id' && workOrderId.trim()) {
-      query = query.ilike('work_order_id', `%${workOrderId}%`);
-    }
-
-    const { data, error } = await query.order('created_at', { ascending: false });
-
-    if (error) {
-      console.error("Error fetching work orders:", error);
-      setNotification({ type: 'error', message: 'Failed to fetch work orders. Please try again.' });
-    } else if (data.length === 0) {
-      setNotification({ type: 'info', message: 'No work orders found.' });
+      setNotification({ type: 'info', message: `No ${selectedOrderType === 'sales_order' ? 'sales' : 'work'} orders found.` });
     } else {
       setOrders(data);
     }
@@ -133,7 +130,7 @@ const RaiseRequest = ({ isCollapsed }) => {
         employee_id: user.id,
         modification_type: modificationType,
         modification_reason: modificationReason,
-        employee_name: name,
+        employee_name: selectedEmployee, // Set verifier's name here
         status: 'pending',
         branch: branch // Ensure status is set to 'pending'
       }]);
@@ -348,7 +345,7 @@ const RaiseRequest = ({ isCollapsed }) => {
                   />
                 </div>
                 <button
-                  onClick={fetchWorkOrders}
+                  onClick={fetchOrders}
                   className={`mt-4 sm:mt-0 w-full sm:w-auto inline-flex justify-center py-3 px-6 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition ${
                     isLoading ? 'opacity-50 cursor-not-allowed' : ''
                   }`}
@@ -362,7 +359,7 @@ const RaiseRequest = ({ isCollapsed }) => {
             {searchModeWork === 'all' && (
               <div className="bg-white rounded-lg px-6 flex justify-center mb-4">
                 <button
-                  onClick={fetchWorkOrders}
+                  onClick={fetchOrders}
                   className={`w-full sm:w-auto inline-flex justify-center py-3 px-6 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition ${
                     isLoading ? 'opacity-50 cursor-not-allowed' : ''
                   }`}
@@ -443,7 +440,7 @@ const RaiseRequest = ({ isCollapsed }) => {
 
           {/* Employee Selection */}
           <div className="mb-4">
-            <label htmlFor="employee" className="block mb-2 font-medium">Select Employee</label>
+            <label htmlFor="employee" className="block mb-2 font-medium">Select Employee to Verify</label>
             <select
               id="employee"
               value={selectedEmployee}

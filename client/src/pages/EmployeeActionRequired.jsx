@@ -7,9 +7,7 @@ import supabase from '../supabaseClient';
 import dayjs from 'dayjs'; // Ensure dayjs is imported
 
 const EmployeeActionRequired = ({ isCollapsed }) => {
-  const { user } = useAuth();
-  // Removed the useModificationContext import and usage
-  // const { actionRequests, setActionRequests } = useModificationContext();
+  const { user, name, branch } = useAuth(); // Added 'branch' if needed
   const [salesRequests, setSalesRequests] = useState([]);
   const [workRequests, setWorkRequests] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -42,10 +40,10 @@ const EmployeeActionRequired = ({ isCollapsed }) => {
 
       // Ensure the work order was created in the past and within 12 hours
       if (diffHours >= 0 && diffHours <= 12) {
-        // Auto-approve the request
+        // Auto-approve the request by updating status and setting verifier's name
         const { error: updateError } = await supabase
           .from('modification_requests')
-          .update({ status: 'approved' })
+          .update({ status: 'approved', employee_name: 'Auto-approved' }) // Set verifier's name
           .eq('request_id', request.request_id);
 
         if (!updateError) {
@@ -97,7 +95,7 @@ const EmployeeActionRequired = ({ isCollapsed }) => {
           });
         }
 
-        // After auto-approvals, fetch the updated list of pending, approved, and rejected requests
+        // After auto-approvals, fetch the updated list of approved and rejected requests
         const { data: updatedData, error: updatedError } = await supabase
           .from('modification_requests')
           .select('*')
@@ -129,12 +127,12 @@ const EmployeeActionRequired = ({ isCollapsed }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user.id]);
 
-  // Updated acknowledgeRejection function to accept orderType
-  const acknowledgeRejection = async (requestId, orderType) => { // Added orderType parameter
+  // Acknowledge Rejection
+  const acknowledgeRejection = async (requestId, orderType) => { // Pass orderType
     setActionLoading(requestId);
     const { error } = await supabase
       .from('modification_requests')
-      .update({ status: 'acknowledged' }) // Ensure 'acknowledged' column exists in your table
+      .update({ status: 'rejection' }) // Ensure 'acknowledged' column exists in your table
       .eq('request_id', requestId);
 
     if (!error) {
@@ -210,6 +208,9 @@ const EmployeeActionRequired = ({ isCollapsed }) => {
                             {request.status}
                           </span>
                         </p>
+                        <p className="text-sm text-gray-600">
+                          Verified By: {request.employee_name}
+                        </p>
                       </div>
                       <div className="flex space-x-2">
                         {request.status === 'approved' ? (
@@ -252,6 +253,9 @@ const EmployeeActionRequired = ({ isCollapsed }) => {
                           <span className={`ml-1 font-semibold ${request.status === 'approved' ? 'text-green-600' : 'text-red-600'}`}>
                             {request.status}
                           </span>
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          Verified By: {request.employee_name}
                         </p>
                       </div>
                       <div className="flex space-x-2">

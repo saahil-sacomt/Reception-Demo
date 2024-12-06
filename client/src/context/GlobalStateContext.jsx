@@ -275,6 +275,8 @@ const globalStateReducer = (state, action) => {
         ...state,
         branches: action.payload,
       };
+      case "RESET_STATE":
+      return { ...defaultInitialState };
 
     default:
       return state;
@@ -307,6 +309,14 @@ export const GlobalStateProvider = ({ children }) => {
   };
   */
 
+  const resetState = () => {
+    // If you're using localStorage, uncomment the line below
+    // localStorage.removeItem("globalState");
+  
+    dispatch({ type: "RESET_STATE" }); // We'll handle this action in the reducer
+  };
+  
+
   /*
   useEffect(() => {
     const handlePageRefresh = () => {
@@ -327,7 +337,7 @@ export const GlobalStateProvider = ({ children }) => {
   // This ensures state resets on every refresh
 
   return (
-    <GlobalStateContext.Provider value={{ state, dispatch }}>
+    <GlobalStateContext.Provider value={{ state, dispatch,resetState }}>
       {children}
     </GlobalStateContext.Provider>
   );
