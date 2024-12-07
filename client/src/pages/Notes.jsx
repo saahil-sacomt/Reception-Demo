@@ -33,7 +33,6 @@ const Notes = () => {
   const [showProductSuggestions, setShowProductSuggestions] = React.useState(false);
 
   const searchProductRef = useRef(null);
-  // Removed searchOrderRef as it's no longer needed
 
   // Fetch products and branches on component mount
   useEffect(() => {
@@ -133,7 +132,6 @@ const Notes = () => {
   // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
-    // No need to set a separate message state as we're using toast notifications
 
     // Validate required fields
     if (
@@ -170,11 +168,8 @@ const Notes = () => {
         reason: reason || null,
       };
 
-      // Include order information if needed
       if (order_id) {
-        // Depending on your database schema, you might want to differentiate between sales and work orders
-        // For simplicity, we'll assume a generic order_id without type
-        insertData.order_id = order_id; // Adjust field name as per your database
+        insertData.order_id = order_id;
       }
 
       const { data: noteData, error: noteError } = await supabase
@@ -187,7 +182,8 @@ const Notes = () => {
 
       // Update 'stock' table based on note type
       if (note_type === 'debit') {
-        // Debit Note: Increase stock
+        // Previously 'Debit' text, now we display as 'Credit' in UI
+        // Increase stock
         const { data: stockData, error: stockError } = await supabase
           .from('stock')
           .select('id, quantity')
@@ -229,9 +225,11 @@ const Notes = () => {
           }
         }
 
-        toast.success('Debit Note created and stock updated successfully!');
+        // Show swapped text: originally "Debit Note created", now show "Credit Note created"
+        toast.success('Credit Note created and stock updated successfully!');
       } else if (note_type === 'credit') {
-        // Credit Note: Decrease stock
+        // Previously 'Credit' text, now displayed as 'Debit' in UI
+        // Decrease stock
         const { data: stockData, error: stockError } = await supabase
           .from('stock')
           .select('id, quantity')
@@ -248,7 +246,7 @@ const Notes = () => {
         }
 
         if (stockData.quantity < qty) {
-          throw new Error('Insufficient stock to create a Credit Note.');
+          throw new Error('Insufficient stock to create a Debit Note.');
         }
 
         // Update stock
@@ -264,7 +262,8 @@ const Notes = () => {
           throw updateError;
         }
 
-        toast.success('Credit Note created and stock updated successfully!');
+        // Show swapped text: originally "Credit Note created", now show "Debit Note created"
+        toast.success('Debit Note created and stock updated successfully!');
       }
 
       resetForm();
@@ -299,7 +298,6 @@ const Notes = () => {
               placeholder="Enter Order ID"
               className="w-full p-2 border rounded-md focus:ring-green-500 focus:border-green-500"
               required
-              // Removed ref={searchOrderRef} as it's no longer needed
             />
           </div>
 
@@ -310,6 +308,7 @@ const Notes = () => {
               <div>
                 <label className="block mb-2 font-medium">Note Type <span className="text-red-500">*</span></label>
                 <div className="flex space-x-4">
+                  {/* Swapped texts: the button that sets note_type='debit' now displays "Credit" */}
                   <button
                     type="button"
                     onClick={() => dispatch({ type: 'SET_NOTES_FORM', payload: { note_type: 'debit' } })}
@@ -317,8 +316,9 @@ const Notes = () => {
                       note_type === 'debit' ? 'bg-green-500 text-white shadow-xl' : 'bg-white text-gray-700'
                     } focus:outline-none focus:ring-2 focus:ring-green-400`}
                   >
-                    Debit
+                    Credit
                   </button>
+                  {/* The button that sets note_type='credit' now displays "Debit" */}
                   <button
                     type="button"
                     onClick={() => dispatch({ type: 'SET_NOTES_FORM', payload: { note_type: 'credit' } })}
@@ -326,7 +326,7 @@ const Notes = () => {
                       note_type === 'credit' ? 'bg-green-500 text-white shadow-xl' : 'bg-white text-gray-700'
                     } focus:outline-none focus:ring-2 focus:ring-green-400`}
                   >
-                    Credit
+                    Debit
                   </button>
                 </div>
               </div>
