@@ -799,7 +799,13 @@ const Home = ({ isCollapsed }) => {
                     onChange={(e) => setWorkOrderSearchTerm(e.target.value)}
                     placeholder="Search by Work Order ID"
                     className="flex-1 px-4 py-2 border border-gray-300 rounded-l-lg focus:outline-none"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleWorkOrderSearch();
+                      }
+                    }}
                   />
+
                   <button
                     onClick={handleWorkOrderSearch}
                     className="bg-green-500 text-white px-4 py-2 rounded-r-lg hover:bg-green-600 flex items-center"
@@ -893,7 +899,7 @@ const Home = ({ isCollapsed }) => {
               <>
                 {/* If a work order is selected, show its details */}
                 <div className="bg-white rounded-lg text-gray-800 print:p-0 print:m-0">
-                  <div className="printable-area bg-white p-6 print:w-full print:p-0 print:m-0">
+                  <div className="printable-area bg-white p-6 print:w-full print:p-0 print:m-0 print:text-lg">
                     {/* Header Information */}
                     <div className="flex justify-between items-start mb-8">
                       <div className="flex justify-between w-full">
@@ -984,6 +990,7 @@ const Home = ({ isCollapsed }) => {
                     </div>
 
                     {/* **Modified: Financial Summary Arranged in Two Columns** */}
+                    {/* Replace the existing "Financial Summary" section with this updated version */}
                     <div className="grid grid-cols-2 gap-8 mb-8">
                       {/* Left Column */}
                       <div>
@@ -1003,11 +1010,12 @@ const Home = ({ isCollapsed }) => {
                           <span className="font-medium">Payment Method:</span>{" "}
                           <strong>
                             {selectedWorkOrder.payment_method
-                              ? `${selectedWorkOrder.payment_method.charAt(0).toUpperCase()}${selectedWorkOrder.payment_method.slice(1)}`
+                              ? selectedWorkOrder.payment_method.charAt(0).toUpperCase() + selectedWorkOrder.payment_method.slice(1)
                               : 'N/A'}
                           </strong>
                         </p>
                       </div>
+
                       {/* Right Column */}
                       <div className="text-right">
                         <p>
@@ -1015,17 +1023,17 @@ const Home = ({ isCollapsed }) => {
                           <strong>₹{parseFloat(selectedWorkOrder.advance_details || 0).toFixed(2)}</strong>
                         </p>
                         <p className="text-lg">
-                          <span className="font-medium">Total Amount (Incl. GST):</span>{" "}
-                          <strong>₹{selectedWorkOrder.discounted_subtotal?.toFixed(2) || '0.00'}</strong>
-                        </p>
-                        <p className="text-lg">
-                          <span className="font-medium">Amount Due:</span>{" "}
                           <strong>
-                            ₹{(selectedWorkOrder.discounted_subtotal - parseFloat(selectedWorkOrder.advance_details || 0)).toFixed(2)}
-                          </strong>
+                            <span className="font-bold">Total Amount (Incl. GST):</span>{" "}
+                            ₹{selectedWorkOrder.discounted_total?.toFixed(2) || '0.00'}</strong>
+                        </p>
+                        <p className="text-lg"><strong>
+                          <span className="font-bold">Amount Due:</span>{" "}
+                          ₹{selectedWorkOrder.amount_due?.toFixed(2) || '0.00'}</strong>
                         </p>
                       </div>
                     </div>
+
 
                     {/* Footer */}
                     <div className="mb-8">
@@ -1095,7 +1103,13 @@ const Home = ({ isCollapsed }) => {
                     onChange={(e) => setSalesOrderSearchTerm(e.target.value)}
                     placeholder="Search by Sales Order ID"
                     className="flex-1 px-4 py-2 border border-gray-300 rounded-l-lg focus:outline-none"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleSalesOrderSearch();
+                      }
+                    }}
                   />
+
                   <button
                     onClick={handleSalesOrderSearch}
                     className="bg-green-500 text-white px-4 py-2 rounded-r-lg hover:bg-green-600 flex items-center"
@@ -1189,7 +1203,7 @@ const Home = ({ isCollapsed }) => {
               <>
                 {/* If a sales order is selected, show its details */}
                 <div className="bg-white rounded-lg text-gray-800 print:p-0 print:m-0">
-                  <div className="printable-area bg-white p-6 print:w-full print:p-0 print:m-0">
+                  <div className="printable-area bg-white p-6 print:w-full print:p-0 print:m-0 print:text-lg">
                     {/* Header Information */}
                     <div className="flex justify-between items-start mb-8">
                       <div className="flex justify-between w-full">
@@ -1243,7 +1257,7 @@ const Home = ({ isCollapsed }) => {
                         </div>
                         {/* Right Column */}
                         <div>
-                          
+
                         </div>
                       </div>
                     </div>
@@ -1288,16 +1302,14 @@ const Home = ({ isCollapsed }) => {
                       {/* Left Column */}
                       <div>
                         <p>
-                          <span className="font-medium">Amount After Discount:</span>{" "}
-                          <strong>₹{selectedSalesOrder.subtotal?.toFixed(2) || '0.00'}</strong>
+                          <span className="font-medium">Advance Paid:</span>{" "}
+                          <strong>₹{parseFloat(selectedSalesOrder.advance_details || 0).toFixed(2)}</strong>
                         </p>
                         <p>
-                          <span className="font-medium">CGST (6%):</span>{" "}
-                          <strong>₹{selectedSalesOrder.cgst?.toFixed(2) || '0.00'}</strong>
-                        </p>
-                        <p>
-                          <span className="font-medium">SGST (6%):</span>{" "}
-                          <strong>₹{selectedSalesOrder.sgst?.toFixed(2) || '0.00'}</strong>
+                          <span className="font-medium">Balance paid:</span>{" "}
+                          <strong>
+                            ₹{(selectedSalesOrder.final_amount || 0).toFixed(2)}
+                          </strong>
                         </p>
                         <p>
                           <span className="font-medium">Payment Method:</span>{" "}
@@ -1311,19 +1323,31 @@ const Home = ({ isCollapsed }) => {
                       {/* Right Column */}
                       <div className="text-right">
                         <p>
-                          <span className="font-medium">Advance Paid:</span>{" "}
-                          <strong>₹{parseFloat(selectedSalesOrder.advance_details || 0).toFixed(2)}</strong>
+                          <span className="font-medium">Amount After Discount:</span>{" "}
+                          <strong>₹{selectedSalesOrder.subtotal?.toFixed(2) || '0.00'}</strong>
                         </p>
-                        <p className="text-lg">
-                          <span className="font-medium">Total Amount (Incl. GST):</span>{" "}
-                          <strong>₹{selectedSalesOrder.total_amount?.toFixed(2) || '0.00'}</strong>
+
+
+                        <p>
+                          <span className="font-medium">CGST (6%):</span>{" "}
+                          <strong>₹{selectedSalesOrder.cgst?.toFixed(2) || '0.00'}</strong>
                         </p>
-                        <p className="text-lg">
-                          <span className="font-medium">Amount Due:</span>{" "}
+                        <p>
+                          <span className="font-medium">SGST (6%):</span>{" "}
+                          <strong>₹{selectedSalesOrder.sgst?.toFixed(2) || '0.00'}</strong>
+                        </p>
+                        <p className="text-lg text-gray-800 mt-4">
                           <strong>
-                            ₹{(selectedSalesOrder.final_amount || 0).toFixed(2)}
+                            <span className="font-bold">Total Amount (Incl. GST):</span>{" "}
+
+                            ₹{
+                              (parseFloat(selectedSalesOrder.final_amount || 0) +
+                                parseFloat(selectedSalesOrder.advance_details || 0)
+                              ).toFixed(2)
+                            }
                           </strong>
                         </p>
+
                       </div>
                     </div>
 

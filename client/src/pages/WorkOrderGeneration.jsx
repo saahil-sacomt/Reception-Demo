@@ -946,6 +946,8 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         updated_at: new Date().toISOString(),
         branch: branch,
         customer_id: customerId,
+        discounted_total: discountedTotal,    // from the computed totals
+  amount_due: balanceDue,
       };
   
       if (isEditing) {
