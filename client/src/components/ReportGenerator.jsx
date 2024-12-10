@@ -462,7 +462,6 @@ const ReportGenerator = ({ isCollapsed }) => {
           return;
         }
 
-        // Ensure uniqueness
         const distinctPurchaseFrom = Array.from(new Set(data.map(d => d.purchase_from).filter(Boolean)));
         const uniqueOptions = ['All', ...distinctPurchaseFrom];
         setPurchaseFromOptions(uniqueOptions);
@@ -516,7 +515,7 @@ const ReportGenerator = ({ isCollapsed }) => {
       let fetchedData = [];
       let reportDetails = {};
 
-      let startDate, endDate;
+      let startStr, endStr;
 
       let branchesToReport = isCombined ? [] : selectedBranches;
       if (isEmployee) {
@@ -536,8 +535,10 @@ const ReportGenerator = ({ isCollapsed }) => {
           setLoading(false);
           return;
         }
-        startDate = new Date(`${date}T00:00:00+05:30`);
-        endDate = new Date(`${date}T23:59:59+05:30`);
+
+        startStr = `${date} 00:00:00`;
+        endStr = `${date} 23:59:59`;
+
         reportDetails = {
           type: 'Daily',
           date: formatDateDDMMYYYY(date),
@@ -559,8 +560,11 @@ const ReportGenerator = ({ isCollapsed }) => {
           return;
         }
         const lastDay = getLastDayOfMonth(year, month);
-        startDate = new Date(`${year}-${month}-01T00:00:00+05:30`);
-        endDate = new Date(`${year}-${month}-${lastDay}T23:59:59+05:30`);
+
+        const paddedMonth = month.toString().padStart(2, '0');
+        startStr = `${year}-${paddedMonth}-01 00:00:00`;
+        endStr = `${year}-${paddedMonth}-${lastDay} 23:59:59`;
+
         reportDetails = {
           type: 'Monthly',
           month,
@@ -588,8 +592,10 @@ const ReportGenerator = ({ isCollapsed }) => {
           setLoading(false);
           return;
         }
-        startDate = new Date(`${fromDate}T00:00:00+05:30`);
-        endDate = new Date(`${toDate}T23:59:59+05:30`);
+
+        startStr = `${fromDate} 00:00:00`;
+        endStr = `${toDate} 23:59:59`;
+
         reportDetails = {
           type: 'Date Range',
           fromDate: formatDateDDMMYYYY(fromDate),
@@ -609,8 +615,8 @@ const ReportGenerator = ({ isCollapsed }) => {
           let query = supabase
             .from('sales_orders')
             .select('*')
-            .gte('created_at', startDate.toISOString())
-            .lte('created_at', endDate.toISOString());
+            .gte('created_at', startStr)
+            .lte('created_at', endStr);
 
           if (!isCombined) {
             query = query.in('branch', branchesToReport);
@@ -625,8 +631,8 @@ const ReportGenerator = ({ isCollapsed }) => {
           let query = supabase
             .from('work_orders')
             .select('*')
-            .gte('created_at', startDate.toISOString())
-            .lte('created_at', endDate.toISOString());
+            .gte('created_at', startStr)
+            .lte('created_at', endStr);
 
           if (!isCombined) {
             query = query.in('branch', branchesToReport);
@@ -641,8 +647,8 @@ const ReportGenerator = ({ isCollapsed }) => {
           let query = supabase
             .from('privilegecards')
             .select('*')
-            .gte('created_at', startDate.toISOString())
-            .lte('created_at', endDate.toISOString());
+            .gte('created_at', startStr)
+            .lte('created_at', endStr);
 
           if (!isCombined) {
             query = query.in('branch', branchesToReport);
@@ -653,105 +659,101 @@ const ReportGenerator = ({ isCollapsed }) => {
           fetchedData = data;
           break;
         }
-        case 'product_sales':
-          // (No changes, just the block as previously implemented)
-          // ... code for product_sales ...
-          // (Same code as given previously for product_sales, no changes needed.)
-          {
-            const { data: productsData, error: productsError } = await supabase
-              .from('products')
-              .select('*');
+        case 'product_sales': {
+          const { data: productsData, error: productsError } = await supabase
+            .from('products')
+            .select('*');
 
-            if (productsError) throw productsError;
+          if (productsError) throw productsError;
 
-            const stockQuery = supabase.from('stock').select('*');
-            if (!isCombined) {
-              stockQuery.in('branch_code', branchesToReport);
-            }
-
-            const { data: stockData, error: stockError } = await stockQuery;
-            if (stockError) throw stockError;
-
-            const salesQuery = supabase
-              .from('sales_orders')
-              .select('items')
-              .gte('created_at', startDate.toISOString())
-              .lte('created_at', endDate.toISOString());
-            if (!isCombined) {
-              salesQuery.in('branch', branchesToReport);
-            }
-
-            const { data: salesData, error: salesError } = await salesQuery;
-            if (salesError) throw salesError;
-
-            const workQuery = supabase
-              .from('work_orders')
-              .select('product_entries')
-              .gte('created_at', startDate.toISOString())
-              .lte('created_at', endDate.toISOString());
-            if (!isCombined) {
-              workQuery.in('branch', branchesToReport);
-            }
-
-            const { data: workData, error: workError } = await workQuery;
-            if (workError) throw workError;
-
-            const salesAggregated = {};
-            salesData.forEach(sale => {
-              const items = sale.items || [];
-              items.forEach(item => {
-                const pid = item.id;
-                const quantity = parseInt(item.quantity, 10) || 0;
-                if (!salesAggregated[pid]) {
-                  salesAggregated[pid] = 0;
-                }
-                salesAggregated[pid] += quantity;
-              });
-            });
-
-            workData.forEach(work => {
-              const products = work.product_entries || [];
-              products.forEach(product => {
-                const pid = product.id;
-                const quantity = parseInt(product.quantity, 10) || 0;
-                if (!salesAggregated[pid]) {
-                  salesAggregated[pid] = 0;
-                }
-                salesAggregated[pid] += quantity;
-              });
-            });
-
-            formattedProductIdSummary = productsData.map(product => {
-              const pid = product.id;
-              const productStock = stockData.filter(stock => stock.product_id === pid);
-              const currentStock = productStock.reduce((acc, curr) => acc + (curr.quantity || 0), 0);
-              const totalSold = salesAggregated[pid] || 0;
-              const totalRevenue = (product.mrp || 0) * totalSold;
-
-              return {
-                'Product ID': product.product_id || 'N/A',
-                'Product Name': product.product_name || 'N/A',
-                'MRP': product.mrp ? Number(product.mrp).toFixed(2) : '0.00',
-                'Rate': product.rate ? Number(product.rate).toFixed(2) : '0.00',
-                'HSN Code': product.hsn_code || 'N/A',
-                'Total Quantity Sold': totalSold,
-                'Total Revenue': totalRevenue.toFixed(2),
-                'Stock Created At': formatDateDDMMYYYY(product.created_at, false),
-                'Stock Updated At': formatDateDDMMYYYY(product.updated_at, false),
-                'Current Stock Count': currentStock,
-              };
-            });
-
-            formattedProductIdSummary.sort((a, b) => a['Product Name'].localeCompare(b['Product Name']));
-            fetchedData = formattedProductIdSummary;
+          const stockQuery = supabase.from('stock').select('*');
+          if (!isCombined) {
+            stockQuery.in('branch_code', branchesToReport);
           }
+
+          const { data: stockData, error: stockError } = await stockQuery;
+          if (stockError) throw stockError;
+
+          const salesQuery = supabase
+            .from('sales_orders')
+            .select('items')
+            .gte('created_at', startStr)
+            .lte('created_at', endStr);
+          if (!isCombined) {
+            salesQuery.in('branch', branchesToReport);
+          }
+
+          const { data: salesData, error: salesError } = await salesQuery;
+          if (salesError) throw salesError;
+
+          const workQuery = supabase
+            .from('work_orders')
+            .select('product_entries')
+            .gte('created_at', startStr)
+            .lte('created_at', endStr);
+          if (!isCombined) {
+            workQuery.in('branch', branchesToReport);
+          }
+
+          const { data: workData, error: workError } = await workQuery;
+          if (workError) throw workError;
+
+          const salesAggregated = {};
+          salesData.forEach(sale => {
+            const items = sale.items || [];
+            items.forEach(item => {
+              const pid = item.id;
+              const quantity = parseInt(item.quantity, 10) || 0;
+              if (!salesAggregated[pid]) {
+                salesAggregated[pid] = 0;
+              }
+              salesAggregated[pid] += quantity;
+            });
+          });
+
+          workData.forEach(work => {
+            const products = work.product_entries || [];
+            products.forEach(product => {
+              const pid = product.id;
+              const quantity = parseInt(product.quantity, 10) || 0;
+              if (!salesAggregated[pid]) {
+                salesAggregated[pid] = 0;
+              }
+              salesAggregated[pid] += quantity;
+            });
+          });
+
+          formattedProductIdSummary = productsData.map(product => {
+            const pid = product.id;
+            const productStock = stockData.filter(stock => stock.product_id === pid);
+            const currentStock = productStock.reduce((acc, curr) => acc + (curr.quantity || 0), 0);
+            const totalSold = salesAggregated[pid] || 0;
+            const totalRevenue = (product.mrp || 0) * totalSold;
+
+            return {
+              'Product ID': product.product_id || 'N/A',
+              'Product Name': product.product_name || 'N/A',
+              'MRP': product.mrp ? Number(product.mrp).toFixed(2) : '0.00',
+              'Rate': product.rate ? Number(product.rate).toFixed(2) : '0.00',
+              'HSN Code': product.hsn_code || 'N/A',
+              'Total Quantity Sold': totalSold,
+              'Total Revenue': totalRevenue.toFixed(2),
+              'Stock Created At': formatDateDDMMYYYY(product.created_at, false),
+              'Stock Updated At': formatDateDDMMYYYY(product.updated_at, false),
+              'Current Stock Count': currentStock,
+            };
+          });
+
+          formattedProductIdSummary.sort((a, b) => a['Product Name'].localeCompare(b['Product Name']));
+          fetchedData = formattedProductIdSummary;
           break;
+        }
         case 'modification_reports': {
           let query = supabase
             .from('modification_requests')
             .select('*')
-            .gte('created_at', startDate.toISOString())
-            .lte('created_at', endDate.toISOString());
+            .gte('created_at', startStr)
+            .lte('created_at', endStr);
 
           if (!isCombined) {
             query = query.in('branch', branchesToReport);
@@ -762,107 +764,105 @@ const ReportGenerator = ({ isCollapsed }) => {
           fetchedData = data;
           break;
         }
-        case 'consolidated':
-          // ... code for consolidated ...
-          {
-            const salesQuery = supabase
-              .from('sales_orders')
-              .select('sales_order_id, work_order_id, mr_number, final_amount, cgst, sgst, total_amount, created_at, updated_at, branch, customer_id, discount, advance_details')
-              .gte('created_at', startDate.toISOString())
-              .lte('created_at', endDate.toISOString());
+        case 'consolidated': {
+          const salesQuery = supabase
+            .from('sales_orders')
+            .select('sales_order_id, work_order_id, mr_number, final_amount, cgst, sgst, total_amount, created_at, updated_at, branch, customer_id, discount, advance_details, is_b2b')
+            .gte('created_at', startStr)
+            .lte('created_at', endStr);
 
-            if (!isCombined) {
-              salesQuery.in('branch', branchesToReport);
-            }
-
-            const { data: salesData, error: salesError } = await salesQuery;
-            if (salesError) throw salesError;
-
-            const workQuery = supabase
-              .from('work_orders')
-              .select('work_order_id, mr_number, advance_details, created_at, updated_at, branch, customer_id')
-              .gte('created_at', startDate.toISOString())
-              .lte('created_at', endDate.toISOString());
-
-            if (!isCombined) {
-              workQuery.in('branch', branchesToReport);
-            }
-
-            const { data: workData, error: workError } = await workQuery;
-            if (workError) throw workError;
-
-            const mrNumbers = [
-              ...salesData.map(sale => sale.mr_number),
-              ...workData.map(work => work.mr_number)
-            ].filter(mr => mr !== null && mr !== '');
-
-            const customerIds = [
-              ...salesData.map(sale => sale.customer_id),
-              ...workData.map(work => work.customer_id)
-            ].filter(id => id !== null && id !== '');
-
-            const { data: patientsData, error: patientsError } = await supabase
-              .from('patients')
-              .select('mr_number, name')
-              .in('mr_number', mrNumbers);
-
-            if (patientsError) throw patientsError;
-
-            const { data: customersData, error: customersError } = await supabase
-              .from('customers')
-              .select('customer_id, name')
-              .in('customer_id', customerIds);
-
-            if (customersError) throw customersError;
-
-            const patientMap = Object.fromEntries(patientsData.map(p => [p.mr_number, p.name]));
-            const customerMap = Object.fromEntries(customersData.map(c => [c.customer_id, c.name]));
-
-            const consolidatedSales = salesData.map(sale => {
-              let customerName = customerMap[sale.customer_id] || 'N/A';
-              const totalGST = (parseFloat(sale.cgst) || 0) + (parseFloat(sale.sgst) || 0);
-
-              return {
-                sales_order_id: sale.sales_order_id || 'N/A',
-                work_order_id: sale.work_order_id || 'N/A',
-                mr_number: sale.mr_number || 'N/A',
-                total_amount: parseFloat(sale.total_amount) || 0,
-                total_gst: totalGST,
-                discount: parseFloat(sale.discount) || 0,
-                advance_collected: 0,
-                balance_collected: parseFloat(sale.final_amount) || 0,
-                total_collected: parseFloat(sale.final_amount) || 0,
-                patient_customer_name: patientMap[sale.mr_number] || customerName || 'N/A',
-                branch: sale.branch || 'N/A',
-                created_at: sale.created_at ? formatDateDDMMYYYY(sale.created_at, true) : 'N/A',
-                updated_at: sale.updated_at ? formatDateDDMMYYYY(sale.updated_at, true) : 'N/A',
-              };
-            });
-
-            const consolidatedWork = workData.map(work => {
-              let customerName = customerMap[work.customer_id] || 'N/A';
-
-              return {
-                sales_order_id: 'N/A',
-                work_order_id: work.work_order_id || 'N/A',
-                mr_number: work.mr_number || 'N/A',
-                total_amount: 0,
-                total_gst: 0,
-                discount: 0,
-                advance_collected: parseFloat(work.advance_details) || 0,
-                balance_collected: 0,
-                total_collected: parseFloat(work.advance_details) || 0,
-                patient_customer_name: patientMap[work.mr_number] || customerName || 'N/A',
-                branch: work.branch || 'N/A',
-                created_at: work.created_at ? formatDateDDMMYYYY(work.created_at, true) : 'N/A',
-                updated_at: work.updated_at ? formatDateDDMMYYYY(work.updated_at, true) : 'N/A',
-              };
-            });
-
-            const consolidatedData = [...consolidatedSales, ...consolidatedWork];
-            fetchedData = consolidatedData;
+          if (!isCombined) {
+            salesQuery.in('branch', branchesToReport);
           }
+
+          const { data: salesData, error: salesError } = await salesQuery;
+          if (salesError) throw salesError;
+
+          const workQuery = supabase
+            .from('work_orders')
+            .select('work_order_id, mr_number, advance_details, created_at, updated_at, branch, customer_id')
+            .gte('created_at', startStr)
+            .lte('created_at', endStr);
+
+          if (!isCombined) {
+            workQuery.in('branch', branchesToReport);
+          }
+
+          const { data: workData, error: workError } = await workQuery;
+          if (workError) throw workError;
+
+          const mrNumbers = [
+            ...salesData.map(sale => sale.mr_number),
+            ...workData.map(work => work.mr_number)
+          ].filter(mr => mr !== null && mr !== '');
+
+          const customerIds = [
+            ...salesData.map(sale => sale.customer_id),
+            ...workData.map(work => work.customer_id)
+          ].filter(id => id !== null && id !== '');
+
+          const { data: patientsData, error: patientsError } = await supabase
+            .from('patients')
+            .select('mr_number, name')
+            .in('mr_number', mrNumbers);
+
+          if (patientsError) throw patientsError;
+
+          const { data: customersData, error: customersError } = await supabase
+            .from('customers')
+            .select('customer_id, name')
+            .in('customer_id', customerIds);
+
+          if (customersError) throw customersError;
+
+          const patientMap = Object.fromEntries(patientsData.map(p => [p.mr_number, p.name]));
+          const customerMap = Object.fromEntries(customersData.map(c => [c.customer_id, c.name]));
+
+          const consolidatedSales = salesData.map(sale => {
+            let customerName = customerMap[sale.customer_id] || 'N/A';
+            const totalGST = (parseFloat(sale.cgst) || 0) + (parseFloat(sale.sgst) || 0);
+
+            return {
+              sales_order_id: sale.sales_order_id || 'N/A',
+              work_order_id: sale.work_order_id || 'N/A',
+              mr_number: sale.mr_number || 'N/A',
+              total_amount: parseFloat(sale.total_amount) || 0,
+              total_gst: totalGST,
+              discount: parseFloat(sale.discount) || 0,
+              advance_collected: 0,
+              balance_collected: parseFloat(sale.final_amount) || 0,
+              total_collected: parseFloat(sale.final_amount) || 0,
+              patient_customer_name: patientMap[sale.mr_number] || customerName || 'N/A',
+              branch: sale.branch || 'N/A',
+              created_at: sale.created_at ? formatDateDDMMYYYY(sale.created_at, true) : 'N/A',
+              updated_at: sale.updated_at ? formatDateDDMMYYYY(sale.updated_at, true) : 'N/A',
+            };
+          });
+
+          const consolidatedWork = workData.map(work => {
+            let customerName = customerMap[work.customer_id] || 'N/A';
+
+            return {
+              sales_order_id: 'N/A',
+              work_order_id: work.work_order_id || 'N/A',
+              mr_number: work.mr_number || 'N/A',
+              total_amount: 0,
+              total_gst: 0,
+              discount: 0,
+              advance_collected: parseFloat(work.advance_details) || 0,
+              balance_collected: 0,
+              total_collected: parseFloat(work.advance_details) || 0,
+              patient_customer_name: patientMap[work.mr_number] || customerName || 'N/A',
+              branch: work.branch || 'N/A',
+              created_at: work.created_at ? formatDateDDMMYYYY(work.created_at, true) : 'N/A',
+              updated_at: work.updated_at ? formatDateDDMMYYYY(work.updated_at, true) : 'N/A',
+            };
+          });
+
+          const consolidatedData = [...consolidatedSales, ...consolidatedWork];
+          fetchedData = consolidatedData;
           break;
+        }
         case 'stock_report': {
           const { data: productsData, error: productsError } = await supabase
             .from('products')
@@ -897,8 +897,8 @@ const ReportGenerator = ({ isCollapsed }) => {
           const salesQuery = supabase
             .from('sales_orders')
             .select('items')
-            .gte('created_at', startDate.toISOString())
-            .lte('created_at', endDate.toISOString());
+            .gte('created_at', startStr)
+            .lte('created_at', endStr);
 
           if (!isCombined) {
             salesQuery.in('branch', branchesToReport);
@@ -910,8 +910,8 @@ const ReportGenerator = ({ isCollapsed }) => {
           const workQuery = supabase
             .from('work_orders')
             .select('product_entries')
-            .gte('created_at', startDate.toISOString())
-            .lte('created_at', endDate.toISOString());
+            .gte('created_at', startStr)
+            .lte('created_at', endStr);
 
           if (!isCombined) {
             workQuery.in('branch', branchesToReport);
@@ -961,14 +961,13 @@ const ReportGenerator = ({ isCollapsed }) => {
           let purchaseQuery = supabase
             .from('purchases')
             .select('*')
-            .gte('created_at', startDate.toISOString())
-            .lte('created_at', endDate.toISOString());
+            .gte('created_at', startStr)
+            .lte('created_at', endStr);
 
           if (!isCombined) {
             purchaseQuery = purchaseQuery.in('branch_code', branchesToReport);
           }
 
-          // Apply purchase_from filter only if not "All"
           if (selectedPurchaseFrom !== 'All') {
             purchaseQuery = purchaseQuery.eq('purchase_from', selectedPurchaseFrom);
           }
@@ -985,8 +984,8 @@ const ReportGenerator = ({ isCollapsed }) => {
               *,
               products(product_name)
             `)
-            .gte('assigned_at', startDate.toISOString())
-            .lte('assigned_at', endDate.toISOString());
+            .gte('assigned_at', startStr)
+            .lte('assigned_at', endStr);
 
           if (!isCombined) {
             const branchesFilter = selectedBranches.map(branch => `"${branch}"`).join(',');
@@ -1005,8 +1004,8 @@ const ReportGenerator = ({ isCollapsed }) => {
               *,
               products (product_name)
             `)
-            .gte('date', startDate.toISOString())
-            .lte('date', endDate.toISOString());
+            .gte('date', startStr)
+            .lte('date', endStr);
 
           if (!isCombined) {
             query.in('branch_code', branchesToReport);
