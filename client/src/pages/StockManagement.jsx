@@ -413,7 +413,7 @@ const StockManagement = ({ isCollapsed }) => {
         isLoadingRef.current = false;
       }
     },
-    [bulkBranchUpload, fileUpload, uploadFormatUpload, bulkUploadMode, bulkUploadStock, refreshStockData]
+    [bulkBranchUpload, fileUpload, uploadFormatUpload, bulkUploadMode, refreshStockData]
   );
 
   // ============================
@@ -667,7 +667,7 @@ const StockManagement = ({ isCollapsed }) => {
         return;
       }
 
-      // Fetch the product's internal ID using the selected product
+      // Fetch the selected product details
       const product = products.find((p) => p.id === parseInt(selectedProductAssign, 10));
 
       if (!product) {
@@ -697,8 +697,13 @@ const StockManagement = ({ isCollapsed }) => {
             to_branch_code: toBranchAssign,
             quantity: qty,
             notes: "", // Optional
+            rate: parseFloat(rateAssign),
+            mrp: parseFloat(mrpAssign),
+            hsn_code: hsnCodeAssign,
           },
         ];
+
+        console.log("Assigning Stock with Assignments:", assignments); // Debugging
 
         const response = await assignStock(assignments);
 
@@ -734,6 +739,7 @@ const StockManagement = ({ isCollapsed }) => {
       quantityAssign,
       rateAssign,
       mrpAssign,
+      hsnCodeAssign,
       products,
       assignStock,
       refreshStockData,
@@ -947,7 +953,6 @@ const StockManagement = ({ isCollapsed }) => {
               </button>
             </div>
           </div>
-
         </div>
 
         {/* File Input */}
