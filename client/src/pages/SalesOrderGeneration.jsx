@@ -1670,23 +1670,31 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
   };
 
   const focusFirstFieldOfStep = () => {
-    if (step === 1) workOrderInputRef.current?.focus();
-    if (step === 2) document.getElementById(`productId-0`)?.focus();
-    if (step === 3) {
+    if (step === 0) {
+      workOrderInputRef.current?.focus();
+    }
+    
+    
+    if (step === 1) document.getElementById(`productId-0`)?.focus();
+    if (step === 2) {
       if (hasMrNumber === "yes") {
         mrNumberRef.current?.focus();
       } else if (hasMrNumber === "no") {
         customerNameRef.current?.focus();
       }
     }
-    if (step === 4 && salesOrderForm.privilegeCard) {
+    if (step === 3 && salesOrderForm.privilegeCard) {
       if (salesOrderForm.redeemOption === "barcode") {
         privilegeCardRef.current?.focus();
       } else if (salesOrderForm.redeemOption === "phone") {
         privilegePhoneRef.current?.focus();
       }
     }
-    if (step === 5) employeeRef.current?.focus();
+    if (step === 4) employeeRef.current?.focus();
+    if (step === 5) {
+      discountInputRef.current?.focus();
+    }
+    
   };
 
   const setSearchQuery = (query) => {
@@ -3915,6 +3923,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                         type="number"
                         placeholder="Enter Discount Amount"
                         value={discount}
+                        ref={discountInputRef}
                         onChange={(e) => {
                           const discountValue = e.target.value;
                           updateSalesOrderForm({ discount: discountValue });
