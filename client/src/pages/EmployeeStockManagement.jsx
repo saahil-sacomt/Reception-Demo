@@ -29,6 +29,43 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
 
   const itemsPerPage = 10;
 
+  // Define targetBranch based on role
+  const targetBranch = role === "admin" ? "G001" : branch;
+
+  // Lookup Branch for Stock Viewing (Admins can select any branch)
+  const [lookupBranch, setLookupBranch] = useState(branch);
+
+  // Fetch all branches for Admin's dropdown
+  const [branchesList, setBranchesList] = useState([]);
+
+  useEffect(() => {
+    const fetchAllBranches = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("branches")
+          .select("branch_code, branch_name, type")
+          .order("branch_name", { ascending: true });
+
+        if (error) {
+          console.error("Error fetching branches:", error);
+          toast.error("Failed to fetch branches.");
+          setBranchesList([]);
+          return;
+        }
+
+        setBranchesList(data || []);
+      } catch (err) {
+        console.error("Error fetching branches:", err);
+        toast.error("An unexpected error occurred while fetching branches.");
+        setBranchesList([]);
+      }
+    };
+
+    if (role === "admin") {
+      fetchAllBranches();
+    }
+  }, [role]);
+
   // For Add New Products (Multiple)
   const [addProducts, setAddProducts] = useState([{
     productName: "",
@@ -84,15 +121,21 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
     };
   }, []);
 
-  // Fetch Employees
+  // Fetch Employees with Role Filtering for Admins
   const fetchEmployees = useCallback(async () => {
-    if (!branch) return;
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from("employees")
         .select("id, name")
         .eq("branch", branch)
         .order("name", { ascending: true });
+
+      if (role === "admin") {
+        // **Change:** Filter to show only admin employees if user is admin
+        query = query.eq("role", "admin");
+      }
+
+      const { data, error } = await query;
 
       if (error) {
         console.error("Error fetching employees:", error);
@@ -106,7 +149,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
       toast.error("An unexpected error occurred while fetching employees.");
       setEmployees([]);
     }
-  }, [branch]);
+  }, [branch, role]);
 
   useEffect(() => {
     fetchEmployees();
@@ -202,13 +245,19 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
     toast.dismiss();
   };
 
+  // Define targetBranch based on role
+  // Admins add/update stock to G001, employees to their own branch
+  const getTargetBranch = () => (role === "admin" ? "G001" : branch);
+
+  // Generate Bill Number based on targetBranch
   const generateBillNumber = useCallback(async () => {
-    if (!branch) return "BILL-0001";
+    const currentTargetBranch = getTargetBranch();
+    if (!currentTargetBranch) return "BILL-0001";
     try {
       const { data, error } = await supabase
         .from("purchases")
         .select("bill_number")
-        .eq("branch_code", branch)
+        .eq("branch_code", currentTargetBranch)
         .order("created_at", { ascending: false })
         .limit(1);
 
@@ -234,7 +283,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
       toast.error("An unexpected error occurred while generating bill number.");
       return "BILL-0001";
     }
-  }, [branch]);
+  }, [role, branch]);
 
   useEffect(() => {
     const setupBillDetails = async () => {
@@ -249,10 +298,10 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
         setUpdateBillDate(currentDate);
       }
     };
-    if (branch) {
+    if (getTargetBranch()) {
       setupBillDetails();
     }
-  }, [branch, mode, generateBillNumber]);
+  }, [getTargetBranch, mode, generateBillNumber]);
 
   // Add another product entry for Add mode
   const handleAddProductEntry = () => {
@@ -327,7 +376,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
       }
     }
 
-    if (!branch) {
+    if (!getTargetBranch()) {
       toast.error("Branch not set");
       return;
     }
@@ -410,7 +459,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
       }
     }
 
-    if (!branch) {
+    if (!getTargetBranch()) {
       toast.error("Branch not set");
       return;
     }
@@ -483,7 +532,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
 
         const resStock = await addOrUpdateStock(
           resAdd.data.id,
-          branch,
+          getTargetBranch(), // Use targetBranch (G001 for admin)
           p.quantity,
           p.rate,
           p.mrp
@@ -495,7 +544,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
 
         const resPurchase = await addPurchase({
           product_id: resAdd.data.id,
-          branch_code: branch,
+          branch_code: getTargetBranch(), // Use targetBranch (G001 for admin)
           quantity: p.quantity,
           rate: p.rate,
           mrp: p.mrp,
@@ -541,7 +590,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
       for (let p of products) {
         const resUpdate = await updateExistingProduct(
           p.product_id_db,
-          branch,
+          getTargetBranch(), // Use targetBranch (G001 for admin)
           p.quantity,
           p.rate,
           p.mrp,
@@ -556,7 +605,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
 
         const resPurchase = await addPurchase({
           product_id: p.product_id_db,
-          branch_code: branch,
+          branch_code: getTargetBranch(), // Use targetBranch (G001 for admin)
           quantity: p.quantity,
           rate: p.rate,
           mrp: p.mrp,
@@ -658,7 +707,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
   };
 
   const fetchStockData = useCallback(async () => {
-    if (!branch) {
+    if (!lookupBranch) {
       setFilteredStocks([]);
       return;
     }
@@ -670,7 +719,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
           `quantity,
            product:products(id, product_name, product_id, rate, mrp, purchase_from, hsn_code)`
         )
-        .eq("branch_code", branch);
+        .eq("branch_code", lookupBranch);
 
       if (error) {
         console.error("Error fetching stock data:", error);
@@ -683,7 +732,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
       console.error("Error fetching stock data:", err);
       toast.error("An unexpected error occurred while fetching stock data.");
     }
-  }, [branch]);
+  }, [lookupBranch]);
 
   useEffect(() => {
     fetchStockData();
@@ -945,12 +994,22 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
             type="submit"
             className={`mt-4 w-full p-2 text-white rounded ${
               isLoading
-                ? "bg-blue-500 cursor-not-allowed"
+                ? "bg-blue-500 cursor-not-allowed flex items-center justify-center"
                 : "bg-green-500 hover:bg-green-600"
             }`}
             disabled={isLoading}
           >
-            {isLoading ? "Preparing..." : "Add New Products"}
+            {isLoading ? (
+              <>
+                <svg
+                  className="animate-spin h-5 w-5 mr-3 border-t-2 border-b-2 border-white rounded-full"
+                  viewBox="0 0 24 24"
+                ></svg>
+                Preparing...
+              </>
+            ) : (
+              "Add New Products"
+            )}
           </button>
         </form>
       )}
@@ -1190,135 +1249,185 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
             type="submit"
             className={`mt-4 w-full p-2 text-white rounded ${
               isLoading
-                ? "bg-blue-500 cursor-not-allowed"
+                ? "bg-blue-500 cursor-not-allowed flex items-center justify-center"
                 : "bg-green-500 hover:bg-green-600"
             }`}
             disabled={isLoading}
           >
-            {isLoading ? "Preparing..." : "Update Products"}
+            {isLoading ? (
+              <>
+                <svg
+                  className="animate-spin h-5 w-5 mr-3 border-t-2 border-b-2 border-white rounded-full"
+                  viewBox="0 0 24 24"
+                ></svg>
+                Preparing...
+              </>
+            ) : (
+              "Update Products"
+            )}
           </button>
         </form>
       )}
 
-      {branch && (
+    
+
+      {role === "admin" && (
         <div className="mt-8">
-          <h2 className="text-xl font-semibold mb-4">
-            Current Stock for Branch: {branch}
-          </h2>
+          {/* <h2 className="text-xl font-semibold mb-4">
+            Current Stock for Branch: {lookupBranch}
+          </h2> */}
 
-          <input
-            type="text"
-            placeholder="Search by Product ID or Name"
-            value={stockSearchQuery}
-            onChange={handleStockSearchInputChange}
-            className="w-full p-2 border rounded mb-4"
-          />
-
-          <div className="overflow-x-auto">
-            <table className="min-w-full bg-white">
-              <thead>
-                <tr>
-                  <th className="py-2 px-4 border-b">Product ID</th>
-                  <th className="py-2 px-4 border-b">Product Name</th>
-                  <th className="py-2 px-4 border-b">Quantity</th>
-                  {role !== "employee" && <th className="py-2 px-4 border-b">Party Rate</th>}
-                  <th className="py-2 px-4 border-b">MRP</th>
-                  <th className="py-2 px-4 border-b">HSN Code</th>
-                  <th className="py-2 px-4 border-b">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {displayedStocks.map((stock) => (
-                  <tr key={stock.product.product_id}>
-                    <td className="py-2 px-4 border-b text-center">{stock.product.product_id}</td>
-                    <td className="py-2 px-4 border-b">{stock.product.product_name}</td>
-                    <td className="py-2 px-4 border-b text-center">{stock.quantity}</td>
-                    {role !== "employee" && (
-                      <td className="py-2 px-4 border-b text-center">
-                        {stock.product.rate !== null ? parseFloat(stock.product.rate).toFixed(2) : "N/A"}
-                      </td>
-                    )}
-                    <td className="py-2 px-4 border-b text-center">
-                      {stock.product.mrp !== null ? parseFloat(stock.product.mrp).toFixed(2) : "N/A"}
-                    </td>
-                    <td className="py-2 px-4 border-b text-center">{stock.product.hsn_code || "N/A"}</td>
-                    <td className="py-2 px-4 border-b text-center">
-  <button
-    onClick={() => {
-      if (mode === "update") {
-        const product = stock.product;
-        const updated = [...updateProducts];
-
-        updated[0].selectedProduct = {
-          id: product.id,
-          product_name: product.product_name,
-          product_id: product.product_id,
-          rate: product.rate,
-          mrp: product.mrp,
-          purchase_from: product.purchase_from,
-          hsn_code: product.hsn_code
-        };
-
-        updated[0].searchQuery = `${product.product_name} (${product.product_id})`;
-        updated[0].rate = product.rate !== null ? product.rate.toString() : "";
-        updated[0].mrp = product.mrp !== null ? product.mrp.toString() : "";
-        updated[0].hsnCode = product.hsn_code || "";
-
-        setUpdateProducts(updated);
-        toast.success(`${product.product_name} selected for update.`);
-      } else {
-        toast.info("Select button action is only meaningful in update mode.");
-      }
-    }}
-    className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded"
-  >
-    Select
-  </button>
-</td>
-
-                  </tr>
-                ))}
-                {displayedStocks.length === 0 && (
-                  <tr>
-                    <td colSpan={role !== "employee" ? "7" : "6"} className="py-4 text-center">
-                      No stock entries found.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+          {/* Branch Selection Dropdown for Admin */}
+          <div className="mb-4 relative">
+            <label htmlFor="lookupBranch" className="block mb-2 font-medium">
+              Select Branch to View Stock
+            </label>
+            <select
+              id="lookupBranch"
+              value={lookupBranch}
+              onChange={(e) => setLookupBranch(e.target.value)}
+              className="w-full p-2 border rounded"
+            >
+              <option value="" disabled>Select Branch</option>
+              {branchesList.map((b) => (
+                <option key={b.branch_code} value={b.branch_code}>
+                  {b.branch_name} {b.type === "godown" ? "(Godown)" : ""}
+                </option>
+              ))}
+            </select>
           </div>
-
-          {totalPages > 1 && (
-            <div className="flex justify-center items-center mt-4 space-x-4">
-              <button
-                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-                disabled={currentPage === 1}
-                className={`px-3 py-1 rounded ${
-                  currentPage === 1
-                    ? "bg-gray-300 cursor-not-allowed"
-                    : "bg-blue-500 text-white hover:bg-blue-600"
-                }`}
-              >
-                Previous
-              </button>
-              <span>Page {currentPage} of {totalPages}</span>
-              <button
-                onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-                disabled={currentPage === totalPages}
-                className={`px-3 py-1 rounded ${
-                  currentPage === totalPages
-                    ? "bg-gray-300 cursor-not-allowed"
-                    : "bg-blue-500 text-white hover:bg-blue-600"
-                }`}
-              >
-                Next
-              </button>
-            </div>
-          )}
         </div>
       )}
 
+      {role !== "admin" && branch && (
+        <div className="mt-8">
+          {/* <h2 className="text-xl font-semibold mb-4">
+            Current Stock for Branch: {branch}
+          </h2> */}
+        </div>
+      )}
+
+      {/* Stock Search and Table */}
+      <div className="mt-8">
+        <h2 className="text-xl font-semibold mb-4">
+          Current Stock for Branch: {role === "admin" ? lookupBranch : branch}
+        </h2>
+
+        {/* Stock Search Input */}
+        <input
+          type="text"
+          placeholder="Search by Product ID or Name"
+          value={stockSearchQuery}
+          onChange={handleStockSearchInputChange}
+          className="w-full p-2 border rounded mb-4"
+        />
+
+        {/* Stock Table */}
+        <div className="overflow-x-auto">
+          <table className="min-w-full bg-white">
+            <thead>
+              <tr>
+                <th className="py-2 px-4 border-b">Product ID</th>
+                <th className="py-2 px-4 border-b">Product Name</th>
+                <th className="py-2 px-4 border-b">Quantity</th>
+                {role !== "employee" && <th className="py-2 px-4 border-b">Party Rate</th>}
+                <th className="py-2 px-4 border-b">MRP</th>
+                <th className="py-2 px-4 border-b">HSN Code</th>
+                <th className="py-2 px-4 border-b">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {displayedStocks.map((stock) => (
+                <tr key={stock.product.product_id}>
+                  <td className="py-2 px-4 border-b text-center">{stock.product.product_id}</td>
+                  <td className="py-2 px-4 border-b">{stock.product.product_name}</td>
+                  <td className="py-2 px-4 border-b text-center">{stock.quantity}</td>
+                  {role !== "employee" && (
+                    <td className="py-2 px-4 border-b text-center">
+                      {stock.product.rate !== null ? parseFloat(stock.product.rate).toFixed(2) : "N/A"}
+                    </td>
+                  )}
+                  <td className="py-2 px-4 border-b text-center">
+                    {stock.product.mrp !== null ? parseFloat(stock.product.mrp).toFixed(2) : "N/A"}
+                  </td>
+                  <td className="py-2 px-4 border-b text-center">{stock.product.hsn_code || "N/A"}</td>
+                  <td className="py-2 px-4 border-b text-center">
+                    <button
+                      onClick={() => {
+                        if (mode === "update") {
+                          const product = stock.product;
+                          const updated = [...updateProducts];
+
+                          updated[0].selectedProduct = {
+                            id: product.id,
+                            product_name: product.product_name,
+                            product_id: product.product_id,
+                            rate: product.rate,
+                            mrp: product.mrp,
+                            purchase_from: product.purchase_from,
+                            hsn_code: product.hsn_code
+                          };
+
+                          updated[0].searchQuery = `${product.product_name} (${product.product_id})`;
+                          updated[0].rate = product.rate !== null ? product.rate.toString() : "";
+                          updated[0].mrp = product.mrp !== null ? product.mrp.toString() : "";
+                          updated[0].hsnCode = product.hsn_code || "";
+
+                          setUpdateProducts(updated);
+                          toast.success(`${product.product_name} selected for update.`);
+                        } else {
+                          toast.info("Select button action is only meaningful in update mode.");
+                        }
+                      }}
+                      className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded"
+                    >
+                      Select
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {displayedStocks.length === 0 && (
+                <tr>
+                  <td colSpan={role !== "employee" ? "7" : "6"} className="py-4 text-center">
+                    No stock entries found.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="flex justify-center items-center mt-4 space-x-4">
+            <button
+              onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+              className={`px-3 py-1 rounded ${
+                currentPage === 1
+                  ? "bg-gray-300 cursor-not-allowed"
+                  : "bg-blue-500 text-white hover:bg-blue-600"
+              }`}
+            >
+              Previous
+            </button>
+            <span>Page {currentPage} of {totalPages}</span>
+            <button
+              onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+              disabled={currentPage === totalPages}
+              className={`px-3 py-1 rounded ${
+                currentPage === totalPages
+                  ? "bg-gray-300 cursor-not-allowed"
+                  : "bg-blue-500 text-white hover:bg-blue-600"
+              }`}
+            >
+              Next
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Purchase Modal */}
       <Modal
         isOpen={state.modals.showPurchaseModal}
         onRequestClose={handleCancelModal}
@@ -1354,7 +1463,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
                       <th className="py-2 px-4 border-b">Qty</th>
                       <th className="py-2 px-4 border-b">Rate</th>
                       <th className="py-2 px-4 border-b">MRP</th>
-                      <th className="py-2 px-4 border-b">HSN</th>
+                      <th className="py-2 px-4 border-b">HSN Code</th>
                       <th className="py-2 px-4 border-b">Purchase From</th>
                     </tr>
                   </thead>
@@ -1456,9 +1565,10 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
             </div>
           </div>
         )}
-      </Modal>
-    </div>
-  );
+        </Modal>
+      </div>
+    );
+
 };
 
 export default EmployeeStockManagement;
