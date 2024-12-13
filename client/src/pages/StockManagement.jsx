@@ -40,7 +40,7 @@ const StockManagement = ({ isCollapsed }) => {
   // ============================
   const [searchProductAssign, setSearchProductAssign] = useState("");
   const [productSuggestionsAssign, setProductSuggestionsAssign] = useState([]);
-  const [selectedProductAssign, setSelectedProductAssign] = useState("");
+  const [selectedProductAssign, setSelectedProductAssign] = useState(""); // internal PK
   const [quantityAssign, setQuantityAssign] = useState("");
   const [rateAssign, setRateAssign] = useState("");
   const [mrpAssign, setMrpAssign] = useState("");
@@ -55,7 +55,7 @@ const StockManagement = ({ isCollapsed }) => {
   const [bulkBranchUpload, setBulkBranchUpload] = useState("");
   const [uploadFormatUpload, setUploadFormatUpload] = useState("csv");
   const [fileUpload, setFileUpload] = useState(null);
-  const [bulkUploadMode, setBulkUploadMode] = useState("add"); // New state for upload mode
+  const [bulkUploadMode, setBulkUploadMode] = useState("add"); 
 
   // ============================
   // Bulk Assign Stock States
@@ -78,7 +78,7 @@ const StockManagement = ({ isCollapsed }) => {
   const fileUploadRef = useRef(null);
   const fileAssignRef = useRef(null);
   const isUploadingRef = useRef(false);
-  const [stockToEdit, setStockToEdit] = useState(null); // State for editing stock
+  const [stockToEdit, setStockToEdit] = useState(null);
 
   // ============================
   // Pagination States
@@ -98,9 +98,7 @@ const StockManagement = ({ isCollapsed }) => {
           "A bulk upload is in progress. Are you sure you want to leave?";
       }
     };
-
     window.addEventListener("beforeunload", handleBeforeUnload);
-
     return () => {
       window.removeEventListener("beforeunload", handleBeforeUnload);
     };
@@ -121,10 +119,9 @@ const StockManagement = ({ isCollapsed }) => {
           toast.error("Failed to fetch branches.");
           return;
         }
-
         setBranches(branchesData);
 
-        // Fetch products
+        // Fetch products (all products from DB)
         const { data: productsData, error: productsError } = await supabase
           .from("products")
           .select("*");
@@ -133,19 +130,17 @@ const StockManagement = ({ isCollapsed }) => {
           toast.error("Failed to fetch products.");
           return;
         }
-
-        setProducts(productsData);
+        setProducts(productsData || []);
       } catch (err) {
         console.error("Error fetching data:", err);
         toast.error("An unexpected error occurred while fetching data.");
       }
     };
-
     fetchData();
   }, []);
 
   // ============================
-  // Fetch product suggestions for Add/Update Stock with debounce
+  // Debounced fetch for product suggestions (Add)
   // ============================
   const fetchProductSuggestionsAdd = useCallback(
     debounce(async (query) => {
@@ -165,7 +160,6 @@ const StockManagement = ({ isCollapsed }) => {
           setProductSuggestionsAdd([]);
           return;
         }
-
         setProductSuggestionsAdd(data || []);
       } catch (err) {
         console.error("Error fetching product suggestions (Add):", err);
@@ -176,7 +170,7 @@ const StockManagement = ({ isCollapsed }) => {
   );
 
   // ============================
-  // Fetch product suggestions for Assign Stock with debounce
+  // Debounced fetch for product suggestions (Assign)
   // ============================
   const fetchProductSuggestionsAssign = useCallback(
     debounce(async (query) => {
@@ -196,7 +190,6 @@ const StockManagement = ({ isCollapsed }) => {
           setProductSuggestionsAssign([]);
           return;
         }
-
         setProductSuggestionsAssign(data || []);
       } catch (err) {
         console.error("Error fetching product suggestions (Assign):", err);
@@ -207,7 +200,7 @@ const StockManagement = ({ isCollapsed }) => {
   );
 
   // ============================
-  // Fetch product suggestions for Lookup with debounce
+  // Debounced fetch for product suggestions (Lookup)
   // ============================
   const fetchProductSuggestionsLookup = useCallback(
     debounce(async (query) => {
@@ -227,7 +220,6 @@ const StockManagement = ({ isCollapsed }) => {
           setLookupProductSuggestions([]);
           return;
         }
-
         setLookupProductSuggestions(data || []);
       } catch (err) {
         console.error("Error fetching product suggestions (Lookup):", err);
@@ -248,12 +240,11 @@ const StockManagement = ({ isCollapsed }) => {
   };
 
   const handleProductSelectAdd = (product) => {
-    setSelectedProductAdd(product.id); // Internal ID
+    setSelectedProductAdd(product.id); // internal PK
     setSearchProductAdd(`${product.product_name} (${product.product_id})`);
     setProductSuggestionsAdd([]);
     setShowSuggestionsAdd(false);
-
-    // Set Rate and MRP based on selected product
+    // set Rate & MRP from product DB
     setRateAdd(product.rate !== null ? product.rate.toFixed(2) : "");
     setMrpAdd(product.mrp !== null ? product.mrp.toFixed(2) : "");
   };
@@ -269,12 +260,10 @@ const StockManagement = ({ isCollapsed }) => {
   };
 
   const handleProductSelectAssign = (product) => {
-    setSelectedProductAssign(product.id); // Internal ID
+    setSelectedProductAssign(product.id); // internal PK
     setSearchProductAssign(`${product.product_name} (${product.product_id})`);
     setProductSuggestionsAssign([]);
     setShowSuggestionsAssign(false);
-
-    // Set Rate, MRP, and HSN Code based on selected product
     setRateAssign(product.rate !== null ? product.rate.toFixed(2) : "");
     setMrpAssign(product.mrp !== null ? product.mrp.toFixed(2) : "");
     setHsnCodeAssign(product.hsn_code || "");
@@ -295,7 +284,7 @@ const StockManagement = ({ isCollapsed }) => {
     setLookupProductSuggestions([]);
     setShowSuggestionsLookup(false);
 
-    // Fetch stock for this specific product and lookupBranch
+    // Fetch specific product's stock in lookupBranch
     const fetchLookupStock = async () => {
       try {
         const { data, error } = await supabase
@@ -306,13 +295,13 @@ const StockManagement = ({ isCollapsed }) => {
           `)
           .eq("branch_code", lookupBranch)
           .eq("product_id", product.id) // Internal ID
-          .single(); // Ensure unique stock entry
+          .single();
 
         if (error || !data) {
           setLookupResults([]);
           toast.info("No stock found for the selected product.");
         } else {
-          setLookupResults([data]); // Wrap in array for consistency
+          setLookupResults([data]);
         }
       } catch (err) {
         console.error("Error fetching lookup stock:", err);
@@ -320,16 +309,14 @@ const StockManagement = ({ isCollapsed }) => {
         toast.error("Failed to fetch stock details.");
       }
     };
-
     fetchLookupStock();
   };
 
   // ============================
-  // Function to refresh stock data
+  // Refresh stock data
   // ============================
   const refreshStockData = useCallback(async () => {
     if (!lookupBranch) return;
-
     try {
       const { data, error } = await supabase
         .from("stock")
@@ -353,9 +340,8 @@ const StockManagement = ({ isCollapsed }) => {
             stock.product.product_name.toLowerCase().includes(searchLower)
         );
       }
-
       setFilteredStocks(filtered);
-      setCurrentPage(0); // Reset to first page on data refresh
+      setCurrentPage(0);
     } catch (err) {
       console.error("Error refreshing stock data:", err);
       toast.error("An unexpected error occurred while refreshing stock data.");
@@ -363,7 +349,7 @@ const StockManagement = ({ isCollapsed }) => {
   }, [lookupBranch, searchProductAdd]);
 
   // ============================
-  // Handler for Bulk Upload to a Single Branch
+  // Bulk Upload to Single Branch
   // ============================
   const handleBulkUploadToBranch = useCallback(
     async (e) => {
@@ -373,10 +359,8 @@ const StockManagement = ({ isCollapsed }) => {
         return;
       }
 
-      // Validate file type
       const allowedExtensions = ["csv"];
       const fileExtension = fileUpload.name.split(".").pop().toLowerCase();
-
       if (!allowedExtensions.includes(fileExtension)) {
         toast.error("Invalid file format. Please upload a CSV file.");
         return;
@@ -390,8 +374,8 @@ const StockManagement = ({ isCollapsed }) => {
           fileUpload,
           uploadFormatUpload,
           bulkBranchUpload,
-          null, // toBranchCode is null for single branch upload
-          bulkUploadMode // Pass the selected mode
+          null,
+          bulkUploadMode
         );
 
         if (response.success) {
@@ -399,7 +383,7 @@ const StockManagement = ({ isCollapsed }) => {
           setFileUpload(null);
           setBulkBranchUpload("");
           setUploadFormatUpload("csv");
-          setBulkUploadMode("add"); // Reset to default mode
+          setBulkUploadMode("add");
           if (fileUploadRef.current) fileUploadRef.current.value = "";
           refreshStockData();
         } else {
@@ -417,7 +401,7 @@ const StockManagement = ({ isCollapsed }) => {
   );
 
   // ============================
-  // Fetch stock data based on lookupBranch and searchProductAdd
+  // UseEffect: fetch stock data based on lookupBranch
   // ============================
   useEffect(() => {
     const fetchStockData = async () => {
@@ -425,7 +409,6 @@ const StockManagement = ({ isCollapsed }) => {
         setFilteredStocks([]);
         return;
       }
-
       try {
         const { data, error } = await supabase
           .from("stock")
@@ -439,7 +422,6 @@ const StockManagement = ({ isCollapsed }) => {
           toast.error("Failed to fetch stock data.");
           return;
         }
-
         let filtered = data;
         if (searchProductAdd.trim()) {
           const searchLower = searchProductAdd.toLowerCase();
@@ -449,67 +431,51 @@ const StockManagement = ({ isCollapsed }) => {
               stock.product.product_name.toLowerCase().includes(searchLower)
           );
         }
-
         setFilteredStocks(filtered);
-        setCurrentPage(0); // Reset to first page on data fetch
+        setCurrentPage(0);
       } catch (err) {
         console.error("Error fetching stock data:", err);
         toast.error("An unexpected error occurred while fetching stock data.");
       }
     };
-
     fetchStockData();
   }, [lookupBranch, searchProductAdd]);
 
   // ============================
-  // Handler for file selection in Bulk Upload
+  // File change handlers
   // ============================
   const handleFileChangeUpload = useCallback((e) => {
     const uploadedFile = e.target.files[0];
-    if (uploadedFile) {
-      setFileUpload(uploadedFile);
-    } else {
-      setFileUpload(null);
-    }
+    if (uploadedFile) setFileUpload(uploadedFile);
+    else setFileUpload(null);
   }, []);
 
-  // ============================
-  // Handler for file selection in Bulk Assign
-  // ============================
   const handleFileChangeAssign = useCallback((e) => {
     const uploadedFile = e.target.files[0];
-    if (uploadedFile) {
-      setFileAssign(uploadedFile);
-    } else {
-      setFileAssign(null);
-    }
+    if (uploadedFile) setFileAssign(uploadedFile);
+    else setFileAssign(null);
   }, []);
 
   // ============================
-  // Handler for Bulk Assign Stock
+  // Bulk Assign Stock
   // ============================
   const handleBulkAssign = useCallback(
     async (e) => {
       e.preventDefault();
-
       if (!bulkFromBranchAssign || !bulkToBranchAssign || !fileAssign) {
         toast.error("Please select both source and destination branches and upload a file.");
         return;
       }
-
       if (bulkFromBranchAssign === bulkToBranchAssign) {
         toast.error("From and To branches cannot be the same.");
         return;
       }
 
-      // Validate file type based on uploadFormatAssign
-      const allowedExtensions = ["csv"]; // Add "xml" if needed
+      const allowedExtensions = ["csv"];
       const fileExtension = fileAssign.name.split(".").pop().toLowerCase();
-
       if (!allowedExtensions.includes(fileExtension)) {
         toast.error(
-          `Invalid file format. Please upload a ${uploadFormatAssign === "csv" ? "CSV" : "XML"
-          } file.`
+          `Invalid file format. Please upload a ${uploadFormatAssign === "csv" ? "CSV" : "XML"} file.`
         );
         return;
       }
@@ -518,21 +484,20 @@ const StockManagement = ({ isCollapsed }) => {
       isUploadingRef.current = true;
 
       try {
+        // Bulk stock function with "add" mode
         const response = await bulkUploadStock(
           fileAssign,
           uploadFormatAssign,
           bulkFromBranchAssign,
           bulkToBranchAssign,
-          "add" // Assuming assign operations are always 'add'
+          "add"
         );
 
         if (response.success) {
           let message = "Bulk stock assign successful.";
-
           if (response.insertedProducts && response.insertedProducts.length > 0) {
             message += ` Inserted ${response.insertedProducts.length} new product(s).`;
           }
-
           toast.success(message);
           setFileAssign(null);
           setUploadFormatAssign("csv");
@@ -556,7 +521,6 @@ const StockManagement = ({ isCollapsed }) => {
       bulkToBranchAssign,
       fileAssign,
       uploadFormatAssign,
-      bulkUploadStock,
       refreshStockData,
     ]
   );
@@ -568,32 +532,23 @@ const StockManagement = ({ isCollapsed }) => {
     setCurrentPage(selectedItem.selected);
   };
 
-  // ============================
-  // Calculate the items to display on the current page
-  // ============================
   const offset = currentPage * itemsPerPage;
-  const currentItems =
-    lookupResults.length > 0
-      ? lookupResults.slice(offset, offset + itemsPerPage)
-      : filteredStocks.slice(offset, offset + itemsPerPage);
-  const pageCount = Math.ceil(
-    (lookupResults.length > 0 ? lookupResults.length : filteredStocks.length) / itemsPerPage
-  );
+  const dataSource = lookupResults.length > 0 ? lookupResults : filteredStocks;
+  const currentItems = dataSource.slice(offset, offset + itemsPerPage);
+  const pageCount = Math.ceil(dataSource.length / itemsPerPage);
 
   // ============================
-  // Handler for Manual Stock Addition
+  // Handler for Add/Update Stock
   // ============================
   const handleAddUpdateStock = useCallback(
     async (e) => {
       e.preventDefault();
-
       if (!selectedBranchAdd || !selectedProductAdd || !quantityAdd) {
         toast.error("Please fill in all required fields.");
         return;
       }
 
       const product = products.find((p) => p.id === parseInt(selectedProductAdd, 10));
-
       if (!product) {
         toast.error("Selected product does not exist.");
         return;
@@ -606,7 +561,6 @@ const StockManagement = ({ isCollapsed }) => {
       }
 
       isLoadingRef.current = true;
-
       try {
         const response = await addOrUpdateStock(
           product.id,
@@ -615,7 +569,6 @@ const StockManagement = ({ isCollapsed }) => {
           rateAdd ? parseFloat(rateAdd) : null,
           mrpAdd ? parseFloat(mrpAdd) : null
         );
-
         if (response.success) {
           toast.success("Stock updated successfully.");
           // Reset form
@@ -626,7 +579,6 @@ const StockManagement = ({ isCollapsed }) => {
           setMrpAdd("");
           setProductSuggestionsAdd([]);
           setShowSuggestionsAdd(false);
-          // Refresh stock data
           refreshStockData();
         } else {
           toast.error(response.error || "Failed to update stock.");
@@ -656,22 +608,41 @@ const StockManagement = ({ isCollapsed }) => {
   const handleAssignStock = useCallback(
     async (e) => {
       e.preventDefault();
-
-      if (!fromBranchAssign || !toBranchAssign || !selectedProductAssign || !quantityAssign) {
+      if (!fromBranchAssign || !toBranchAssign || !quantityAssign) {
         toast.error("Please fill in all required fields.");
         return;
       }
-
       if (fromBranchAssign === toBranchAssign) {
         toast.error("From and To branches cannot be the same.");
         return;
       }
 
-      // Fetch the selected product details
-      const product = products.find((p) => p.id === parseInt(selectedProductAssign, 10));
+      // Try local array first
+      let product = products.find((p) => p.id === parseInt(selectedProductAssign, 10));
 
+      // If user typed but didn't pick from suggestions, do a final DB check by product_id or name
+      if (!product && searchProductAssign) {
+        try {
+          const input = searchProductAssign.toLowerCase().trim();
+          // Attempt DB fetch by partial match on product_id or product_name
+          const { data: fallbackData, error } = await supabase
+            .from("products")
+            .select("id, product_name, product_id, rate, mrp, hsn_code")
+            .or(`product_name.ilike.%${input}%,product_id.ilike.%${input}%`)
+            .limit(1);
+
+          if (!error && fallbackData.length > 0) {
+            product = fallbackData[0];
+            setSelectedProductAssign(product.id.toString());
+          }
+        } catch (errFetch) {
+          console.error("Error in fallback DB lookup:", errFetch);
+        }
+      }
+
+      // Now if still no product, error out
       if (!product) {
-        toast.error("Selected product does not exist.");
+        toast.error("Selected product doesn't exist in the DB. Please add it first.");
         return;
       }
 
@@ -680,33 +651,27 @@ const StockManagement = ({ isCollapsed }) => {
         toast.error("Please enter a valid quantity.");
         return;
       }
-
-      // Ensure rate and mrp are available
       if (rateAssign === "" || mrpAssign === "") {
-        toast.error("Rate and MRP must be available for the selected product.");
+        toast.error("Rate and MRP must be provided for the selected product.");
         return;
       }
 
       isLoadingRef.current = true;
-
       try {
         const assignments = [
           {
-            product_id: product.id, // Internal ID
+            product_id: product.id, 
             from_branch_code: fromBranchAssign,
             to_branch_code: toBranchAssign,
             quantity: qty,
-            notes: "", // Optional
+            notes: "",
             rate: parseFloat(rateAssign),
             mrp: parseFloat(mrpAssign),
             hsn_code: hsnCodeAssign,
           },
         ];
 
-        console.log("Assigning Stock with Assignments:", assignments); // Debugging
-
         const response = await assignStock(assignments);
-
         if (response.success) {
           toast.success("Stock assigned successfully.");
           // Reset form
@@ -720,7 +685,6 @@ const StockManagement = ({ isCollapsed }) => {
           setQuantityAssign("");
           setProductSuggestionsAssign([]);
           setShowSuggestionsAssign(false);
-          // Refresh stock data
           refreshStockData();
         } else {
           toast.error(response.error || "Failed to assign stock.");
@@ -740,6 +704,7 @@ const StockManagement = ({ isCollapsed }) => {
       rateAssign,
       mrpAssign,
       hsnCodeAssign,
+      searchProductAssign,
       products,
       assignStock,
       refreshStockData,
@@ -748,8 +713,9 @@ const StockManagement = ({ isCollapsed }) => {
 
   return (
     <div
-      className={`transition-all duration-300 ${isCollapsed ? "mx-20" : "mx-20 px-20"
-        } justify-center my-20 p-8 rounded-xl mx-auto max-w-4xl bg-green-50 shadow-inner`}
+      className={`transition-all duration-300 ${
+        isCollapsed ? "mx-20" : "mx-20 px-20"
+      } justify-center my-20 p-8 rounded-xl mx-auto max-w-4xl bg-green-50 shadow-inner`}
     >
       <h1 className="text-2xl font-semibold mb-6 text-center">Stock Management</h1>
 
@@ -791,13 +757,11 @@ const StockManagement = ({ isCollapsed }) => {
               value={searchProductAdd}
               onChange={handleProductInputAdd}
               onFocus={() => setShowSuggestionsAdd(true)}
-              onBlur={() => setTimeout(() => setShowSuggestionsAdd(false), 200)} // Delay to allow click
+              onBlur={() => setTimeout(() => setShowSuggestionsAdd(false), 200)}
               placeholder="Type product name or ID"
               className="w-full p-2 border rounded"
               required
             />
-
-            {/* Suggestion Dropdown */}
             {showSuggestionsAdd && productSuggestionsAdd.length > 0 && (
               <ul className="absolute z-10 border rounded bg-white shadow-md max-h-40 overflow-y-auto w-full">
                 {productSuggestionsAdd.map((product) => (
@@ -813,7 +777,7 @@ const StockManagement = ({ isCollapsed }) => {
             )}
           </div>
 
-          {/* Quantity Input */}
+          {/* Quantity */}
           <div>
             <label htmlFor="quantityAdd" className="block mb-2 font-medium">
               Quantity
@@ -829,7 +793,7 @@ const StockManagement = ({ isCollapsed }) => {
             />
           </div>
 
-          {/* Rate Input (Optional) */}
+          {/* Rate (Optional) */}
           <div>
             <label htmlFor="rateAdd" className="block mb-2 font-medium">
               Rate (Optional)
@@ -845,7 +809,7 @@ const StockManagement = ({ isCollapsed }) => {
             />
           </div>
 
-          {/* MRP Input (Optional) */}
+          {/* MRP (Optional) */}
           <div>
             <label htmlFor="mrpAdd" className="block mb-2 font-medium">
               MRP (Optional)
@@ -864,10 +828,9 @@ const StockManagement = ({ isCollapsed }) => {
 
         <button
           type="submit"
-          className={`mt-4 w-full p-2 text-white rounded flex items-center justify-center ${isLoadingRef.current
-              ? "bg-blue-500 cursor-not-allowed"
-              : "bg-green-500 hover:bg-green-600"
-            }`}
+          className={`mt-4 w-full p-2 text-white rounded flex items-center justify-center ${
+            isLoadingRef.current ? "bg-blue-500 cursor-not-allowed" : "bg-green-500 hover:bg-green-600"
+          }`}
           disabled={isLoadingRef.current}
         >
           {isLoadingRef.current ? (
@@ -885,7 +848,6 @@ const StockManagement = ({ isCollapsed }) => {
       <form onSubmit={handleBulkUploadToBranch} className="mb-8">
         <h2 className="text-xl font-semibold mb-4">Bulk Upload Stock to a Branch</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Branch Selection */}
           <div>
             <label htmlFor="bulkBranchUpload" className="block mb-2 font-medium">
               Select Branch/Godown
@@ -907,8 +869,6 @@ const StockManagement = ({ isCollapsed }) => {
               ))}
             </select>
           </div>
-
-          {/* File Format Selection */}
           <div>
             <label htmlFor="uploadFormatUpload" className="block mb-2 font-medium">
               File Format
@@ -921,32 +881,25 @@ const StockManagement = ({ isCollapsed }) => {
               required
             >
               <option value="csv">CSV</option>
-              {/* Add XML option if needed */}
-              {/* <option value="xml">XML</option> */}
             </select>
           </div>
-
-          {/* Upload Mode Selection */}
-          {/* Step Selection Buttons */}
           <div className="mb-4">
             <h2 className="font-semibold mb-4">Select Upload Mode</h2>
             <div className="flex space-x-4">
               <button
                 type="button"
-                className={`px-4 py-2 rounded ${bulkUploadMode === "add"
-                    ? "bg-green-500 text-white shadow-xl"
-                    : "bg-gray-200 text-gray-700"
-                  }`}
+                className={`px-4 py-2 rounded ${
+                  bulkUploadMode === "add" ? "bg-green-500 text-white shadow-xl" : "bg-gray-200 text-gray-700"
+                }`}
                 onClick={() => setBulkUploadMode("add")}
               >
                 Update Stock
               </button>
               <button
                 type="button"
-                className={`px-4 py-2 rounded ${bulkUploadMode === "rewrite"
-                    ? "bg-green-500 text-white shadow-xl"
-                    : "bg-gray-200 text-gray-700"
-                  }`}
+                className={`px-4 py-2 rounded ${
+                  bulkUploadMode === "rewrite" ? "bg-green-500 text-white shadow-xl" : "bg-gray-200 text-gray-700"
+                }`}
                 onClick={() => setBulkUploadMode("rewrite")}
               >
                 Rewrite Stock
@@ -954,8 +907,6 @@ const StockManagement = ({ isCollapsed }) => {
             </div>
           </div>
         </div>
-
-        {/* File Input */}
         <div className="mt-4">
           <label htmlFor="bulkBranchFile" className="block mb-2 font-medium">
             Upload CSV File
@@ -970,13 +921,11 @@ const StockManagement = ({ isCollapsed }) => {
             ref={fileUploadRef}
           />
         </div>
-
         <button
           type="submit"
-          className={`mt-4 w-full p-2 text-white rounded flex items-center justify-center ${isLoadingRef.current
-              ? "bg-blue-500 cursor-not-allowed"
-              : "bg-green-500 hover:bg-green-600"
-            }`}
+          className={`mt-4 w-full p-2 text-white rounded flex items-center justify-center ${
+            isLoadingRef.current ? "bg-blue-500 cursor-not-allowed" : "bg-green-500 hover:bg-green-600"
+          }`}
           disabled={isLoadingRef.current}
         >
           {isLoadingRef.current ? (
@@ -992,11 +941,8 @@ const StockManagement = ({ isCollapsed }) => {
 
       {/* ======= Assign Stock Between Branches ======= */}
       <form onSubmit={handleAssignStock} className="mb-8">
-        <h2 className="text-xl font-semibold mb-4">
-          Assign Stock Between Branches/Godowns
-        </h2>
+        <h2 className="text-xl font-semibold mb-4">Assign Stock Between Branches/Godowns</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* From Branch Selection */}
           <div>
             <label htmlFor="fromBranchAssign" className="block mb-2 font-medium">
               From Branch/Godown
@@ -1018,8 +964,6 @@ const StockManagement = ({ isCollapsed }) => {
               ))}
             </select>
           </div>
-
-          {/* To Branch Selection */}
           <div>
             <label htmlFor="toBranchAssign" className="block mb-2 font-medium">
               To Branch/Godown
@@ -1041,8 +985,6 @@ const StockManagement = ({ isCollapsed }) => {
               ))}
             </select>
           </div>
-
-          {/* Product Selection */}
           <div className="relative">
             <label htmlFor="assignProduct" className="block mb-2 font-medium">
               Product
@@ -1054,13 +996,11 @@ const StockManagement = ({ isCollapsed }) => {
               value={searchProductAssign}
               onChange={handleProductInputAssign}
               onFocus={() => setShowSuggestionsAssign(true)}
-              onBlur={() => setTimeout(() => setShowSuggestionsAssign(false), 200)} // Delay to allow click
+              onBlur={() => setTimeout(() => setShowSuggestionsAssign(false), 200)}
               placeholder="Type product name or ID"
               className="w-full p-2 border rounded"
               required
             />
-
-            {/* Suggestion Dropdown */}
             {showSuggestionsAssign && productSuggestionsAssign.length > 0 && (
               <ul className="absolute z-10 border rounded bg-white shadow-md max-h-40 overflow-y-auto w-full">
                 {productSuggestionsAssign.map((prod) => (
@@ -1077,7 +1017,6 @@ const StockManagement = ({ isCollapsed }) => {
           </div>
         </div>
 
-        {/* Rate, MRP, and HSN Code Fields */}
         <div className="mt-4 grid grid-cols-3 gap-4">
           <div>
             <label htmlFor="rateAssign" className="block mb-2 font-medium">
@@ -1127,7 +1066,6 @@ const StockManagement = ({ isCollapsed }) => {
           </div>
         </div>
 
-        {/* Quantity Input */}
         <div className="mt-4">
           <label htmlFor="quantityAssign" className="block mb-2 font-medium">
             Quantity
@@ -1147,10 +1085,9 @@ const StockManagement = ({ isCollapsed }) => {
 
         <button
           type="submit"
-          className={`mt-4 w-full p-2 text-white rounded flex items-center justify-center ${isLoadingRef.current
-              ? "bg-blue-500 cursor-not-allowed"
-              : "bg-green-500 hover:bg-green-600"
-            }`}
+          className={`mt-4 w-full p-2 text-white rounded flex items-center justify-center ${
+            isLoadingRef.current ? "bg-blue-500 cursor-not-allowed" : "bg-green-500 hover:bg-green-600"
+          }`}
           disabled={isLoadingRef.current}
         >
           {isLoadingRef.current ? (
@@ -1168,7 +1105,6 @@ const StockManagement = ({ isCollapsed }) => {
       <form onSubmit={handleBulkAssign} className="mb-8">
         <h2 className="text-xl font-semibold mb-4">Bulk Assign Stock</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* From Branch Selection */}
           <div>
             <label htmlFor="bulkFromBranchAssign" className="block mb-2 font-medium">
               From Branch/Godown
@@ -1190,8 +1126,6 @@ const StockManagement = ({ isCollapsed }) => {
               ))}
             </select>
           </div>
-
-          {/* To Branch Selection */}
           <div>
             <label htmlFor="bulkToBranchAssign" className="block mb-2 font-medium">
               To Branch/Godown
@@ -1213,8 +1147,6 @@ const StockManagement = ({ isCollapsed }) => {
               ))}
             </select>
           </div>
-
-          {/* File Format Selection */}
           <div>
             <label htmlFor="uploadFormatAssign" className="block mb-2 font-medium">
               File Format
@@ -1227,13 +1159,9 @@ const StockManagement = ({ isCollapsed }) => {
               required
             >
               <option value="csv">CSV</option>
-              {/* Add XML option if needed */}
-              {/* <option value="xml">XML</option> */}
             </select>
           </div>
         </div>
-
-        {/* File Input */}
         <div className="mt-4">
           <label htmlFor="bulkAssignFile" className="block mb-2 font-medium">
             Upload CSV File
@@ -1248,13 +1176,11 @@ const StockManagement = ({ isCollapsed }) => {
             ref={fileAssignRef}
           />
         </div>
-
         <button
           type="submit"
-          className={`mt-4 w-full p-2 text-white rounded flex items-center justify-center ${isLoadingRef.current
-              ? "bg-blue-500 cursor-not-allowed"
-              : "bg-green-500 hover:bg-green-600"
-            }`}
+          className={`mt-4 w-full p-2 text-white rounded flex items-center justify-center ${
+            isLoadingRef.current ? "bg-blue-500 cursor-not-allowed" : "bg-green-500 hover:bg-green-600"
+          }`}
           disabled={isLoadingRef.current}
         >
           {isLoadingRef.current ? (
@@ -1272,7 +1198,6 @@ const StockManagement = ({ isCollapsed }) => {
       <div className="mb-8">
         <h2 className="text-xl font-semibold mb-4">Lookup Stock Details</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Branch Selection for Lookup */}
           <div>
             <label htmlFor="lookupBranch" className="block mb-2 font-medium">
               Select Branch
@@ -1282,7 +1207,7 @@ const StockManagement = ({ isCollapsed }) => {
               value={lookupBranch}
               onChange={(e) => {
                 setLookupBranch(e.target.value);
-                setLookupResults([]); // Clear previous lookup results
+                setLookupResults([]); 
               }}
               className="w-full p-2 border rounded"
               required
@@ -1297,8 +1222,6 @@ const StockManagement = ({ isCollapsed }) => {
               ))}
             </select>
           </div>
-
-          {/* Product Search Input */}
           <div className="relative">
             <label htmlFor="lookupProduct" className="block mb-2 font-medium">
               Search Product by ID or Name
@@ -1309,13 +1232,11 @@ const StockManagement = ({ isCollapsed }) => {
               value={lookupSearchProduct}
               onChange={handleLookupProductInput}
               onFocus={() => setShowSuggestionsLookup(true)}
-              onBlur={() => setTimeout(() => setShowSuggestionsLookup(false), 200)} // Delay to allow click
+              onBlur={() => setTimeout(() => setShowSuggestionsLookup(false), 200)}
               placeholder="Type product name or ID"
               className="w-full p-2 border rounded"
               required
             />
-
-            {/* Suggestion Dropdown */}
             {showSuggestionsLookup && lookupProductSuggestions.length > 0 && (
               <ul className="absolute z-10 border rounded bg-white shadow-md max-h-40 overflow-y-auto w-full">
                 {lookupProductSuggestions.map((product) => (
@@ -1331,8 +1252,6 @@ const StockManagement = ({ isCollapsed }) => {
             )}
           </div>
         </div>
-
-        {/* Stock Details Table */}
         {lookupBranch && (
           <div className="mt-6 overflow-x-auto">
             <table className="min-w-full bg-white">
@@ -1348,8 +1267,8 @@ const StockManagement = ({ isCollapsed }) => {
                 </tr>
               </thead>
               <tbody>
-                {lookupResults.length > 0
-                  ? lookupResults.map((stock) => (
+                {currentItems.length > 0 ? (
+                  currentItems.map((stock) => (
                     <tr key={`${stock.product.id}-${lookupBranch}`}>
                       <td className="py-2 px-4 border-b text-center">
                         {stock.product.product_id}
@@ -1384,42 +1303,7 @@ const StockManagement = ({ isCollapsed }) => {
                       </td>
                     </tr>
                   ))
-                  : currentItems.map((stock) => (
-                    <tr key={`${stock.product.id}-${lookupBranch}`}>
-                      <td className="py-2 px-4 border-b text-center">
-                        {stock.product.product_id}
-                      </td>
-                      <td className="py-2 px-4 border-b">{stock.product.product_name}</td>
-                      <td className="py-2 px-4 border-b text-center">{stock.quantity}</td>
-                      <td className="py-2 px-4 border-b text-center">
-                        {stock.product.rate !== null ? stock.product.rate.toFixed(2) : "N/A"}
-                      </td>
-                      <td className="py-2 px-4 border-b text-center">
-                        {stock.product.mrp !== null ? stock.product.mrp.toFixed(2) : "N/A"}
-                      </td>
-                      <td className="py-2 px-4 border-b text-center">
-                        {stock.product.hsn_code || "N/A"}
-                      </td>
-                      <td className="py-2 px-4 border-b text-center">
-                        <button
-                          onClick={() => {
-                            setStockToEdit({
-                              ...stock,
-                              branch_code: lookupBranch,
-                            });
-                            dispatch({
-                              type: "SET_MODAL_STATE",
-                              payload: { showEditStockModal: true },
-                            });
-                          }}
-                          className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded"
-                        >
-                          Edit
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                {currentItems.length === 0 && lookupResults.length === 0 && (
+                ) : (
                   <tr>
                     <td colSpan="7" className="py-4 text-center">
                       No stock entries found.
@@ -1429,7 +1313,6 @@ const StockManagement = ({ isCollapsed }) => {
               </tbody>
             </table>
 
-            {/* ======= Pagination Controls ======= */}
             {pageCount > 1 && (
               <div className="flex justify-center mt-4">
                 <ReactPaginate
@@ -1438,12 +1321,8 @@ const StockManagement = ({ isCollapsed }) => {
                   pageCount={pageCount}
                   onPageChange={handlePageClick}
                   containerClassName={"flex space-x-2"}
-                  previousLinkClassName={
-                    "px-3 py-1 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
-                  }
-                  nextLinkClassName={
-                    "px-3 py-1 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
-                  }
+                  previousLinkClassName={"px-3 py-1 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"}
+                  nextLinkClassName={"px-3 py-1 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"}
                   disabledClassName={"opacity-50 cursor-not-allowed"}
                   activeClassName={"bg-blue-500 text-white rounded"}
                 />
@@ -1468,7 +1347,6 @@ const StockManagement = ({ isCollapsed }) => {
         />
       )}
 
-      {/* ======= Toast Container ======= */}
       <ToastContainer
         position="top-right"
         autoClose={5000}

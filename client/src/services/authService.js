@@ -167,6 +167,8 @@ export const assignStock = async (assignments) => {
       updated_at: new Date().toISOString(),
     }));
 
+    console.log("AssignStock - Deducting from sources:", stockEntriesFrom);
+
     const { error: upsertStockFromError } = await supabase
       .from("stock")
       .upsert(stockEntriesFrom, { onConflict: ["product_id", "branch_code"] });
@@ -201,6 +203,8 @@ export const assignStock = async (assignments) => {
       updated_at: new Date().toISOString(),
     }));
 
+    console.log("AssignStock - Adding to destinations:", stockEntriesTo);
+
     // Step 8: Upsert stock entries to destination branches
     const { error: upsertStockToError } = await supabase
       .from("stock")
@@ -210,18 +214,20 @@ export const assignStock = async (assignments) => {
       throw new Error(`Failed to add stock to destination branches: ${upsertStockToError.message}`);
     }
 
-    // Step 9: Record the stock assignments (Optional)
-    // Ensure that the 'stock_assignments' table exists with appropriate columns
+    // Step 9: Record the stock assignments
     const assignmentsToRecord = assignments.map(assignment => ({
       product_id: assignment.product_id,
       from_branch_code: assignment.from_branch_code,
       to_branch_code: assignment.to_branch_code,
       quantity: assignment.quantity,
       notes: assignment.notes || '',
-      rate: null, // Assuming rate is not tracked here. Update if necessary.
-      mrp: null,  // Assuming mrp is not tracked here. Update if necessary.
+      rate: assignment.rate || null, // If rate is provided
+      mrp: assignment.mrp || null,   // If mrp is provided
+      // hsn_code: assignment.hsn_code || null, // If hsn_code is provided
       // assigned_at is automatically set by default
     }));
+
+    console.log("AssignStock - Recording assignments:", assignmentsToRecord);
 
     const { error: recordAssignmentsError } = await supabase
       .from("stock_assignments")
@@ -230,6 +236,8 @@ export const assignStock = async (assignments) => {
     if (recordAssignmentsError) {
       throw new Error(`Failed to record stock assignments: ${recordAssignmentsError.message}`);
     }
+
+    console.log("AssignStock - Successfully assigned stock.");
 
     return { success: true, error: null };
   } catch (error) {
