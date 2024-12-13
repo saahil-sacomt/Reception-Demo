@@ -69,182 +69,159 @@ export const assignStock = async (assignments) => {
     if (!Array.isArray(assignments) || assignments.length === 0) {
       throw new Error("No assignments provided.");
     }
-
-    // Step 0: Validate and fetch all involved product IDs
+    
     const productIds = assignments.map(a => a.product_id);
     const uniqueProductIds = [...new Set(productIds)];
 
-    // Fetch products to ensure they exist
+    // -- Step 0: Validate products exist --
     const { data: productsData, error: productsError } = await supabase
       .from("products")
       .select("id")
       .in("id", uniqueProductIds);
+    if (productsError) throw new Error(`Error fetching products: ${productsError.message}`);
 
-    if (productsError) {
-      throw new Error(`Error fetching products: ${productsError.message}`);
-    }
-
-    const existingProductIds = productsData.map(p => p.id);
+    const existingProductIds = (productsData || []).map(p => p.id);
     const missingProductIds = uniqueProductIds.filter(id => !existingProductIds.includes(id));
-
     if (missingProductIds.length > 0) {
       throw new Error(`Products not found: ${missingProductIds.join(", ")}`);
     }
 
-    // Step 1: Validate assignments
+    // Validate each assignment
     for (let [index, assignment] of assignments.entries()) {
       const { product_id, from_branch_code, to_branch_code, quantity } = assignment;
-
       if (!product_id || !from_branch_code || !to_branch_code || !quantity) {
-        throw new Error(`Invalid assignment data at index ${index + 1}. Ensure all fields are provided.`);
+        throw new Error(`Invalid assignment data at index ${index + 1}.`);
       }
-
       if (from_branch_code === to_branch_code) {
-        throw new Error(`Source and destination branches cannot be the same for assignment at index ${index + 1}.`);
+        throw new Error(`Source and destination cannot be the same (index ${index + 1}).`);
       }
-
       if (quantity <= 0) {
-        throw new Error(`Quantity must be greater than zero for assignment at index ${index + 1}.`);
+        throw new Error(`Quantity must be > 0 (index ${index + 1}).`);
       }
     }
 
-    // Step 2: Validate branch codes exist
-    const branchCodes = assignments.reduce((acc, assignment) => {
-      acc.add(assignment.from_branch_code);
-      acc.add(assignment.to_branch_code);
-      return acc;
-    }, new Set());
-
+    // Validate branch codes
+    const branchCodes = new Set([...assignments.map(a => a.from_branch_code), ...assignments.map(a => a.to_branch_code)]);
     const { data: branchesData, error: branchesError } = await supabase
       .from("branches")
       .select("branch_code")
       .in("branch_code", Array.from(branchCodes));
-
-    if (branchesError) {
-      throw new Error(`Error fetching branches: ${branchesError.message}`);
-    }
-
-    const existingBranchCodes = branchesData.map(b => b.branch_code);
-    const missingBranchCodes = Array.from(branchCodes).filter(code => !existingBranchCodes.includes(code));
-
+    if (branchesError) throw new Error(`Error fetching branches: ${branchesError.message}`);
+    const existingBranchCodes = (branchesData || []).map(b => b.branch_code);
+    const missingBranchCodes = [...branchCodes].filter(code => !existingBranchCodes.includes(code));
     if (missingBranchCodes.length > 0) {
       throw new Error(`Branches not found: ${missingBranchCodes.join(", ")}`);
     }
 
-    // Step 3: Fetch all source stock entries in bulk
+    // Step 3: Fetch source stocks
     const fromBranchCodes = [...new Set(assignments.map(a => a.from_branch_code))];
     const { data: sourceStocks, error: sourceStocksError } = await supabase
       .from("stock")
       .select("product_id, branch_code, quantity")
       .in("product_id", uniqueProductIds)
       .in("branch_code", fromBranchCodes);
-
     if (sourceStocksError) {
       throw new Error(`Error fetching source stocks: ${sourceStocksError.message}`);
     }
 
-    // Create a map for quick lookup
+    // Build source stock map
     const sourceStockMap = {};
     sourceStocks.forEach(stock => {
       sourceStockMap[`${stock.product_id}_${stock.branch_code}`] = stock.quantity;
     });
 
-    // Step 4: Verify sufficient stock for each assignment
+    // Verify sufficient stock
     for (let [index, assignment] of assignments.entries()) {
-      const { product_id, from_branch_code, quantity } = assignment;
-      const availableQuantity = sourceStockMap[`${product_id}_${from_branch_code}`] || 0;
-
-      if (availableQuantity < quantity) {
-        throw new Error(`Insufficient stock for product ID ${product_id} in branch ${from_branch_code} at assignment index ${index + 1}. Available: ${availableQuantity}, Requested: ${quantity}.`);
+      const availableQuantity = sourceStockMap[`${assignment.product_id}_${assignment.from_branch_code}`] || 0;
+      if (availableQuantity < assignment.quantity) {
+        throw new Error(`Insufficient stock for product ID ${assignment.product_id} in branch ${assignment.from_branch_code} (index ${index + 1}).`);
       }
     }
 
-    // Step 5: Deduct stock from source branches
-    const stockEntriesFrom = assignments.map(assignment => ({
-      product_id: assignment.product_id,
-      branch_code: assignment.from_branch_code,
-      quantity: sourceStockMap[`${assignment.product_id}_${assignment.from_branch_code}`] - assignment.quantity,
+    // Prepare "from" upsert
+    let stockEntriesFrom = assignments.map(a => ({
+      product_id: a.product_id,
+      branch_code: a.from_branch_code,
+      quantity: sourceStockMap[`${a.product_id}_${a.from_branch_code}`] - a.quantity,
       updated_at: new Date().toISOString(),
     }));
 
-    console.log("AssignStock - Deducting from sources:", stockEntriesFrom);
+    // Remove any leftover 'id' fields
+    stockEntriesFrom = stockEntriesFrom.map(({ id, ...rest }) => rest);
+
+    console.log("Deducting stock FROM source branches:", stockEntriesFrom);
 
     const { error: upsertStockFromError } = await supabase
       .from("stock")
       .upsert(stockEntriesFrom, { onConflict: ["product_id", "branch_code"] });
-
     if (upsertStockFromError) {
       throw new Error(`Failed to deduct stock from source branches: ${upsertStockFromError.message}`);
     }
 
-    // Step 6: Fetch existing stock entries for destination branches in bulk
+    // Step 6: Fetch destination stock
     const toBranchCodes = [...new Set(assignments.map(a => a.to_branch_code))];
     const { data: destStocks, error: destStocksError } = await supabase
       .from("stock")
       .select("product_id, branch_code, quantity")
       .in("product_id", uniqueProductIds)
       .in("branch_code", toBranchCodes);
-
     if (destStocksError) {
       throw new Error(`Error fetching destination stocks: ${destStocksError.message}`);
     }
 
-    // Create a map for quick lookup
+    // Build dest stock map
     const destStockMap = {};
     destStocks.forEach(stock => {
       destStockMap[`${stock.product_id}_${stock.branch_code}`] = stock.quantity;
     });
 
-    // Step 7: Prepare stock entries for destination branches (add stock)
-    const stockEntriesTo = assignments.map(assignment => ({
-      product_id: assignment.product_id,
-      branch_code: assignment.to_branch_code,
-      quantity: (destStockMap[`${assignment.product_id}_${assignment.to_branch_code}`] || 0) + assignment.quantity,
+    // Prepare "to" upsert
+    let stockEntriesTo = assignments.map(a => ({
+      product_id: a.product_id,
+      branch_code: a.to_branch_code,
+      quantity: (destStockMap[`${a.product_id}_${a.to_branch_code}`] || 0) + a.quantity,
       updated_at: new Date().toISOString(),
     }));
 
-    console.log("AssignStock - Adding to destinations:", stockEntriesTo);
+    // Remove 'id' if it exists
+    stockEntriesTo = stockEntriesTo.map(({ id, ...rest }) => rest);
 
-    // Step 8: Upsert stock entries to destination branches
+    console.log("Adding stock TO destination branches:", stockEntriesTo);
+
     const { error: upsertStockToError } = await supabase
       .from("stock")
       .upsert(stockEntriesTo, { onConflict: ["product_id", "branch_code"] });
-
     if (upsertStockToError) {
       throw new Error(`Failed to add stock to destination branches: ${upsertStockToError.message}`);
     }
 
-    // Step 9: Record the stock assignments
-    const assignmentsToRecord = assignments.map(assignment => ({
-      product_id: assignment.product_id,
-      from_branch_code: assignment.from_branch_code,
-      to_branch_code: assignment.to_branch_code,
-      quantity: assignment.quantity,
-      notes: assignment.notes || '',
-      rate: assignment.rate || null, // If rate is provided
-      mrp: assignment.mrp || null,   // If mrp is provided
-      // hsn_code: assignment.hsn_code || null, // If hsn_code is provided
-      // assigned_at is automatically set by default
+    // Record stock assignments
+    const assignmentsToRecord = assignments.map(a => ({
+      product_id: a.product_id,
+      from_branch_code: a.from_branch_code,
+      to_branch_code: a.to_branch_code,
+      quantity: a.quantity,
+      notes: a.notes || '',
+      rate: a.rate || null,
+      mrp: a.mrp || null,
     }));
-
-    console.log("AssignStock - Recording assignments:", assignmentsToRecord);
+    console.log("assignStock - Recording assignments:", assignmentsToRecord);
 
     const { error: recordAssignmentsError } = await supabase
       .from("stock_assignments")
       .insert(assignmentsToRecord);
-
     if (recordAssignmentsError) {
       throw new Error(`Failed to record stock assignments: ${recordAssignmentsError.message}`);
     }
 
     console.log("AssignStock - Successfully assigned stock.");
-
     return { success: true, error: null };
   } catch (error) {
-    console.error('Error in assignStock:', error.message);
+    console.error("Error in assignStock:", error.message);
     return { success: false, error: error.message };
   }
 };
+
 
 /**
  * Bulk uploads stock data from a CSV or XML file.
