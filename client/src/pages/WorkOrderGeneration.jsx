@@ -2455,21 +2455,6 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
           )}
         </div>
       </form>
-
-      {/* Optional: Back to List Button */}
-      {isEditing && (
-        <div className="flex justify-center mt-4">
-          <button
-            onClick={() => navigate("/work-orders")}
-            ref={backToListButtonRef}
-            className="flex items-center justify-center w-44 h-12 bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition"
-            aria-label="Back to Work Orders List"
-          >
-            <ArrowLeftIcon className="w-5 h-5 mr-2" />
-            Back to List
-          </button>
-        </div>
-      )}
     </div>
   );
 };
