@@ -767,7 +767,7 @@ const ReportGenerator = ({ isCollapsed }) => {
         case 'consolidated': {
           const salesQuery = supabase
             .from('sales_orders')
-            .select('sales_order_id, work_order_id, mr_number, final_amount, cgst, sgst, total_amount, created_at, updated_at, branch, customer_id, discount, advance_details, is_b2b')
+            .select('sales_order_id, work_order_id, mr_number, final_amount, cgst, sgst, total_amount, created_at, updated_at, branch, customer_id, discount, advance_details')
             .gte('created_at', startStr)
             .lte('created_at', endStr);
 
