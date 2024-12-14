@@ -184,9 +184,9 @@ export const assignStock = async (assignments) => {
     }));
 
     // Remove 'id' if it exists
-    stockEntriesTo = stockEntriesTo.map(({ id, ...rest }) => rest);
+    // stockEntriesTo = stockEntriesTo.map(({ id, ...rest }) => rest);
 
-    console.log("Adding stock TO destination branches:", stockEntriesTo);
+    // console.log("Adding stock TO destination branches:", stockEntriesTo);
 
     const { error: upsertStockToError } = await supabase
       .from("stock")
