@@ -14,19 +14,20 @@ const AdminActionRequired = ({ isCollapsed }) => {
   const [notification, setNotification] = useState({ type: '', message: '' });
 
   /**
-   * Fetches all pending modification requests and segregates them into sales and work orders.
-   * This function ensures that only pending requests are displayed to the admin.
+   * Fetches all pending modification requests for the admin's branch and segregates them into sales and work orders.
+   * This function ensures that only branch-specific pending requests are displayed to the admin.
    */
   const fetchRequests = async () => {
     setLoading(true);
     setNotification({ type: '', message: '' });
 
     try {
-      // Fetch pending modification requests
+      // Fetch pending modification requests for the admin's branch
       const { data, error } = await supabase
         .from('modification_requests')
         .select('*')
-        .eq('status', 'pending');
+        .eq('status', 'pending')
+        .eq('branch', branch); // Added branch filter
 
       if (error) {
         console.error("Error fetching requests:", error);
@@ -61,7 +62,8 @@ const AdminActionRequired = ({ isCollapsed }) => {
       const { error } = await supabase
         .from('modification_requests')
         .update({ status: 'approved', employee_name: name }) // Set verifier's name as admin's name
-        .eq('request_id', requestId);
+        .eq('request_id', requestId)
+        .eq('branch', branch); // Ensure the branch matches
 
       if (!error) {
         setNotification({ type: 'success', message: 'Request approved successfully.' });
@@ -100,7 +102,8 @@ const AdminActionRequired = ({ isCollapsed }) => {
       const { error } = await supabase
         .from('modification_requests')
         .update({ status: 'rejected', rejection_reason: reason, employee_name: name }) // Set verifier's name as admin's name
-        .eq('request_id', requestId);
+        .eq('request_id', requestId)
+        .eq('branch', branch); // Ensure the branch matches
 
       if (!error) {
         setNotification({ type: 'success', message: 'Request rejected successfully.' });
@@ -132,14 +135,16 @@ const AdminActionRequired = ({ isCollapsed }) => {
   }, [notification]);
 
   /**
-   * Fetches the pending modification requests when the component mounts or when the role changes.
+   * Fetches the pending modification requests when the component mounts or when the role/branch changes.
    */
   useEffect(() => {
-    if (role === 'admin') {
+    if (role === 'admin' && branch) {
       fetchRequests();
+    } else if (role === 'admin' && !branch) {
+      setNotification({ type: 'error', message: 'Admin branch information is missing.' });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [role]);
+  }, [role, branch]);
 
   return (
     <div className={`transition-all duration-300 ${isCollapsed ? "mx-20" : "mx-20 px-20"} justify-center mt-20 p-20 rounded-xl mx-auto max-w-6xl`}>
