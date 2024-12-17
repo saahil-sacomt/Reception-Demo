@@ -245,19 +245,14 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
     toast.dismiss();
   };
 
-  // Define targetBranch based on role
-  // Admins add/update stock to G001, employees to their own branch
-  const getTargetBranch = () => (role === "admin" ? "G001" : branch);
-
   // Generate Bill Number based on targetBranch
   const generateBillNumber = useCallback(async () => {
-    const currentTargetBranch = getTargetBranch();
-    if (!currentTargetBranch) return "BILL-0001";
+    if (!targetBranch) return "BILL-0001";
     try {
       const { data, error } = await supabase
         .from("purchases")
         .select("bill_number")
-        .eq("branch_code", currentTargetBranch)
+        .eq("branch_code", targetBranch)
         .order("created_at", { ascending: false })
         .limit(1);
 
@@ -283,7 +278,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
       toast.error("An unexpected error occurred while generating bill number.");
       return "BILL-0001";
     }
-  }, [role, branch]);
+  }, [targetBranch]);
 
   useEffect(() => {
     const setupBillDetails = async () => {
@@ -298,10 +293,10 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
         setUpdateBillDate(currentDate);
       }
     };
-    if (getTargetBranch()) {
+    if (targetBranch) {
       setupBillDetails();
     }
-  }, [getTargetBranch, mode, generateBillNumber]);
+  }, [targetBranch, mode, generateBillNumber]);
 
   // Add another product entry for Add mode
   const handleAddProductEntry = () => {
@@ -376,7 +371,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
       }
     }
 
-    if (!getTargetBranch()) {
+    if (!targetBranch) {
       toast.error("Branch not set");
       return;
     }
@@ -459,7 +454,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
       }
     }
 
-    if (!getTargetBranch()) {
+    if (!targetBranch) {
       toast.error("Branch not set");
       return;
     }
@@ -532,7 +527,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
 
         const resStock = await addOrUpdateStock(
           resAdd.data.id,
-          getTargetBranch(), // Use targetBranch (G001 for admin)
+          targetBranch, // Use targetBranch (G001 for admin)
           p.quantity,
           p.rate,
           p.mrp
@@ -544,7 +539,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
 
         const resPurchase = await addPurchase({
           product_id: resAdd.data.id,
-          branch_code: getTargetBranch(), // Use targetBranch (G001 for admin)
+          branch_code: targetBranch, // Use targetBranch (G001 for admin)
           quantity: p.quantity,
           rate: p.rate,
           mrp: p.mrp,
@@ -590,7 +585,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
       for (let p of products) {
         const resUpdate = await updateExistingProduct(
           p.product_id_db,
-          getTargetBranch(), // Use targetBranch (G001 for admin)
+          targetBranch, // Use targetBranch (G001 for admin)
           p.quantity,
           p.rate,
           p.mrp,
@@ -605,7 +600,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
 
         const resPurchase = await addPurchase({
           product_id: p.product_id_db,
-          branch_code: getTargetBranch(), // Use targetBranch (G001 for admin)
+          branch_code: targetBranch, // Use targetBranch (G001 for admin)
           quantity: p.quantity,
           rate: p.rate,
           mrp: p.mrp,
@@ -1269,14 +1264,8 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
         </form>
       )}
 
-    
-
       {role === "admin" && (
         <div className="mt-8">
-          {/* <h2 className="text-xl font-semibold mb-4">
-            Current Stock for Branch: {lookupBranch}
-          </h2> */}
-
           {/* Branch Selection Dropdown for Admin */}
           <div className="mb-4 relative">
             <label htmlFor="lookupBranch" className="block mb-2 font-medium">
@@ -1301,9 +1290,7 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
 
       {role !== "admin" && branch && (
         <div className="mt-8">
-          {/* <h2 className="text-xl font-semibold mb-4">
-            Current Stock for Branch: {branch}
-          </h2> */}
+          {/* Optionally, you can add content here for non-admin roles */}
         </div>
       )}
 
@@ -1565,9 +1552,9 @@ const EmployeeStockManagement = ({ isCollapsed }) => {
             </div>
           </div>
         )}
-        </Modal>
-      </div>
-    );
+      </Modal>
+    </div>
+  );
 
 };
 
