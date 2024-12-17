@@ -711,20 +711,20 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       alert("Please wait while the work order is being saved.");
       return;
     }
-
+  
     if (submitted) {
       alert("Work order submitted already");
       return; // Prevent duplicate submissions
     }
-
+  
     dispatch({ type: "SET_WORK_ORDER_FORM", payload: { isSaving: true } });
-
+  
     // Validate advance amount
     if (!validateAdvanceAmount()) {
       dispatch({ type: "SET_WORK_ORDER_FORM", payload: { isSaving: false } });
       return;
     }
-
+  
     // Validation Checks
     const validations = [
       {
@@ -765,7 +765,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         ref: paymentMethodRef,
       },
     ];
-
+  
     for (const validation of validations) {
       if (validation.condition) {
         setValidationErrors((prev) => ({
@@ -777,7 +777,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         return;
       }
     }
-
+  
     // Validate product entries
     const productErrors = {};
     productEntries.forEach((product, index) => {
@@ -788,7 +788,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       if (!product.quantity)
         productErrors[`productQuantity-${index}`] = "Quantity is required.";
     });
-
+  
     // Step 3 Validation for MR number or customer details
     if (step === 3) {
       if (hasMrNumber === null) {
@@ -811,7 +811,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
           productErrors["customerGender"] = "Gender is required.";
       }
     }
-
+  
     // Handle Product Validation Errors
     if (Object.keys(productErrors).length > 0) {
       setValidationErrors(productErrors);
@@ -853,10 +853,10 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       dispatch({ type: "SET_WORK_ORDER_FORM", payload: { isSaving: false } });
       return;
     }
-
+  
     // Clear errors
     setValidationErrors({});
-
+  
     try {
       let customerId = null;
   
@@ -946,8 +946,8 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         updated_at: new Date().toISOString(),
         branch: branch,
         customer_id: customerId,
-        discounted_total: discountedTotal,    // from the computed totals
-  amount_due: balanceDue,
+        discounted_total: discountedTotal, // from the computed totals
+        amount_due: balanceDue,
       };
   
       if (isEditing) {
@@ -973,42 +973,48 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
           });
   
           try {
+            // Fetch the related modification_request(s)
             const { data: modReqData, error: modReqError } = await supabase
               .from("modification_requests")
-              .select("id")
+              .select("id, status")
               .eq("order_id", workOrderId)
               .eq("order_type", "work_order")
-              .eq("status", "approved")
-              .single();
-    
+              .in("status", ["approved", "pending"]) // Include 'pending' if applicable
+              .order("id", { ascending: false }) // Order by latest first
+              .limit(1); // Adjust if multiple modification_requests per work_order
+  
             if (modReqError) {
-              console.error("Error fetching modification request:", modReqError);
-              // Optionally alert the user or handle the error as needed
-            } else if (modReqData) {
-              const modificationRequestId = modReqData.id;
+              console.error("Error fetching modification request:", modReqError.message);
+              alert("Failed to fetch modification request. Please contact support.");
+              // Optionally, proceed without updating modification_request
+            } else if (modReqData && modReqData.length > 0) {
+              const modificationRequest = modReqData[0];
               console.log(
                 "Attempting to update modification_request with ID:",
-                modificationRequestId
+                modificationRequest.id
               );
-    
+  
+              // Update the modification_request status to 'completed'
               const { error: modificationError } = await supabase
                 .from("modification_requests")
-                .update({ status: "completed" })
-                .eq("id", modificationRequestId);
-    
+                .update({ status: "completed", updated_at: new Date().toISOString() })
+                .eq("id", modificationRequest.id);
+  
               if (modificationError) {
                 console.error(
                   "Error updating modification request status:",
-                  modificationError
+                  modificationError.message
                 );
                 alert(
                   "Work order was updated, but failed to update modification request status. Please contact support."
                 );
               } else {
                 console.log("Modification request status updated to 'completed'.");
+                alert("Modification request completed successfully.");
               }
             } else {
-              console.log("No pending modification request found for this work order.");
+              console.log("No pending or approved modification request found for this work order.");
+              // Optionally, handle cases where no modification_request exists
             }
           } catch (err) {
             console.error("Unexpected error updating modification request:", err);
@@ -1036,7 +1042,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
           if (error.status === 409) {
             alert("Work Order ID already exists. Please try saving again.");
             // Optionally, regenerate Work Order ID
-            generateNewWorkOrderId();
+            await generateNewWorkOrderId();
           } else {
             alert("Failed to save work order.");
           }
@@ -1085,6 +1091,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     generateNewWorkOrderId,
     modificationRequestId,
   ]);
+  
 
   // Navigate to the previous step
   const prevStep = useCallback(() => {
