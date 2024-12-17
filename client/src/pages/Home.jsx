@@ -996,7 +996,7 @@ const Home = ({ isCollapsed }) => {
                       <div>
                         <p>
                           <span className="font-medium">Amount After Discount:</span>{" "}
-                          <strong>₹{selectedWorkOrder.subtotal?.toFixed(2) || '0.00'}</strong>
+                          <strong>₹{selectedWorkOrder.discounted_subtotal?.toFixed(2) || '0.00'}</strong>
                         </p>
                         <p>
                           <span className="font-medium">CGST (6%):</span>{" "}

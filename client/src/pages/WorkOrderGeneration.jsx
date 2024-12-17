@@ -2189,14 +2189,14 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                 {/* Financial Summary */}
                 <div className="flex justify-between mb-6 space-x-8">
                   <div>
-                    <p>
-                      Amt. after discount:<strong> ₹{subtotal.toFixed(2)}</strong>
-                    </p>
-
                     {/* <p>
-                      Discounted Subtotal:
-                      <strong> ₹{discountedSubtotal.toFixed(2)}</strong>
+                      Amt. after discount:<strong> ₹{subtotal.toFixed(2)}</strong>
                     </p> */}
+
+                    <p>
+                    Amt. after discount:
+                      <strong> ₹{discountedSubtotal.toFixed(2)}</strong>
+                    </p>
 
                     <p>
                       CGST (6%):<strong> ₹{cgst.toFixed(2)}</strong>
