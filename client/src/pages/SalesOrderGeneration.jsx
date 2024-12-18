@@ -73,7 +73,7 @@ const fetchProductDetailsFromDatabase = async (productId, branch) => {
       .from("products")
       .select("*")
       .eq("product_id", productId)
-      .single();
+      .maybeSingle();
 
     if (productError || !productData) {
       console.error("Error fetching product details:", productError);
@@ -901,7 +901,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
       .from("patients")
       .select("*")
       .eq("mr_number", mrNumber)
-      .single();
+      .maybeSingle();
 
     if (error) {
       console.error("Error fetching patient details:", error.message);

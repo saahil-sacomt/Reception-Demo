@@ -608,6 +608,8 @@ const StockManagement = ({ isCollapsed }) => {
   const handleAssignStock = useCallback(
     async (e) => {
       e.preventDefault();
+  
+      // Basic validations
       if (!fromBranchAssign || !toBranchAssign || !quantityAssign) {
         toast.error("Please fill in all required fields.");
         return;
@@ -616,65 +618,98 @@ const StockManagement = ({ isCollapsed }) => {
         toast.error("From and To branches cannot be the same.");
         return;
       }
-
-      // Try local array first
-      let product = products.find((p) => p.id === parseInt(selectedProductAssign, 10));
-
-      // If user typed but didn't pick from suggestions, do a final DB check by product_id or name
+  
+      // Ensure a product is selected
+      if (!selectedProductAssign) {
+        toast.error("Please select a product from the suggestions.");
+        return;
+      }
+  
+      // Find the product in the local products array
+      let product = products.find(
+        (p) => p.id === parseInt(selectedProductAssign, 10)
+      );
+  
+      // If product not found locally, perform a fallback lookup
       if (!product && searchProductAssign) {
         try {
           const input = searchProductAssign.toLowerCase().trim();
-          // Attempt DB fetch by partial match on product_id or product_name
-          const { data: fallbackData, error } = await supabase
+  
+          // Step 1: Attempt exact match on product_id
+          const { data: exactData, error: exactError } = await supabase
             .from("products")
             .select("id, product_name, product_id, rate, mrp, hsn_code")
-            .or(`product_name.ilike.%${input}%,product_id.ilike.%${input}%`)
-            .limit(1);
-
-          if (!error && fallbackData.length > 0) {
-            product = fallbackData[0];
+            .eq("product_id", input)
+            .single();
+  
+          if (!exactError && exactData) {
+            product = exactData;
             setSelectedProductAssign(product.id.toString());
+          } else {
+            // Step 2: Attempt partial match on product_name
+            const { data: partialData, error: partialError } = await supabase
+              .from("products")
+              .select("id, product_name, product_id, rate, mrp, hsn_code")
+              .ilike("product_name", `%${input}%`)
+              .limit(1);
+  
+            if (!partialError && partialData.length > 0) {
+              product = partialData[0];
+              setSelectedProductAssign(product.id.toString());
+            }
           }
         } catch (errFetch) {
           console.error("Error in fallback DB lookup:", errFetch);
+          toast.error("Failed to fetch product details. Please try again.");
+          return;
         }
       }
-
-      // Now if still no product, error out
+  
+      // If product is still not found, notify the user
       if (!product) {
-        toast.error("Selected product doesn't exist in the DB. Please add it first.");
+        toast.error(
+          "Selected product doesn't exist in the database. Please add it first."
+        );
         return;
       }
-
+  
+      // Validate quantity
       const qty = parseInt(quantityAssign, 10);
       if (isNaN(qty) || qty <= 0) {
         toast.error("Please enter a valid quantity.");
         return;
       }
+  
+      // Validate rate and MRP
       if (rateAssign === "" || mrpAssign === "") {
         toast.error("Rate and MRP must be provided for the selected product.");
         return;
       }
-
+  
       isLoadingRef.current = true;
+  
       try {
         const assignments = [
           {
-            product_id: product.id, 
+            product_id: product.id, // Internal PK
             from_branch_code: fromBranchAssign,
             to_branch_code: toBranchAssign,
             quantity: qty,
-            notes: "",
+            notes: "", // Optional, can be customized
             rate: parseFloat(rateAssign),
             mrp: parseFloat(mrpAssign),
             hsn_code: hsnCodeAssign,
           },
         ];
-
+  
+        console.log("Submitting Assignments:", assignments);
+  
         const response = await assignStock(assignments);
+  
         if (response.success) {
+          console.log("AssignStock Success:", response);
           toast.success("Stock assigned successfully.");
-          // Reset form
+          // Reset form fields
           setFromBranchAssign("");
           setToBranchAssign("");
           setSelectedProductAssign("");
@@ -687,6 +722,7 @@ const StockManagement = ({ isCollapsed }) => {
           setShowSuggestionsAssign(false);
           refreshStockData();
         } else {
+          console.error("AssignStock Failed:", response.error);
           toast.error(response.error || "Failed to assign stock.");
         }
       } catch (err) {
@@ -710,6 +746,7 @@ const StockManagement = ({ isCollapsed }) => {
       refreshStockData,
     ]
   );
+  
 
   return (
     <div
