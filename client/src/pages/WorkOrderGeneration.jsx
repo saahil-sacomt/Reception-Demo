@@ -121,7 +121,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         NTA: 2295, // Neyyantinkara
         KOT1: 5701, // Kottarakara 1
         KOT2: 6701, // Kottarakara 2
-        KAT: 7701, // Kattakada
+        KAT: 2792, // Kattakada
         // Add other branches as needed
       };
 
