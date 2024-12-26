@@ -536,7 +536,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
       NTA: 2556, // Default ID for Neyyantinkara
       KOT1: 3001, // Default ID for Kottarakara 1
       KOT2: 4001, // Default ID for Kottarakara 2
-      KAT: 5001, // Default ID for Kattakada
+      KAT: 2792, // Default ID for Kattakada
     };
 
     if (!branch) {
