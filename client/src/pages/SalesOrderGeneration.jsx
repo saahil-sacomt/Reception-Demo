@@ -533,7 +533,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     // Define default starting sales_order_id for each branch
     const branchDefaultIds = {
       TVR: 4103, // Default ID for Trivandrum
-      NTA: 2556, // Default ID for Neyyantinkara
+      NTA: 2570, // Default ID for Neyyantinkara
       KOT1: 3001, // Default ID for Kottarakara 1
       KOT2: 4001, // Default ID for Kottarakara 2
       KAT: 2792, // Default ID for Kattakada
