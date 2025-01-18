@@ -1,6 +1,6 @@
 // client/src/pages/Signup.jsx
 
-import { useState } from 'react';
+import { useState , useEffect} from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { signUp } from '../services/authService';
 import Input from '../components/Input';
@@ -27,71 +27,115 @@ const Signup = () => {
 
   // client/src/data/branches.js
 
-const branches = [
-  { name: 'Neyyatinkara', code: 'NTA' },
-  { name: 'Trivandrum', code: 'TVR' },
-  { name: 'Kottarakara 1', code: 'KOT1' },
-  { name: 'Kottarakara 2', code: 'KOT2' },
-  { name: 'Kattakada', code: 'KAT' },
-  // Add more branches as needed
-];
+  // New state for sub-role/department
+  const [subRole, setSubRole] = useState('');
+  const [availableSubRoles, setAvailableSubRoles] = useState([]);
+
+  const branches = [
+    { name: 'Neyyatinkara', code: 'NTA' },
+    { name: 'Trivandrum', code: 'TVR' },
+    { name: 'Kottarakara 1', code: 'KOT1' },
+    { name: 'Kottarakara 2', code: 'KOT2' },
+    { name: 'Kattakada', code: 'KAT' },
+    // Add more branches as needed
+  ];
+
+
+
+  const subDepartmentsByRoleAndBranch = {
+    reception: {
+      NTA: ['Reception NTA-A', 'Reception NTA-B'],
+      TVR: ['Reception TVR-X', 'Reception TVR-Y'],
+      KOT1: ['Reception K1-A'],
+      KOT2: ['Reception K2-A'],
+      KAT: ['Reception KAT-A'],
+    },
+    counselling: {
+      NTA: ['Counselling A', 'Counselling B'],
+      TVR: ['Counselling X', 'Counselling Y'],
+      KOT1: ['Counselling K1-A'],
+      KOT2: ['Counselling K2-A'],
+      KAT: ['Counselling KAT-A'],
+    },
+    opd: {
+      NTA: ['OPD 1', 'OPD 2'],
+      TVR: ['OPD X', 'OPD Y'],
+      KOT1: ['OPD K1-A'],
+      KOT2: ['OPD K2-A'],
+      KAT: ['OPD KAT-A'],
+    },
+  };
+
 
 
   // Regular Expressions for Validation
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   const phoneRegex = /^\+?[1-9]\d{1,14}$/; // E.164 format
 
+  // Dynamically update the options based on the selected role and branch
+  useEffect(() => {
+    if (
+      subDepartmentsByRoleAndBranch[role] &&
+      subDepartmentsByRoleAndBranch[role][selectedBranch]
+    ) {
+      setAvailableSubRoles(subDepartmentsByRoleAndBranch[role][selectedBranch]);
+    } else {
+      setAvailableSubRoles([]);
+    }
+    setSubRole('');
+  }, [role, selectedBranch]);
+
   const handleSignup = async (e) => {
     e.preventDefault();
     setErrorMessage('');
 
     // Add PIN validation
-  if (pin.length < 4 || pin.length > 6) {
-    setErrorMessage('PIN must be between 4 to 6 digits.');
-    return;
-  }
-  
+    if (pin.length < 4 || pin.length > 6) {
+      setErrorMessage('PIN must be between 4 to 6 digits.');
+      return;
+    }
+
     // Frontend Validations
     if (!name.trim()) {
       setErrorMessage('Full Name is required.');
       return;
     }
-  
+
     if (!emailRegex.test(email)) {
       setErrorMessage('Please enter a valid email address.');
       return;
     }
-  
+
     if (password.length < 6) {
       setErrorMessage('Password must be at least 6 characters long.');
       return;
     }
-  
+
     if (password !== confirmPassword) {
       setErrorMessage('Passwords do not match.');
       return;
     }
-  
+
     if (!address.trim()) {
       setErrorMessage('Address is required.');
       return;
     }
-  
+
     if (!phoneRegex.test(phoneNumber)) {
       setErrorMessage('Please enter a valid phone number.');
       return;
     }
-  
+
     if (!phoneRegex.test(emergencyContact)) {
       setErrorMessage('Please enter a valid emergency contact number.');
       return;
     }
-  
+
     if (!selectedBranch) {
       setErrorMessage('Please select a branch.');
       return;
     }
-  
+
     try {
       const { data, error } = await signUp(
         name,
@@ -101,10 +145,11 @@ const branches = [
         address,
         phoneNumber,
         emergencyContact,
-        selectedBranch ,
-        pin// Pass the selected branch code
+        selectedBranch,
+        pin,// Pass the selected branch code
+        subRole
       );
-  
+
       if (error) {
         setErrorMessage(`Signup failed: ${error.message}`);
       } else {
@@ -117,11 +162,11 @@ const branches = [
       setErrorMessage('An unexpected error occurred. Please try again.');
     }
   };
-  
+
 
   const togglePasswordVisibility = () => setShowPassword(!showPassword);
 
-  
+
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-white p-20">
@@ -340,6 +385,9 @@ const branches = [
                   <option value="employee">Employee</option>
                   <option value="admin">Admin</option>
                   <option value="super_admin">Super Admin</option>
+                  <option value="reception">Reception</option>
+                  <option value="counselling">Counselling</option>
+                  <option value="opd">OPD</option>
                 </select>
               </div>
 
@@ -367,6 +415,34 @@ const branches = [
                 </select>
               </div>
 
+              {/* Sub-Department Selection */}
+              {['reception', 'counselling', 'opd'].includes(role) && (
+
+                <div>
+                  <label htmlFor="subRole" className="block text-sm font-medium text-gray-700 mt-4">
+                    Select Department <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    id="subRole"
+                    name="subRole"
+                    value={subRole}
+                    onChange={(e) => setSubRole(e.target.value)}
+                    className="mt-1 block w-full pl-3 pr-10 py-2 border-gray-300 rounded-md"
+                    required
+                  >
+                    <option value="" disabled>
+                      -- Select Department --
+                    </option>
+                    {availableSubRoles.map((dept) => (
+                      <option key={dept} value={dept}>
+                        {dept}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+
               {/* Address */}
               <div>
                 <Input
@@ -381,18 +457,18 @@ const branches = [
                 />
               </div>
               {/* PIN */}
-<div>
-  <Input
-    label="Employee PIN"
-    type="password"
-    name="pin"
-    id="pin"
-    value={pin}
-    onChange={(e) => setPin(e.target.value)}
-    required
-    placeholder="Enter a secure PIN"
-  />
-</div>
+              <div>
+                <Input
+                  label="Employee PIN"
+                  type="password"
+                  name="pin"
+                  id="pin"
+                  value={pin}
+                  onChange={(e) => setPin(e.target.value)}
+                  required
+                  placeholder="Enter a secure PIN"
+                />
+              </div>
 
 
               {/* Phone Number */}

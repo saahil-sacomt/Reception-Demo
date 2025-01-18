@@ -558,7 +558,8 @@ export const signUp = async (
   phoneNumber,
   emergencyContact,
   branch,
-  pin
+  pin,
+  subRole
 ) => {
   try {
     // Step 1: Sign up the user using Supabase Auth
@@ -602,6 +603,7 @@ export const signUp = async (
           emp_id: `emp${Math.floor(1000 + Math.random() * 9000)}`, // Generate emp_id
           branch,
           pin: hashedPin,
+          sub_role: subRole,
         },
       ])
       .select(); // Select the inserted employee data
