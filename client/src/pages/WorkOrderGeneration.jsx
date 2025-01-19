@@ -37,7 +37,11 @@ const formatDate = (date) => {
 };
 
 const WorkOrderGeneration = ({ isCollapsed }) => {
-  const { branch } = useAuth();
+  const { branch, subRole } = useAuth();
+  // console.log("Branch in WorkOrderGeneration:", branch);
+  // console.log("SubRole in WorkOrderGeneration:", subRole);
+
+
   const { orderId } = useParams(); // Get orderId from route params
   const isEditing = Boolean(orderId);
 
@@ -70,6 +74,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     isSaving,
     allowPrint,
     employees,
+
   } = workOrderForm;
 
   const navigate = useNavigate();
@@ -131,7 +136,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         return;
       }
 
-      console.log("Current Branch:", branch);
+      // console.log("Current Branch:", branch);
       console.log(
         "Default Work Order ID for this branch:",
         branchDefaultIds[branch] || 1001
@@ -142,6 +147,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         .from("work_orders")
         .select("work_order_id")
         .eq("branch", branch) // Filter by branch
+        .eq("sub_role", subRole)
         .order("work_order_id", { ascending: false })
         .limit(1);
 
@@ -151,22 +157,58 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         return;
       }
 
-      console.log("Last Work Orders Retrieved for branch:", lastWorkOrders);
+      console.log("Last Work Orders Retrieved for branch:", lastWorkOrders[0].work_order_id);
 
       let newWorkOrderId = branchDefaultIds[branch] || 1001; // Default if no work orders exist for branch
 
+      // console.log(newWorkOrderId);
+
+
+      const strSubRole = subRole;
       if (lastWorkOrders && lastWorkOrders.length > 0) {
-        const lastWorkOrderId = parseInt(lastWorkOrders[0].work_order_id, 10);
-        console.log("Last Work Order ID for branch:", lastWorkOrderId);
-        if (!isNaN(lastWorkOrderId)) {
-          newWorkOrderId = lastWorkOrderId + 1;
-        } else {
-          console.warn(
-            "Invalid lastWorkOrderId, defaulting to:",
-            newWorkOrderId
-          );
+        if (strSubRole.includes("OPD")) {
+          const str = lastWorkOrders[0].work_order_id
+          const match = str.match(/(\d+)$/); // Regex to match digits at the end of the string
+
+          if (match) {
+            console.log('Regex', match[0]); // Output: 3742
+            newWorkOrderId = parseInt(match[0]) + 1;
+          } else {
+            console.log("No number found");
+          }
+
+        }
+        else {
+          const lastWorkOrderId = parseInt(lastWorkOrders[0].work_order_id, 10);
+          console.log("Last Work Order ID for branch:", lastWorkOrderId);
+          if (!isNaN(lastWorkOrderId)) {
+            newWorkOrderId = lastWorkOrderId + 1;
+          } else {
+            console.warn(
+              "Invalid lastWorkOrderId, defaulting to:",
+              newWorkOrderId
+            );
+          }
         }
       }
+
+
+
+
+      // Determine the OP Number based on subRole
+      // Determine the OP Number based on subRole
+      let opNumber = "01"; // Default OP Number
+      if (subRole.toLowerCase().includes("opd")) {
+        // Extract the OP Number from subRole (e.g., "OPD 01")
+        const subRoleParts = subRole.split(" ");
+        opNumber = subRoleParts.length > 1 ? subRoleParts[1] : "01";
+      }
+
+      // Format the new Work Order ID
+      newWorkOrderId = `OPW-${opNumber}-${String(newWorkOrderId).padStart(3, "0")}`;
+
+      console.log(newWorkOrderId);
+
 
       dispatch({
         type: "SET_WORK_ORDER_FORM",
@@ -307,12 +349,12 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
               productEntries: productEntries.map((entry, i) =>
                 i === index
                   ? {
-                      id: productDetails.product_id,
-                      name: productDetails.product_name,
-                      price: productDetails.mrp || "",
-                      quantity: entry.quantity || "",
-                      hsn_code: productDetails.hsn_code || "",
-                    }
+                    id: productDetails.product_id,
+                    name: productDetails.product_name,
+                    price: productDetails.mrp || "",
+                    quantity: entry.quantity || "",
+                    hsn_code: productDetails.hsn_code || "",
+                  }
                   : entry
               ),
             },
@@ -711,20 +753,20 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       alert("Please wait while the work order is being saved.");
       return;
     }
-  
+
     if (submitted) {
       alert("Work order submitted already");
       return; // Prevent duplicate submissions
     }
-  
+
     dispatch({ type: "SET_WORK_ORDER_FORM", payload: { isSaving: true } });
-  
+
     // Validate advance amount
     if (!validateAdvanceAmount()) {
       dispatch({ type: "SET_WORK_ORDER_FORM", payload: { isSaving: false } });
       return;
     }
-  
+
     // Validation Checks
     const validations = [
       {
@@ -765,7 +807,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         ref: paymentMethodRef,
       },
     ];
-  
+
     for (const validation of validations) {
       if (validation.condition) {
         setValidationErrors((prev) => ({
@@ -777,7 +819,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         return;
       }
     }
-  
+
     // Validate product entries
     const productErrors = {};
     productEntries.forEach((product, index) => {
@@ -788,7 +830,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       if (!product.quantity)
         productErrors[`productQuantity-${index}`] = "Quantity is required.";
     });
-  
+
     // Step 3 Validation for MR number or customer details
     if (step === 3) {
       if (hasMrNumber === null) {
@@ -797,21 +839,13 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       } else if (hasMrNumber) {
         if (!mrNumber) productErrors["mrNumber"] = "MR Number is required.";
       } else {
-        if (!customerName)
-          productErrors["customerName"] = "Name is required.";
-        if (!customerPhone)
-          productErrors["customerPhone"] = "Phone number is required.";
-        if (!customerAddress)
-          productErrors["customerAddress"] = "Address is required.";
-        if (!customerAge)
-          productErrors["customerAge"] = "Age is required.";
-        if (customerAge && parseInt(customerAge) < 0)
-          productErrors["customerAge"] = "Age cannot be negative.";
-        if (!customerGender)
-          productErrors["customerGender"] = "Gender is required.";
+        // If MR No is false, throw an error
+        alert("Cannot proceed, please contact reception.");
+        dispatch({ type: "SET_WORK_ORDER_FORM", payload: { isSaving: false } });
+        return;
       }
     }
-  
+
     // Handle Product Validation Errors
     if (Object.keys(productErrors).length > 0) {
       setValidationErrors(productErrors);
@@ -853,13 +887,13 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       dispatch({ type: "SET_WORK_ORDER_FORM", payload: { isSaving: false } });
       return;
     }
-  
+
     // Clear errors
     setValidationErrors({});
-  
+
     try {
       let customerId = null;
-  
+
       if (hasMrNumber) {
         // Fetch existing customer by MR number
         const { data: existingCustomer, error: customerError } = await supabase
@@ -867,7 +901,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
           .select("id")
           .eq("mr_number", mrNumber.trim())
           .single();
-  
+
         if (customerError) {
           alert("No valid customer found with the provided MR Number.");
           dispatch({
@@ -876,35 +910,14 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
           });
           return;
         }
-  
+
         customerId = null; // Assuming patient details are stored separately
       } else {
-        // Create new customer
-        const { data: newCustomer, error: customerCreationError } = await supabase
-          .from("customers")
-          .insert({
-            name: customerName.trim(),
-            phone_number: customerPhone.trim(),
-            address: customerAddress.trim(),
-            age: parseInt(customerAge, 10),
-            gender: customerGender,
-          })
-          .select("customer_id") // Ensure correct field selection
-          .single();
-  
-        if (customerCreationError) {
-          console.error("Error creating customer:", customerCreationError.message);
-          alert("Failed to create a new customer.");
-          dispatch({
-            type: "SET_WORK_ORDER_FORM",
-            payload: { isSaving: false },
-          });
-          return;
-        }
-  
-        customerId = newCustomer?.customer_id;
+        window.alert(
+          "Customer does not have an MR number. Contact to Reception "
+        );
       }
-  
+
       // Prepare the payload
       let payload = {
         product_entries: productEntries.map((entry) => ({
@@ -913,26 +926,27 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
           price: parseFloat(entry.price),
           quantity: parseInt(entry.quantity),
           hsn_code: entry.hsn_code,
+
         })),
         advance_details: advance,
         due_date: dueDate,
         mr_number: hasMrNumber ? mrNumber : null,
         patient_details: hasMrNumber
           ? {
-              mr_number: mrNumber.trim(),
-              name: patientDetails?.name || "",
-              age: patientDetails?.age || "",
-              phone_number: patientDetails?.phoneNumber || "",
-              gender: patientDetails?.gender || "",
-              address: patientDetails?.address || "",
-            }
+            mr_number: mrNumber.trim(),
+            name: patientDetails?.name || "",
+            age: patientDetails?.age || "",
+            phone_number: patientDetails?.phoneNumber || "",
+            gender: patientDetails?.gender || "",
+            address: patientDetails?.address || "",
+          }
           : {
-              name: customerName.trim(),
-              phone_number: customerPhone.trim(),
-              address: customerAddress.trim(),
-              age: parseInt(customerAge, 10),
-              gender: customerGender,
-            },
+            name: customerName.trim(),
+            phone_number: customerPhone.trim(),
+            address: customerAddress.trim(),
+            age: parseInt(customerAge, 10),
+            gender: customerGender,
+          },
         employee: workOrderForm.employee,
         payment_method: paymentMethod,
         subtotal,
@@ -948,15 +962,16 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         customer_id: customerId,
         discounted_total: discountedTotal, // from the computed totals
         amount_due: balanceDue,
+        sub_role: subRole,
       };
-  
+
       if (isEditing) {
         payload.work_order_id = workOrderId;
         const { error } = await supabase
           .from("work_orders")
           .update(payload)
           .eq("work_order_id", workOrderId);
-  
+
         if (error) {
           if (error.status === 409) {
             alert("Work Order ID already exists. Generating a new ID...");
@@ -971,7 +986,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
             type: "SET_WORK_ORDER_FORM",
             payload: { allowPrint: true, submitted: true },
           });
-  
+
           try {
             // Fetch the related modification_request(s)
             const { data: modReqData, error: modReqError } = await supabase
@@ -982,7 +997,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
               .in("status", ["approved", "pending"]) // Include 'pending' if applicable
               .order("id", { ascending: false }) // Order by latest first
               .limit(1); // Adjust if multiple modification_requests per work_order
-  
+
             if (modReqError) {
               console.error("Error fetching modification request:", modReqError.message);
               alert("Failed to fetch modification request. Please contact support.");
@@ -993,13 +1008,13 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                 "Attempting to update modification_request with ID:",
                 modificationRequest.id
               );
-  
+
               // Update the modification_request status to 'completed'
               const { error: modificationError } = await supabase
                 .from("modification_requests")
                 .update({ status: "completed", updated_at: new Date().toISOString() })
                 .eq("id", modificationRequest.id);
-  
+
               if (modificationError) {
                 console.error(
                   "Error updating modification request status:",
@@ -1035,9 +1050,9 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         }
         payload.work_order_id = workOrderId;
         payload.created_at = new Date().toISOString();
-  
+
         const { error } = await supabase.from("work_orders").insert(payload);
-  
+
         if (error) {
           if (error.status === 409) {
             alert("Work Order ID already exists. Please try saving again.");
@@ -1045,6 +1060,8 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
             await generateNewWorkOrderId();
           } else {
             alert("Failed to save work order.");
+            console.log(error);
+
           }
         } else {
           alert("Work order saved successfully!");
@@ -1090,8 +1107,9 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     isEditing,
     generateNewWorkOrderId,
     modificationRequestId,
+    subRole,
   ]);
-  
+
 
   // Navigate to the previous step
   const prevStep = useCallback(() => {
@@ -1344,12 +1362,12 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                 productEntries: productEntries.map((entry, i) =>
                   i === index
                     ? {
-                        id: productDetails.product_id,
-                        name: productDetails.product_name,
-                        price: productDetails.mrp || "",
-                        quantity: entry.quantity || "",
-                        hsn_code: productDetails.hsn_code || "",
-                      }
+                      id: productDetails.product_id,
+                      name: productDetails.product_name,
+                      price: productDetails.mrp || "",
+                      quantity: entry.quantity || "",
+                      hsn_code: productDetails.hsn_code || "",
+                    }
                     : entry
                 ),
               },
@@ -1707,17 +1725,13 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
               <button
                 type="button"
                 onClick={() => {
+                  alert("Cannot proceed without MR number. Please contact reception to create new customer.");
                   dispatch({
                     type: "SET_WORK_ORDER_FORM",
-                    payload: { hasMrNumber: false },
+                    payload: { hasMrNumber: null },
                   });
-                  setValidationErrors((prev) => {
-                    const { hasMrNumber, ...rest } = prev;
-                    return rest;
-                  });
-                  // Move focus to Customer Name input
                   setTimeout(() => {
-                    customerNameRef.current?.focus();
+                    yesButtonRef.current?.focus();
                   }, 0);
                 }}
                 ref={noButtonRef}
@@ -1806,148 +1820,34 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                 )}
               </>
             ) : (
-              <>
-                {/* Customer Name Input */}
-                <div>
-                  <label className="block text-gray-700 font-medium mb-1">
-                    Name
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Enter Name"
-                    value={customerName}
-                    onChange={(e) =>
-                      dispatch({
-                        type: "SET_WORK_ORDER_FORM",
-                        payload: { customerName: e.target.value },
-                      })
-                    }
-                    onKeyDown={(e) => handleEnterKey(e, customerPhoneRef)}
-                    ref={customerNameRef}
-                    className={`border border-gray-300 w-full px-4 py-3 rounded-lg ${validationErrors.customerName ? "border-red-500" : ""
-                      }`}
-                    aria-label="Enter Name"
-                  />
-                  {validationErrors.customerName && (
-                    <p className="text-red-500 text-xs mt-1">
-                      {validationErrors.customerName}
-                    </p>
-                  )}
+              <div className="flex flex-col items-center justify-center p-8 bg-red-50 border-2 border-red-200 rounded-lg mt-4">
+                <div className="text-red-600 mb-4">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
                 </div>
-                {/* Customer Phone Number Input */}
-                <div>
-                  <label className="block text-gray-700 font-medium mb-1">
-                    Phone Number
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Enter Phone Number"
-                    value={customerPhone}
-                    onChange={(e) =>
-                      dispatch({
-                        type: "SET_WORK_ORDER_FORM",
-                        payload: { customerPhone: e.target.value },
-                      })
-                    }
-                    onKeyDown={(e) => handleEnterKey(e, customerAddressRef)}
-                    ref={customerPhoneRef}
-                    className={`border border-gray-300 w-full px-4 py-3 rounded-lg ${validationErrors.customerPhone ? "border-red-500" : ""
-                      }`}
-                    aria-label="Enter Phone Number"
-                  />
-                  {validationErrors.customerPhone && (
-                    <p className="text-red-500 text-xs mt-1">
-                      {validationErrors.customerPhone}
-                    </p>
-                  )}
+                <h3 className="text-xl font-bold text-red-700 mb-2">MR Number Required</h3>
+                <div className="text-center mb-6">
+                  <p className="text-gray-700 text-lg mb-2">
+                    New customer registration can only be done at reception.
+                  </p>
+                  <p className="text-gray-600">
+                    Please direct the customer to reception desk.
+                  </p>
                 </div>
-                {/* Customer Address Input */}
-                <div>
-                  <label className="block text-gray-700 font-medium mb-1">
-                    Address
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Enter Address"
-                    value={customerAddress}
-                    onChange={(e) =>
-                      dispatch({
-                        type: "SET_WORK_ORDER_FORM",
-                        payload: { customerAddress: e.target.value },
-                      })
-                    }
-                    onKeyDown={(e) => handleEnterKey(e, customerAgeRef)}
-                    ref={customerAddressRef}
-                    className={`border border-gray-300 w-full px-4 py-3 rounded-lg ${validationErrors.customerAddress ? "border-red-500" : ""
-                      }`}
-                    aria-label="Enter Customer Address"
-                  />
-                  {validationErrors.customerAddress && (
-                    <p className="text-red-500 text-xs mt-1">
-                      {validationErrors.customerAddress}
-                    </p>
-                  )}
-                </div>
-                {/* Customer Age Input */}
-                <div>
-                  <label className="block text-gray-700 font-medium mb-1">
-                    Age
-                  </label>
-                  <input
-                    type="number"
-                    placeholder="Enter Age"
-                    value={customerAge}
-                    onChange={(e) =>
-                      dispatch({
-                        type: "SET_WORK_ORDER_FORM",
-                        payload: { customerAge: e.target.value },
-                      })
-                    }
-                    onKeyDown={(e) => handleEnterKey(e, customerGenderRef)}
-                    ref={customerAgeRef}
-                    className={`border border-gray-300 w-full px-4 py-3 rounded-lg ${validationErrors.customerAge ? "border-red-500" : ""
-                      }`}
-                    aria-label="Enter Age"
-                  />
-                  {validationErrors.customerAge && (
-                    <p className="text-red-500 text-xs mt-1">
-                      {validationErrors.customerAge}
-                    </p>
-                  )}
-                </div>
-                {/* Customer Gender Input */}
-                <div>
-                  <label className="block text-gray-700 font-medium mb-1">
-                    Gender
-                  </label>
-                  <select
-                    value={customerGender}
-                    onChange={(e) =>
-                      dispatch({
-                        type: "SET_WORK_ORDER_FORM",
-                        payload: { customerGender: e.target.value },
-                      })
-                    }
-                    onKeyDown={(e) => handleEnterKey(e, nextButtonRef)}
-                    ref={customerGenderRef}
-                    className={`border border-gray-300 w-full px-4 py-3 rounded-lg ${validationErrors.customerGender ? "border-red-500" : ""
-                      }`}
-                    aria-label="Select Gender"
-                  >
-                    <option value="" disabled>
-                      Select Gender
-                    </option>
-                    <option value="M">Male</option>
-                    <option value="F">Female</option>
-                    <option value="Other">Other</option>
-                  </select>
-                  {validationErrors.customerGender && (
-                    <p className="text-red-500 text-xs mt-1">
-                      {validationErrors.customerGender}
-                    </p>
-                  )}
-                </div>
-              </>
+                <button
+                  type="button"
+                  onClick={() => {
+                    dispatch({
+                      type: "SET_WORK_ORDER_FORM",
+                      payload: { hasMrNumber: null }
+                    });
+                  }}
+                  className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-lg transition-colors"
+                >
+                  Back
+                </button>
+              </div>
             )}
           </div>
         )}
@@ -2193,17 +2093,17 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                       Amt. after discount:<strong> ₹{subtotal.toFixed(2)}</strong>
                     </p> */}
 
-                    <p>
-                    Amt. after discount:
+                    {/* <p>
+                      Amt. after discount:
                       <strong> ₹{discountedSubtotal.toFixed(2)}</strong>
-                    </p>
+                    </p> */}
 
-                    <p>
+                    {/* <p>
                       CGST (6%):<strong> ₹{cgst.toFixed(2)}</strong>
                     </p>
                     <p>
                       SGST (6%):<strong> ₹{sgst.toFixed(2)}</strong>
-                    </p>
+                    </p> */}
                     <p>
                       Payment Method:
                       <strong>
@@ -2227,7 +2127,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                       Advance Paid:<strong> ₹{advance.toFixed(2)}</strong>
                     </p>
                     <p className="text-xl">
-                      <strong>Total Amount (Incl. GST):{" "}
+                      <strong>Total Amount :{" "}
                         ₹{discountedTotal.toFixed(2)}</strong>
                     </p>
                     <p className="text-xl">

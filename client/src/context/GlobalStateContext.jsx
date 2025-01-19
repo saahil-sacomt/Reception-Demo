@@ -3,7 +3,8 @@
 import React, { createContext, useContext, useReducer, useEffect } from "react";
 import merge from "lodash.merge";
 
-const savedState = {}; // Remove localStorage retrieval
+// Initialize savedState as needed or keep it empty
+const savedState = {}; // Remove localStorage retrieval if not used
 
 // Create a context
 const GlobalStateContext = createContext();
@@ -152,10 +153,17 @@ const globalStateReducer = (state, action) => {
     case "SET_SALES_ORDER_FORM":
       return {
         ...state,
-        salesOrderForm: { ...state.salesOrderForm, ...action.payload },
+        salesOrderForm: {
+          ...state.salesOrderForm,
+          ...action.payload,
+        },
       };
+
     case "RESET_SALES_ORDER_FORM":
-      return { ...state, salesOrderForm: defaultInitialState.salesOrderForm };
+      return {
+        ...state,
+        salesOrderForm: { ...defaultInitialState.salesOrderForm },
+      };
 
     // WorkOrderForm actions
     case "SET_WORK_ORDER_FORM":
@@ -275,7 +283,7 @@ const globalStateReducer = (state, action) => {
         ...state,
         branches: action.payload,
       };
-      case "RESET_STATE":
+    case "RESET_STATE":
       return { ...defaultInitialState };
 
     default:
@@ -283,61 +291,12 @@ const globalStateReducer = (state, action) => {
   }
 };
 
-// Create a provider component
+// Provider Component
 export const GlobalStateProvider = ({ children }) => {
   const [state, dispatch] = useReducer(globalStateReducer, initialState);
 
-  // **Remove localStorage persistence to reset state on refresh**
-  /*
-  useEffect(() => {
-    localStorage.setItem("globalState", JSON.stringify(state));
-  }, [state]);
-  */
-
-  /*
-  const resetState = () => {
-    localStorage.removeItem("globalState");
-    dispatch({ type: "RESET_SALES_ORDER_FORM" });
-    dispatch({ type: "RESET_WORK_ORDER_FORM" });
-    dispatch({ type: "RESET_MODAL_STATES" });
-    dispatch({ type: "RESET_SELECTED_WORK_ORDER" });
-    dispatch({ type: "RESET_SELECTED_SALES_ORDER" });
-    dispatch({ type: "RESET_PURCHASE_MODAL" });
-    dispatch({ type: "RESET_STOCK_ASSIGNMENT_FORM" });
-    dispatch({ type: "RESET_NOTES_FORM" });
-    dispatch({ type: "SET_IS_UPLOADING", payload: false });
-  };
-  */
-
-  const resetState = () => {
-    // If you're using localStorage, uncomment the line below
-    // localStorage.removeItem("globalState");
-  
-    dispatch({ type: "RESET_STATE" }); // We'll handle this action in the reducer
-  };
-  
-
-  /*
-  useEffect(() => {
-    const handlePageRefresh = () => {
-      if (state.isUploading) {
-        resetState();
-      }
-    };
-
-    window.addEventListener("beforeunload", handlePageRefresh);
-
-    return () => {
-      window.removeEventListener("beforeunload", handlePageRefresh);
-    };
-  }, [state.isUploading]); // Add isUploading to dependencies
-  */
-
-  // **Optionally, reset state on every render by not persisting**
-  // This ensures state resets on every refresh
-
   return (
-    <GlobalStateContext.Provider value={{ state, dispatch,resetState }}>
+    <GlobalStateContext.Provider value={{ state, dispatch }}>
       {children}
     </GlobalStateContext.Provider>
   );

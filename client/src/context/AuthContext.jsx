@@ -10,25 +10,26 @@ export const AuthProvider = ({ children }) => {
   const [name, setName] = useState(null);
   const [role, setRole] = useState(null);
   const [branch, setBranch] = useState(null);
+  const [subRole, setSubRole] = useState(null); // New state for subRole
   const [loading, setLoading] = useState(true);
 
   const fetchUserDetails = async (userId) => {
     try {
       const { data, error } = await supabase
         .from('employees')
-        .select('role, name,branch')
+        .select('role, name,branch,sub_role') // Added sub_role to the select
         .eq('auth_user_id', userId)
         .single();
 
       if (error) {
         console.error("Error fetching role:", error);
-        return { role: null, name: null, branch:null };
+        return { role: null, name: null, branch: null };
       }
 
-      return { role: data.role || null, name: data.name || null, branch: data.branch || null };
+      return { role: data.role || null, name: data.name || null, branch: data.branch || null , subRole: data.sub_role || null }; // Added subRole to the return
     } catch (err) {
       console.error("Unexpected error fetching role:", err);
-      return { role: null, name: null, branch:null };
+      return { role: null, name: null, branch: null , subRole: null }; // Added subRole to the return
     }
   };
 
@@ -42,6 +43,7 @@ export const AuthProvider = ({ children }) => {
       setRole(userDetails.role);
       setName(userDetails.name);
       setBranch(userDetails.branch);
+      setSubRole(userDetails.subRole); // Set the subRole state
       // console.log("User role set to:", userDetails.role);
       // console.log("User name set to:", userDetails.name);
       // console.log("User name set to:", userDetails.branch);
@@ -58,6 +60,7 @@ export const AuthProvider = ({ children }) => {
         setRole(null);
         setName(null);
         setBranch(null);
+        setSubRole(null); // Reset the subRole state
       }
     });
 
@@ -82,10 +85,11 @@ export const AuthProvider = ({ children }) => {
     setRole(null);
     setName(null);
     setBranch(null);
+    setSubRole(null); // Reset subRole
   };
 
   return (
-    <AuthContext.Provider value={{ user, role, name,branch, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, role, name, branch, login, logout, loading , subRole }}> 
       {children}
     </AuthContext.Provider>
   );

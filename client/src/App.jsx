@@ -99,7 +99,7 @@ const App = () => {
             <Route
               element={
                 <RequireAuth
-                  allowedRoles={["super_admin", "admin", "employee"]}
+                  allowedRoles={["super_admin", "admin", "employee" , "counselling" , "opd" , "reception"]}
                 />
               }
             >

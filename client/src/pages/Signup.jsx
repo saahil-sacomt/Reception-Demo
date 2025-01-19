@@ -43,26 +43,26 @@ const Signup = () => {
 
 
   const subDepartmentsByRoleAndBranch = {
-    reception: {
-      NTA: ['Reception NTA-A', 'Reception NTA-B'],
-      TVR: ['Reception TVR-X', 'Reception TVR-Y'],
-      KOT1: ['Reception K1-A'],
-      KOT2: ['Reception K2-A'],
-      KAT: ['Reception KAT-A'],
-    },
+    // reception: {
+    //   NTA: ['Reception NTA-01', 'Reception NTA-02'],
+    //   TVR: ['Reception TVR-01', 'Reception TVR-01'],
+    //   KOT1: ['Reception K1-01'],
+    //   KOT2: ['Reception K2-01'],
+    //   KAT: ['Reception KAT-01'],
+    // },
     counselling: {
-      NTA: ['Counselling A', 'Counselling B'],
-      TVR: ['Counselling X', 'Counselling Y'],
-      KOT1: ['Counselling K1-A'],
-      KOT2: ['Counselling K2-A'],
-      KAT: ['Counselling KAT-A'],
+      NTA: ['Counselling 01', 'Counselling 02'],
+      TVR: ['Counselling 01', 'Counselling 02'],
+      KOT1: ['Counselling K1-01'],
+      KOT2: ['Counselling K2-01'],
+      KAT: ['Counselling KAT-01'],
     },
     opd: {
-      NTA: ['OPD 1', 'OPD 2'],
-      TVR: ['OPD X', 'OPD Y'],
-      KOT1: ['OPD K1-A'],
-      KOT2: ['OPD K2-A'],
-      KAT: ['OPD KAT-A'],
+      NTA: ['OPD 01', 'OPD 02'],
+      TVR: ['OPD 01', 'OPD 02'],
+      KOT1: ['OPD K1-01'],
+      KOT2: ['OPD K2-01'],
+      KAT: ['OPD KAT-01'],
     },
   };
 
@@ -416,7 +416,7 @@ const Signup = () => {
               </div>
 
               {/* Sub-Department Selection */}
-              {['reception', 'counselling', 'opd'].includes(role) && (
+              {[ 'counselling', 'opd'].includes(role) && (
 
                 <div>
                   <label htmlFor="subRole" className="block text-sm font-medium text-gray-700 mt-4">

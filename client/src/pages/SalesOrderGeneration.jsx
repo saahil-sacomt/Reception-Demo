@@ -11,7 +11,8 @@ import supabase from "../supabaseClient";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import EmployeeVerification from "../components/EmployeeVerification";
-import { useGlobalState } from "../context/GlobalStateContext";
+import { useGlobalState} from "../context/GlobalStateContext";
+import { XMarkIcon } from '@heroicons/react/24/solid'; // For solid icons
 
 const today = new Date();
 const dd = String(today.getDate()).padStart(2, "0");
@@ -50,12 +51,11 @@ const fetchCustomerByPhone = async (phone) => {
   const { data, error } = await supabase
     .from("customers")
     .select("*")
-    .eq("phone_number", phone)
-    .order("created_at", { ascending: false });
+    .eq("phone_number", phone);
 
   if (error) {
-    console.error("Error fetching customer by phone:", error.message);
-    return null;
+    console.error("Error fetching customers:", error);
+    return [];
   }
   return data;
 };
@@ -102,6 +102,7 @@ const fetchProductDetailsFromDatabase = async (productId, branch) => {
 
 // Helper function to calculate loyalty points
 const calculateLoyaltyPoints = (
+  amountAfterDiscount, // Add this parameter
   subtotalWithGST,
   redeemPointsAmount,
   privilegeCard,
@@ -317,10 +318,10 @@ function calculateAmounts(
   const finalAmount = balanceDue.toFixed(2); // Final amount after all deductions
 
   return {
+    amountAfterDiscount: amountAfterDiscount.toFixed(2), // Add this line
     subtotalWithGST: subtotalWithGST.toFixed(2),
     subtotalWithoutGST: taxableValue.toFixed(2), // Add this line
     totalDiscount: totalDiscount.toFixed(2),
-    amountAfterDiscount: amountAfterDiscount.toFixed(2),
     taxableValue: taxableValue.toFixed(2),
     gstAmount: gstAmount.toFixed(2),
     cgstAmount: cgstAmount.toFixed(2),
@@ -334,8 +335,11 @@ function calculateAmounts(
 
 // Main Component
 const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
-  const { user, role, name, branch, loading: authLoading } = useAuth();
+  const { user, role, name, branch, loading: authLoading, subRole } = useAuth();
   console.log("branch:", branch); // Destructure branch from AuthContext
+  console.log("subRole:", subRole); // Destructure subRole from AuthContext
+  const [validationErrors, setValidationErrors] = useState({});
+
 
   const { state, dispatch, resetState } = useGlobalState(); // Access global state
   const { salesOrderForm } = state;
@@ -387,7 +391,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     privilegeCardDetails,
     loyaltyPoints,
     pointsToAdd,
-    validationErrors,
+    // validationErrors,
     redeemOption,
     redeemPointsAmount,
     fetchMethod,
@@ -408,6 +412,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
   const [employees, setEmployees] = useState([]);
   const [productSuggestions, setProductSuggestions] = useState([]);
   const [isGeneratingId, setIsGeneratingId] = useState(false);
+  
 
   // Refs for input fields to control focus
   const workOrderInputRef = useRef(null);
@@ -432,6 +437,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
   const discountInputRef = useRef(null);
   const productRefs = useRef([]);
   const quantityRefs = useRef([]);
+  const gstNumberRef = useRef(null);
+
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -439,7 +446,10 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
 
   // Helper function to update global form state
   const updateSalesOrderForm = (payload) => {
-    dispatch({ type: "SET_SALES_ORDER_FORM", payload });
+    dispatch({
+      type: "SET_SALES_ORDER_FORM",
+      payload,
+    });
   };
 
   // Function to create a new customer
@@ -551,6 +561,18 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         branchDefaultIds[branch]
       ); // Debugging: check the default ID for the branch
 
+
+      // Extract OP Number from selected work order
+      let opNumber = "01"; // Default OP Number
+      if (selectedWorkOrder && selectedWorkOrder.work_order_id) {
+        // Assuming work_order_id format is "OPW-XX-XXX" where XX is the OP number
+        const match = selectedWorkOrder.work_order_id.match(/OPW-(\d+)-/);
+        if (match && match[1]) {
+          opNumber = match[1];
+          console.log("Extracted OP Number:", opNumber);
+        }
+      }
+
       // Fetch the maximum sales_order_id for the specific branch
       const { data, error } = await supabase
         .from("sales_orders")
@@ -579,7 +601,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
       console.log("Calculated lastSalesOrderId:", lastSalesOrderId); // Debugging: check lastSalesOrderId
 
       // Increment the last sales_order_id by 1
-      const newSalesOrderId = lastSalesOrderId + 1;
+      let newSalesOrderId = lastSalesOrderId + 1;
+      newSalesOrderId = `OPS-${opNumber}-${String(newSalesOrderId + 1).padStart(3, "0")}`;
 
       // Optionally, you can update the sales order form with the new ID
       updateSalesOrderForm({ salesOrderId: newSalesOrderId });
@@ -1247,7 +1270,9 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         selectedWorkOrder.customer_phone;
 
       if (customerPhone) {
-        const customer = await fetchCustomerByPhone(customerPhone.trim());
+        // console.log("Fetching customer details using phone number:", customerPhone.trim());
+        
+        const customer = await fetchCustomerByPhone(customerPhone);
         if (customer) {
           updateSalesOrderForm({
             patientDetails: {
@@ -1505,24 +1530,17 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
       } else {
         delete errors[`productPrice-${index}`];
       }
-    } else if (field === "quantity" && productEntries[index].stock > 0) {
+    } else if (field === "quantity") {
       const quantity = parseInt(productEntries[index].quantity, 10);
       if (!quantity) {
         errors[`productQuantity-${index}`] = "Quantity is required";
       } else if (quantity <= 0) {
-        errors[`productQuantity-${index}`] =
-          "Quantity must be greater than zero";
-      } else if (quantity > productEntries[index].stock) {
-        errors[
-          `productQuantity-${index}`
-        ] = `Quantity cannot exceed stock (${productEntries[index].stock})`;
+        errors[`productQuantity-${index}`] = "Quantity must be greater than zero";
       } else {
         delete errors[`productQuantity-${index}`];
       }
     } else {
-      delete errors[
-        `product${field.charAt(0).toUpperCase() + field.slice(1)}-${index}`
-      ];
+      delete errors[`product${field.charAt(0).toUpperCase() + field.slice(1)}-${index}`];
     }
 
     updateSalesOrderForm({
@@ -1542,30 +1560,14 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           "Work Order ID, MR Number, or Phone Number is required";
       // No need to validate branchCode as branch is fetched from context
     } else if (step === 1) {
-      // Check if any product has stock <=0
-      const stockIssues = productEntries.filter(
-        (product) => product.stock <= 0
-      );
-      if (stockIssues.length > 0) {
-        errors.stock =
-          "One or more products have zero or negative stock. Please adjust.";
-      }
-
       productEntries.forEach((product, index) => {
-        if (!product.id)
-          errors[`productId-${index}`] = "Product ID is required";
-        if (!product.price)
-          errors[`productPrice-${index}`] = "Price is required";
-        if (product.stock > 0 && !product.quantity)
-          errors[`productQuantity-${index}`] = "Quantity is required";
-        else if (product.stock > 0) {
+        if (!product.id) errors[`productId-${index}`] = "Product ID is required";
+        if (!product.price) errors[`productPrice-${index}`] = "Price is required";
+        if (!product.quantity) errors[`productQuantity-${index}`] = "Quantity is required";
+        else {
           const quantity = parseInt(product.quantity, 10);
           if (isNaN(quantity) || quantity <= 0) {
             errors[`productQuantity-${index}`] = "Enter a valid quantity";
-          } else if (quantity > product.stock) {
-            errors[
-              `productQuantity-${index}`
-            ] = `Cannot exceed stock (${product.stock})`;
           }
         }
       });
@@ -1673,8 +1675,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     if (step === 0) {
       workOrderInputRef.current?.focus();
     }
-    
-    
+
+
     if (step === 1) document.getElementById(`productId-0`)?.focus();
     if (step === 2) {
       if (hasMrNumber === "yes") {
@@ -1694,7 +1696,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     if (step === 5) {
       discountInputRef.current?.focus();
     }
-    
+
   };
 
   const setSearchQuery = (query) => {
@@ -1712,10 +1714,10 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
   const handleOrderCompletion = async () => {
     console.log("Submit handler triggered");
     const currentUTCDateTime = getCurrentUTCDateTime();
-  
+
     if (isSaving) return;
     if (submitted) return; // Prevent duplicate clicks
-  
+
     updateSalesOrderForm({ isSaving: true }); // Set isSaving to true
     updateSalesOrderForm({
       validationErrors: {
@@ -1723,10 +1725,10 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         generalError: "",
       },
     });
-  
+
     try {
       let customerId = null;
-  
+
       // **Step 1: Save Customer Details (if applicable)**
       if (hasMrNumber === "no") {
         // Validate Customer Details
@@ -1740,7 +1742,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         if (!age || parseInt(age, 10) <= 0)
           customerErrors.customerAge = "Age must be a positive number.";
         if (!gender) customerErrors.customerGender = "Gender is required.";
-  
+
         if (Object.keys(customerErrors).length > 0) {
           updateSalesOrderForm({
             validationErrors: {
@@ -1751,7 +1753,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           updateSalesOrderForm({ isSaving: false });
           return;
         }
-  
+
         // Call saveCustomerDetails with customer details
         const savedCustomer = await saveCustomerDetails({
           name: customerName,
@@ -1760,14 +1762,14 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           gender,
           age: parseInt(age, 10),
         });
-  
+
         if (savedCustomer && savedCustomer.length > 0) {
           customerId = savedCustomer[0].customer_id; // Retrieve customer_id from the first inserted record
         } else {
           throw new Error("Failed to retrieve customer_id after insertion.");
         }
       }
-  
+
       // **Step 2: Handle Loyalty Points Update (if applicable)**
       if (privilegeCard && privilegeCardDetails) {
         const { updatedPoints, pointsToRedeem, pointsToAdd } = calculateLoyaltyPoints(
@@ -1777,12 +1779,12 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           privilegeCardDetails,
           loyaltyPoints
         );
-  
+
         const { error: loyaltyError } = await supabase
           .from("privilegecards")
           .update({ loyalty_points: updatedPoints })
           .eq("pc_number", privilegeCardDetails.pc_number);
-  
+
         if (loyaltyError) {
           console.error("Error updating loyalty points:", loyaltyError);
           updateSalesOrderForm({
@@ -1794,19 +1796,19 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           updateSalesOrderForm({ isSaving: false });
           return;
         }
-  
+
         updateSalesOrderForm({
           loyaltyPoints: updatedPoints,
           pointsToAdd: pointsToAdd,
         });
       }
-  
+
       // **Step 3: Prepare Variables for Sales Data**
       const sanitizedRedeemedPoints = privilegeCard
         ? parseInt(redeemPointsAmount) || 0
         : 0;
       const sanitizedPointsAdded = privilegeCard ? pointsToAdd || 0 : 0;
-  
+
       if (isEditing) {
         // **Step 4: Update Existing Sales Order**
         const updatePayload = {
@@ -1841,14 +1843,14 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           branch: branch,
           // **Important:** Do NOT include 'modification_request_id' or any other invalid fields
         };
-  
+
         console.log("Update Payload:", updatePayload); // Debugging: Inspect the payload
-  
+
         const { error: updateError } = await supabase
           .from("sales_orders")
           .update(updatePayload)
           .eq("sales_order_id", salesOrderId);
-  
+
         if (updateError) {
           console.error("Error updating sales order:", updateError);
           updateSalesOrderForm({
@@ -1860,16 +1862,16 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           updateSalesOrderForm({ isSaving: false });
           return;
         }
-  
+
         // **Step 5: Handle Stock Updates for Modifications**
         // Calculate differences between original and updated products
         const differences = calculateProductDifferences(
           originalProductEntries,
           productEntries
         );
-  
+
         console.log("Product Differences:", differences);
-  
+
         // Process each difference
         for (const diff of differences) {
           const { productId, diff: quantityChange } = diff;
@@ -1880,7 +1882,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
             .eq("product_id", productId)
             .eq("branch_code", branch)
             .single();
-  
+
           if (stockError || !stockData) {
             console.error(
               `Error fetching stock for product ID ${productId}:`,
@@ -1895,9 +1897,9 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
             updateSalesOrderForm({ isSaving: false });
             return;
           }
-  
+
           let newQuantity = stockData.quantity + quantityChange;
-  
+
           if (newQuantity < 0) {
             updateSalesOrderForm({
               validationErrors: {
@@ -1908,14 +1910,14 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
             updateSalesOrderForm({ isSaving: false });
             return;
           }
-  
+
           // Update stock
           const { error: stockUpdateError } = await supabase
             .from("stock")
             .update({ quantity: newQuantity })
             .eq("product_id", productId)
             .eq("branch_code", branch);
-  
+
           if (stockUpdateError) {
             console.error(
               `Error updating stock for product ID ${productId}:`,
@@ -1931,7 +1933,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
             return;
           }
         }
-  
+
         // **Step 6: Update Modification Request Status**
         // Fetch the 'id' (primary key) of the updated sales order
         const { data: updatedSalesOrderData, error: fetchUpdatedError } =
@@ -1940,13 +1942,13 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
             .select("id")
             .eq("sales_order_id", salesOrderId)
             .single();
-  
+
         if (fetchUpdatedError || !updatedSalesOrderData) {
           console.error("Error fetching updated sales order ID:", fetchUpdatedError);
           alert("Failed to fetch updated sales order ID.");
         } else {
           const salesOrderRecordId = updatedSalesOrderData.id;
-  
+
           // Now, update the corresponding modification request(s)
           try {
             // Fetch modification requests related to this sales order
@@ -1956,7 +1958,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
               .eq("order_id", salesOrderId) // Use 'salesOrderRecordId' here
               .eq("order_type", "sales_order")
               .eq("status", "approved"); // Assuming 'pending' is the correct status
-  
+
             if (modReqError) {
               console.error("Error fetching modification request:", modReqError);
               // Optionally handle the error as needed
@@ -1968,12 +1970,12 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                   "Attempting to update modification_request with ID:",
                   modificationRequestId
                 );
-  
+
                 const { error: modificationError } = await supabase
                   .from("modification_requests")
                   .update({ status: "completed" })
                   .eq("id", modificationRequestId);
-  
+
                 if (modificationError) {
                   console.error(
                     "Error updating modification request status:",
@@ -1996,7 +1998,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
             );
           }
         }
-  
+
         alert("Sales order updated successfully!");
         updateSalesOrderForm({
           allowPrint: true,
@@ -2015,7 +2017,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           updateSalesOrderForm({ isSaving: false });
           return;
         }
-  
+
         const insertPayload = {
           sales_order_id: newSalesOrderId,
           work_order_id: selectedWorkOrder
@@ -2049,13 +2051,13 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           branch: branch,
           // **Important:** Do NOT include 'modification_request_id' or any other invalid fields
         };
-  
+
         console.log("Insert Payload:", insertPayload); // Debugging: Inspect the payload
-  
+
         const { error: insertError } = await supabase
           .from("sales_orders")
           .insert(insertPayload);
-  
+
         if (insertError) {
           console.error("Error inserting sales order:", insertError);
           updateSalesOrderForm({
@@ -2067,14 +2069,14 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           updateSalesOrderForm({ isSaving: false });
           return;
         }
-  
+
         // **Step 5: Mark Work Order as Used (if applicable)**
         if (selectedWorkOrder) {
           const { error: workOrderError } = await supabase
             .from("work_orders")
             .update({ is_used: true })
             .eq("work_order_id", selectedWorkOrder.work_order_id);
-  
+
           if (workOrderError) {
             console.error("Error marking work order as used:", workOrderError);
             updateSalesOrderForm({
@@ -2087,12 +2089,12 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
             return;
           }
         }
-  
+
         // **Step 6: Deduct Stock for New Orders**
         const validProducts = productEntries.filter(
           (product) => product.id && product.quantity > 0
         );
-  
+
         if (!validProducts || validProducts.length === 0) {
           console.error("No valid products to process");
           updateSalesOrderForm({
@@ -2104,9 +2106,9 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           updateSalesOrderForm({ isSaving: false });
           return;
         }
-  
+
         console.log("Valid Products for Deduction:", validProducts);
-  
+
         // Fetch current stock for all valid products in one query
         const productIds = validProducts.map((prod) => prod.id); // Use integer ids
         const { data: stockData, error: stockError } = await supabase
@@ -2114,7 +2116,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           .select("product_id, quantity")
           .in("product_id", productIds)
           .eq("branch_code", branch);
-  
+
         if (stockError || !stockData) {
           console.error("Error fetching stock data:", stockError);
           updateSalesOrderForm({
@@ -2126,18 +2128,18 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           updateSalesOrderForm({ isSaving: false });
           return;
         }
-  
+
         // Create a map of current stock
         const stockMap = new Map();
         stockData.forEach((stock) => {
           stockMap.set(stock.product_id, stock.quantity);
         });
-  
+
         // Validate stock deductions
         for (const product of validProducts) {
           const currentStock = stockMap.get(product.id) || 0;
           const newStock = currentStock - product.quantity;
-  
+
           if (newStock < 0) {
             updateSalesOrderForm({
               validationErrors: {
@@ -2149,7 +2151,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
             return;
           }
         }
-  
+
         // Update stock quantities in bulk
         const updateStockPromises = validProducts.map((product) => {
           const newQuantity = stockMap.get(product.id) - product.quantity;
@@ -2159,14 +2161,14 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
             .eq("product_id", product.id)
             .eq("branch_code", branch);
         });
-  
+
         const updateStockResults = await Promise.all(updateStockPromises);
-  
+
         // Check for any errors in stock updates
         const stockUpdateErrors = updateStockResults.filter(
           (result) => result.error
         );
-  
+
         if (stockUpdateErrors.length > 0) {
           console.error("Error updating stock levels:", stockUpdateErrors);
           updateSalesOrderForm({
@@ -2178,17 +2180,17 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           updateSalesOrderForm({ isSaving: false, submitted: true });
           return;
         }
-  
+
         alert("Sales order created successfully!");
         updateSalesOrderForm({
           allowPrint: true,
           submitted: true,
         });
       }
-  
+
       // **Step 7: Final Steps: Reset Form and Allow Printing**
       updateSalesOrderForm({ allowPrint: true, submitted: true });
-  
+
       alert("Order processed successfully!");
       setTimeout(() => {
         printButtonRef.current?.focus(); // Move focus to the Print button
@@ -2205,7 +2207,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
       updateSalesOrderForm({ isSaving: false, submitted: true }); // Set isSaving to false
     }
   };
-  
+
 
   // Function to reset the form
   const resetForm = () => {
@@ -2229,15 +2231,15 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     setIsGeneratingId(false);
   };
 
-  // Confirm and reset the form
+
   const handleExit = () => {
     if (
       window.confirm(
-        "Are you sure you want to exit? Unsaved changes will be lost."
+        "Are you sure you want to exit?"
       )
     ) {
-      resetState(); // Reset the state
-      navigate("/home"); // Redirect to the home page or another page
+      dispatch({ type: "RESET_SALES_ORDER_FORM" });
+    navigate("/home");
     }
   };
 
@@ -2247,6 +2249,215 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     resetForm();
     navigate("/home");
   }, [dispatch, navigate]);
+
+
+  // Function to save the sales order
+  const saveSalesOrder = async () => {
+    if (isSaving) {
+      alert("Please wait while the sales order is being saved.");
+      return;
+    }
+
+    if (submitted) {
+      alert("Sales order submitted already");
+      return;
+    }
+
+    dispatch({ type: "SET_SALES_ORDER_FORM", payload: { isSaving: true } });
+
+    // Validation Checks
+    const validations = [
+      {
+        condition: !employee,
+        errorKey: "employee",
+        message: "Employee selection is required.",
+        ref: employeeRef,
+      },
+      {
+        condition: isB2B && !gstNumber,
+        errorKey: "gstNumber",
+        message: "GST Number is required for B2B orders.",
+        ref: gstNumberRef,
+      },
+      {
+        condition:
+          discount &&
+          (isNaN(discount) || discount < 0 || parseFloat(discount) > subtotalWithoutGST),
+        errorKey: "discountAmount",
+        message: "Enter a valid discount amount that does not exceed the subtotal.",
+        ref: discountInputRef,
+      },
+      {
+        condition: !paymentMethod,
+        errorKey: "paymentMethod",
+        message: "Payment method is required.",
+        ref: paymentMethodRef,
+      },
+    ];
+
+    for (const validation of validations) {
+      if (validation.condition) {
+        setValidationErrors((prev) => ({
+          ...prev,
+          [validation.errorKey]: validation.message,
+        }));
+        validation.ref.current?.focus();
+        dispatch({ type: "SET_SALES_ORDER_FORM", payload: { isSaving: false } });
+        return;
+      }
+    }
+
+    // Validate product entries
+    const productErrors = {};
+    productEntries.forEach((product, index) => {
+      if (!product.id) {
+        productErrors[`productId-${index}`] = "Product ID is required";
+      }
+      if (!product.price) {
+        productErrors[`productPrice-${index}`] = "Product price is required";
+      }
+      if (!product.quantity) {
+        productErrors[`productQuantity-${index}`] = "Product quantity is required";
+      }
+    });
+
+    if (Object.keys(productErrors).length > 0) {
+      setValidationErrors(productErrors);
+      const firstErrorKey = Object.keys(productErrors)[0];
+      if (
+        firstErrorKey.startsWith("productId") ||
+        firstErrorKey.startsWith("productPrice") ||
+        firstErrorKey.startsWith("productQuantity")
+      ) {
+        const index = parseInt(firstErrorKey.split("-")[1], 10);
+        quantityRefs.current[index]?.focus();
+      }
+      dispatch({ type: "SET_SALES_ORDER_FORM", payload: { isSaving: false } });
+      return;
+    }
+
+    try {
+      // Generate new sales order ID
+      const newSalesOrderId = await generateSalesOrderId(branch);
+      if (!newSalesOrderId) {
+        alert("Failed to generate sales order ID");
+        dispatch({ type: "SET_SALES_ORDER_FORM", payload: { isSaving: false } });
+        return;
+      }
+
+      // Calculate amounts
+      const {
+        subtotalWithGST,
+        subtotalWithoutGST,
+        totalDiscount,
+        amountAfterDiscount,
+        taxableValue,
+        gstAmount,
+        cgstAmount,
+        sgstAmount,
+        advance,
+        balanceDue,
+        privilegeDiscount,
+        finalAmount,
+      } = calculateAmounts(
+        productEntries,
+        advanceDetails,
+        discount,
+        workOrderDiscount,
+        privilegeCard,
+        privilegeCardDetails,
+        redeemPointsAmount,
+        loyaltyPoints
+      );
+
+      // Calculate loyalty points
+      const { updatedPoints, pointsToRedeem, pointsToAdd } = calculateLoyaltyPoints(
+        parseFloat(subtotalWithGST),
+        parseFloat(redeemPointsAmount),
+        privilegeCard,
+        privilegeCardDetails,
+        loyaltyPoints
+      );
+
+      // Prepare the payload
+      const payload = {
+        sales_order_id: newSalesOrderId, // Use the formatted ID
+        branch,
+        sub_role: subRole,
+        work_order_id: selectedWorkOrder ? selectedWorkOrder.work_order_id : null,
+        employee,
+        // due_date: dueDate,
+        mr_number: mrNumber,
+        // customer_name: customerName,
+        patient_phone: customerPhone,
+        // customer_address: address,
+        // customer_age: age,
+        // customer_gender: gender,
+        payment_method: paymentMethod,
+        discount: parseFloat(discount) || 0,
+        advance_details: parseFloat(advanceDetails) || 0,
+        total_amount: parseFloat(finalAmount),
+        subtotal: parseFloat(subtotalWithoutGST),
+        cgst: parseFloat(cgstAmount),
+        sgst: parseFloat(sgstAmount),
+        // is_b2b: isB2B,
+        // gst_number: gstNumber,
+        product_entries: productEntries.map((entry) => ({
+          product_id: entry.id,
+          quantity: parseInt(entry.quantity, 10),
+          price: parseFloat(entry.price),
+          hsn_code: entry.hsn_code,
+        })),
+        created_at: getCurrentUTCDateTime(),
+        updated_at: getCurrentUTCDateTime(),
+      };
+
+      // Insert the sales order into the database
+      const { error: insertError } = await supabase
+        .from("sales_orders")
+        .insert([payload]);
+
+      if (insertError) {
+        console.error("Error inserting sales order:", insertError);
+        alert("An error occurred while saving the sales order. Please try again.");
+        dispatch({ type: "SET_SALES_ORDER_FORM", payload: { isSaving: false } });
+        return;
+      }
+
+      // Update loyalty points if applicable
+      if (privilegeCard) {
+        const { data, error } = await supabase
+          .from("privilegecards")
+          .update({ loyalty_points: updatedPoints })
+          .eq("pc_number", privilegeCard);
+
+        if (error) {
+          console.error("Error updating loyalty points:", error);
+        } else {
+          console.log("Loyalty points updated successfully.");
+        }
+      }
+
+      // If everything is successful
+      alert("Sales order saved successfully!");
+      dispatch({
+        type: "SET_SALES_ORDER_FORM",
+        payload: {
+          submitted: true,
+          allowPrint: true,
+          loyaltyPoints: updatedPoints,
+          pointsToAdd: pointsToAdd,
+        },
+      });
+
+      // Do not reset the form immediately. Allow user to print or exit.
+    } catch (err) {
+      console.error("Unexpected error saving sales order:", err);
+      alert("An unexpected error occurred while saving the sales order.");
+    } finally {
+      dispatch({ type: "SET_SALES_ORDER_FORM", payload: { isSaving: false } });
+    }
+  };
 
   return (
     <div
@@ -2384,8 +2595,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                       updateSalesOrderForm({ fetchMethod: "work_order_id" })
                     }
                     className={`px-4 py-2 rounded-lg ${salesOrderForm.fetchMethod === "work_order_id"
-                        ? "bg-green-500 text-white"
-                        : "bg-gray-200"
+                      ? "bg-green-500 text-white"
+                      : "bg-gray-200"
                       }`}
                     onKeyDown={(e) => {
                       if (e.key === "ArrowRight") {
@@ -2405,8 +2616,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                     }
                     id="fetchMethod-mr_number"
                     className={`px-4 py-2 rounded-lg ${salesOrderForm.fetchMethod === "mr_number"
-                        ? "bg-green-500 text-white"
-                        : "bg-gray-200"
+                      ? "bg-green-500 text-white"
+                      : "bg-gray-200"
                       }`}
                     onKeyDown={(e) => {
                       if (e.key === "ArrowRight") {
@@ -2431,8 +2642,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                     }
                     id="fetchMethod-phone_number"
                     className={`px-4 py-2 rounded-lg ${salesOrderForm.fetchMethod === "phone_number"
-                        ? "bg-green-500 text-white"
-                        : "bg-gray-200"
+                      ? "bg-green-500 text-white"
+                      : "bg-gray-200"
                       }`}
                     onKeyDown={(e) => {
                       if (e.key === "ArrowLeft") {
@@ -2744,49 +2955,31 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
 
                       {/* Quantity Input */}
                       <div className="relative w-2/4">
-                        {product.stock === 0 ? (
-                          <input
-                            type="text"
-                            value="Out of Stock"
-                            readOnly
-                            className="border border-gray-300 px-4 py-3 rounded-lg w-full text-center bg-red-100 text-red-600"
-                          />
-                        ) : (
-                          <input
-                            type="number"
-                            id={`productQuantity-${index}`}
-                            placeholder="Quantity"
-                            value={product.quantity}
-                            onChange={(e) =>
-                              handleProductChange(
-                                index,
-                                "quantity",
-                                e.target.value
-                              )
-                            }
-                            className="border border-gray-300 px-4 py-3 rounded-lg w-full text-center"
-                            min="1"
-                            max={product.stock} // Prevent ordering more than available stock
-                            ref={(el) => (quantityRefs.current[index] = el)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                e.preventDefault();
-                                if (e.shiftKey) {
-                                  // Shift + Enter: Add new product field and focus on first product ID
-                                  updateSalesOrderForm({
-                                    productEntries: [
-                                      ...productEntries,
-                                      {
-                                        id: "",
-                                        product_id: "",
-                                        name: "",
-                                        price: "",
-                                        quantity: "",
-                                      },
-                                    ],
-                                  });
-                                  setOriginalProductEntries([
-                                    ...originalProductEntries,
+
+                        <input
+                          type="number"
+                          id={`productQuantity-${index}`}
+                          placeholder="Quantity"
+                          value={product.quantity}
+                          onChange={(e) =>
+                            handleProductChange(
+                              index,
+                              "quantity",
+                              e.target.value
+                            )
+                          }
+                          className="border border-gray-300 px-4 py-3 rounded-lg w-full text-center"
+                          min="1"
+                          max={product.stock} // Prevent ordering more than available stock
+                          ref={(el) => (quantityRefs.current[index] = el)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              if (e.shiftKey) {
+                                // Shift + Enter: Add new product field and focus on first product ID
+                                updateSalesOrderForm({
+                                  productEntries: [
+                                    ...productEntries,
                                     {
                                       id: "",
                                       product_id: "",
@@ -2794,44 +2987,55 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                                       price: "",
                                       quantity: "",
                                     },
-                                  ]); // Update original entries
-                                  setProductSuggestions([
-                                    ...productSuggestions,
-                                    [],
-                                  ]);
-                                  setTimeout(
-                                    () =>
-                                      document
-                                        .getElementById(
-                                          `productId-${productEntries.length}`
-                                        )
-                                        ?.focus(),
-                                    0
-                                  );
-                                } else {
-                                  // Enter: Proceed to the next step
-                                  nextStep();
-                                }
+                                  ],
+                                });
+                                setOriginalProductEntries([
+                                  ...originalProductEntries,
+                                  {
+                                    id: "",
+                                    product_id: "",
+                                    name: "",
+                                    price: "",
+                                    quantity: "",
+                                  },
+                                ]); // Update original entries
+                                setProductSuggestions([
+                                  ...productSuggestions,
+                                  [],
+                                ]);
+                                setTimeout(
+                                  () =>
+                                    document
+                                      .getElementById(
+                                        `productId-${productEntries.length}`
+                                      )
+                                      ?.focus(),
+                                  0
+                                );
+                              } else {
+                                // Enter: Proceed to the next step
+                                nextStep();
                               }
-                              // Handle Arrow Keys for navigation
-                              else if (e.key === "ArrowRight") {
-                                e.preventDefault();
-                                // Focus on the next input field, e.g., price or delete button
-                                const nextIndex = index + 1;
-                                if (nextIndex < productEntries.length) {
-                                  document
-                                    .getElementById(`productId-${nextIndex}`)
-                                    ?.focus();
-                                }
-                              } else if (e.key === "ArrowLeft") {
-                                e.preventDefault();
+                            }
+                            // Handle Arrow Keys for navigation
+                            else if (e.key === "ArrowRight") {
+                              e.preventDefault();
+                              // Focus on the next input field, e.g., price or delete button
+                              const nextIndex = index + 1;
+                              if (nextIndex < productEntries.length) {
                                 document
-                                  .getElementById(`productPrice-${index}`)
+                                  .getElementById(`productId-${nextIndex}`)
                                   ?.focus();
                               }
-                            }}
-                          />
-                        )}
+                            } else if (e.key === "ArrowLeft") {
+                              e.preventDefault();
+                              document
+                                .getElementById(`productPrice-${index}`)
+                                ?.focus();
+                            }
+                          }}
+                        />
+
                         {validationErrors[`productQuantity-${index}`] && (
                           <p className="text-red-500 text-xs absolute -bottom-5 left-0">
                             {validationErrors[`productQuantity-${index}`]}
@@ -2904,12 +3108,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                 >
                   Add Product
                 </button>
-                {/* Stock Validation Error */}
-                {validationErrors.stock && (
-                  <p className="text-red-500 text-xs mt-1">
-                    {validationErrors.stock}
-                  </p>
-                )}
+
               </div>
             </div>
           )}
@@ -2928,8 +3127,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                   id="hasMrNumber-yes"
                   onClick={() => updateSalesOrderForm({ hasMrNumber: "yes" })}
                   className={`px-4 py-2 rounded-lg ${hasMrNumber === "yes"
-                      ? "bg-green-500 text-white"
-                      : "bg-gray-200"
+                    ? "bg-green-500 text-white"
+                    : "bg-gray-200"
                     }`}
                   onKeyDown={(e) => {
                     if (e.key === "ArrowRight") {
@@ -2945,8 +3144,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                   id="hasMrNumber-no"
                   onClick={() => updateSalesOrderForm({ hasMrNumber: "no" })}
                   className={`px-4 py-2 rounded-lg ${hasMrNumber === "no"
-                      ? "bg-green-500 text-white"
-                      : "bg-gray-200"
+                    ? "bg-green-500 text-white"
+                    : "bg-gray-200"
                     }`}
                   onKeyDown={(e) => {
                     if (e.key === "ArrowLeft") {
@@ -3218,8 +3417,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                     }, 0);
                   }}
                   className={`px-4 py-2 rounded-lg ${state.salesOrderForm.privilegeCard
-                      ? "bg-green-500 text-white"
-                      : "bg-gray-200"
+                    ? "bg-green-500 text-white"
+                    : "bg-gray-200"
                     }`}
                   onKeyDown={(e) => {
                     if (e.key === "ArrowRight") {
@@ -3256,8 +3455,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                   }}
                   id="privilegeCard-no"
                   className={`px-4 py-2 rounded-lg ${!state.salesOrderForm.privilegeCard
-                      ? "bg-green-500 text-white"
-                      : "bg-gray-200"
+                    ? "bg-green-500 text-white"
+                    : "bg-gray-200"
                     }`}
                   onKeyDown={(e) => {
                     if (e.key === "ArrowLeft") {
@@ -3285,8 +3484,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                         })
                       }
                       className={`px-4 py-2 rounded-lg ${state.salesOrderForm.redeemOption === "barcode"
-                          ? "bg-green-500 text-white"
-                          : "bg-gray-200"
+                        ? "bg-green-500 text-white"
+                        : "bg-gray-200"
                         }`}
                       onKeyDown={(e) => {
                         if (e.key === "ArrowRight") {
@@ -3314,8 +3513,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                         })
                       }
                       className={`px-4 py-2 rounded-lg ${state.salesOrderForm.redeemOption === "phone"
-                          ? "bg-green-500 text-white"
-                          : "bg-gray-200"
+                        ? "bg-green-500 text-white"
+                        : "bg-gray-200"
                         }`}
                       onKeyDown={(e) => {
                         if (e.key === "ArrowLeft") {
@@ -3534,8 +3733,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                                 });
                               }}
                               className={`px-4 py-2 mb-2 rounded-lg ${state.salesOrderForm.redeemOption === "full"
-                                  ? "bg-green-500 text-white"
-                                  : "bg-gray-200"
+                                ? "bg-green-500 text-white"
+                                : "bg-gray-200"
                                 }`}
                             >
                               Redeem Full Points
@@ -3560,8 +3759,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                                 ); // Focus on custom amount input
                               }}
                               className={`px-4 py-2 mb-2 rounded-lg ${state.salesOrderForm.redeemOption === "custom"
-                                  ? "bg-green-500 text-white"
-                                  : "bg-gray-200"
+                                ? "bg-green-500 text-white"
+                                : "bg-gray-200"
                                 }`}
                             >
                               Redeem Custom Amount
@@ -3996,74 +4195,42 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
 
               {/* Action Buttons Outside Printable Area */}
               <div className="flex justify-center text-center space-x-4 mt-6">
-                <button
-                  type="button" /* Ensure the type is set to "button" */
-                  onClick={handleOrderCompletion}
-                  ref={saveOrderRef}
-                  onKeyDown={async (e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      await handleOrderCompletion();
-                      setTimeout(
-                        () => printButtonRef.current?.focus(),
-                        100
-                      ); /* Move focus to Print button after saving */
-                    }
-                  }}
-                  className={`flex items-center justify-center w-44 h-12 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition ${!paymentMethod ||
-                      parseFloat(state.salesOrderForm.discount) > subtotalWithGST
-                      ? "opacity-50 cursor-not-allowed"
-                      : ""
-                    }`}
-                  disabled={
-                    !paymentMethod ||
-                    isLoading ||
-                    isSaving ||
-                    submitted ||
-                    parseFloat(state.salesOrderForm.discount) > subtotalWithGST
-                  }
-                >
-                  {submitted
-                    ? "Order Submitted"
-                    : isEditing
-                      ? "Update Order"
-                      : "Submit Order"}{" "}
-                  {privilegeCard && privilegeCardDetails
-                    ? "& Update Loyalty Points"
-                    : ""}
-                </button>
-
-                {allowPrint && (
+                {!submitted && (
                   <button
-                    type="button" /* Ensure the type is set to "button" */
-                    onClick={handlePrint}
-                    ref={printButtonRef}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        handlePrint();
-                        setTimeout(
-                          () => newWorkOrderButtonRef.current?.focus(),
-                          100
-                        ); /* Move focus to Create New after printing */
-                      }
-                    }}
+                    type="button"
+                    onClick={saveSalesOrder}
+                    ref={saveOrderRef}
                     className="flex items-center justify-center w-44 h-12 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition"
+                    disabled={isSaving || submitted}
+                    aria-label="Save Sales Order"
                   >
-                    <PrinterIcon className="w-5 h-5 inline mr-2" />
-                    Print
+                    {isSaving ? "Saving..." : "Save Sales Order"}
                   </button>
                 )}
 
-                {/* Exit Button */}
-                {allowPrint && (
-                  <button
-                    type="button" /* Ensure the type is set to "button" */
-                    onClick={handleExit}
-                    className="flex items-center justify-center w-44 h-12 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition"
-                  >
-                    Exit
-                  </button>
+                {submitted && allowPrint && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={handlePrint}
+                      ref={printButtonRef}
+                      className="flex items-center justify-center w-44 h-12 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition"
+                      aria-label="Print Sales Order"
+                    >
+                      <PrinterIcon className="w-5 h-5 mr-2" />
+                      Print
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleExit}
+                      className="flex items-center justify-center w-44 h-12 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition"
+                      aria-label="Exit Sales Order Generation"
+                    >
+                      <XMarkIcon className="w-5 h-5 mr-2" />
+                      Exit
+                    </button>
+                  </>
                 )}
               </div>
             </>
@@ -4086,8 +4253,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                 ref={nextButtonRef}
                 onClick={nextStep}
                 className={`bg-green-500 hover:bg-green-600 text-white mx-2 px-4 py-2 rounded-lg ${step === 4 && !salesOrderForm.isPinVerified
-                    ? "opacity-50 cursor-not-allowed"
-                    : ""
+                  ? "opacity-50 cursor-not-allowed"
+                  : ""
                   }`}
                 disabled={step === 4 && !salesOrderForm.isPinVerified}
               >
