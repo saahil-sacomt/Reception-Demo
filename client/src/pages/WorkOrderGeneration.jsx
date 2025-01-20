@@ -157,7 +157,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         return;
       }
 
-      console.log("Last Work Orders Retrieved for branch:", lastWorkOrders[0].work_order_id);
+      // console.log("Last Work Orders Retrieved for branch:", lastWorkOrders[0]?.work_order_id);
 
       let newWorkOrderId = branchDefaultIds[branch] || 1001; // Default if no work orders exist for branch
 
@@ -166,9 +166,9 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
 
       const strSubRole = subRole;
       if (lastWorkOrders && lastWorkOrders.length > 0) {
-        if (strSubRole.includes("OPD")) {
+        if ((strSubRole.includes("OPD"))) {
           const str = lastWorkOrders[0].work_order_id
-          const match = str.match(/(\d+)$/); // Regex to match digits at the end of the string
+          const match = str.match(/(\d+)$/); //Regex to match digits at the end of the string
 
           if (match) {
             console.log('Regex', match[0]); // Output: 3742
@@ -206,6 +206,8 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
 
       // Format the new Work Order ID
       newWorkOrderId = `OPW-${opNumber}-${String(newWorkOrderId).padStart(3, "0")}`;
+
+
 
       console.log(newWorkOrderId);
 
@@ -898,9 +900,12 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         // Fetch existing customer by MR number
         const { data: existingCustomer, error: customerError } = await supabase
           .from("patients")
-          .select("id")
+          .select("*")
           .eq("mr_number", mrNumber.trim())
           .single();
+
+        // console.log(customerId);
+        customerId = existingCustomer.customer_id;
 
         if (customerError) {
           alert("No valid customer found with the provided MR Number.");
@@ -911,7 +916,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
           return;
         }
 
-        customerId = null; // Assuming patient details are stored separately
+        // customerId = null; // Assuming patient details are stored separately
       } else {
         window.alert(
           "Customer does not have an MR number. Contact to Reception "
@@ -926,7 +931,6 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
           price: parseFloat(entry.price),
           quantity: parseInt(entry.quantity),
           hsn_code: entry.hsn_code,
-
         })),
         advance_details: advance,
         due_date: dueDate,
@@ -957,9 +961,11 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         total_amount: totalAmountWithGST,
         is_b2b: isB2B,
         gst_number: isB2B ? gstNumber : null,
+        customer_id: customerId,
+
         updated_at: new Date().toISOString(),
         branch: branch,
-        customer_id: customerId,
+        // customer_id: customerId,
         discounted_total: discountedTotal, // from the computed totals
         amount_due: balanceDue,
         sub_role: subRole,

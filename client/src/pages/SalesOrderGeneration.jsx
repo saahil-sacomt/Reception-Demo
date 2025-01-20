@@ -1045,11 +1045,15 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         query = query.eq("mr_number", searchQuery);
       } else if (fetchMethod === "phone_number") {
         // Fetch work orders associated with customers having the phone number
+        console.log(searchQuery);
+        
         const { data: customer, error: customerError } = await supabase
           .from("customers")
-          .select("id")
+          .select("*")
           .eq("phone_number", searchQuery)
-          .single();
+          // .single();
+          // .maybeSingle();
+          console.log("Fetched customer:", customer);
 
         if (customerError) {
           console.error("Error fetching customers:", customerError.message);
@@ -1075,7 +1079,9 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           return;
         }
 
-        const customerId = customer.id;
+        const customerId = customer[0].customer_id;
+        console.log(customerId);
+        
         query = query.eq("customer_id", customerId);
       }
 
