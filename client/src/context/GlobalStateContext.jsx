@@ -34,6 +34,7 @@ const defaultInitialState = {
     gstNumber: "",
     customerId: "",
     isB2B: false,
+    isInsurance: false,
     hasMrNumber: "yes",
     customerName: "",
     customerPhone: "",
@@ -173,6 +174,25 @@ const globalStateReducer = (state, action) => {
       };
     case "RESET_WORK_ORDER_FORM":
       return { ...state, workOrderForm: defaultInitialState.workOrderForm };
+
+    // Add new action type
+    case "RESET_PRODUCT_FIELDS":
+      return {
+        ...state,
+        workOrderForm: {
+          ...state.workOrderForm,
+          productEntries: state.workOrderForm.productEntries.map((entry, i) =>
+            i === action.payload.index ? {
+              ...entry,
+              id: "",
+              name: "",
+              price: "",
+              hsn_code: "",
+              quantity: ""
+            } : entry
+          )
+        }
+      };
 
     // Modal Actions
     case "SET_MODAL_STATE":

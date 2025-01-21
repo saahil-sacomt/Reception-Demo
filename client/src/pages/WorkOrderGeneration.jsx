@@ -36,10 +36,32 @@ const formatDate = (date) => {
   return `${dd}/${mm}/${yyyy}`;
 };
 
+
 const WorkOrderGeneration = ({ isCollapsed }) => {
+
+  const verifyProductId = useCallback(async (productId) => {
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('id')
+        .eq('id', productId)
+        .single();
+
+      if (error) {
+        console.error('Supabase error:', error);
+        return false;
+      }
+
+      return data !== null;
+    } catch (err) {
+      console.error('Error verifying product:', err);
+      return false;
+    }
+  }, []);
+
   const { branch, subRole } = useAuth();
   // console.log("Branch in WorkOrderGeneration:", branch);
-  // console.log("SubRole in WorkOrderGeneration:", subRole);
+  console.log("SubRole in WorkOrderGeneration:", subRole);
 
 
   const { orderId } = useParams(); // Get orderId from route params
@@ -63,6 +85,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     discount,
     gstNumber,
     isB2B,
+    is_insurance,
     hasMrNumber,
     customerName,
     customerPhone,
@@ -94,7 +117,6 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   const [validationErrors, setValidationErrors] = useState({});
 
   // Refs
-  const dueDateRef = useRef(null);
   const mrNumberRef = useRef(null);
   const employeeRef = useRef(null);
   const paymentMethodRef = useRef(null);
@@ -166,7 +188,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
 
       const strSubRole = subRole;
       if (lastWorkOrders && lastWorkOrders.length > 0) {
-        if ((strSubRole.includes("OPD"))) {
+        if ((strSubRole.includes("OPD")) || ((strSubRole.includes("Counselling")))) {
           const str = lastWorkOrders[0].work_order_id
           const match = str.match(/(\d+)$/); //Regex to match digits at the end of the string
 
@@ -198,14 +220,19 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       // Determine the OP Number based on subRole
       // Determine the OP Number based on subRole
       let opNumber = "01"; // Default OP Number
-      if (subRole.toLowerCase().includes("opd")) {
+      if ((subRole.toLowerCase().includes("opd") || (subRole.toLowerCase().includes("counselling")))) {
         // Extract the OP Number from subRole (e.g., "OPD 01")
         const subRoleParts = subRole.split(" ");
         opNumber = subRoleParts.length > 1 ? subRoleParts[1] : "01";
       }
 
       // Format the new Work Order ID
-      newWorkOrderId = `OPW-${opNumber}-${String(newWorkOrderId).padStart(3, "0")}`;
+      if ((subRole.toLowerCase().includes("opd"))) {
+        newWorkOrderId = `OPW-${opNumber}-${String(newWorkOrderId).padStart(3, "0")}`;
+      }
+      else {
+        newWorkOrderId = `CR-${opNumber}-${String(newWorkOrderId).padStart(3, "0")}`;
+      }
 
 
 
@@ -376,7 +403,14 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
 
   // Handle product input
   const handleProductInput = useCallback(
-    async (index, value) => {
+    async (index, value, field) => {
+      if (field === "id" && !value.trim()) {
+        dispatch({
+          type: "RESET_PRODUCT_FIELDS",
+          payload: { index }
+        });
+        return;
+      }
       dispatch({
         type: "SET_WORK_ORDER_FORM",
         payload: {
@@ -385,6 +419,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
           ),
         },
       });
+
 
       if (value) {
         const suggestions = await fetchProductSuggestions(value, "id", index);
@@ -397,7 +432,8 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         if (suggestions.length === 1 && suggestions[0].product_id === value) {
           await handleProductSelection(index, suggestions[0].product_id);
         }
-      } else {
+      }
+      else {
         setProductSuggestions((prev) => ({
           ...prev,
           [index]: [],
@@ -506,21 +542,21 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   }, []);
 
   const focusFirstFieldOfStep = useCallback(() => {
-    if (step === 1) {
+    if (step === 2) {
       document.getElementById(`productId-0`)?.focus();
     }
-    if (step === 2) {
-      dueDateRef.current?.focus();
-    }
-    if (step === 3) {
+    // if (step === 2) {
+    //   dueDateRef.current?.focus();
+    // }
+    if (step === 1) {
       // Focus on the "Yes" button initially
       yesButtonRef.current?.focus();
     }
-    if (step === 4) {
+    if (step === 3) {
       if (isB2B) gstNumberRef.current?.focus();
       else employeeRef.current?.focus();
     }
-    if (step === 5) {
+    if (step === 4) {
       discountRef.current?.focus(); // Start with discount amount field
     }
   }, [step, isB2B]);
@@ -617,24 +653,39 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   }, [advanceDetails, totalAmount]);
 
   // Navigate to the next step with validations
-  const nextStep = useCallback(() => {
+  const nextStep = useCallback(async () => {
     let errors = {};
 
-    if (step === 1) {
-      // Validate Step 1: Product Entries
-      productEntries.forEach((product, index) => {
-        if (!product.id)
+    if (step === 2) {
+      for (const [index, product] of productEntries.entries()) {
+        if (!product.id) {
           errors[`productId-${index}`] = "Product ID is required.";
-        if (!product.price)
-          errors[`productPrice-${index}`] = "Price is required.";
-        if (!product.quantity)
-          errors[`productQuantity-${index}`] = "Quantity is required.";
-      });
-    } else if (step === 2) {
-      // Validate Step 2: Due Date
-      if (!dueDate) errors.dueDate = "Due date is required.";
-    } else if (step === 3) {
-      // Validate Step 3: MR Number or customer details
+          continue;
+        }
+
+        try {
+          const { data, error } = await supabase
+            .from('products')
+            .select('product_id')
+            .eq('product_id', product.id)
+            .single();
+
+          console.log("Product verification response:", { data, error }); // Debug log
+
+          if (error || !data) {
+            alert(`Product ID ${product.id} not found . Add product from Purchase section.`);
+            navigate('/employee-stock-management');
+            return;
+          }
+        } catch (err) {
+          console.error('Error verifying product:', err);
+          alert(`Error verifying product ${product.id}. Please try again.`);
+          return;
+        }
+      }
+
+    } else if (step === 1) {
+      // Validate Step 2: MR Number or customer details
       if (hasMrNumber === null) {
         errors.hasMrNumber = "Please indicate if you have an MR Number.";
       } else if (hasMrNumber) {
@@ -651,7 +702,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         if (!customerGender)
           errors.customerGender = "Gender is required.";
       }
-    } else if (step === 4) {
+    } else if (step === 3) {
       if (!employee) {
         errors.employee = "Employee selection is required.";
       } else if (!isPinVerified) {
@@ -660,7 +711,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       if (isB2B && !gstNumber) {
         errors.gstNumber = "GST Number is required for B2B orders.";
       }
-    } else if (step === 5) {
+    } else if (step === 4) {
       // Validate Step 5: Discount Amount, Payment Method, and Advance Details
       if (
         discount &&
@@ -693,8 +744,6 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       ) {
         const index = firstErrorKey.split("-")[1];
         document.getElementById(firstErrorKey)?.focus();
-      } else if (firstErrorKey === "dueDate") {
-        dueDateRef.current?.focus();
       } else if (firstErrorKey === "mrNumber") {
         mrNumberRef.current?.focus();
       } else if (firstErrorKey === "gstNumber") {
@@ -725,12 +774,11 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
 
     // Clear errors and proceed to the next step
     setValidationErrors({});
-    if (step < 5)
+    if (step < 4)
       dispatch({ type: "SET_WORK_ORDER_FORM", payload: { step: step + 1 } });
   }, [
     step,
     productEntries,
-    dueDate,
     hasMrNumber,
     mrNumber,
     customerName,
@@ -747,6 +795,9 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     advanceDetails,
     paymentMethod,
     dispatch,
+    verifyProductId,
+    navigate,
+    // dispatch
   ]);
 
   // Save Work Order handler
@@ -834,7 +885,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     });
 
     // Step 3 Validation for MR number or customer details
-    if (step === 3) {
+    if (step === 1) {
       if (hasMrNumber === null) {
         productErrors["hasMrNumber"] =
           "Please indicate if you have an MR Number.";
@@ -859,8 +910,6 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       ) {
         const index = firstErrorKey.split("-")[1];
         document.getElementById(firstErrorKey)?.focus();
-      } else if (firstErrorKey === "dueDate") {
-        dueDateRef.current?.focus();
       } else if (firstErrorKey === "mrNumber") {
         mrNumberRef.current?.focus();
       } else if (firstErrorKey === "gstNumber") {
@@ -933,7 +982,6 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
           hsn_code: entry.hsn_code,
         })),
         advance_details: advance,
-        due_date: dueDate,
         mr_number: hasMrNumber ? mrNumber : null,
         patient_details: hasMrNumber
           ? {
@@ -960,6 +1008,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         sgst,
         total_amount: totalAmountWithGST,
         is_b2b: isB2B,
+        is_insurance: subRole.includes("Counselling")  ? workOrderForm.isInsurance : null,
         gst_number: isB2B ? gstNumber : null,
         customer_id: customerId,
 
@@ -1454,7 +1503,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         onSubmit={(e) => e.preventDefault()}
       >
         {/* Step 1: Work Order ID and Product Entries */}
-        {step === 1 && (
+        {step === 2 && (
           <div className="w-fit bg-gray-50 p-6 rounded-md shadow-inner space-y-4">
             {/* Generated Work Order ID */}
             <div>
@@ -1656,42 +1705,9 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
           </div>
         )}
 
-        {/* Step 2: Due Date */}
-        {step === 2 && (
-          <div className="w-full bg-gray-50 p-6 rounded-md shadow-inner space-y-4 text-center">
-            <h2 className="text-lg font-semibold text-gray-700">Due Date</h2>
-            <label className="block text-gray-700 font-medium mb-1">
-              Select Due Date
-            </label>
-            <div className="relative">
-              <CalendarIcon className="h-5 w-5 text-gray-400 absolute left-3 top-3" />
-              <input
-                type="date"
-                value={dueDate}
-                onChange={(e) =>
-                  dispatch({
-                    type: "SET_WORK_ORDER_FORM",
-                    payload: { dueDate: e.target.value },
-                  })
-                }
-                onKeyDown={(e) => handleEnterKey(e, nextButtonRef)}
-                ref={dueDateRef}
-                min={getTodayDate()} // Set minimum date to today
-                className={`border border-gray-300 w-full px-10 py-3 rounded-lg text-center appearance-none ${validationErrors.dueDate ? "border-red-500" : ""
-                  }`}
-                aria-label="Select due date"
-              />
-              {validationErrors.dueDate && (
-                <p className="text-red-500 text-xs mt-1">
-                  {validationErrors.dueDate}
-                </p>
-              )}
-            </div>
-          </div>
-        )}
 
-        {/* Step 3: MR Number or Customer Details */}
-        {step === 3 && (
+        {/* Step 2: MR Number or Customer Details */}
+        {step === 1 && (
           <div className="bg-gray-50 p-6 rounded-md shadow-inner space-y-6">
             <h2 className="text-lg font-semibold text-gray-700">
               Customer Details
@@ -1859,8 +1875,9 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         )}
 
         {/* Step 4: Employee Selection, B2B Toggle, and GST Number if B2B */}
-        {step === 4 && (
+        {step === 3 && (
           <div className="bg-gray-50 p-6 rounded-md shadow-inner space-y-6">
+
             <h2 className="text-lg font-semibold text-gray-700">
               Order Created by Employee Details
             </h2>
@@ -1911,10 +1928,50 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
             )}
 
             {/* B2B Toggle */}
-            <div className="flex items-center space-x-4 mt-6">
+
+            <div className="flex items-center space-x-4">
+              <span className="font-medium">
+                {subRole.includes("Counselling") ? 'Is Insurance?' : 'Is B2B?'}
+              </span>
+              <button
+                type="button"
+                onClick={() =>
+                  dispatch({
+                    type: "SET_WORK_ORDER_FORM",
+                    payload: {
+                      [subRole.includes("Counselling") ? 'isInsurance' : 'isB2B']: true
+                    },
+                  })
+                }
+                className={`px-4 py-2 rounded-lg ${(subRole.includes("Counselling") ? workOrderForm.isInsurance : workOrderForm.isB2B)
+                  ? "bg-green-600 text-white"
+                  : "bg-green-100 text-white"
+                  }`}
+              >
+                Yes
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  dispatch({
+                    type: "SET_WORK_ORDER_FORM",
+                    payload: {
+                      [subRole.includes("Counselling") ? 'isInsurance' : 'isB2B']: false
+                    },
+                  })
+                }
+                className={`px-4 py-2 rounded-lg ${(subRole.includes("Counselling") ? workOrderForm.isInsurance : workOrderForm.isB2B) === false
+                  ? "bg-red-600 text-white"
+                  : "bg-red-100 text-white"
+                  }`}
+              >
+                No
+              </button>
+            </div>
+            {/* <div className="flex items-center space-x-4 mt-6">
               <label className="flex items-center cursor-pointer space-x-4">
                 <span className="font-semibold text-gray-700">
-                  Is this a B2B order?
+                  {((subRole.includes("Counselling"))) ? "Insurance" : 'Is this a B2B order?"'}
                 </span>
                 <div className="relative">
                   <input
@@ -1947,7 +2004,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                   ></div>
                 </div>
               </label>
-            </div>
+            </div> */}
 
             {/* GST Number Input for B2B Orders */}
             {isB2B && (
@@ -1982,7 +2039,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         )}
 
         {/* Step 5: Discount, Payment Method, Advance Details, Save and Print */}
-        {step === 5 && (
+        {step === 4 && (
           <>
             {/* Printable Area */}
             <div className=" bg-white rounded-lg text-gray-800">
@@ -2254,9 +2311,6 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
 
                 {/* Footer Section */}
                 <div className="flex-col justify-start mx-auto items-start text-left text-md">
-                  <p className="mt-2 text-md">
-                    Delivery On:<strong> {dueDate ? formatDate(dueDate) : "N/A"}</strong>
-                  </p>
 
                   {isB2B && (
                     <p>

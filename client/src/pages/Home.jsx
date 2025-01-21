@@ -720,25 +720,25 @@ const Home = ({ isCollapsed }) => {
             )}
 
             {/* Reports and Stock Management Section for Admin */}
-            {role === 'admin' && (
-              <div className="flex flex-col lg:flex-row lg:space-x-6 mt-10 lg:mt-0 w-full lg:w-1/2">
-                {/* Purchase Stock Container */}
-                <div
-                  className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 w-1/2"
-                  onClick={() => navigate('/employee-stock-management')}
-                >
-                  <ArchiveBoxArrowDownIcon className='h-36 w-36 text-green-500 mr-2' />
-                  <h2 className="text-xl text-gray-800 mt-4">Purchase Stock</h2>
-                </div>
-                <div
-                  className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 w-1/2 mt-6 lg:mt-0"
-                  onClick={() => navigate('/notes')}
-                >
-                  <BanknotesIcon className='h-36 w-36 text-green-500 mr-2' />
-                  <h2 className="text-xl text-gray-800 mt-4">Credit and Debit Notes</h2>
-                </div>
+            {/* {role === 'admin' && ( */}
+            <div className="flex flex-col lg:flex-row lg:space-x-6 mt-10 lg:mt-0 w-full lg:w-1/2">
+              {/* Purchase Stock Container */}
+              <div
+                className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 w-1/2"
+                onClick={() => navigate('/employee-stock-management')}
+              >
+                <ArchiveBoxArrowDownIcon className='h-36 w-36 text-green-500 mr-2' />
+                <h2 className="text-xl text-gray-800 mt-4">Purchase Stock</h2>
               </div>
-            )}
+              <div
+                className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 w-1/2 mt-6 lg:mt-0"
+                onClick={() => navigate('/notes')}
+              >
+                <BanknotesIcon className='h-36 w-36 text-green-500 mr-2' />
+                <h2 className="text-xl text-gray-800 mt-4">Credit and Debit Notes</h2>
+              </div>
+            </div>
+            {/* )} */}
           </div>
           {/* Reports and Stock Management Section for Employee */}
           {role === 'employee' && (

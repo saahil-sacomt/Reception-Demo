@@ -17,6 +17,7 @@ import Home from "./pages/Home";
 import FetchLoyaltyPoints from "./pages/FetchLoyaltyPoints";
 import OrderGenerationPage from "./pages/OrderGenerationPage";
 import WorkOrderGeneration from "./pages/WorkOrderGeneration";
+import CounsellingWorkOrderGeneration from "./pages/CounsellingWorkOrderGeneration";
 import SalesOrderGeneration from "./pages/SalesOrderGeneration";
 import PrivilegeGeneration from "./pages/PrivilegeGeneration";
 // import SettingsPage from './pages/SettingsPage';
@@ -31,6 +32,7 @@ import { supabase } from './supabaseClient'
 import EmployeeStockManagement from "./pages/EmployeeStockManagement";
 import NotesReport from "./pages/Notes";
 import ModifyOrderWrapper from "./components/ModifyOrderWrapper";
+import { useAuth } from './context/AuthContext';
 
 const App = () => {
   const location = useLocation();
@@ -94,12 +96,17 @@ const App = () => {
             <Route path="/login" element={<Login />} />
 
             <Route path="/unauthorized" element={<Unauthorized />} />
+            {/* Employee Stock Management */}
+            <Route
+              path="/employee-stock-management"
+              element={<EmployeeStockManagement isCollapsed={isCollapsed} />}
+            />
 
             {/* Protected Routes */}
             <Route
               element={
                 <RequireAuth
-                  allowedRoles={["super_admin", "admin", "employee" , "counselling" , "opd" , "reception"]}
+                  allowedRoles={["super_admin", "admin", "employee", "counselling", "opd", "reception"]}
                 />
               }
             >
@@ -117,9 +124,16 @@ const App = () => {
                 element={<ModifyOrderWrapper isCollapsed={isCollapsed} />}
               />
               <Route
-                path="/work-order"
-                element={<WorkOrderGeneration isCollapsed={isCollapsed} />}
-              />
+                element={<RequireAuth allowedRoles={["opd", "counselling"]} />}
+              >
+                <Route
+                  path="/work-order"
+                  element={
+
+                    <WorkOrderGeneration isCollapsed={isCollapsed} />
+                  }
+                />
+              </Route>
               <Route
                 path="/sales-order"
                 element={<SalesOrderGeneration isCollapsed={isCollapsed} />}
@@ -155,11 +169,6 @@ const App = () => {
                 element={<FetchLoyaltyPoints isCollapsed={isCollapsed} />}
               />
             </Route>
-            {/* Employee Stock Management */}
-            <Route
-              path="/employee-stock-management"
-              element={<EmployeeStockManagement isCollapsed={isCollapsed} />}
-            />
 
             <Route
               element={<RequireAuth allowedRoles={["super_admin", "admin"]} />}
