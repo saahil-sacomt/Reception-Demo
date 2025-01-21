@@ -11,6 +11,8 @@ const GlobalStateContext = createContext();
 
 // Initial State
 const defaultInitialState = {
+  workOrders: [],
+  selectedWorkOrder: null,
   pendingRequestsCount: 0,
   pendingWorkOrdersCount: 0,
   salesTodayCount: 0,

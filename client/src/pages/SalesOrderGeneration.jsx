@@ -11,7 +11,7 @@ import supabase from "../supabaseClient";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import EmployeeVerification from "../components/EmployeeVerification";
-import { useGlobalState} from "../context/GlobalStateContext";
+import { useGlobalState } from "../context/GlobalStateContext";
 import { XMarkIcon } from '@heroicons/react/24/solid'; // For solid icons
 
 const today = new Date();
@@ -412,7 +412,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
   const [employees, setEmployees] = useState([]);
   const [productSuggestions, setProductSuggestions] = useState([]);
   const [isGeneratingId, setIsGeneratingId] = useState(false);
-  
+
 
   // Refs for input fields to control focus
   const workOrderInputRef = useRef(null);
@@ -581,6 +581,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         .order("sales_order_id", { ascending: false })
         .limit(1);
 
+      console.log("Data:", data); // Debugging: check the data
+
       if (error) {
         console.error(
           `Error fetching last sales_order_id for branch ${branch}:`,
@@ -594,15 +596,40 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
 
       // If data exists, extract the last sales_order_id for that branch
       if (data && data.length > 0) {
-        lastSalesOrderId =
-          parseInt(data[0].sales_order_id, 10) || lastSalesOrderId;
+        setSelectedWorkOrder: data[0];
+        const str = data[0].sales_order_id
+        const match = str.match(/(\d+)$/); //Regex to match digits at the end of the string
+
+        if (match) {
+          console.log('Regex', match[0]); // Output: 3742
+          lastSalesOrderId = parseInt(match[0]);
+        } else {
+          console.log("No number found");
+        }
       }
 
       console.log("Calculated lastSalesOrderId:", lastSalesOrderId); // Debugging: check lastSalesOrderId
 
       // Increment the last sales_order_id by 1
       let newSalesOrderId = lastSalesOrderId + 1;
-      newSalesOrderId = `OPS-${opNumber}-${String(newSalesOrderId + 1).padStart(3, "0")}`;
+      console.log("Calculated newSalesOrderId:", newSalesOrderId); // Debugging: check newSalesOrderId
+
+      // newSalesOrderId = `OPS-${opNumber}-${String(newSalesOrderId + 1).padStart(3, "0")}`;
+      // console.log(selectedWorkOrder.work_order_id);
+
+
+      if (data) {
+        if (data[0].work_order_id?.includes("OPW")) {
+          console.log('1');
+
+          newSalesOrderId = `OPS-${opNumber}-${String(newSalesOrderId).padStart(3, "0")}`;
+        } else {
+          console.log('2');
+
+          newSalesOrderId = `CRS-${opNumber}-${String(newSalesOrderId).padStart(3, "0")}`;
+        }
+      }
+
 
       // Optionally, you can update the sales order form with the new ID
       updateSalesOrderForm({ salesOrderId: newSalesOrderId });
@@ -618,6 +645,49 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
   };
 
   // Function to fetch and set a new sales ID when the branch is available
+
+  // const generateSalesOrderId = async (branch) => {
+  //   try {
+  //     const { data, error } = await supabase
+  //       .from("sales_orders")
+  //       .select("sales_order_id")
+  //       .order("created_at", { ascending: false })
+  //       .limit(1);
+
+  //     if (error) {
+  //       console.error("Error fetching latest sales order ID:", error);
+  //       return;
+  //     }
+
+  //     const latestSalesOrderId = data.length > 0 ? data[0].sales_order_id : null;
+  //     const currentYear = new Date().getFullYear();
+  //     const branchCode = branch ? branch.substring(0, 3).toUpperCase() : "BRN";
+
+  //     let newSalesOrderId;
+
+  //     if (latestSalesOrderId) {
+  //       const [prefix, year, count] = latestSalesOrderId.split("-");
+  //       const newCount = parseInt(count, 10) + 1;
+  //       newSalesOrderId = `${prefix}-${year}-${String(newCount).padStart(4, "0")}`;
+  //     } else {
+  //       newSalesOrderId = `${branchCode}-${currentYear}-0001`;
+  //     }
+
+  //     // Append OPS or CRS based on selected work order
+  //     if (selectedWorkOrder && selectedWorkOrder.work_order_id) {
+  //       if (selectedWorkOrder.work_order_id.includes("OPD")) {
+  //         newSalesOrderId += "-OPS";
+  //       } else if (selectedWorkOrder.work_order_id.includes("counselling")) {
+  //         newSalesOrderId += "-CRS";
+  //       }
+  //     }
+
+  //     return newSalesOrderId;
+  //   } catch (error) {
+  //     console.error("Error generating new sales order ID:", error);
+  //   }
+  // };
+
   const fetchSalesOrderId = async () => {
     if (branch && !isEditing) {
       // Only generate ID if not editing
@@ -1041,55 +1111,54 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
       if (fetchMethod === "work_order_id") {
         query = query.eq("work_order_id", searchQuery);
       } else if (fetchMethod === "mr_number") {
-        // Fetch work orders by MR Number directly
         query = query.eq("mr_number", searchQuery);
       } else if (fetchMethod === "phone_number") {
-        // Fetch work orders associated with customers having the phone number
-        console.log(searchQuery);
-        
+        console.log("Search query (phone number):", searchQuery);
+
+        // Fetch customer by phone number
         const { data: customer, error: customerError } = await supabase
           .from("customers")
           .select("*")
-          .eq("phone_number", searchQuery)
-          // .single();
-          // .maybeSingle();
-          console.log("Fetched customer:", customer);
+          .eq("phone_number", searchQuery);
+
+        console.log("Customer query result:", customer);
 
         if (customerError) {
           console.error("Error fetching customers:", customerError.message);
           updateSalesOrderForm({
             validationErrors: {
               ...validationErrors,
-              generalError: "Failed to fetch customers",
+              generalError: "Failed to fetch customers.",
             },
           });
           updateSalesOrderForm({ isFetchingWorkOrders: false });
           return;
         }
 
-        if (!customer) {
+        if (!customer || customer.length === 0) {
+          console.error("No customers found for the given phone number.");
           updateSalesOrderForm({ workOrders: [] });
           updateSalesOrderForm({
             validationErrors: {
               ...validationErrors,
-              generalError: "No customers found with this number",
+              generalError: "No customers found with this phone number.",
             },
           });
           updateSalesOrderForm({ isFetchingWorkOrders: false });
           return;
         }
 
-        const customerId = customer[0].customer_id;
-        console.log(customerId);
-        
+        const customerId = customer[0].customer_id; // Extract the ID
+        console.log("Customer ID:", customerId);
+
         query = query.eq("customer_id", customerId);
       }
 
       // Exclude work orders that are already used and belong to the current branch
-      query = query.eq("is_used", false).eq("branch", branch); // Added branch filter
+      query = query.eq("is_used", false).eq("branch", branch);
 
       const { data, error } = await query
-        .select("*") // Or specify the fields explicitly
+        .select("*")
         .order("created_at", { ascending: false });
 
       if (error) {
@@ -1097,13 +1166,11 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         updateSalesOrderForm({
           validationErrors: {
             ...validationErrors,
-            generalError: "Failed to fetch work orders",
+            generalError: "Failed to fetch work orders.",
           },
         });
       } else {
         updateSalesOrderForm({ workOrders: data });
-
-        // Clear any previous error messages
         updateSalesOrderForm({
           validationErrors: {
             ...validationErrors,
@@ -1111,7 +1178,6 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           },
         });
 
-        // Focus on the first work order button if found, otherwise on the proceed button
         setTimeout(() => {
           if (data.length > 0) {
             firstWorkOrderButtonRef.current?.focus();
@@ -1127,7 +1193,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
       updateSalesOrderForm({
         validationErrors: {
           ...validationErrors,
-          generalError: "Failed to fetch work orders",
+          generalError: "Failed to fetch work orders.",
         },
       });
       updateSalesOrderForm({ isFetchingWorkOrders: false });
@@ -1277,7 +1343,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
 
       if (customerPhone) {
         // console.log("Fetching customer details using phone number:", customerPhone.trim());
-        
+
         const customer = await fetchCustomerByPhone(customerPhone);
         if (customer) {
           updateSalesOrderForm({
@@ -2058,6 +2124,18 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           // **Important:** Do NOT include 'modification_request_id' or any other invalid fields
         };
 
+        const { data: updateData, error: updateError } = await supabase
+          .from('work_orders')
+          .update({ is_used: true })
+          .eq('work_order_id', selectedWorkOrder.work_order_id)
+          .select();
+
+        console.log("Update response:", { updateData, updateError });
+
+        if (updateError) {
+          throw new Error(`Failed to update work order: ${updateError.message}`);
+        }
+
         console.log("Insert Payload:", insertPayload); // Debugging: Inspect the payload
 
         const { error: insertError } = await supabase
@@ -2076,25 +2154,12 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           return;
         }
 
-        // **Step 5: Mark Work Order as Used (if applicable)**
-        if (selectedWorkOrder) {
-          const { error: workOrderError } = await supabase
-            .from("work_orders")
-            .update({ is_used: true })
-            .eq("work_order_id", selectedWorkOrder.work_order_id);
 
-          if (workOrderError) {
-            console.error("Error marking work order as used:", workOrderError);
-            updateSalesOrderForm({
-              validationErrors: {
-                ...validationErrors,
-                generalError: "Failed to update work order status.",
-              },
-            });
-            updateSalesOrderForm({ isSaving: false });
-            return;
-          }
-        }
+
+
+        // **Step 5: Mark Work Order as Used (if applicable)**
+
+
 
         // **Step 6: Deduct Stock for New Orders**
         const validProducts = productEntries.filter(
@@ -2245,7 +2310,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
       )
     ) {
       dispatch({ type: "RESET_SALES_ORDER_FORM" });
-    navigate("/home");
+      navigate("/home");
     }
   };
 
@@ -2259,6 +2324,11 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
 
   // Function to save the sales order
   const saveSalesOrder = async () => {
+
+    console.log("Initial selectedWorkOrder:", selectedWorkOrder);
+    // console.log("saveSalesOrder called"); // Add this line
+
+
     if (isSaving) {
       alert("Please wait while the sales order is being saved.");
       return;
@@ -2390,7 +2460,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         sales_order_id: newSalesOrderId, // Use the formatted ID
         branch,
         sub_role: subRole,
-        work_order_id: selectedWorkOrder ? selectedWorkOrder.work_order_id : null,
+        work_order_id: selectedWorkOrder.work_order_id,
         employee,
         // due_date: dueDate,
         mr_number: mrNumber,
@@ -2444,6 +2514,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         }
       }
 
+
+
       // If everything is successful
       alert("Sales order saved successfully!");
       dispatch({
@@ -2486,14 +2558,14 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                 <strong>Advance Amount Paid:</strong> ₹
                 {parseFloat(selectedWorkOrder.advance_details).toFixed(2)}
               </p>
-              <p>
+              {/* <p>
                 <strong>CGST:</strong> ₹
                 {parseFloat(selectedWorkOrder.cgst).toFixed(2)}
               </p>
               <p>
                 <strong>SGST:</strong> ₹
                 {parseFloat(selectedWorkOrder.sgst).toFixed(2)}
-              </p>
+              </p> */}
               <p>
                 <strong>Created At:</strong>{" "}
                 {convertUTCToIST(selectedWorkOrder.created_at)}
@@ -2743,9 +2815,9 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                               <strong>Work Order ID:</strong>{" "}
                               {workOrder.work_order_id}
                             </p>
-                            <p>
+                            {/* <p>
                               <strong>Due Date:</strong> {workOrder.due_date}
-                            </p>
+                            </p> */}
                             <p>
                               <strong>Advance Paid:</strong> ₹
                               {parseFloat(workOrder.advance_details).toFixed(2)}
@@ -4069,24 +4141,24 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                         Amt. after discount:
                         <strong> ₹{parseFloat(taxableValue).toFixed(2)}</strong>
                       </p>
-                      <p>
+                      {/* <p>
                         CGST (6%):
                         <strong> ₹{parseFloat(cgstAmount).toFixed(2)}</strong>
                       </p>
                       <p>
                         SGST (6%):
                         <strong> ₹{parseFloat(sgstAmount).toFixed(2)}</strong>
-                      </p>
+                      </p> */}
                       {/* Advance Paid */}
 
                       {/* Final Amount Due */}
 
-                      <p className="text-xl">
+                      {/* <p className="text-xl">
                         <strong>
                           Total Paid (Incl. GST): ₹
                           {parseFloat(amountAfterDiscount).toFixed(2)}
                         </strong>
-                      </p>
+                      </p> */}
 
                       {/* Billed By */}
                       <div className="mt-4">
