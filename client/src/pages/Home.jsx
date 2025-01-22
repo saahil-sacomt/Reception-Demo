@@ -2,6 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import SplashScreen from '../components/SplashScreen';
 import walletImage from '../assets/pngwing.com.png';
+import { ClipboardDocumentCheckIcon } from '@heroicons/react/24/outline';
+
 import {
   CircleStackIcon,
   ClipboardDocumentIcon,
@@ -634,7 +636,7 @@ const Home = ({ isCollapsed }) => {
           </div>
 
           {/* Purchase and Order Generation Sections (Horizontal Row) */}
-          <div className="flex flex-col lg:flex-row items-start lg:space-x-6 mx-6">
+          <div className="flex flex-col lg:flex-row items-start lg:space-x-6 mx-6 z-10">
             {/* Purchase Section */}
             {role !== 'admin' && role !== 'super_admin' && (
               <div className="flex flex-col lg:flex-row items-center bg-green-50 py-8 px-6 rounded-lg shadow w-full lg:w-1/2">
@@ -678,7 +680,15 @@ const Home = ({ isCollapsed }) => {
                   <TicketIcon className='h-36 w-36 text-green-500' />
                   <h2 className="text-xl text-gray-800 mt-4">Sales Order Generation</h2>
                 </div>
+                <div
+                  className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 w-full"
+                  onClick={() => navigate('/work-order')}
+                >
+                  <ClipboardDocumentCheckIcon className='h-36 w-36 text-green-500' />
+                  <h2 className="text-xl text-gray-800 mt-4">Consulting</h2>
+                </div>
               </div>
+
             )}
 
             {/* Reports and Stock Management Section */}

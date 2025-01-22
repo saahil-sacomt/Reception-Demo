@@ -336,8 +336,8 @@ function calculateAmounts(
 // Main Component
 const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
   const { user, role, name, branch, loading: authLoading, subRole } = useAuth();
-  console.log("branch:", branch); // Destructure branch from AuthContext
-  console.log("subRole:", subRole); // Destructure subRole from AuthContext
+  // console.log("branch:", branch); // Destructure branch from AuthContext
+  // console.log("subRole:", subRole); // Destructure subRole from AuthContext
   const [validationErrors, setValidationErrors] = useState({});
 
 
@@ -539,6 +539,26 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     return `${financialYearStart}-${financialYearEnd}`;
   };
 
+  const processWorkOrder = (workOrderId) => {
+    console.log("Processing work order:", workOrderId);
+
+    if (workOrderId.startsWith("OPW")) {
+      // Action for OPW work orders
+      console.log("Processing OPW work order:", workOrderId);
+      // Add specific logic for OPW
+    } else if (workOrderId.startsWith("CR")) {
+      // Action for CR work orders
+      console.log("Processing CR work order:", workOrderId);
+      // Add specific logic for CR
+    } else {
+      // Default action for other work orders
+      console.log("Unknown work order type:", workOrderId);
+      // Add fallback logic if needed
+    }
+  };
+
+
+
   const generateSalesOrderId = async (branch) => {
     // Define default starting sales_order_id for each branch
     const branchDefaultIds = {
@@ -555,23 +575,14 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     }
 
     try {
-      console.log("Branch passed:", branch); // Debugging: check the branch passed
+      // console.log("Branch passed:", branch); // Debugging: check the branch passed
       console.log(
         "Default Sales Order ID for this branch:",
         branchDefaultIds[branch]
       ); // Debugging: check the default ID for the branch
 
 
-      // Extract OP Number from selected work order
-      let opNumber = "01"; // Default OP Number
-      if (selectedWorkOrder && selectedWorkOrder.work_order_id) {
-        // Assuming work_order_id format is "OPW-XX-XXX" where XX is the OP number
-        const match = selectedWorkOrder.work_order_id.match(/OPW-(\d+)-/);
-        if (match && match[1]) {
-          opNumber = match[1];
-          console.log("Extracted OP Number:", opNumber);
-        }
-      }
+
 
       // Fetch the maximum sales_order_id for the specific branch
       const { data, error } = await supabase
@@ -592,6 +603,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
       }
 
       // Set the default starting sales_order_id for the branch if no orders exist
+
       let lastSalesOrderId = branchDefaultIds[branch] || 1000; // Default to 1000 if branch not found in the map
 
       // If data exists, extract the last sales_order_id for that branch
@@ -606,6 +618,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         } else {
           console.log("No number found");
         }
+
       }
 
       console.log("Calculated lastSalesOrderId:", lastSalesOrderId); // Debugging: check lastSalesOrderId
@@ -615,20 +628,57 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
       console.log("Calculated newSalesOrderId:", newSalesOrderId); // Debugging: check newSalesOrderId
 
       // newSalesOrderId = `OPS-${opNumber}-${String(newSalesOrderId + 1).padStart(3, "0")}`;
+
       // console.log(selectedWorkOrder.work_order_id);
 
+      // Extract OP Number from selected work order
+      let opNumber = "01"; // Default OP Number
+      if (selectedWorkOrder && selectedWorkOrder.work_order_id) {
+        // console.log(selectedWorkOrder.work_order_id);
 
-      if (data) {
-        if (data[0].work_order_id?.includes("OPW")) {
-          console.log('1');
 
+        // Assuming work_order_id format is "OPW-XX-XXX" where XX is the OP number
+        let match = selectedWorkOrder.work_order_id.match(/CR-(\d+)-/);
+        if (!match) {
+          match = selectedWorkOrder.work_order_id.match(/OPW-(\d+)-/);
+        }
+        if (match && match[1]) {
+          opNumber = match[1];
+          console.log("Extracted OP Number:", opNumber);
+        }
+        else {
+          console.log("No OP Number found");
+        }
+
+        const workOrderId = selectedWorkOrder.work_order_id;
+
+        // Regex to match "OPW" or "CR" at the start of the string
+        const opwRegex = /^OPW/;
+        const crRegex = /^CR/;
+
+        if (opwRegex.test(workOrderId)) {
+          console.log("1");
+          // Logic specific to OPW work orders
           newSalesOrderId = `OPS-${opNumber}-${String(newSalesOrderId).padStart(3, "0")}`;
-        } else {
-          console.log('2');
-
+          console.log("Handling OPW work order:", workOrderId);
+          // Additional actions for OPW
+        } else if (crRegex.test(workOrderId)) {
+          console.log("2");
+          // Logic specific to CR work orders
           newSalesOrderId = `CRS-${opNumber}-${String(newSalesOrderId).padStart(3, "0")}`;
+          console.log("Handling CR work order:", workOrderId);
+          // Additional actions for CR
+        } else {
+          console.log("Unknown work order type:", workOrderId);
+          // Handle unexpected work order types
         }
       }
+
+
+
+      // console.log();
+
+
 
 
       // Optionally, you can update the sales order form with the new ID
@@ -643,6 +693,17 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
       return null;
     }
   };
+
+  // Add this useEffect to watch for selectedWorkOrder changes
+  useEffect(() => {
+    if (selectedWorkOrder) {
+      generateSalesOrderId(branch).then(newId => {
+        if (newId) {
+          updateSalesOrderForm({ salesOrderId: newId });
+        }
+      });
+    }
+  }, [selectedWorkOrder, branch]); // Dependencies: selectedWorkOrder and branch
 
   // Function to fetch and set a new sales ID when the branch is available
 
