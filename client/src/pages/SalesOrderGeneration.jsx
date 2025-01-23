@@ -287,7 +287,7 @@ function calculateAmounts(
   const amountAfterDiscount = subtotalWithGST - totalDiscount;
 
   // **Step 3: Extract GST from Amount After Discount**
-  const taxableValue = amountAfterDiscount / (1 + GST_RATE);
+  const taxableValue = amountAfterDiscount ;
   const gstAmount = amountAfterDiscount - taxableValue;
   const cgstAmount = gstAmount / 2;
   const sgstAmount = gstAmount / 2;
@@ -401,6 +401,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     isLoading,
     workOrderDiscount,
     submitted,
+
   } = salesOrderForm;
 
   // Local states
@@ -450,6 +451,36 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
       type: "SET_SALES_ORDER_FORM",
       payload,
     });
+  };
+
+  // 1. Add new function to generate general sales order ID
+  const generateGeneralSalesId = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("sales_orders")
+        .select("sales_order_id")
+        .like("sales_order_id", "GNS-%")
+        .order("sales_order_id", { ascending: false })
+        .limit(1);
+
+      if (error) {
+        console.error("Error fetching last general sales order ID:", error);
+        return "GNS-00001";
+      }
+
+      if (!data || data.length === 0) {
+        return "GNS-00001";
+      }
+
+      // Extract number from last ID and increment
+      const lastId = data[0].sales_order_id;
+      const lastNumber = parseInt(lastId.split("-")[1], 10);
+      const newNumber = (lastNumber + 1).toString().padStart(5, "0");
+      return `GNS-${newNumber}`;
+    } catch (error) {
+      console.error("Error generating general sales ID:", error);
+      return "GNS-00001";
+    }
   };
 
   // Function to create a new customer
@@ -557,6 +588,19 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     }
   };
 
+  const handleProceedWithoutWorkOrder = async () => {
+    const generalSalesId = await generateGeneralSalesId();
+
+    updateSalesOrderForm({
+      step: 1,
+      salesOrderId: generalSalesId,
+      selectedWorkOrder: null,
+      workOrderId: null,
+      // Reset any work order related fields
+      workOrderDiscount: 0,
+      advanceDetails: "",
+    });
+  };
 
 
   const generateSalesOrderId = async (branch) => {
@@ -569,9 +613,18 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
       KAT: 2792, // Default ID for Kattakada
     };
 
+
     if (!branch) {
       console.error("Branch is undefined. Cannot generate Sales Order ID.");
       return;
+    }
+
+    if (!selectedWorkOrder) {
+      // If no work order is selected, generate general sales ID
+      return generateGeneralSalesId();
+    }
+    else {
+      console.log("Selected Work Order:", selectedWorkOrder);
     }
 
     try {
@@ -2386,7 +2439,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
   // Function to save the sales order
   const saveSalesOrder = async () => {
 
-    console.log("Initial selectedWorkOrder:", selectedWorkOrder);
+    // console.log("Initial selectedWorkOrder:", selectedWorkOrder);
     // console.log("saveSalesOrder called"); // Add this line
 
 
@@ -2521,7 +2574,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         sales_order_id: newSalesOrderId, // Use the formatted ID
         branch,
         sub_role: subRole,
-        work_order_id: selectedWorkOrder.work_order_id,
+        work_order_id: selectedWorkOrder?.work_order_id || 'GENERAL',
         employee,
         // due_date: dueDate,
         mr_number: mrNumber,
@@ -2928,7 +2981,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                   <p>No work orders found for this search.</p>
                   <button
                     type="button" // Added type="button"
-                    onClick={() => updateSalesOrderForm({ step: 1 })}
+                    onClick={handleProceedWithoutWorkOrder}
                     ref={proceedButtonRef}
                     className="mt-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition"
                     onKeyDown={(e) => {
@@ -4105,7 +4158,6 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                         <th className="border px-4 py-2">#</th>
                         <th className="border px-4 py-2">Product ID</th>
                         <th className="border px-4 py-2">Product Name</th>
-                        <th className="border px-4 py-2">HSN Code</th>
                         <th className="border px-4 py-2">Price</th>
                         <th className="border px-4 py-2">Quantity</th>
                         <th className="border px-4 py-2">Total</th>
@@ -4125,9 +4177,6 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                               {product.product_id}
                             </td>
                             <td className="border px-4 py-2">{product.name}</td>
-                            <td className="border px-4 py-2 text-center">
-                              {product.hsn_code}
-                            </td>
                             <td className="border px-4 py-2 text-center">
                               ₹{price.toFixed(2)}
                             </td>

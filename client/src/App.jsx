@@ -34,6 +34,8 @@ import NotesReport from "./pages/Notes";
 import ModifyOrderWrapper from "./components/ModifyOrderWrapper";
 import { useAuth } from './context/AuthContext';
 import Consulting from "./pages/Consulting";
+import AddService from "./pages/AddService";
+import PatientRegistration from "./pages/PatientRegistration";
 
 const App = () => {
   const location = useLocation();
@@ -111,6 +113,7 @@ const App = () => {
                 />
               }
             >
+              <Route path="/patient-registration" element={<PatientRegistration />} />
               <Route
                 path="/home"
                 element={<Home isCollapsed={isCollapsed} />}
@@ -141,6 +144,14 @@ const App = () => {
                 <Route
                   path="/consulting"
                   element={<Consulting isCollapsed={isCollapsed} />}
+                />
+              </Route>
+              <Route
+                element={<RequireAuth allowedRoles={["counselling"]} />}
+              >
+                <Route
+                  path="/add-service"
+                  element={<AddService isCollapsed={isCollapsed} />}
                 />
               </Route>
               <Route

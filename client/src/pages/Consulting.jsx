@@ -19,7 +19,24 @@ const dd = String(today.getDate()).padStart(2, "0");
 const mm = String(today.getMonth() + 1).padStart(2, "0");
 const yyyy = today.getFullYear();
 
+
+
 const formattedDate = `${dd}/${mm}/${yyyy}`;
+
+
+const DEFAULT_CONSULTING_SERVICE = {
+    product_id: "CS01",  // Consulting Service ID
+    name: "Consultation",
+    price: "500",
+    hsn_code: "998931"
+};
+
+// Additional common services
+const COMMON_SERVICES = [
+    DEFAULT_CONSULTING_SERVICE,
+    { product_id: "CS02", name: "Follow-up Consultation", price: "800", hsn_code: "998931" },
+    { product_id: "CS03", name: "Special Consultation", price: "1000", hsn_code: "998931" }
+];
 
 // Utility Functions
 const mockOtp = "1234";
@@ -287,7 +304,7 @@ function calculateAmounts(
     const amountAfterDiscount = subtotalWithGST - totalDiscount;
 
     // **Step 3: Extract GST from Amount After Discount**
-    const taxableValue = amountAfterDiscount / (1 + GST_RATE);
+    const taxableValue = amountAfterDiscount
     const gstAmount = amountAfterDiscount - taxableValue;
     const cgstAmount = gstAmount / 2;
     const sgstAmount = gstAmount / 2;
@@ -373,7 +390,7 @@ const Consulting = memo(({ isCollapsed, onModificationSuccess }) => {
         dueDate,
         mrNumber,
         isPinVerified,
-        patientDetails = {},
+        patientDetails,
         employee,
         paymentMethod,
         discount,
@@ -413,6 +430,25 @@ const Consulting = memo(({ isCollapsed, onModificationSuccess }) => {
     const [employees, setEmployees] = useState([]);
     const [productSuggestions, setProductSuggestions] = useState([]);
     const [isGeneratingId, setIsGeneratingId] = useState(false);
+    const [consultingServices, setConsultingServices] = useState([]);
+
+    const fetchConsultingServices = async () => {
+        const { data, error } = await supabase
+            .from('consulting_services')
+            .select('*')
+            .eq('is_active', true);
+
+        if (error) {
+            console.error('Error fetching consulting services:', error);
+            return;
+        }
+        setConsultingServices(data);
+    };
+
+
+    useEffect(() => {
+        fetchConsultingServices();
+    }, []);
 
 
     // Refs for input fields to control focus
@@ -824,6 +860,22 @@ const Consulting = memo(({ isCollapsed, onModificationSuccess }) => {
 
     // Function to handle product ID input changes and fetch product details
     const handleProductInputChange = async (index, value) => {
+
+        const commonService = COMMON_SERVICES.find(s => s.product_id === value);
+        if (commonService) {
+            const updatedEntries = [...productEntries];
+            updatedEntries[index] = {
+                id: commonService.product_id,
+                product_id: commonService.product_id,
+                name: commonService.name,
+                price: commonService.price,
+                hsn_code: commonService.hsn_code,
+                quantity: "1"  // Default quantity
+            };
+            updateSalesOrderForm({ productEntries: updatedEntries });
+            return;
+        }
+
         if (!branch) {
             console.error("Branch is undefined. Cannot fetch product details.");
             const updatedEntries = [...productEntries];
@@ -1788,7 +1840,12 @@ const Consulting = memo(({ isCollapsed, onModificationSuccess }) => {
             return;
         }
 
+        // console.log("Searching for MR number:", mrNumber);
+
+
         const patient = await fetchPatientByMRNumber(mrNumber.trim());
+        console.log("Patient details:", patient);
+
 
         if (patient) {
             updateSalesOrderForm({
@@ -1800,7 +1857,17 @@ const Consulting = memo(({ isCollapsed, onModificationSuccess }) => {
                     gender: patient.gender || "N/A",
                     address: patient.address || "N/A",
                 },
-                validationErrors: { ...validationErrors, mrNumber: null },
+                // Also update individual fields for the form
+                customerName: patient.name || "",
+                customerPhone: patient.phone_number || "",
+                address: patient.address || "",
+                age: patient.age?.toString() || "",
+                gender: patient.gender || "",
+                validationErrors: {
+                    ...validationErrors,
+                    mrNumber: null,
+                    generalError: "",
+                },
             });
             updateSalesOrderForm({
                 validationErrors: {
@@ -3077,13 +3144,26 @@ const Consulting = memo(({ isCollapsed, onModificationSuccess }) => {
                                                         }
                                                     }}
                                                 />
-                                                <datalist id={`productIdSuggestions-${index}`}>
+                                                {/* <datalist id={`productIdSuggestions-${index}`}>
                                                     {productSuggestions[index] &&
                                                         productSuggestions[index].map((suggestion) => (
                                                             <option
                                                                 key={suggestion.product_id}
                                                                 value={suggestion.product_id}
                                                             />
+                                                        ))}
+                                                </datalist> */}
+                                                <datalist id={`productIdSuggestions-${index}`}>
+                                                    {COMMON_SERVICES.map((service) => (
+                                                        <option key={service.product_id} value={service.product_id}>
+                                                            {service.name}
+                                                        </option>
+                                                    ))}
+                                                    {productSuggestions[index] &&
+                                                        productSuggestions[index].map((suggestion) => (
+                                                            <option key={suggestion.product_id} value={suggestion.product_id}>
+                                                                {suggestion.product_name}
+                                                            </option>
                                                         ))}
                                                 </datalist>
 
@@ -3385,7 +3465,7 @@ const Consulting = memo(({ isCollapsed, onModificationSuccess }) => {
                                             </p>
                                             <p>
                                                 <strong>Phone number:</strong>{" "}
-                                                {phone_number}
+                                                {customerPhone}
                                             </p>
                                         </div>
                                     )}
@@ -4157,7 +4237,6 @@ const Consulting = memo(({ isCollapsed, onModificationSuccess }) => {
                                                 <th className="border px-4 py-2">#</th>
                                                 <th className="border px-4 py-2">Product ID</th>
                                                 <th className="border px-4 py-2">Product Name</th>
-                                                <th className="border px-4 py-2">HSN Code</th>
                                                 <th className="border px-4 py-2">Price</th>
                                                 <th className="border px-4 py-2">Quantity</th>
                                                 <th className="border px-4 py-2">Total</th>

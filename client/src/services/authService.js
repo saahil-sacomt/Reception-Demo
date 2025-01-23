@@ -156,8 +156,7 @@ export const assignStock = async (assignments) => {
           `Insufficient stock for product ID ${assignment.product_id} in branch ${assignment.from_branch_code} (Assignment Index: ${index + 1})`
         );
         throw new Error(
-          `Insufficient stock for product ID ${assignment.product_id} in branch ${assignment.from_branch_code} (Assignment Index: ${
-            index + 1
+          `Insufficient stock for product ID ${assignment.product_id} in branch ${assignment.from_branch_code} (Assignment Index: ${index + 1
           }).`
         );
       }
@@ -656,38 +655,44 @@ export const signOut = async () => {
  * @returns {Object} - Success status and any error message.
  */
 export const addNewProduct = async (productData) => {
-  const { product_name, product_id, mrp, rate, hsn_code, purchase_from } = productData;
+  const { product_name, product_id, mrp, rate, hsn_code, purchase_from, doctorname, department } = productData;
 
   try {
     // Check if product_id already exists
+    console.log(productData);
+    
     const { data: existingProduct, error: fetchError } = await supabase
       .from("products")
-      .select("id")
+      .select("product_id")
       .eq("product_id", product_id)
-      .single();
+      .maybeSingle();
 
-    if (fetchError && fetchError.code !== "PGRST116") { // PGRST116: No rows found
+    if (fetchError) {
       throw fetchError;
     }
 
     if (existingProduct) {
-      return { success: false, error: "Product ID already exists." };
+      return {
+        success: false,
+        error: `Product ID ${product_id} already exists.`
+      };
     }
 
     // Insert new product
     const { data, error } = await supabase
       .from("products")
-      .insert([
-        {
-          product_name,
-          product_id,
-          mrp,
-          rate,
-          hsn_code: hsn_code || "9001",
-          purchase_from, // Include the new purchase_from field
-        },
-      ])
-      .select("id"); // Select the inserted product's ID
+      .insert({
+        product_name,
+        product_id,
+        mrp: parseFloat(mrp) || 0,
+        rate: parseFloat(mrp) || 0,
+        hsn_code: hsn_code || "9001",
+        purchase_from,
+        doctorname,
+        department
+      })
+      .select()
+      .single();
 
     if (error) {
       console.error("Error adding new product:", error.message);
@@ -826,7 +831,7 @@ export const editStock = async (productId, branchCode, quantity, rate, mrp) => {
       })
       .eq("product_id", productId)
       .eq("branch_code", branchCode);
-    
+
     if (error) throw error;
 
     // Optionally, update rate and MRP in the products table if provided
