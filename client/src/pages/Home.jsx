@@ -682,7 +682,7 @@ const Home = ({ isCollapsed }) => {
                 </div>
                 <div
                   className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 w-full"
-                  onClick={() => navigate('/work-order')}
+                  onClick={() => navigate('/consulting')}
                 >
                   <ClipboardDocumentCheckIcon className='h-36 w-36 text-green-500' />
                   <h2 className="text-xl text-gray-800 mt-4">Consulting</h2>

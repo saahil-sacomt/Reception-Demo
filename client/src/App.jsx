@@ -33,6 +33,7 @@ import EmployeeStockManagement from "./pages/EmployeeStockManagement";
 import NotesReport from "./pages/Notes";
 import ModifyOrderWrapper from "./components/ModifyOrderWrapper";
 import { useAuth } from './context/AuthContext';
+import Consulting from "./pages/Consulting";
 
 const App = () => {
   const location = useLocation();
@@ -132,6 +133,14 @@ const App = () => {
 
                     <WorkOrderGeneration isCollapsed={isCollapsed} />
                   }
+                />
+              </Route>
+              <Route
+                element={<RequireAuth allowedRoles={["reception"]} />}
+              >
+                <Route
+                  path="/consulting"
+                  element={<Consulting isCollapsed={isCollapsed} />}
                 />
               </Route>
               <Route
