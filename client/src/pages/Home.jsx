@@ -679,7 +679,7 @@ const Home = ({ isCollapsed }) => {
                 )}
 
 
-                {role === 'Reception' && (
+                {role === 'reception' && (
                   <div
                     className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200"
                     onClick={() => navigate('/sales-order')}
