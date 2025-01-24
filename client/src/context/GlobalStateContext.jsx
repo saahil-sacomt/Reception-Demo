@@ -85,6 +85,7 @@ const defaultInitialState = {
     isSaving: false,
     allowPrint: false,
     submitted: false,
+    insuranceName: '',
   },
   // Add Modal States
   modals: {
@@ -95,7 +96,6 @@ const defaultInitialState = {
     showEditStockModal: false,
   },
   // Add Selected Order States
-  selectedWorkOrder: null,
   selectedSalesOrder: null,
   // Add Purchase Modal Content
   purchaseModal: {

@@ -86,6 +86,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     gstNumber,
     isB2B,
     is_insurance,
+    insuranceName,
     hasMrNumber,
     customerName,
     customerPhone,
@@ -110,6 +111,48 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
 
   const handleSearchQueryChange = (e) => {
     setSearchQuery(e.target.value);
+  };
+
+
+  const [showInsuranceModal, setShowInsuranceModal] = useState(false);
+
+  const InsuranceModal = ({ isOpen, onClose, onSubmit }) => {
+    const [name, setName] = useState('');
+
+    return (
+      isOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg w-96">
+            <h3 className="text-lg font-semibold mb-4">Enter Insurance Details</h3>
+            <input
+              type="text"
+              placeholder="Enter Insurance Provider Name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-4 py-2 mb-4"
+              autoFocus
+            />
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={onClose}
+                className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  onSubmit(name);
+                  onClose();
+                }}
+                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+              >
+                Submit
+              </button>
+            </div>
+          </div>
+        </div>
+      )
+    );
   };
 
   // Initialize productSuggestions as an object for per-product index suggestions
@@ -1008,7 +1051,8 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         sgst,
         total_amount: totalAmountWithGST,
         is_b2b: isB2B,
-        is_insurance: subRole.includes("Counselling")  ? workOrderForm.isInsurance : null,
+        is_insurance: subRole.includes("Counselling") ? workOrderForm.isInsurance : null,
+        insurance_name: insuranceName,
         gst_number: isB2B ? gstNumber : null,
         customer_id: customerId,
 
@@ -1489,7 +1533,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
 
       {/* Progress Tracker */}
       <div className=" flex items-center mb-8 w-2/3 mx-auto">
-        {Array.from({ length: 5 }, (_, i) => (
+        {Array.from({ length: 3 }, (_, i) => (
           <div
             key={i}
             className={`flex-1 h-2 rounded-xl mx-1 ${step > i + 1 ? "bg-[#5db76d]" : "bg-gray-300"
@@ -1929,9 +1973,9 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
 
             {/* B2B Toggle */}
 
-            <div className="flex items-center space-x-4">
+            {/* (<div className="flex items-center space-x-4">
               <span className="font-medium">
-                {subRole.includes("Counselling") ? 'Is Insurance?' : 'Is B2B?'}
+                 Is B2B?
               </span>
               <button
                 type="button"
@@ -1939,11 +1983,11 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                   dispatch({
                     type: "SET_WORK_ORDER_FORM",
                     payload: {
-                      [subRole.includes("Counselling") ? 'isInsurance' : 'isB2B']: true
+                      [isB2B]: true
                     },
                   })
                 }
-                className={`px-4 py-2 rounded-lg ${(subRole.includes("Counselling") ? workOrderForm.isInsurance : workOrderForm.isB2B)
+                className={`px-4 py-2 rounded-lg ${(workOrderForm.isB2B)
                   ? "bg-green-600 text-white"
                   : "bg-green-100 text-white"
                   }`}
@@ -1967,44 +2011,181 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
               >
                 No
               </button>
-            </div>
-            {/* <div className="flex items-center space-x-4 mt-6">
-              <label className="flex items-center cursor-pointer space-x-4">
-                <span className="font-semibold text-gray-700">
-                  {((subRole.includes("Counselling"))) ? "Insurance" : 'Is this a B2B order?"'}
-                </span>
-                <div className="relative">
-                  <input
-                    type="checkbox"
-                    id="b2b-toggle"
-                    checked={isB2B}
-                    onChange={(e) => {
+            </div>)
+            <div className="space-y-4 mt-6">
+              <div className="flex items-center space-x-4">
+                <span className="font-medium">Is Insurance?</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    dispatch({
+                      type: "SET_WORK_ORDER_FORM",
+                      payload: { isInsurance: true }
+                    });
+                    setShowInsuranceModal(true);
+                  }}
+                  className={`px-4 py-2 rounded-lg ${workOrderForm.isInsurance
+                      ? "bg-green-600 text-white"
+                      : "bg-green-100 text-green-600"
+                    }`}
+                >
+                  Yes
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    dispatch({
+                      type: "SET_WORK_ORDER_FORM",
+                      payload: {
+                        isInsurance: false,
+                        insuranceName: ''
+                      }
+                    });
+                  }}
+                  className={`px-4 py-2 rounded-lg ${workOrderForm.isInsurance === false
+                      ? "bg-red-600 text-white"
+                      : "bg-red-100 text-red-600"
+                    }`}
+                >
+                  No
+                </button>
+              </div>
+
+              {workOrderForm.isInsurance && workOrderForm.insuranceName && (
+                <div className="bg-gray-50 p-3 rounded-lg">
+                  <p className="text-sm">
+                    <span className="font-medium">Insurance Provider:</span> {workOrderForm.insuranceName}
+                  </p>
+                </div>
+              )}
+
+              <InsuranceModal
+                isOpen={showInsuranceModal}
+                onClose={() => setShowInsuranceModal(false)}
+                onSubmit={(name) => {
+                  dispatch({
+                    type: "SET_WORK_ORDER_FORM",
+                    payload: { insuranceName: name }
+                  });
+                }}
+              />
+            </div> */}
+
+            {subRole?.includes("Counselling") ? (
+              // Insurance Section for Counselling
+              <div className="space-y-4 mt-6">
+                <div className="flex items-center space-x-4">
+                  <span className="font-medium">Is Insurance?</span>
+                  <button
+                    type="button"
+                    onClick={() => {
                       dispatch({
                         type: "SET_WORK_ORDER_FORM",
-                        payload: { isB2B: e.target.checked },
+                        payload: { isInsurance: true }
                       });
-                      // Reset GST Number when toggling off B2B
-                      if (!e.target.checked)
+                      setShowInsuranceModal(true);
+                    }}
+                    className={`px-4 py-2 rounded-lg ${workOrderForm.isInsurance
+                      ? "bg-green-600 text-white"
+                      : "bg-green-100 text-green-600"
+                      }`}
+                  >
+                    Yes
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      dispatch({
+                        type: "SET_WORK_ORDER_FORM",
+                        payload: {
+                          isInsurance: false,
+                          insuranceName: ''
+                        }
+                      });
+                    }}
+                    className={`px-4 py-2 rounded-lg ${workOrderForm.isInsurance === false
+                      ? "bg-red-600 text-white"
+                      : "bg-red-100 text-red-600"
+                      }`}
+                  >
+                    No
+                  </button>
+                </div>
+
+                {workOrderForm.isInsurance && workOrderForm.insuranceName && (
+                  <div className="bg-gray-50 p-3 rounded-lg">
+                    <p className="text-sm">
+                      <span className="font-medium">Insurance Provider:</span> {workOrderForm.insuranceName}
+                    </p>
+                  </div>
+                )}
+
+                <InsuranceModal
+                  isOpen={showInsuranceModal}
+                  onClose={() => setShowInsuranceModal(false)}
+                  onSubmit={(name) => {
+                    dispatch({
+                      type: "SET_WORK_ORDER_FORM",
+                      payload: { insuranceName: name }
+                    });
+                  }}
+                />
+              </div>
+            ) : (
+              <div className="space-y-4 mt-6">
+                <div className="flex items-center space-x-4">
+                  <span className="font-medium">B2B Customer?</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      dispatch({
+                        type: "SET_WORK_ORDER_FORM",
+                        payload: { isB2B: true }
+                      });
+                    }}
+                    className={`px-4 py-2 rounded-lg ${isB2B ? "bg-green-600 text-white" : "bg-green-100 text-green-600"
+                      }`}
+                  >
+                    Yes
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      dispatch({
+                        type: "SET_WORK_ORDER_FORM",
+                        payload: {
+                          isB2B: false,
+                          gstNumber: ''
+                        }
+                      });
+                    }}
+                    className={`px-4 py-2 rounded-lg ${isB2B === false ? "bg-red-600 text-white" : "bg-red-100 text-red-600"
+                      }`}
+                  >
+                    No
+                  </button>
+                </div>
+
+                {isB2B && (
+                  <div className="mt-4">
+                    <input
+                      type="text"
+                      ref={gstNumberRef}
+                      placeholder="Enter GST Number"
+                      value={gstNumber}
+                      onChange={(e) =>
                         dispatch({
                           type: "SET_WORK_ORDER_FORM",
-                          payload: { gstNumber: "" },
-                        });
-                    }}
-                    className="sr-only"
-                    aria-checked={isB2B}
-                    aria-label="Toggle B2B Order"
-                  />
-                  <div
-                    className={`w-11 h-6 rounded-full transition-colors duration-300 ${isB2B ? "bg-green-500" : "bg-gray-300"
-                      }`}
-                  ></div>
-                  <div
-                    className={`absolute w-5 h-5 bg-white rounded-full top-0.5 left-0.5 transform transition-transform duration-300 ${isB2B ? "translate-x-5" : "translate-x-0"
-                      }`}
-                  ></div>
-                </div>
-              </label>
-            </div> */}
+                          payload: { gstNumber: e.target.value }
+                        })
+                      }
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
 
             {/* GST Number Input for B2B Orders */}
             {isB2B && (
@@ -2109,7 +2290,6 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                       <th className="border px-4 py-2">#</th>
                       <th className="border px-4 py-2">Product ID</th>
                       <th className="border px-4 py-2">Product Name</th>
-                      <th className="border px-4 py-2">HSN Code</th>
                       <th className="border px-4 py-2">Price</th>
                       <th className="border px-4 py-2">Quantity</th>
                       <th className="border px-4 py-2">Total</th>
@@ -2131,9 +2311,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                           <td className="border px-4 py-2">
                             {product.name || "N/A"}
                           </td>
-                          <td className="border px-4 py-2 text-center">
-                            {product.hsn_code || "N/A"}
-                          </td>
+
                           <td className="border px-4 py-2 text-center">
                             ₹{adjustedPrice.toFixed(2)}
                           </td>
