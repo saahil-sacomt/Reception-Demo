@@ -39,6 +39,16 @@ const formatDate = (date) => {
 
 const WorkOrderGeneration = ({ isCollapsed }) => {
 
+  useEffect(() => {
+    // Reset work order form when component mounts
+    dispatch({ type: 'RESET_WORK_ORDER_FORM' });
+
+    // Cleanup when component unmounts
+    return () => {
+      dispatch({ type: 'RESET_WORK_ORDER_FORM' });
+    };
+  }, []);
+
   const verifyProductId = useCallback(async (productId) => {
     try {
       const { data, error } = await supabase
@@ -59,15 +69,16 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     }
   }, []);
 
-  const { branch, subRole } = useAuth();
+  const { branch, subRole, role } = useAuth();
   // console.log("Branch in WorkOrderGeneration:", branch);
   console.log("SubRole in WorkOrderGeneration:", subRole);
+  console.log("Branch:", branch);
 
 
   const { orderId } = useParams(); // Get orderId from route params
   const isEditing = Boolean(orderId);
 
-  const { state, dispatch, resetState } = useGlobalState();
+  const { state, dispatch } = useGlobalState();
   const { workOrderForm } = state;
 
   const {
@@ -230,30 +241,42 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
 
 
       const strSubRole = subRole;
+      // if (lastWorkOrders && lastWorkOrders.length > 0) {
+      //   if ((role.includes("opd")) || ((role.includes("counselling")))) {
+      //     const str = lastWorkOrders[0].work_order_id
+      //     const match = str.match(/(\d+)$/); //Regex to match digits at the end of the string
+
+      //     if (match) {
+      //       console.log('Regex', match[0]); // Output: 3742
+      //       newWorkOrderId = parseInt(match[0]) + 1;
+      //     } else {
+      //       console.log("No number found");
+      //     }
+
+      //   }
+      //   else {
+      //     const lastWorkOrderId = parseInt(lastWorkOrders[0].work_order_id, 10);
+      //     console.log("Last Work Order ID for branch:", lastWorkOrderId);
+      //     if (!isNaN(lastWorkOrderId)) {
+      //       newWorkOrderId = lastWorkOrderId + 1;
+      //     } else {
+      //       console.warn(
+      //         "Invalid lastWorkOrderId, defaulting to:",
+      //         newWorkOrderId
+      //       );
+      //     }
+      //   }
+      // }
+
       if (lastWorkOrders && lastWorkOrders.length > 0) {
-        if ((strSubRole.includes("OPD")) || ((strSubRole.includes("Counselling")))) {
-          const str = lastWorkOrders[0].work_order_id
-          const match = str.match(/(\d+)$/); //Regex to match digits at the end of the string
+        const lastWorkOrderId = lastWorkOrders[0].work_order_id;
+        console.log("Last Work Order ID:", lastWorkOrderId);
 
-          if (match) {
-            console.log('Regex', match[0]); // Output: 3742
-            newWorkOrderId = parseInt(match[0]) + 1;
-          } else {
-            console.log("No number found");
-          }
-
-        }
-        else {
-          const lastWorkOrderId = parseInt(lastWorkOrders[0].work_order_id, 10);
-          console.log("Last Work Order ID for branch:", lastWorkOrderId);
-          if (!isNaN(lastWorkOrderId)) {
-            newWorkOrderId = lastWorkOrderId + 1;
-          } else {
-            console.warn(
-              "Invalid lastWorkOrderId, defaulting to:",
-              newWorkOrderId
-            );
-          }
+        // Extract number from existing format (OPW-XX-XXX or CR-XX-XXX)
+        const match = lastWorkOrderId.match(/\d+$/);
+        if (match) {
+          newWorkOrderId = parseInt(match[0]) + 1;
+          console.log("New number extracted:", newWorkOrderId);
         }
       }
 
@@ -262,20 +285,37 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
 
       // Determine the OP Number based on subRole
       // Determine the OP Number based on subRole
-      let opNumber = "01"; // Default OP Number
-      if ((subRole.toLowerCase().includes("opd") || (subRole.toLowerCase().includes("counselling")))) {
-        // Extract the OP Number from subRole (e.g., "OPD 01")
+      console.log(role);
+
+      let opNumber = "01";
+      if (subRole) {
         const subRoleParts = subRole.split(" ");
         opNumber = subRoleParts.length > 1 ? subRoleParts[1] : "01";
       }
 
-      // Format the new Work Order ID
-      if ((subRole.toLowerCase().includes("opd"))) {
+      // Format the work order ID based on subRole
+      if (role && role.includes("opd")) {
+        console.log("Generating OPD work order ID");
         newWorkOrderId = `OPW-${opNumber}-${String(newWorkOrderId).padStart(3, "0")}`;
-      }
-      else {
+        console.log(branch);
+
+      } else {
+        console.log("Generating counselling work order ID");
         newWorkOrderId = `CR-${opNumber}-${String(newWorkOrderId).padStart(3, "0")}`;
       }
+
+      console.log("Final Generated Work Order ID:", newWorkOrderId);
+      // // Format the new Work Order ID
+      // if ((subRole.includes("OPD"))) {
+      //   console.log('1');
+
+      //   newWorkOrderId = `OPW-${opNumber}-${String(newWorkOrderId).padStart(3, "0")}`;
+      // }
+      // else {
+      //   console.log('2');
+
+      //   newWorkOrderId = `CR-${opNumber}-${String(newWorkOrderId).padStart(3, "0")}`;
+      // }
 
 
 
@@ -611,18 +651,20 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
 
   // Handle Exit button functionality
   const handleExit = useCallback(() => {
-    const confirmExit = window.confirm(
-      isPrinted
-        ? "Form has been printed. Do you want to exit?"
-        : "Are you sure you want to exit without saving or printing?"
-    );
-    if (confirmExit) {
+    if (isPrinted) {
+      // Reset form state using dispatch
+      dispatch({ type: 'RESET_WORK_ORDER_FORM' });
       resetForm();
-      resetState();
+      navigate('/home');
     } else {
-      dispatch({ type: "SET_WORK_ORDER_FORM", payload: { isPrinted: false } });
+      const confirmed = window.confirm('Are you sure you want to exit without printing?');
+      if (confirmed) {
+        dispatch({ type: 'RESET_WORK_ORDER_FORM' });
+        resetForm();
+        navigate('/home');
+      }
     }
-  }, [isPrinted, resetForm, resetState, dispatch]);
+  }, [isPrinted, resetForm, dispatch, navigate]);
 
   // Implement handlePrint using window.print()
   const handlePrint = useCallback(() => {
@@ -694,6 +736,12 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     }
     return true;
   }, [advanceDetails, totalAmount]);
+
+  const getCurrentISTDateTime = () => {
+    const now = new Date();
+    // Add IST offset (UTC+5:30)
+    return new Date(now.getTime() + (5.5 * 60 * 60 * 1000)).toISOString();
+  };
 
   // Navigate to the next step with validations
   const nextStep = useCallback(async () => {
@@ -1148,7 +1196,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
           return;
         }
         payload.work_order_id = workOrderId;
-        payload.created_at = new Date().toISOString();
+        payload.created_at = getCurrentISTDateTime();
 
         const { error } = await supabase.from("work_orders").insert(payload);
 
@@ -1494,8 +1542,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   );
 
   useEffect(() => {
-    // Only generate a new Work Order ID if the branch is available
-    if (branch && !workOrderForm.isEditing && !workOrderId) {
+    if (!workOrderId && !workOrderForm.isEditing) {
       generateNewWorkOrderId();
     }
   }, [branch, generateNewWorkOrderId, workOrderForm.isEditing, workOrderId]);

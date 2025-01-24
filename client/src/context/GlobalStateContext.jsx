@@ -174,8 +174,11 @@ const globalStateReducer = (state, action) => {
         ...state,
         workOrderForm: { ...state.workOrderForm, ...action.payload },
       };
-    case "RESET_WORK_ORDER_FORM":
-      return { ...state, workOrderForm: defaultInitialState.workOrderForm };
+    case 'RESET_WORK_ORDER_FORM':
+      return {
+        ...state,
+        workOrderForm: defaultInitialState.workOrderForm // Make sure to define this
+      };
 
     // Add new action type
     case "RESET_PRODUCT_FIELDS":
