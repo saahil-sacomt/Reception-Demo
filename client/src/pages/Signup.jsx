@@ -388,6 +388,8 @@ const Signup = () => {
                   <option value="reception">Reception</option>
                   <option value="counselling">Counselling</option>
                   <option value="opd">OPD</option>
+                  <option value="insurance">Insurance</option>
+                  
                 </select>
               </div>
 

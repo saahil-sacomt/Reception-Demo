@@ -4,6 +4,8 @@ import SplashScreen from '../components/SplashScreen';
 import walletImage from '../assets/pngwing.com.png';
 import { ClipboardDocumentCheckIcon } from '@heroicons/react/24/outline';
 import { UserPlusIcon } from '@heroicons/react/24/outline';
+import { ShieldCheckIcon } from '@heroicons/react/24/outline';
+
 
 import {
   CircleStackIcon,
@@ -638,17 +640,15 @@ const Home = ({ isCollapsed }) => {
             </div>
           </div>
 
-          {/* Purchase and Order Generation Sections (Grid Layout) */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mx-6 z-10">
-            {/* Purchase Section */}
-            {role !== 'admin' && role !== 'super_admin' && (
-              <div className="flex flex-col items-center bg-green-50 py-8 px-6 rounded-lg shadow">
+          {role !== 'admin' && role !== 'super_admin' && (
+            <div className="flex justify-center mb-6 mx-6">
+              <div className="flex flex-col items-center bg-green-50 py-8 px-6 rounded-lg shadow h-full max-w-sm w-full">
                 <img
                   src={walletImage}
                   alt="Wallet Icon"
                   className="w-48 h-auto p-6 shadow-xl rounded-full bg-white"
                 />
-                <div className="text-left space-y-2 ml-6">
+                <div className="text-left space-y-2 ml-6 w-full">
                   <h3 className="text-2xl text-green-500">Generate a New Privilege Card</h3>
                   <p className="text-sm text-gray-600 pb-4">
                     Click the button below to generate new Privilege cards.
@@ -661,162 +661,160 @@ const Home = ({ isCollapsed }) => {
                   </button>
                 </div>
               </div>
-            )}
+            </div>
+          )}
 
-            {/* Work Order and Sales Order Generation Section */}
-            {role !== 'admin' && role !== 'super_admin' && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full">
-                {/* Work Order Container */}
-                {/* Work Order Generation - Only visible to OPD and Counselling */}
-                {(role === 'opd' || role === 'counselling') && (
-                  <div
-                    className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200"
-                    onClick={() => navigate('/work-order')}
-                  >
-                    <WrenchScrewdriverIcon className='h-36 w-36 text-green-500' />
-                    <h2 className="text-xl text-gray-800 mt-4">Work Order Generation</h2>
-                  </div>
-                )}
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mx-6 z-10 auto-rows-fr">
 
-
-                {role === 'reception' && (
-                  <div
-                    className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200"
-                    onClick={() => navigate('/sales-order')}
-                  >
-                    <TicketIcon className='h-36 w-36 text-green-500' />
-                    <h2 className="text-xl text-gray-800 mt-4">Sales Order Generation</h2>
-                  </div>
-                )}
-
-
-                <div
-                  className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200"
-                  onClick={() => navigate('/consulting')}
-                >
-                  <ClipboardDocumentCheckIcon className='h-36 w-36 text-green-500' />
-                  <h2 className="text-xl text-gray-800 mt-4">Consulting</h2>
-                </div>
-
-                <div
-                  className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200"
-                  onClick={() => navigate('/patient-registration')}
-                >
-                  <UserPlusIcon className='h-36 w-36 text-green-500' />
-                  <h2 className="text-xl text-gray-800 mt-4">Patient Registration</h2>
-                </div>
+            {/* Work Order Generation - OPD / Counselling */}
+            {(role === 'opd' || role === 'counselling') && (
+              <div
+                className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 h-full"
+                onClick={() => navigate('/work-order')}
+              >
+                <WrenchScrewdriverIcon className='h-36 w-36 text-green-500' />
+                <h2 className="text-xl text-gray-800 mt-4">Work Order Generation</h2>
               </div>
             )}
 
-            {/* Reports and Stock Management Section */}
+            {/* Sales Order Generation - Reception */}
+            {role === 'reception' && (
+              <div
+                className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 h-full"
+                onClick={() => navigate('/sales-order')}
+              >
+                <TicketIcon className='h-36 w-36 text-green-500' />
+                <h2 className="text-xl text-gray-800 mt-4">Sales Order Generation</h2>
+              </div>
+            )}
+
+            {/* Consulting - Reception */}
+            {role === 'reception' && (
+              <div
+                className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 h-full"
+                onClick={() => navigate('/consulting')}
+              >
+                <ClipboardDocumentCheckIcon className='h-36 w-36 text-green-500' />
+                <h2 className="text-xl text-gray-800 mt-4">Consulting</h2>
+              </div>
+            )}
+
+            {/* Patient Registration - Reception */}
+            {role === 'reception' && (
+              <div
+                className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 h-full"
+                onClick={() => navigate('/patient-registration')}
+              >
+                <UserPlusIcon className='h-36 w-36 text-green-500' />
+                <h2 className="text-xl text-gray-800 mt-4">Patient Registration</h2>
+              </div>
+            )}
+
+            {/* Stock Management - visible for all except employee */}
             {role !== 'employee' && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full">
-                {/* Reports Container */}
-                <div
-                  className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200"
-                  onClick={() => navigate('/reportgenerator')}
-                >
-                  <ClipboardDocumentIcon className='h-36 w-36 text-green-500' />
-                  <h2 className="text-xl text-gray-800 mt-4">Reports</h2>
-                </div>
-
-                {/* Stock Management Container */}
-                <div
-                  className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200"
-                  onClick={() => navigate('/stock-manage')}
-                >
-                  <CircleStackIcon className='h-36 w-36 text-green-500' />
-                  <h2 className="text-xl text-gray-800 mt-4">Stock Management</h2>
-                </div>
+              <div
+                className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 h-full"
+                onClick={() => navigate('/stock-manage')}
+              >
+                <CircleStackIcon className='h-36 w-36 text-green-500' />
+                <h2 className="text-xl text-gray-800 mt-4">Stock Management</h2>
               </div>
             )}
 
-            {/* Super Admin Section */}
+            {/* Reports - visible to everyone */}
+            <div
+              className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 h-full"
+              onClick={() => navigate('/reportgenerator')}
+            >
+              <ClipboardDocumentIcon className='h-36 w-36 text-green-500' />
+              <h2 className="text-xl text-gray-800 mt-4">Reports</h2>
+            </div>
+
+            {/* Super Admin - Add New User */}
             {role === 'super_admin' && (
-              <div className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 w-full text-center">
-                <div
-                  className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200"
-                  onClick={() => navigate('/signup')}
-                >
-                  <ClipboardDocumentIcon className='h-36 w-36 text-green-500 rounded-lg' />
-                  <h2 className="text-xl text-gray-800 mt-4">Add New User</h2>
-                </div>
+              <div
+                className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 h-full text-center"
+                onClick={() => navigate('/signup')}
+              >
+                <ClipboardDocumentIcon className='h-36 w-36 text-green-500 rounded-lg' />
+                <h2 className="text-xl text-gray-800 mt-4">Add New User</h2>
               </div>
             )}
 
-            {/* Reports and Stock Management Section for Admin */}
+            {/* Purchase Stock - all except counselling */}
             {role !== 'counselling' && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full">
-                {/* Purchase Stock Container */}
-                <div
-                  className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200"
-                  onClick={() => navigate('/employee-stock-management')}
-                >
-                  <ArchiveBoxArrowDownIcon className='h-36 w-36 text-green-500' />
-                  <h2 className="text-xl text-gray-800 mt-4">Purchase Stock</h2>
-                </div>
-
-                <div
-                  className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200"
-                  onClick={() => navigate('/notes')}
-                >
-                  <BanknotesIcon className='h-36 w-36 text-green-500' />
-                  <h2 className="text-xl text-gray-800 mt-4">Credit and Debit Notes</h2>
-                </div>
+              <div
+                className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 h-full"
+                onClick={() => navigate('/employee-stock-management')}
+              >
+                <ArchiveBoxArrowDownIcon className='h-36 w-36 text-green-500' />
+                <h2 className="text-xl text-gray-800 mt-4">Purchase Stock</h2>
               </div>
             )}
 
-            {/* for counselling add new service */}
+            {/* Credit and Debit Notes - not OPD/counselling */}
+            {role !== 'opd' && role !== 'counselling' && (
+              <div
+                className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 h-full"
+                onClick={() => navigate('/notes')}
+              >
+                <BanknotesIcon className='h-36 w-36 text-green-500' />
+                <h2 className="text-xl text-gray-800 mt-4">Credit and Debit Notes</h2>
+              </div>
+            )}
+
+            {/* Counselling - Add Service */}
             {role === 'counselling' && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full">
-                {/* Add Service Container */}
-                <div
-                  className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200"
-                  onClick={() => navigate('/add-service')}
-                >
-                  <ArchiveBoxArrowDownIcon className='h-36 w-36 text-green-500' />
-                  <h2 className="text-xl text-gray-800 mt-4">Add Service</h2>
-                </div>
-
-                <div
-                  className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200"
-                  onClick={() => navigate('/notes')}
-                >
-                  <BanknotesIcon className='h-36 w-36 text-green-500' />
-                  <h2 className="text-xl text-gray-800 mt-4">Credit and Debit Notes</h2>
-                </div>
+              <div
+                className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 h-full"
+                onClick={() => navigate('/add-service')}
+              >
+                <ArchiveBoxArrowDownIcon className='h-36 w-36 text-green-500' />
+                <h2 className="text-xl text-gray-800 mt-4">Add Service</h2>
               </div>
             )}
 
-            {/* Reports and Stock Management Section for Employee */}
+            {/* Counselling - Credit/Debit Notes */}
+            {role === 'counselling' && (
+              <div
+                className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 h-full"
+                onClick={() => navigate('/notes')}
+              >
+                <BanknotesIcon className='h-36 w-36 text-green-500' />
+                <h2 className="text-xl text-gray-800 mt-4">Credit and Debit Notes</h2>
+              </div>
+            )}
+
+            {/* Employee-only section */}
             {role === 'employee' && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-10 px-6 w-full">
-                {/* Reports Container */}
+              <>
+                {/* Reports */}
                 <div
-                  className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200"
+                  className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 h-full"
                   onClick={() => navigate('/reportgenerator')}
                 >
                   <ClipboardDocumentIcon className='h-36 w-36 text-green-500' />
                   <h2 className="text-xl text-gray-800 mt-4">Reports</h2>
                 </div>
 
-                {/* Stock Management Container */}
+                {/* Purchase Section */}
                 <div
-                  className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200"
+                  className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 h-full"
                   onClick={() => navigate('/employee-stock-management')}
                 >
                   <ArchiveBoxArrowDownIcon className='h-36 w-36 text-green-500' />
                   <h2 className="text-xl text-gray-800 mt-4">Purchase Section</h2>
                 </div>
 
+                {/* Credit and Debit Notes */}
                 <div
-                  className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200"
+                  className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 h-full"
                   onClick={() => navigate('/notes')}
                 >
                   <BanknotesIcon className='h-36 w-36 text-green-500' />
                   <h2 className="text-xl text-gray-800 mt-4">Credit and Debit Notes</h2>
                 </div>
-              </div>
+              </>
             )}
           </div>
         </div>)}
