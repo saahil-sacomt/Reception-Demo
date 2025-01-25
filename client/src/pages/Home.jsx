@@ -640,7 +640,7 @@ const Home = ({ isCollapsed }) => {
             </div>
           </div>
 
-          {role !== 'admin' && role !== 'super_admin' && (
+          {role !== 'admin' && role !== 'super_admin' && role !== 'insurance'&&  (
             <div className="flex justify-center mb-6 mx-6">
               <div className="flex flex-col items-center bg-green-50 py-8 px-6 rounded-lg shadow h-full max-w-sm w-full">
                 <img
@@ -667,7 +667,7 @@ const Home = ({ isCollapsed }) => {
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mx-6 z-10 auto-rows-fr">
 
             {/* Work Order Generation - OPD / Counselling */}
-            {(role === 'opd' || role === 'counselling') && (
+            {(role === 'opd' || role === 'counselling')  && (
               <div
                 className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 h-full"
                 onClick={() => navigate('/work-order')}
@@ -711,7 +711,7 @@ const Home = ({ isCollapsed }) => {
             )}
 
             {/* Stock Management - visible for all except employee */}
-            {role !== 'employee' && (
+            {role !== 'employee' && role !== 'insurance' &&(
               <div
                 className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 h-full"
                 onClick={() => navigate('/stock-manage')}
@@ -742,7 +742,7 @@ const Home = ({ isCollapsed }) => {
             )}
 
             {/* Purchase Stock - all except counselling */}
-            {role !== 'counselling' && (
+            {role !== 'counselling' && role !== 'insurance' && (
               <div
                 className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 h-full"
                 onClick={() => navigate('/employee-stock-management')}
@@ -753,7 +753,7 @@ const Home = ({ isCollapsed }) => {
             )}
 
             {/* Credit and Debit Notes - not OPD/counselling */}
-            {role !== 'opd' && role !== 'counselling' && (
+            {(role !== 'opd' && role !== 'counselling' && role !== 'insurance') && (
               <div
                 className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 h-full"
                 onClick={() => navigate('/notes')}
@@ -774,16 +774,6 @@ const Home = ({ isCollapsed }) => {
               </div>
             )}
 
-            {/* Counselling - Credit/Debit Notes */}
-            {role === 'counselling' && (
-              <div
-                className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 h-full"
-                onClick={() => navigate('/notes')}
-              >
-                <BanknotesIcon className='h-36 w-36 text-green-500' />
-                <h2 className="text-xl text-gray-800 mt-4">Credit and Debit Notes</h2>
-              </div>
-            )}
 
             {/* Employee-only section */}
             {role === 'employee' && (

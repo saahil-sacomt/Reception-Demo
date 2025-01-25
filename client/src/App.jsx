@@ -36,6 +36,7 @@ import { useAuth } from './context/AuthContext';
 import Consulting from "./pages/Consulting";
 import AddService from "./pages/AddService";
 import PatientRegistration from "./pages/PatientRegistration";
+import InsuranceCreation from "./pages/Insurance";
 
 const App = () => {
   const location = useLocation();
@@ -109,10 +110,16 @@ const App = () => {
             <Route
               element={
                 <RequireAuth
-                  allowedRoles={["super_admin", "admin", "employee", "counselling", "opd", "reception"]}
+                  allowedRoles={["super_admin", "admin", "employee", "counselling", "opd", "reception", "insurance"]}
                 />
               }
             >
+              <Route element={<RequireAuth allowedRoles={["insurance"]} />}>
+                <Route
+                  path="/insuranceCreation"
+                  element={<InsuranceCreation />}
+                />
+              </Route>
               <Route path="/patient-registration" element={<PatientRegistration />} />
               <Route
                 path="/home"
@@ -206,6 +213,7 @@ const App = () => {
                   element={<Signup isCollapsed={isCollapsed} />}
                 />
               </Route>
+
             </Route>
 
             {/* Default Route */}

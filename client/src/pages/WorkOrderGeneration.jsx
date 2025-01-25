@@ -336,10 +336,20 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   // Fetch employees from the Supabase `employees` table
   const fetchEmployees = useCallback(async () => {
     try {
-      const { data, error } = await supabase
-        .from("employees")
-        .select("name")
-        .eq("branch", branch); // Filter by branch if necessary
+      let query = supabase
+        .from('employees')  // Returns a query builder
+        .select('*');       // Keep chaining, do not destructure yet
+
+      // Add conditions
+      query = query.eq('branch', branch);
+
+      if (role === 'opd') {
+        query = query.eq('role', 'opd');
+      } else if (role === 'counselling') {
+        query = query.eq('role', 'counselling');
+      }
+
+      const { data, error } = await query;
 
       if (error) {
         console.error("Error fetching employees:", error.message);
@@ -2018,105 +2028,6 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
               />
             )}
 
-            {/* B2B Toggle */}
-
-            {/* (<div className="flex items-center space-x-4">
-              <span className="font-medium">
-                 Is B2B?
-              </span>
-              <button
-                type="button"
-                onClick={() =>
-                  dispatch({
-                    type: "SET_WORK_ORDER_FORM",
-                    payload: {
-                      [isB2B]: true
-                    },
-                  })
-                }
-                className={`px-4 py-2 rounded-lg ${(workOrderForm.isB2B)
-                  ? "bg-green-600 text-white"
-                  : "bg-green-100 text-white"
-                  }`}
-              >
-                Yes
-              </button>
-              <button
-                type="button"
-                onClick={() =>
-                  dispatch({
-                    type: "SET_WORK_ORDER_FORM",
-                    payload: {
-                      [subRole.includes("Counselling") ? 'isInsurance' : 'isB2B']: false
-                    },
-                  })
-                }
-                className={`px-4 py-2 rounded-lg ${(subRole.includes("Counselling") ? workOrderForm.isInsurance : workOrderForm.isB2B) === false
-                  ? "bg-red-600 text-white"
-                  : "bg-red-100 text-white"
-                  }`}
-              >
-                No
-              </button>
-            </div>)
-            <div className="space-y-4 mt-6">
-              <div className="flex items-center space-x-4">
-                <span className="font-medium">Is Insurance?</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    dispatch({
-                      type: "SET_WORK_ORDER_FORM",
-                      payload: { isInsurance: true }
-                    });
-                    setShowInsuranceModal(true);
-                  }}
-                  className={`px-4 py-2 rounded-lg ${workOrderForm.isInsurance
-                      ? "bg-green-600 text-white"
-                      : "bg-green-100 text-green-600"
-                    }`}
-                >
-                  Yes
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    dispatch({
-                      type: "SET_WORK_ORDER_FORM",
-                      payload: {
-                        isInsurance: false,
-                        insuranceName: ''
-                      }
-                    });
-                  }}
-                  className={`px-4 py-2 rounded-lg ${workOrderForm.isInsurance === false
-                      ? "bg-red-600 text-white"
-                      : "bg-red-100 text-red-600"
-                    }`}
-                >
-                  No
-                </button>
-              </div>
-
-              {workOrderForm.isInsurance && workOrderForm.insuranceName && (
-                <div className="bg-gray-50 p-3 rounded-lg">
-                  <p className="text-sm">
-                    <span className="font-medium">Insurance Provider:</span> {workOrderForm.insuranceName}
-                  </p>
-                </div>
-              )}
-
-              <InsuranceModal
-                isOpen={showInsuranceModal}
-                onClose={() => setShowInsuranceModal(false)}
-                onSubmit={(name) => {
-                  dispatch({
-                    type: "SET_WORK_ORDER_FORM",
-                    payload: { insuranceName: name }
-                  });
-                }}
-              />
-            </div> */}
 
             {subRole?.includes("Counselling") ? (
               // Insurance Section for Counselling

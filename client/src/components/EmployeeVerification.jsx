@@ -22,7 +22,7 @@ const EmployeeVerification = ({ employee, onVerify }) => {
       const { data, error } = await supabase
         .from('employees')
         .select('pin')
-        .eq('name', employee)
+        .eq('id', employee)
         .single();
 
       // Check for errors or invalid PIN
