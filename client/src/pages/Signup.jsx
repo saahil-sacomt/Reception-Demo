@@ -53,16 +53,16 @@ const Signup = () => {
     counselling: {
       NTA: ['Counselling 01', 'Counselling 02'],
       TVR: ['Counselling 01', 'Counselling 02'],
-      KOT1: ['Counselling K1-01'],
-      KOT2: ['Counselling K2-01'],
-      KAT: ['Counselling KAT-01'],
+      KOT1: ['Counselling 01'],
+      KOT2: ['Counselling 01'],
+      KAT: ['Counselling 01'],
     },
     opd: {
       NTA: ['OPD 01', 'OPD 02'],
       TVR: ['OPD 01', 'OPD 02'],
-      KOT1: ['OPD K1-01'],
-      KOT2: ['OPD K2-01'],
-      KAT: ['OPD KAT-01'],
+      KOT1: ['OPD 01'],
+      KOT2: ['OPD 01'],
+      KAT: ['OPD 01'],
     },
   };
 

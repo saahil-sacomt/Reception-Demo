@@ -3,6 +3,8 @@ import supabase from '../supabaseClient';
 import bcrypt from 'bcryptjs';
 
 const EmployeeVerification = ({ employee, onVerify }) => {
+  console.log("EmployeeVerification component rendered for employee:", employee);
+
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
@@ -18,15 +20,27 @@ const EmployeeVerification = ({ employee, onVerify }) => {
     }
 
     try {
+      console.log("Verifying PIN for employee:", employee);
+
       // Fetch the employee's hashed PIN from the database
       const { data, error } = await supabase
         .from('employees')
         .select('pin')
-        .eq('id', employee)
+        .eq('name', employee) // Query by the "name" column
         .single();
 
-      // Check for errors or invalid PIN
-      if (error || !data || !data.pin) {
+
+      console.log("Supabase query result:", { data, error });
+
+      if (error) {
+        console.error("Supabase error:", error.message);
+        setError("Failed to fetch employee data. Please try again.");
+        setSuccessMessage('');
+        onVerify(false);
+        return;
+      }
+
+      if (!data || !data.pin) {
         setError("Employee not found or no PIN set.");
         setSuccessMessage('');
         onVerify(false);
@@ -78,7 +92,7 @@ const EmployeeVerification = ({ employee, onVerify }) => {
       },
     });
   };
-  
+
 
   // Focus on the PIN input field when the component mounts
   useEffect(() => {
@@ -97,7 +111,7 @@ const EmployeeVerification = ({ employee, onVerify }) => {
         onKeyDown={handleKeyDown}
         className="border border-gray-300 px-4 py-2 rounded mb-2 w-full"
       />
-      
+
       {/* Verify Button */}
       <button
         type="button"

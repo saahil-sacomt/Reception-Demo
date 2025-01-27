@@ -282,8 +282,6 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
 
 
 
-
-      // Determine the OP Number based on subRole
       // Determine the OP Number based on subRole
       console.log(role);
 

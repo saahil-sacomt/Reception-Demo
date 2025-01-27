@@ -640,7 +640,7 @@ const Home = ({ isCollapsed }) => {
             </div>
           </div>
 
-          {role !== 'admin' && role !== 'super_admin' && role !== 'insurance'&&  (
+          {role === 'huihui' && (
             <div className="flex justify-center mb-6 mx-6">
               <div className="flex flex-col items-center bg-green-50 py-8 px-6 rounded-lg shadow h-full max-w-sm w-full">
                 <img
@@ -667,7 +667,7 @@ const Home = ({ isCollapsed }) => {
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mx-6 z-10 auto-rows-fr">
 
             {/* Work Order Generation - OPD / Counselling */}
-            {(role === 'opd' || role === 'counselling')  && (
+            {(role === 'opd' || role === 'counselling') && (
               <div
                 className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 h-full"
                 onClick={() => navigate('/work-order')}
@@ -711,7 +711,7 @@ const Home = ({ isCollapsed }) => {
             )}
 
             {/* Stock Management - visible for all except employee */}
-            {role !== 'employee' && role !== 'insurance' &&(
+            {role === 'employee' && (
               <div
                 className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 h-full"
                 onClick={() => navigate('/stock-manage')}
@@ -749,6 +749,17 @@ const Home = ({ isCollapsed }) => {
               >
                 <ArchiveBoxArrowDownIcon className='h-36 w-36 text-green-500' />
                 <h2 className="text-xl text-gray-800 mt-4">Purchase Stock</h2>
+              </div>
+            )}
+
+            {/* Insurance Claims Card */}
+            {(role === 'insurance') && (
+              <div
+                className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 h-full"
+                onClick={() => navigate('/insuranceCreation')}
+              >
+                <ShieldCheckIcon className='h-36 w-36 text-green-500' />
+                <h2 className="text-xl text-gray-800 mt-4">Insurance Claims</h2>
               </div>
             )}
 

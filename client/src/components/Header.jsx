@@ -70,7 +70,7 @@ const Header = ({ selectedTab, setSelectedTab, isCollapsed, toggleSidebar }) => 
       {/* Right Section: Create Button, Profile, and Settings */}
       <div className="flex items-center space-x-4">
         <div className="relative">
-          {role === 'admin' && role === 'super_admin' && (<button
+          {(role === 'admin' || role === 'super_admin') && (<button
             onClick={toggleCreateDropdown}
             className="flex flex-row bg-green-500 hover:bg-green-600 px-4 py-2 rounded-lg text-sm text-white"
           >
