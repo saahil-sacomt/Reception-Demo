@@ -287,7 +287,7 @@ function calculateAmounts(
   const amountAfterDiscount = subtotalWithGST - totalDiscount;
 
   // **Step 3: Extract GST from Amount After Discount**
-  const taxableValue = amountAfterDiscount ;
+  const taxableValue = amountAfterDiscount;
   const gstAmount = amountAfterDiscount - taxableValue;
   const cgstAmount = gstAmount / 2;
   const sgstAmount = gstAmount / 2;
@@ -413,6 +413,27 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
   const [employees, setEmployees] = useState([]);
   const [productSuggestions, setProductSuggestions] = useState([]);
   const [isGeneratingId, setIsGeneratingId] = useState(false);
+  // State for consultant
+  const [consultantName, setConsultantName] = useState('');
+  const [consultantList, setConsultantList] = useState([]);
+  const [useManualConsultant, setUseManualConsultant] = useState(false);
+
+  const fetchConsultants = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('consultants')
+        .select('*');
+      if (error) throw error;
+      setConsultantList(data || []);
+    } catch (err) {
+      console.error('Error fetching consultants:', err);
+    }
+  }, []);
+
+  // // Fetch consultants on mount
+  // useEffect(() => {
+  //   fetchConsultants();
+  // }, [fetchConsultants]);
 
 
   // Refs for input fields to control focus
@@ -4149,6 +4170,40 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                           : `${customerPhone || "N/A"}`}
                       </strong>
                     </p>
+                    <p className="mt-2">
+                      <label>
+                        Consultant Name :
+                      </label>
+                      {!useManualConsultant && (
+                        <select
+                          value={consultantName}
+                          onChange={(e) => {
+                            if (e.target.value === 'OTHER') {
+                              setConsultantName('');
+                              setUseManualConsultant(true);
+                            } else {
+                              setConsultantName(e.target.value);
+                            }
+                          }}
+                        >
+                          <option value="">Select Consultant</option>
+                          {consultantList.map((consultant) => (
+                            <option key={consultant.id} value={consultant.name}>
+                              {consultant.name}
+                            </option>
+                          ))}
+                          <option value="OTHER">Other (Manual Entry)</option>
+                        </select>
+                      )}
+                      {useManualConsultant && (
+                        <input
+                          type="text"
+                          value={consultantName}
+                          onChange={(e) => setConsultantName(e.target.value)}
+                          placeholder="Enter consultant name manually"
+                        />
+                      )}
+                    </p>
                   </div>
 
                   {/* Product Table */}
@@ -4156,10 +4211,10 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                     <thead>
                       <tr>
                         <th className="border px-4 py-2">#</th>
-                        <th className="border px-4 py-2">Product ID</th>
+                        {/* <th className="border px-4 py-2">Product ID</th> */}
                         <th className="border px-4 py-2">Product Name</th>
-                        <th className="border px-4 py-2">Price</th>
-                        <th className="border px-4 py-2">Quantity</th>
+                        {/* <th className="border px-4 py-2">Price</th>
+                        <th className="border px-4 py-2">Quantity</th> */}
                         <th className="border px-4 py-2">Total</th>
                       </tr>
                     </thead>
@@ -4173,16 +4228,16 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                             <td className="border px-4 py-2 text-center">
                               {index + 1}
                             </td>
-                            <td className="border px-4 py-2 text-center">
+                            {/* <td className="border px-4 py-2 text-center">
                               {product.product_id}
-                            </td>
+                            </td> */}
                             <td className="border px-4 py-2">{product.name}</td>
-                            <td className="border px-4 py-2 text-center">
+                            {/* <td className="border px-4 py-2 text-center">
                               ₹{price.toFixed(2)}
-                            </td>
-                            <td className="border px-4 py-2 text-center">
+                            </td> */}
+                            {/* <td className="border px-4 py-2 text-center">
                               {quantity}
-                            </td>
+                            </td> */}
                             <td className="border px-4 py-2 text-center">
                               ₹{subtotal.toFixed(2)}
                             </td>
@@ -4218,25 +4273,25 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                       </p> */}
 
                       {/* Amount After Discounts */}
-                      <p>
+                      {/* <p>
                         Advance Paid:
                         <strong> ₹{parseFloat(advance).toFixed(2)}</strong>
-                      </p>
-                      <p>
+                      </p> */}
+                      {/* <p>
                         Balance paid:{" "}
                         <strong>
                           <span>₹{parseFloat(balanceDue).toFixed(2)}</span>
                         </strong>
-                      </p>
+                      </p> */}
 
-                      <p>
+                      {/* <p>
                         Payment Method:
                         <strong>
                           {" "}
                           {paymentMethod.charAt(0).toUpperCase() +
                             paymentMethod.slice(1)}
                         </strong>
-                      </p>
+                      </p> */}
                     </div>
 
                     <div>
@@ -4248,7 +4303,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                       </p> */}
                       {/* Taxable Value and GST Breakdown */}
                       <p>
-                        Amt. after discount:
+                        Total Amount:
                         <strong> ₹{parseFloat(taxableValue).toFixed(2)}</strong>
                       </p>
                       {/* <p>
@@ -4366,7 +4421,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                   </div>
 
                   {/* Footer Section */}
-                  <div className="flex-col justify-start mx-auto items-start text-left text-md">
+                  {/* <div className="flex-col justify-start mx-auto items-start text-left text-md">
                     <ol className="list-decimal list-inside">
                       <p className="mt-2 text-xs">
                         Terms and Conditions:
@@ -4377,7 +4432,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                         </li>
                       </p>
                     </ol>
-                  </div>
+                  </div> */}
                 </div>
               </div>
 

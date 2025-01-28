@@ -126,7 +126,31 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
 
 
   const [showInsuranceModal, setShowInsuranceModal] = useState(false);
+  const [consultantName, setConsultantName] = useState('');
+  const [consultantList, setConsultantList] = useState([]);
+  const [useManualConsultant, setUseManualConsultant] = useState(false);
 
+
+  const fetchConsultants = useCallback(async () => {
+    try {
+      // const { data, error } = await supabase
+      //   .from('consultants')
+      //   .select('*');
+      // if (error) throw error;
+      // setConsultantList(data || []);
+      console.log('fetching ');
+
+
+    } catch (err) {
+      console.error('Error fetching consultants:', err);
+    }
+  }, []);
+
+
+  // Fetch consultants on mount
+  useEffect(() => {
+    fetchConsultants();
+  }, [fetchConsultants]);
   const InsuranceModal = ({ isOpen, onClose, onSubmit }) => {
     const [name, setName] = useState('');
 
@@ -1930,6 +1954,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                       <strong>Phone Number:</strong>{" "}
                       {patientDetails.phoneNumber || "N/A"}
                     </p>
+
                     <p>
                       <strong>Gender:</strong> {patientDetails.gender || "N/A"}
                     </p>
@@ -2237,6 +2262,40 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                         : customerPhone || "N/A"}
                     </strong>
                   </p>
+                  <p className="mt-2">
+                    <label>
+                      Consultant Name : 
+                    </label>
+                    {!useManualConsultant && (
+                      <select
+                        value={consultantName}
+                        onChange={(e) => {
+                          if (e.target.value === 'OTHER') {
+                            setConsultantName('');
+                            setUseManualConsultant(true);
+                          } else {
+                            setConsultantName(e.target.value);
+                          }
+                        }}
+                      >
+                        <option value="">Select Consultant</option>
+                        {consultantList.map((consultant) => (
+                          <option key={consultant.id} value={consultant.name}>
+                            {consultant.name}
+                          </option>
+                        ))}
+                        <option value="OTHER">Other (Manual Entry)</option>
+                      </select>
+                    )}
+                    {useManualConsultant && (
+                      <input
+                        type="text"
+                        value={consultantName}
+                        onChange={(e) => setConsultantName(e.target.value)}
+                        placeholder="Enter consultant name manually"
+                      />
+                    )}
+                  </p>
                 </div>
 
                 {/* Product Table */}
@@ -2244,10 +2303,10 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                   <thead>
                     <tr>
                       <th className="border px-4 py-2">#</th>
-                      <th className="border px-4 py-2">Product ID</th>
+                      {/* <th className="border px-4 py-2">Product ID</th> */}
                       <th className="border px-4 py-2">Product Name</th>
-                      <th className="border px-4 py-2">Price</th>
-                      <th className="border px-4 py-2">Quantity</th>
+                      {/* <th className="border px-4 py-2">Price</th> */}
+                      {/* <th className="border px-4 py-2">Quantity</th> */}
                       <th className="border px-4 py-2">Total</th>
                     </tr>
                   </thead>
@@ -2261,19 +2320,19 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                           <td className="border px-4 py-2 text-center">
                             {index + 1}
                           </td>
-                          <td className="border px-4 py-2 text-center">
+                          {/* <td className="border px-4 py-2 text-center">
                             {product.id || "N/A"}
-                          </td>
+                          </td> */}
                           <td className="border px-4 py-2">
                             {product.name || "N/A"}
                           </td>
 
-                          <td className="border px-4 py-2 text-center">
+                          {/* <td className="border px-4 py-2 text-center">
                             ₹{adjustedPrice.toFixed(2)}
-                          </td>
-                          <td className="border px-4 py-2 text-center">
+                          </td> */}
+                          {/* <td className="border px-4 py-2 text-center">
                             {product.quantity || "N/A"}
-                          </td>
+                          </td> */}
                           <td className="border px-4 py-2 text-center">
                             ₹{adjustedSubtotal.toFixed(2)}
                           </td>
@@ -2320,15 +2379,15 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                       <strong> ₹{validDiscountAmount.toFixed(2)}</strong>
                     </p> */}
 
-                    <p>
+                    {/* <p>
                       Advance Paid:<strong> ₹{advance.toFixed(2)}</strong>
-                    </p>
+                    </p> */}
                     <p className="text-xl">
-                      <strong>Total Amount :{" "}
+                      <strong>Sub total :{" "}
                         ₹{discountedTotal.toFixed(2)}</strong>
                     </p>
                     <p className="text-xl">
-                      <strong>Amount Due: ₹{balanceDue.toFixed(2)}</strong>
+                      <strong>Total Amt.: ₹{balanceDue.toFixed(2)}</strong>
                     </p>
 
                     {/* <p className="text-red-500">
@@ -2452,7 +2511,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                       {gstNumber || "N/A"}
                     </p>
                   )}
-                  <p className="mt-2 text-xs">
+                  {/* <p className="mt-2 text-xs">
                     Terms and Conditions:
                     <ol className="list-decimal list-inside">
                       <li>Work order valid only for two months.</li>
@@ -2461,7 +2520,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                         manufacturing defects/peeling off.
                       </li>
                     </ol>
-                  </p>
+                  </p> */}
                 </div>
               </div>
             </div>
