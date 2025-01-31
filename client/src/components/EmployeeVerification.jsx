@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import supabase from '../supabaseClient';
 import bcrypt from 'bcryptjs';
 
-const EmployeeVerification = ({ employee, onVerify }) => {
+const EmployeeVerification = ({ employee, onVerify , component = 'notInsurance'}) => {
   console.log("EmployeeVerification component rendered for employee:", employee);
 
   const [pin, setPin] = useState('');
@@ -23,10 +23,15 @@ const EmployeeVerification = ({ employee, onVerify }) => {
       console.log("Verifying PIN for employee:", employee);
 
       // Fetch the employee's hashed PIN from the database
+      let columntocheck = 'name';
+      if(component === 'insurance'){
+        columntocheck = 'id';
+      }
+
       const { data, error } = await supabase
         .from('employees')
         .select('pin')
-        .eq('name', employee) // Query by the "name" column
+        .eq(columntocheck, employee) // Query by the "name" column
         .single();
 
 

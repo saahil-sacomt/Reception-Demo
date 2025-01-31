@@ -37,6 +37,7 @@ import Consulting from "./pages/Consulting";
 import AddService from "./pages/AddService";
 import PatientRegistration from "./pages/PatientRegistration";
 import InsuranceCreation from "./pages/Insurance";
+import CheckoutInsurance from "./pages/CheckoutInsurance";
 
 const App = () => {
   const location = useLocation();
@@ -118,6 +119,12 @@ const App = () => {
                 <Route
                   path="/insuranceCreation"
                   element={<InsuranceCreation />}
+                />
+              </Route>
+              <Route element={<RequireAuth allowedRoles={["reception"]} />}>
+                <Route
+                  path="/insurance-checkout"
+                  element={<CheckoutInsurance />}
                 />
               </Route>
               <Route path="/patient-registration" element={<PatientRegistration />} />

@@ -4122,7 +4122,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                 <div className="printable-area print:mt-20 print:block print:absolute print:inset-0 print:w-full bg-white p-4 print:m-0 print:p-0 w-full">
                   {/* Header */}
                   <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-3xl font-bold">Tax Invoice</h2>
+                    <h2 className="text-3xl font-bold">Invoice</h2>
                     <div className="text-right">
                       <p>
                         Date:<strong> {formattedDate}</strong>
@@ -4133,7 +4133,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
 
                       {hasMrNumber && (
                         <p>
-                          MR Number:<strong> {mrNumber || "NA"}</strong>
+                          MR No:<strong> {mrNumber || "NA"}</strong>
                         </p>
                       )}
                     </div>
@@ -4210,9 +4210,9 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                   <table className="w-full border-collapse mb-6">
                     <thead>
                       <tr>
-                        <th className="border px-4 py-2">#</th>
+                        <th className="border px-4 py-2">No.</th>
                         {/* <th className="border px-4 py-2">Product ID</th> */}
-                        <th className="border px-4 py-2">Product Name</th>
+                        <th className="border px-4 py-2">Service Name</th>
                         {/* <th className="border px-4 py-2">Price</th>
                         <th className="border px-4 py-2">Quantity</th> */}
                         <th className="border px-4 py-2">Total</th>
@@ -4411,6 +4411,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                         <option value="cash">Cash</option>
                         <option value="card">Card</option>
                         <option value="online">UPI (Paytm/PhonePe/GPay)</option>
+                        <option value="credit">Credit</option>
+                        {/* <option value="online">UPI (Paytm/PhonePe/GPay)</option> */}
                       </select>
                       {validationErrors.paymentMethod && (
                         <p className="text-red-500 text-xs ml-1">

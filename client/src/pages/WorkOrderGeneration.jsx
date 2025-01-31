@@ -2302,9 +2302,9 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                 <table className="w-full border-collapse mb-6">
                   <thead>
                     <tr>
-                      <th className="border px-4 py-2">#</th>
+                      <th className="border px-4 py-2">No.</th>
                       {/* <th className="border px-4 py-2">Product ID</th> */}
-                      <th className="border px-4 py-2">Product Name</th>
+                      <th className="border px-4 py-2">Service Name</th>
                       {/* <th className="border px-4 py-2">Price</th> */}
                       {/* <th className="border px-4 py-2">Quantity</th> */}
                       <th className="border px-4 py-2">Total</th>
