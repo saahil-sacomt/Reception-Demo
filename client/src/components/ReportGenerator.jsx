@@ -818,9 +818,27 @@ const ReportGenerator = ({ isCollapsed }) => {
           const patientMap = Object.fromEntries(patientsData.map(p => [p.mr_number, p.name]));
           const customerMap = Object.fromEntries(customersData.map(c => [c.customer_id, c.name]));
 
+          const { data: opdSalesData, error: opdError } = await supabase
+            .from('sales_orders')
+            .select('total_amount')
+            .like('work_order_id', 'OPW-%')
+            .gte('created_at', startStr)
+            .lte('created_at', endStr);
+
+          if (opdError) throw opdError;
+
+          const totalOPD = opdSalesData.reduce((sum, order) =>
+            sum + (parseFloat(order.total_amount) || 0), 0
+          );
+
+          // Add totalOPD to reportDetails
+          reportDetails.totalOPD = totalOPD;
+
           const consolidatedSales = salesData.map(sale => {
             let customerName = customerMap[sale.customer_id] || 'N/A';
             const totalGST = (parseFloat(sale.cgst) || 0) + (parseFloat(sale.sgst) || 0);
+
+
 
             return {
               sales_order_id: sale.sales_order_id || 'N/A',
@@ -1509,7 +1527,7 @@ const ReportGenerator = ({ isCollapsed }) => {
           record.work_order_id || 'N/A',
           record.mr_number || 'N/A',
           record.total_amount ? Number(record.total_amount).toFixed(2) : '0.00',
-          record.total_gst ? Number(record.total_gst).toFixed(2) : '0.00',
+          // record.total_gst ? Number(record.total_gst).toFixed(2) : '0.00',
           record.discount ? Number(record.discount).toFixed(2) : '0.00',
           record.advance_collected ? Number(record.advance_collected).toFixed(2) : '0.00',
           record.balance_collected ? Number(record.balance_collected).toFixed(2) : '0.00',
@@ -1754,6 +1772,7 @@ const ReportGenerator = ({ isCollapsed }) => {
           ['Total Advance Collected', totalAdvanceCollected.toFixed(2)],
           ['Total Balance Collected', totalBalanceCollected.toFixed(2)],
           ['Total Collected', totalCollected.toFixed(2)], // Updated summary
+          ['Total OPD Sales', reportDetails.totalOPD.toFixed(2)], // Add OPD total
         ];
         break;
       }
