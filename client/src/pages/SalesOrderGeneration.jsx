@@ -415,7 +415,15 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
   const [isGeneratingId, setIsGeneratingId] = useState(false);
   // State for consultant
   const [consultantName, setConsultantName] = useState('');
-  const [consultantList, setConsultantList] = useState([]);
+  const [consultantList, setConsultantList] = useState([
+    "Dr. Ashad Sivaraman",
+    "Dr. Harshali Yadav",
+    "Dr. Swapna Nair",
+    "Dr. Anoop Sivaraman",
+    "Dr. Anila George",
+    "Dr. Arvin Ponnat",
+    "Dr. Shabna"
+  ]);
   const [useManualConsultant, setUseManualConsultant] = useState(false);
 
   const fetchConsultants = useCallback(async () => {
@@ -2251,10 +2259,12 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           privilege_discount: parseFloat(privilegeDiscount),
           cgst: parseFloat(cgstAmount),
           sgst: parseFloat(sgstAmount),
+          
           final_amount: parseFloat(balanceDue),
           loyalty_points_redeemed: sanitizedRedeemedPoints,
           loyalty_points_added: sanitizedPointsAdded,
           updated_at: currentUTCDateTime,
+          consultant_name: consultantName,
           branch: branch,
           // **Important:** Do NOT include 'modification_request_id' or any other invalid fields
         };
@@ -2620,6 +2630,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           hsn_code: entry.hsn_code,
         })),
         created_at: getCurrentUTCDateTime(),
+        consultant_name: consultantName,
         updated_at: getCurrentUTCDateTime(),
       };
 
@@ -4171,36 +4182,43 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                       </strong>
                     </p>
                     <p className="mt-2">
-                      <label>
-                        Consultant Name :
-                      </label>
+                      <label>Consultant:</label>
                       {!useManualConsultant && (
                         <select
                           value={consultantName}
-                          onChange={(e) => {
-                            if (e.target.value === 'OTHER') {
-                              setConsultantName('');
-                              setUseManualConsultant(true);
-                            } else {
-                              setConsultantName(e.target.value);
-                            }
-                          }}
+                          onChange={(e) => setConsultantName(e.target.value)}
                         >
                           <option value="">Select Consultant</option>
-                          {consultantList.map((consultant) => (
-                            <option key={consultant.id} value={consultant.name}>
-                              {consultant.name}
+                          {consultantList.map((consultant, idx) => (
+                            <option key={idx} value={consultant}>
+                              {consultant}
                             </option>
                           ))}
-                          <option value="OTHER">Other (Manual Entry)</option>
                         </select>
                       )}
+                      {/* Checkbox to switch between dropdown and manual input */}
+                      <div>
+                        <label>
+                          <input
+                            type="checkbox"
+                            checked={useManualConsultant}
+                            onChange={(e) => {
+                              setUseManualConsultant(e.target.checked);
+                              if (!e.target.checked) {
+                                setConsultantName("");
+                              }
+                            }}
+                          />
+                          Enter Manually
+                        </label>
+                      </div>
+                      {/* Manually input consultant name if checkbox selected */}
                       {useManualConsultant && (
                         <input
                           type="text"
+                          placeholder="Enter consultant name"
                           value={consultantName}
                           onChange={(e) => setConsultantName(e.target.value)}
-                          placeholder="Enter consultant name manually"
                         />
                       )}
                     </p>

@@ -127,7 +127,15 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
 
   const [showInsuranceModal, setShowInsuranceModal] = useState(false);
   const [consultantName, setConsultantName] = useState('');
-  const [consultantList, setConsultantList] = useState([]);
+  const [consultantList, setConsultantList] = useState([
+    "Dr. Ashad Sivaraman",
+    "Dr. Harshali Yadav",
+    "Dr. Swapna Nair",
+    "Dr. Anoop Sivaraman",
+    "Dr. Anila George",
+    "Dr. Arvin Ponnat",
+    "Dr. Shabna"
+  ]);
   const [useManualConsultant, setUseManualConsultant] = useState(false);
 
 
@@ -1126,6 +1134,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         payment_method: paymentMethod,
         subtotal,
         discount_amount: validDiscountAmount,
+        consultant_name: consultantName,
         discounted_subtotal: discountedSubtotal,
         cgst,
         sgst,
@@ -1287,6 +1296,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     generateNewWorkOrderId,
     modificationRequestId,
     subRole,
+    consultantName,
   ]);
 
 
@@ -2262,40 +2272,45 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                         : customerPhone || "N/A"}
                     </strong>
                   </p>
-                  <p className="mt-2">
+                  <label>Consultant:</label>
+                  {!useManualConsultant && (
+                    <select
+                      value={consultantName}
+                      onChange={(e) => setConsultantName(e.target.value)}
+                    >
+                      <option value="">Select Consultant</option>
+                      {consultantList.map((consultant, idx) => (
+                        <option key={idx} value={consultant}>
+                          {consultant}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  {/* Checkbox to switch between dropdown and manual input */}
+                  <div>
                     <label>
-                      Consultant Name : 
-                    </label>
-                    {!useManualConsultant && (
-                      <select
-                        value={consultantName}
+                      <input
+                        type="checkbox"
+                        checked={useManualConsultant}
                         onChange={(e) => {
-                          if (e.target.value === 'OTHER') {
-                            setConsultantName('');
-                            setUseManualConsultant(true);
-                          } else {
-                            setConsultantName(e.target.value);
+                          setUseManualConsultant(e.target.checked);
+                          if (!e.target.checked) {
+                            setConsultantName("");
                           }
                         }}
-                      >
-                        <option value="">Select Consultant</option>
-                        {consultantList.map((consultant) => (
-                          <option key={consultant.id} value={consultant.name}>
-                            {consultant.name}
-                          </option>
-                        ))}
-                        <option value="OTHER">Other (Manual Entry)</option>
-                      </select>
-                    )}
-                    {useManualConsultant && (
-                      <input
-                        type="text"
-                        value={consultantName}
-                        onChange={(e) => setConsultantName(e.target.value)}
-                        placeholder="Enter consultant name manually"
                       />
-                    )}
-                  </p>
+                      Enter Manually
+                    </label>
+                  </div>
+                  {/* Manually input consultant name if checkbox selected */}
+                  {useManualConsultant && (
+                    <input
+                      type="text"
+                      placeholder="Enter consultant name"
+                      value={consultantName}
+                      onChange={(e) => setConsultantName(e.target.value)}
+                    />
+                  )}
                 </div>
 
                 {/* Product Table */}
