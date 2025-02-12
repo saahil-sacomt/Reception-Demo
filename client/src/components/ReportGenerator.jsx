@@ -1441,7 +1441,7 @@ const ReportGenerator = ({ isCollapsed }) => {
         tableRows = [
           ['Total Counselling Sales Amount', totalCounselling.toFixed(2)],
           ['Total OPD Sales Amount' , totalOPD.toFixed(2)],
-          ['Total Consulting Sales Amount' , totalOPD.toFixed(2)],
+          ['Total Consulting Sales Amount' , totalConsultation.toFixed(2)],
         ];
         break;
       case 'work_orders':
