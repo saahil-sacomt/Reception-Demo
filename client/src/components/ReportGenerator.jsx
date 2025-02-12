@@ -643,6 +643,27 @@ const ReportGenerator = ({ isCollapsed }) => {
           fetchedData = data;
           break;
         }
+        case 'compiled_report': {
+          console.log("Fetching sales data with params:", { startStr, endStr });
+
+          const { data: salesData, error: salesError } = await supabase
+            .from('sales_orders')
+            .select('total_amount, sales_order_id')
+            .gte('created_at', startStr)
+            .lte('created_at', endStr);
+
+          if (salesError) {
+            console.error("Error fetching sales data:", salesError);
+          } else {
+            console.log("Fetched sales data:", salesData);
+            console.log("Number of records:", salesData?.length);
+          }
+
+          fetchedData = salesData;
+          break;
+
+        }
+
         case 'privilegecards': {
           let query = supabase
             .from('privilegecards')
@@ -659,6 +680,7 @@ const ReportGenerator = ({ isCollapsed }) => {
           fetchedData = data;
           break;
         }
+
         case 'product_sales': {
           const { data: productsData, error: productsError } = await supabase
             .from('products')
@@ -1060,6 +1082,8 @@ const ReportGenerator = ({ isCollapsed }) => {
     switch (reportType) {
       case 'sales_orders':
         return 'Sales Orders';
+      case 'compiled_report':
+        return 'Compiled Report';
       case 'work_orders':
         return 'Work Orders';
       case 'privilegecards':
@@ -1094,6 +1118,8 @@ const ReportGenerator = ({ isCollapsed }) => {
 
     // Add Header
     addHeader(doc, logoDataUrl, reportDetails);
+
+
 
     // Determine table columns based on report type
     let tableColumn = [];
@@ -1130,6 +1156,9 @@ const ReportGenerator = ({ isCollapsed }) => {
           'Created At',
           'Updated At',
         ];
+        break;
+      case 'compiled_report':
+        tableColumn = ['Description', 'Amount'];
         break;
       case 'work_orders':
         tableColumn = isEmployee ? [
@@ -1394,6 +1423,26 @@ const ReportGenerator = ({ isCollapsed }) => {
             ? formatDateDDMMYYYY(record.updated_at, true)
             : 'N/A',
         ]);
+        break;
+      case 'compiled_report':
+        console.log('hui hui', data);
+
+        const totalOPD = data
+          .filter(sale => sale.sales_order_id?.startsWith('OPS-'))
+          .reduce((sum, sale) => sum + (parseFloat(sale.total_amount) || 0), 0);
+
+        const totalCounselling = data
+          .filter(sale => sale.sales_order_id?.startsWith('CRS-'))
+          .reduce((sum, sale) => sum + (parseFloat(sale.total_amount) || 0), 0);
+
+        const totalConsultation = data
+          .filter(sale => !sale.sales_order_id?.includes('-'))
+          .reduce((sum, sale) => sum + (parseFloat(sale.total_amount) || 0), 0);
+        tableRows = [
+          ['Total Counselling Sales Amount', totalCounselling.toFixed(2)],
+          ['Total OPD Sales Amount' , totalOPD.toFixed(2)],
+          ['Total Consulting Sales Amount' , totalOPD.toFixed(2)],
+        ];
         break;
       case 'work_orders':
         tableRows = isEmployee ? data.map((record) => [
@@ -1826,8 +1875,6 @@ const ReportGenerator = ({ isCollapsed }) => {
         ];
         break;
       }
-      default:
-        summaryTable = [];
     }
 
     // Generate the summary table
@@ -1889,22 +1936,36 @@ const ReportGenerator = ({ isCollapsed }) => {
     }
   };
 
+  // const reportTypes = isEmployee ? [
+  //   { value: 'consolidated', label: 'Consolidated' },
+  //   { value: 'stock_report', label: 'Stock Report' },
+  //   { value: 'purchase_report', label: 'Purchase Report' },
+  //   { value: 'stock_assignments', label: 'Stock Assignments' },
+  // ] : [
+  //   { value: 'sales_orders', label: 'Sales Orders' },
+  //   { value: 'work_orders', label: 'Work Orders' },
+  //   { value: 'privilegecards', label: 'Privilege Cards' },
+  //   { value: 'product_sales', label: 'Product Sales' },
+  //   { value: 'modification_reports', label: 'Modification Reports' },
+  //   { value: 'consolidated', label: 'Consolidated' },
+  //   { value: 'stock_report', label: 'Stock Report' },
+  //   { value: 'purchase_report', label: 'Purchase Report' },
+  //   { value: 'stock_assignments', label: 'Stock Assignments' },
+  //   { value: 'credit_debit_notes', label: 'Credit and Debit Note' },
+  // ];
+
   const reportTypes = isEmployee ? [
     { value: 'consolidated', label: 'Consolidated' },
     { value: 'stock_report', label: 'Stock Report' },
     { value: 'purchase_report', label: 'Purchase Report' },
     { value: 'stock_assignments', label: 'Stock Assignments' },
+    { value: 'compiled_report', label: 'Compiled Report' },
   ] : [
     { value: 'sales_orders', label: 'Sales Orders' },
     { value: 'work_orders', label: 'Work Orders' },
-    { value: 'privilegecards', label: 'Privilege Cards' },
-    { value: 'product_sales', label: 'Product Sales' },
-    { value: 'modification_reports', label: 'Modification Reports' },
     { value: 'consolidated', label: 'Consolidated' },
-    { value: 'stock_report', label: 'Stock Report' },
-    { value: 'purchase_report', label: 'Purchase Report' },
-    { value: 'stock_assignments', label: 'Stock Assignments' },
-    { value: 'credit_debit_notes', label: 'Credit and Debit Note' },
+    { value: 'compiled_report', label: 'Compiled Report' },
+
   ];
 
   useEffect(() => {
