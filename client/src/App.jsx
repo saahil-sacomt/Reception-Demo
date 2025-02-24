@@ -127,7 +127,7 @@ const App = () => {
                   element={<CheckoutInsurance />}
                 />
               </Route>
-              <Route path="/patient-registration" element={<PatientRegistration />} />
+              <Route path="/patient-registration" element={<PatientRegistration />}    />
               <Route
                 path="/home"
                 element={<Home isCollapsed={isCollapsed} />}
