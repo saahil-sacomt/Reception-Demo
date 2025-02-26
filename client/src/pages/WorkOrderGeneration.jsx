@@ -134,7 +134,8 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     "Dr. Anoop Sivaraman",
     "Dr. Anila George",
     "Dr. Arvin Ponnat",
-    "Dr. Shabna"
+    "Dr. Shabna",
+    "Dr. Malavika. G",
   ]);
   const [useManualConsultant, setUseManualConsultant] = useState(false);
 
