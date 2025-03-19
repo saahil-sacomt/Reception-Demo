@@ -116,19 +116,119 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     const backToListButtonRef = useRef(null); // New ref for back to list button
 
     // Generate a new Work Order ID
+    // const generateNewWorkOrderId = useCallback(async () => {
+    //     try {
+    //         console.log("Attempting to generate new Work Order ID...");
+
+    //         // Define default starting Work Order IDs per branch
+    //         const branchDefaultIds = {
+    //             TVR: 3742, // Trivandrum
+    //             NTA: 2309, // Neyyantinkara
+    //             KOT1: 5701, // Kottarakara 1
+    //             KOT2: 6701, // Kottarakara 2
+    //             KAT: 2678, // Kattakada
+    //             // Add other branches as needed
+    //         };
+
+    //         if (!branch) {
+    //             console.error("Branch is undefined. Cannot generate Work Order ID.");
+    //             alert("Branch information is missing. Please try again.");
+    //             return;
+    //         }
+
+    //         // console.log("Current Branch:", branch);
+    //         console.log(
+    //             "Default Work Order ID for this branch:",
+    //             branchDefaultIds[branch] || 1001
+    //         );
+
+    //         // Fetch the last Work Order ID for the current branch
+    //         const { data: lastWorkOrders, error } = await supabase
+    //             .from("work_orders")
+    //             .select("work_order_id")
+    //             .eq("branch", branch) // Filter by branch
+    //             .eq("sub_role", subRole)
+    //             .order("work_order_id", { ascending: false })
+    //             .limit(1);
+
+    //         if (error) {
+    //             console.error("Error fetching last work order:", error);
+    //             // alert("Error generating Work Order ID. Please try again.");
+    //             return;
+    //         }
+
+    //         console.log("Last Work Orders Retrieved for branch:", lastWorkOrders[0].work_order_id);
+
+    //         let newWorkOrderId = branchDefaultIds[branch] || 1001; // Default if no work orders exist for branch
+
+    //         // console.log(newWorkOrderId);
+
+
+    //         const strSubRole = subRole;
+    //         if (lastWorkOrders && lastWorkOrders.length > 0) {
+    //             if ((strSubRole.includes("OPD")) || (strSubRole.includes("Counselling"))) {
+    //                 const str = lastWorkOrders[0].work_order_id
+    //                 const match = str.match(/(\d+)$/); //Regex to match digits at the end of the string
+
+    //                 if (match) {
+    //                     console.log('Regex', match[0]); // Output: 3742
+    //                     newWorkOrderId = parseInt(match[0]) + 1;
+    //                 } else {
+    //                     console.log("No number found");
+    //                 }
+
+    //             }
+    //             else {
+    //                 const lastWorkOrderId = parseInt(lastWorkOrders[0].work_order_id, 10);
+    //                 console.log("Last Work Order ID for branch:", lastWorkOrderId);
+    //                 if (!isNaN(lastWorkOrderId)) {
+    //                     newWorkOrderId = lastWorkOrderId + 1;
+    //                 } else {
+    //                     console.warn(
+    //                         "Invalid lastWorkOrderId, defaulting to:",
+    //                         newWorkOrderId
+    //                     );
+    //                 }
+    //             }
+    //         }
+
+
+
+
+    //         // Determine the OP Number based on subRole
+    //         // Determine the OP Number based on subRole
+    //         let opNumber = "01"; // Default OP Number
+    //         if (subRole.toLowerCase().includes("opd")) {
+    //             // Extract the OP Number from subRole (e.g., "OPD 01")
+    //             const subRoleParts = subRole.split(" ");
+    //             opNumber = subRoleParts.length > 1 ? subRoleParts[1] : "01";
+    //         }
+
+    //         // Format the new Work Order ID
+    //         if (subRole == "opd") {
+    //             newWorkOrderId = `OPW-${opNumber}-${String(newWorkOrderId).padStart(3, "0")}`;
+    //         }
+    //         else if (subRole == "counselling") {
+    //             newWorkOrderId = `CR-${opNumber}-${String(newWorkOrderId).padStart(3, "0")}`;
+    //         }
+
+    //         console.log(newWorkOrderId);
+
+
+    //         dispatch({
+    //             type: "SET_WORK_ORDER_FORM",
+    //             payload: { workOrderId: newWorkOrderId.toString() },
+    //         });
+    //         console.log("Generated Work Order ID:", newWorkOrderId);
+    //     } catch (error) {
+    //         console.error("Error generating Work Order ID:", error);
+    //         alert("An unexpected error occurred while generating Work Order ID.");
+    //     }
+    // }, [dispatch, branch]);
+
     const generateNewWorkOrderId = useCallback(async () => {
         try {
             console.log("Attempting to generate new Work Order ID...");
-
-            // Define default starting Work Order IDs per branch
-            const branchDefaultIds = {
-                TVR: 3742, // Trivandrum
-                NTA: 2309, // Neyyantinkara
-                KOT1: 5701, // Kottarakara 1
-                KOT2: 6701, // Kottarakara 2
-                KAT: 2678, // Kattakada
-                // Add other branches as needed
-            };
 
             if (!branch) {
                 console.error("Branch is undefined. Cannot generate Work Order ID.");
@@ -136,96 +236,46 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                 return;
             }
 
-            // console.log("Current Branch:", branch);
-            console.log(
-                "Default Work Order ID for this branch:",
-                branchDefaultIds[branch] || 1001
-            );
-
-            // Fetch the last Work Order ID for the current branch
-            const { data: lastWorkOrders, error } = await supabase
-                .from("work_orders")
-                .select("work_order_id")
-                .eq("branch", branch) // Filter by branch
-                .eq("sub_role", subRole)
-                .order("work_order_id", { ascending: false })
-                .limit(1);
+            // Call the database function to get the next ID atomically
+            const { data: nextId, error } = await supabase.rpc('get_next_work_order_id', {
+                branch_code: branch,
+                role_code: subRole  // This can be null
+            });
 
             if (error) {
-                console.error("Error fetching last work order:", error);
-                // alert("Error generating Work Order ID. Please try again.");
+                console.error("Error generating Work Order ID:", error);
+                alert("Error generating Work Order ID. Please try again.");
                 return;
             }
 
-            console.log("Last Work Orders Retrieved for branch:", lastWorkOrders[0].work_order_id);
-
-            let newWorkOrderId = branchDefaultIds[branch] || 1001; // Default if no work orders exist for branch
-
-            // console.log(newWorkOrderId);
-
-
-            const strSubRole = subRole;
-            if (lastWorkOrders && lastWorkOrders.length > 0) {
-                if ((strSubRole.includes("OPD")) || (strSubRole.includes("Counselling"))) {
-                    const str = lastWorkOrders[0].work_order_id
-                    const match = str.match(/(\d+)$/); //Regex to match digits at the end of the string
-
-                    if (match) {
-                        console.log('Regex', match[0]); // Output: 3742
-                        newWorkOrderId = parseInt(match[0]) + 1;
-                    } else {
-                        console.log("No number found");
-                    }
-
-                }
-                else {
-                    const lastWorkOrderId = parseInt(lastWorkOrders[0].work_order_id, 10);
-                    console.log("Last Work Order ID for branch:", lastWorkOrderId);
-                    if (!isNaN(lastWorkOrderId)) {
-                        newWorkOrderId = lastWorkOrderId + 1;
-                    } else {
-                        console.warn(
-                            "Invalid lastWorkOrderId, defaulting to:",
-                            newWorkOrderId
-                        );
-                    }
-                }
-            }
-
-
-
+            console.log("Database returned next ID:", nextId);
 
             // Determine the OP Number based on subRole
-            // Determine the OP Number based on subRole
-            let opNumber = "01"; // Default OP Number
-            if (subRole.toLowerCase().includes("opd")) {
-                // Extract the OP Number from subRole (e.g., "OPD 01")
+            let opNumber = "01";
+            if (subRole) {
                 const subRoleParts = subRole.split(" ");
                 opNumber = subRoleParts.length > 1 ? subRoleParts[1] : "01";
             }
 
-            // Format the new Work Order ID
-            if (subRole == "opd") {
-                newWorkOrderId = `OPW-${opNumber}-${String(newWorkOrderId).padStart(3, "0")}`;
-            }
-            else if (subRole == "counselling") {
-                newWorkOrderId = `CR-${opNumber}-${String(newWorkOrderId).padStart(3, "0")}`;
+            // Format the work order ID based on role
+            let newWorkOrderId;
+            if (role && role.includes("opd")) {
+                newWorkOrderId = `OPW-${opNumber}-${String(nextId).padStart(3, "0")}`;
+            } else {
+                newWorkOrderId = `CR-${opNumber}-${String(nextId).padStart(3, "0")}`;
             }
 
-            console.log(newWorkOrderId);
-
+            console.log("Final Generated Work Order ID:", newWorkOrderId);
 
             dispatch({
                 type: "SET_WORK_ORDER_FORM",
                 payload: { workOrderId: newWorkOrderId.toString() },
             });
-            console.log("Generated Work Order ID:", newWorkOrderId);
         } catch (error) {
             console.error("Error generating Work Order ID:", error);
             alert("An unexpected error occurred while generating Work Order ID.");
         }
-    }, [dispatch, branch]);
-
+    }, [dispatch, branch, subRole, role]);
     // Fetch employees from the Supabase `employees` table
     const fetchEmployees = useCallback(async () => {
         try {

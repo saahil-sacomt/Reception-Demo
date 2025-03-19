@@ -633,151 +633,218 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
   };
 
 
+  // const generateSalesOrderId = async (branch) => {
+  //   // Define default starting sales_order_id for each branch
+  //   const branchDefaultIds = {
+  //     TVR: 4103, // Default ID for Trivandrum
+  //     NTA: 2570, // Default ID for Neyyantinkara
+  //     KOT1: 3001, // Default ID for Kottarakara 1
+  //     KOT2: 4001, // Default ID for Kottarakara 2
+  //     KAT: 2792, // Default ID for Kattakada
+  //   };
+
+
+  //   if (!branch) {
+  //     console.error("Branch is undefined. Cannot generate Sales Order ID.");
+  //     return;
+  //   }
+
+  //   if (!selectedWorkOrder) {
+  //     // If no work order is selected, generate general sales ID
+  //     return generateGeneralSalesId();
+  //   }
+  //   else {
+  //     console.log("Selected Work Order:", selectedWorkOrder);
+  //   }
+
+  //   try {
+  //     // console.log("Branch passed:", branch); // Debugging: check the branch passed
+  //     console.log(
+  //       "Default Sales Order ID for this branch:",
+  //       branchDefaultIds[branch]
+  //     ); // Debugging: check the default ID for the branch
+
+  //     const { data, error } = await supabase
+  //       .from("sales_orders")
+  //       .select("sales_order_id")
+  //       .eq("branch", branch) // Filter by branch
+  //       .order("sales_order_id", { ascending: false })
+  //       .limit(1);
+
+  //     console.log("Data:", data); // Debugging: check the data
+
+  //     if (error) {
+  //       console.error(
+  //         `Error fetching last sales_order_id for branch ${branch}:`,
+  //         error
+  //       );
+  //       return null;
+  //     }
+
+  //     // Set the default starting sales_order_id for the branch if no orders exist
+
+  //     let lastSalesOrderId = branchDefaultIds[branch] || 1000; // Default to 1000 if branch not found in the map
+
+  //     // If data exists, extract the last sales_order_id for that branch
+  //     if (data && data.length > 0) {
+  //       setSelectedWorkOrder: data[0];
+  //       const str = data[0].sales_order_id
+  //       const match = str.match(/(\d+)$/); //Regex to match digits at the end of the string
+
+  //       if (match) {
+  //         console.log('Regex', match[0]); // Output: 3742
+  //         lastSalesOrderId = parseInt(match[0]);
+  //       } else {
+  //         console.log("No number found");
+  //       }
+
+  //     }
+
+  //     console.log("Calculated lastSalesOrderId:", lastSalesOrderId); // Debugging: check lastSalesOrderId
+
+  //     // Increment the last sales_order_id by 1
+  //     let newSalesOrderId = lastSalesOrderId + 1;
+  //     console.log("Calculated newSalesOrderId:", newSalesOrderId); // Debugging: check newSalesOrderId
+
+
+  //     // Extract OP Number from selected work order
+  //     let opNumber = "01"; // Default OP Number
+  //     if (selectedWorkOrder && selectedWorkOrder.work_order_id) {
+  //       // console.log(selectedWorkOrder.work_order_id);
+
+
+  //       // Assuming work_order_id format is "OPW-XX-XXX" where XX is the OP number
+  //       let match = selectedWorkOrder.work_order_id.match(/CR-(\d+)-/);
+  //       if (!match) {
+  //         match = selectedWorkOrder.work_order_id.match(/OPW-(\d+)-/);
+  //       }
+  //       if (match && match[1]) {
+  //         opNumber = match[1];
+  //         console.log("Extracted OP Number:", opNumber);
+  //       }
+  //       else {
+  //         console.log("No OP Number found");
+  //       }
+
+  //       const workOrderId = selectedWorkOrder.work_order_id;
+
+  //       // Regex to match "OPW" or "CR" at the start of the string
+  //       const opwRegex = /^OPW/;
+  //       const crRegex = /^CR/;
+
+  //       if (opwRegex.test(workOrderId)) {
+  //         console.log("1");
+  //         // Logic specific to OPW work orders
+  //         newSalesOrderId = `OPS-${opNumber}-${String(newSalesOrderId).padStart(3, "0")}`;
+  //         console.log("Handling OPW work order:", workOrderId);
+  //         // Additional actions for OPW
+  //       } else if (crRegex.test(workOrderId)) {
+  //         console.log("2");
+  //         // Logic specific to CR work orders
+  //         newSalesOrderId = `CRS-${opNumber}-${String(newSalesOrderId).padStart(3, "0")}`;
+  //         console.log("Handling CR work order:", workOrderId);
+  //         // Additional actions for CR
+  //       } else {
+  //         console.log("Unknown work order type:", workOrderId);
+  //         // Handle unexpected work order types
+  //       }
+  //     }
+
+
+
+  //     // console.log();
+
+
+
+
+  //     // Optionally, you can update the sales order form with the new ID
+  //     updateSalesOrderForm({ salesOrderId: newSalesOrderId });
+
+  //     return newSalesOrderId.toString();
+  //   } catch (error) {
+  //     console.error(
+  //       `Error generating sales_order_id for branch ${branch}:`,
+  //       error
+  //     );
+  //     return null;
+  //   }
+  // };
+
+  // Add this useEffect to watch for selectedWorkOrder changes
+
+
   const generateSalesOrderId = async (branch) => {
-    // Define default starting sales_order_id for each branch
-    const branchDefaultIds = {
-      TVR: 4103, // Default ID for Trivandrum
-      NTA: 2570, // Default ID for Neyyantinkara
-      KOT1: 3001, // Default ID for Kottarakara 1
-      KOT2: 4001, // Default ID for Kottarakara 2
-      KAT: 2792, // Default ID for Kattakada
-    };
-
-
-    if (!branch) {
-      console.error("Branch is undefined. Cannot generate Sales Order ID.");
-      return;
-    }
-
-    if (!selectedWorkOrder) {
-      // If no work order is selected, generate general sales ID
-      return generateGeneralSalesId();
-    }
-    else {
-      console.log("Selected Work Order:", selectedWorkOrder);
-    }
-
     try {
-      // console.log("Branch passed:", branch); // Debugging: check the branch passed
-      console.log(
-        "Default Sales Order ID for this branch:",
-        branchDefaultIds[branch]
-      ); // Debugging: check the default ID for the branch
+      console.log("Generating unique sales order ID...");
 
-
-
-
-      // Fetch the maximum sales_order_id for the specific branch
-      const { data, error } = await supabase
-        .from("sales_orders")
-        .select("sales_order_id")
-        .eq("branch", branch) // Filter by branch
-        .order("sales_order_id", { ascending: false })
-        .limit(1);
-
-      console.log("Data:", data); // Debugging: check the data
-
-      if (error) {
-        console.error(
-          `Error fetching last sales_order_id for branch ${branch}:`,
-          error
-        );
+      if (!branch) {
+        console.error("Branch is undefined. Cannot generate Sales Order ID.");
         return null;
       }
 
-      // Set the default starting sales_order_id for the branch if no orders exist
-
-      let lastSalesOrderId = branchDefaultIds[branch] || 1000; // Default to 1000 if branch not found in the map
-
-      // If data exists, extract the last sales_order_id for that branch
-      if (data && data.length > 0) {
-        setSelectedWorkOrder: data[0];
-        const str = data[0].sales_order_id
-        const match = str.match(/(\d+)$/); //Regex to match digits at the end of the string
-
-        if (match) {
-          console.log('Regex', match[0]); // Output: 3742
-          lastSalesOrderId = parseInt(match[0]);
-        } else {
-          console.log("No number found");
-        }
-
-      }
-
-      console.log("Calculated lastSalesOrderId:", lastSalesOrderId); // Debugging: check lastSalesOrderId
-
-      // Increment the last sales_order_id by 1
-      let newSalesOrderId = lastSalesOrderId + 1;
-      console.log("Calculated newSalesOrderId:", newSalesOrderId); // Debugging: check newSalesOrderId
-
-      // newSalesOrderId = `OPS-${opNumber}-${String(newSalesOrderId + 1).padStart(3, "0")}`;
-
-      // console.log(selectedWorkOrder.work_order_id);
-
-      // Extract OP Number from selected work order
+      // Extract the OP number from the work order if available
       let opNumber = "01"; // Default OP Number
       if (selectedWorkOrder && selectedWorkOrder.work_order_id) {
-        // console.log(selectedWorkOrder.work_order_id);
+        const workOrderId = selectedWorkOrder.work_order_id;
 
-
-        // Assuming work_order_id format is "OPW-XX-XXX" where XX is the OP number
-        let match = selectedWorkOrder.work_order_id.match(/CR-(\d+)-/);
+        // Try to extract OP number from work order ID format
+        let match = workOrderId.match(/CR-(\d+)-/);
         if (!match) {
-          match = selectedWorkOrder.work_order_id.match(/OPW-(\d+)-/);
+          match = workOrderId.match(/OPW-(\d+)-/);
         }
+
         if (match && match[1]) {
           opNumber = match[1];
           console.log("Extracted OP Number:", opNumber);
         }
-        else {
-          console.log("No OP Number found");
-        }
-
-        const workOrderId = selectedWorkOrder.work_order_id;
-
-        // Regex to match "OPW" or "CR" at the start of the string
-        const opwRegex = /^OPW/;
-        const crRegex = /^CR/;
-
-        if (opwRegex.test(workOrderId)) {
-          console.log("1");
-          // Logic specific to OPW work orders
-          newSalesOrderId = `OPS-${opNumber}-${String(newSalesOrderId).padStart(3, "0")}`;
-          console.log("Handling OPW work order:", workOrderId);
-          // Additional actions for OPW
-        } else if (crRegex.test(workOrderId)) {
-          console.log("2");
-          // Logic specific to CR work orders
-          newSalesOrderId = `CRS-${opNumber}-${String(newSalesOrderId).padStart(3, "0")}`;
-          console.log("Handling CR work order:", workOrderId);
-          // Additional actions for CR
-        } else {
-          console.log("Unknown work order type:", workOrderId);
-          // Handle unexpected work order types
-        }
       }
 
+      // Call the database function to get next ID atomically
+      const { data: nextId, error } = await supabase.rpc('get_next_sales_order_id', {
+        branch_code: branch,
+        role_code: subRole  // This can be null
+      });
 
+      if (error) {
+        console.error("Error generating Sales Order ID:", error);
+        return null;
+      }
 
-      // console.log();
+      console.log("Database returned next ID:", nextId);
 
+      // Determine prefix based on work order type
+      let newSalesOrderId;
+      if (selectedWorkOrder) {
+        const workOrderId = selectedWorkOrder.work_order_id;
 
+        if (workOrderId && workOrderId.startsWith("OPW")) {
+          // Format for OPW work orders
+          newSalesOrderId = `OPS-${opNumber}-${String(nextId).padStart(3, "0")}`;
+        } else if (workOrderId && workOrderId.startsWith("CR")) {
+          // Format for CR work orders
+          newSalesOrderId = `CRS-${opNumber}-${String(nextId).padStart(3, "0")}`;
+        } else {
+          // Default format if work order type cannot be determined
+          newSalesOrderId = `GNS-${String(nextId).padStart(5, "0")}`;
+        }
+      } else {
+        // For general sales (no work order)
+        newSalesOrderId = `GNS-${String(nextId).padStart(5, "0")}`;
+      }
 
+      console.log("Generated Sales Order ID:", newSalesOrderId);
 
-      // Optionally, you can update the sales order form with the new ID
+      // Update the sales order form with the new ID
       updateSalesOrderForm({ salesOrderId: newSalesOrderId });
 
-      return newSalesOrderId.toString();
+      return newSalesOrderId;
     } catch (error) {
-      console.error(
-        `Error generating sales_order_id for branch ${branch}:`,
-        error
-      );
+      console.error("Error generating sales order ID:", error);
       return null;
     }
   };
 
-  // Add this useEffect to watch for selectedWorkOrder changes
+
   useEffect(() => {
     if (selectedWorkOrder) {
       generateSalesOrderId(branch).then(newId => {
@@ -2260,7 +2327,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           privilege_discount: parseFloat(privilegeDiscount),
           cgst: parseFloat(cgstAmount),
           sgst: parseFloat(sgstAmount),
-          
+
           final_amount: parseFloat(balanceDue),
           loyalty_points_redeemed: sanitizedRedeemedPoints,
           loyalty_points_added: sanitizedPointsAdded,
