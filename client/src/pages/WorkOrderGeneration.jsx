@@ -39,16 +39,6 @@ const formatDate = (date) => {
 
 const WorkOrderGeneration = ({ isCollapsed }) => {
 
-  useEffect(() => {
-    // Reset work order form when component mounts
-    dispatch({ type: 'RESET_WORK_ORDER_FORM' });
-
-    // Cleanup when component unmounts
-    return () => {
-      dispatch({ type: 'RESET_WORK_ORDER_FORM' });
-    };
-  }, []);
-
   const verifyProductId = useCallback(async (productId) => {
     try {
       const { data, error } = await supabase
@@ -123,6 +113,46 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   const handleSearchQueryChange = (e) => {
     setSearchQuery(e.target.value);
   };
+
+  useEffect(() => {
+    // Only reset the form if we're starting a new work order
+    // (not editing and no existing work order data)
+    if (!isEditing && !workOrderId) {
+      // Check if there's saved state in sessionStorage
+      const savedState = sessionStorage.getItem('workOrderFormState');
+      if (savedState) {
+        try {
+          // Restore the saved state
+          const parsedState = JSON.parse(savedState);
+          dispatch({
+            type: 'RESTORE_WORK_ORDER_FORM',
+            payload: parsedState
+          });
+        } catch (err) {
+          console.error('Error restoring saved work order state:', err);
+          // Reset only if restoration fails
+          dispatch({ type: 'RESET_WORK_ORDER_FORM' });
+        }
+      }
+    }
+
+    // Remove the reset on unmount
+    return () => {
+      // Save current state to sessionStorage when unmounting
+      sessionStorage.setItem(
+        'workOrderFormState',
+        JSON.stringify(workOrderForm)
+      );
+    };
+  }, []);
+
+  // Add this effect to clear storage after successful submission
+  useEffect(() => {
+    if (submitted && isPrinted) {
+      // Clear saved state after successful completion
+      sessionStorage.removeItem('workOrderFormState');
+    }
+  }, [submitted, isPrinted]);
 
 
   const [showInsuranceModal, setShowInsuranceModal] = useState(false);
@@ -324,7 +354,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   //   }
   // }, [dispatch, branch]);
 
-  
+
 
   // const generateNewWorkOrderId = useCallback(async () => {
   //   try {
@@ -380,34 +410,34 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   const generateNewWorkOrderId = useCallback(async () => {
     try {
       console.log("Attempting to generate new Work Order ID...");
-  
+
       if (!branch) {
         console.error("Branch is undefined. Cannot generate Work Order ID.");
         alert("Branch information is missing. Please try again.");
         return;
       }
-  
+
       // Call the database function to get the next ID atomically
-      const { data: nextId, error } = await supabase.rpc('get_next_work_order_id', { 
+      const { data: nextId, error } = await supabase.rpc('get_next_work_order_id', {
         branch_code: branch,
         role_code: subRole  // This can be null
       });
-  
+
       if (error) {
         console.error("Error generating Work Order ID:", error);
         alert("Error generating Work Order ID. Please try again.");
         return;
       }
-  
+
       console.log("Database returned next ID:", nextId);
-      
+
       // Determine the OP Number based on subRole
       let opNumber = "01";
       if (subRole) {
         const subRoleParts = subRole.split(" ");
         opNumber = subRoleParts.length > 1 ? subRoleParts[1] : "01";
       }
-  
+
       // Format the work order ID based on role
       let newWorkOrderId;
       if (role && role.includes("opd")) {
@@ -415,9 +445,9 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       } else {
         newWorkOrderId = `CR-${opNumber}-${String(nextId).padStart(3, "0")}`;
       }
-  
+
       console.log("Final Generated Work Order ID:", newWorkOrderId);
-  
+
       dispatch({
         type: "SET_WORK_ORDER_FORM",
         payload: { workOrderId: newWorkOrderId.toString() },
@@ -665,6 +695,60 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   const GST_RATE = 12; // Total GST is 12% (6% CGST + 6% SGST)
 
   // Calculate totals
+  // const calculateTotals = useCallback((entries, discountAmt) => {
+  //   // Initialize variables
+  //   let subtotal = 0;
+  //   let validDiscountAmount = 0;
+  //   let discountedSubtotal = 0;
+  //   let cgst = 0;
+  //   let sgst = 0;
+  //   let totalAmount = 0;
+  //   let totalAmountWithGST = 0;
+  //   let discountedTotal = 0;
+
+  //   // Calculate subtotal (price excluding GST)
+  //   subtotal = entries.reduce((total, product) => {
+  //     const price = parseFloat(product.price) || 0; // MRP including GST
+  //     const quantity = parseInt(product.quantity) || 0;
+  //     const basePrice = price / 1.12; // Adjusted price excluding GST
+  //     return total + basePrice * quantity;
+  //   }, 0);
+
+  //   // Calculate total amount including GST (price * quantity)
+  //   totalAmountWithGST = entries.reduce((total, product) => {
+  //     const price = parseFloat(product.price) || 0; // MRP including GST
+  //     const quantity = parseInt(product.quantity) || 0;
+  //     return total + price * quantity;
+  //   }, 0);
+
+  //   // Apply discount
+  //   validDiscountAmount = Math.min(discountAmt || 0, subtotal);
+  //   discountedSubtotal = Math.max(
+  //     (subtotal * 1.12 - validDiscountAmount) / 1.12,
+  //     0
+  //   ); // Prevent negative subtotal
+
+  //   // Calculate GST amounts
+  //   cgst = discountedSubtotal * 0.06;
+  //   sgst = discountedSubtotal * 0.06;
+
+  //   // Calculate total amount including GST
+  //   totalAmount = discountedSubtotal + cgst + sgst;
+
+  //   discountedTotal = totalAmountWithGST - validDiscountAmount;
+
+  //   return {
+  //     subtotal,
+  //     discountAmount: validDiscountAmount,
+  //     discountedSubtotal,
+  //     cgst,
+  //     sgst,
+  //     totalAmount,
+  //     totalAmountWithGST,
+  //     discountedTotal,
+  //   };
+  // }, []);
+
   const calculateTotals = useCallback((entries, discountAmt) => {
     // Initialize variables
     let subtotal = 0;
@@ -677,35 +761,42 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     let discountedTotal = 0;
 
     // Calculate subtotal (price excluding GST)
-    subtotal = entries.reduce((total, product) => {
-      const price = parseFloat(product.price) || 0; // MRP including GST
-      const quantity = parseInt(product.quantity) || 0;
-      const basePrice = price / 1.12; // Adjusted price excluding GST
-      return total + basePrice * quantity;
-    }, 0);
-
-    // Calculate total amount including GST (price * quantity)
     totalAmountWithGST = entries.reduce((total, product) => {
       const price = parseFloat(product.price) || 0; // MRP including GST
       const quantity = parseInt(product.quantity) || 0;
       return total + price * quantity;
     }, 0);
 
-    // Apply discount
-    validDiscountAmount = Math.min(discountAmt || 0, subtotal);
-    discountedSubtotal = Math.max(
-      (subtotal * 1.12 - validDiscountAmount) / 1.12,
-      0
-    ); // Prevent negative subtotal
+    // Handle full discount case
+    if (parseFloat(discountAmt) >= totalAmountWithGST) {
+      return {
+        subtotal: totalAmountWithGST,
+        discountAmount: totalAmountWithGST,
+        discountedSubtotal: 0,
+        cgst: 0,
+        sgst: 0,
+        totalAmount: 0,
+        totalAmountWithGST,
+        discountedTotal: 0
+      };
+    }
 
-    // Calculate GST amounts
+    // Normal discount case
+    subtotal = entries.reduce((total, product) => {
+      const price = parseFloat(product.price) || 0;
+      const quantity = parseInt(product.quantity) || 0;
+      const basePrice = price / 1.12; // Adjusted price excluding GST
+      return total + basePrice * quantity;
+    }, 0);
+
+    validDiscountAmount = Math.min(discountAmt || 0, totalAmountWithGST);
+    discountedSubtotal = Math.max((subtotal * 1.12 - validDiscountAmount) / 1.12, 0);
+
     cgst = discountedSubtotal * 0.06;
     sgst = discountedSubtotal * 0.06;
 
-    // Calculate total amount including GST
     totalAmount = discountedSubtotal + cgst + sgst;
-
-    discountedTotal = totalAmountWithGST - validDiscountAmount;
+    discountedTotal = Math.max(totalAmountWithGST - validDiscountAmount, 0);
 
     return {
       subtotal,
@@ -718,7 +809,6 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       discountedTotal,
     };
   }, []);
-
   // Utility function to get today's date in YYYY-MM-DD format
   const getTodayDate = useCallback(() => {
     const today = new Date();
@@ -1435,10 +1525,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     (e) => {
       let value = e.target.value.replace(/^0+/, ""); // Remove leading zeros
       if (!value) value = ""; // Ensure empty string for invalid input
-      const numericValue = Math.min(
-        Math.max(parseFloat(value) || 0, 0),
-        subtotal
-      ); // Clamp value between 0 and subtotal
+      const numericValue = Math.max(parseFloat(value) || 0, 0);
       dispatch({
         type: "SET_WORK_ORDER_FORM",
         payload: { discount: numericValue.toString() },

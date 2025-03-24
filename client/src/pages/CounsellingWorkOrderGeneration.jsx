@@ -89,6 +89,81 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         setSearchQuery(e.target.value);
     };
 
+
+    useEffect(() => {
+        // Only restore state if we're not editing an existing record
+        if (!isEditing && !workOrderId) {
+            // Check if there's saved state in sessionStorage
+            const savedState = sessionStorage.getItem('counsellingWorkOrderFormState');
+            if (savedState) {
+                try {
+                    // Restore the saved state
+                    const parsedState = JSON.parse(savedState);
+                    dispatch({
+                        type: 'RESTORE_WORK_ORDER_FORM',
+                        payload: parsedState
+                    });
+                } catch (err) {
+                    console.error('Error restoring saved counselling work order state:', err);
+                }
+            }
+        }
+
+        // Save state to sessionStorage when component unmounts
+        return () => {
+            if (!submitted) {
+                sessionStorage.setItem(
+                    'counsellingWorkOrderFormState',
+                    JSON.stringify(workOrderForm)
+                );
+            }
+        };
+    }, [dispatch, isEditing, workOrderId, workOrderForm, submitted]);
+
+    // Add effect to clear storage after successful submission
+    useEffect(() => {
+        if (submitted && isPrinted) {
+            // Clear saved state after successful completion
+            sessionStorage.removeItem('counsellingWorkOrderFormState');
+        }
+    }, [submitted, isPrinted]);
+
+    // Modify the resetForm function to also clear sessionStorage
+    const resetForm = useCallback(() => {
+        dispatch({ type: "RESET_WORK_ORDER_FORM" });
+        setProductSuggestions({});
+        setValidationErrors({});
+        // Clear session storage
+        sessionStorage.removeItem('counsellingWorkOrderFormState');
+        navigate("/home");
+    }, [dispatch, navigate]);
+
+    // Update handleExit to clear sessionStorage
+    const handleExit = useCallback(() => {
+        const confirmExit = window.confirm(
+            isPrinted
+                ? "Form has been printed. Do you want to exit?"
+                : "Are you sure you want to exit without saving or printing?"
+        );
+        if (confirmExit) {
+            // Clear session storage
+            sessionStorage.removeItem('counsellingWorkOrderFormState');
+            resetForm();
+            resetState();
+        } else {
+            dispatch({ type: "SET_WORK_ORDER_FORM", payload: { isPrinted: false } });
+        }
+    }, [isPrinted, resetForm, resetState, dispatch]);
+
+    // Update handlePrint to clear sessionStorage
+    const handlePrint = useCallback(() => {
+        window.print();
+        dispatch({ type: "SET_WORK_ORDER_FORM", payload: { isPrinted: true } });
+        // Clear session storage
+        sessionStorage.removeItem('counsellingWorkOrderFormState');
+        resetForm();
+    }, [dispatch, resetForm]);
+
     // Initialize productSuggestions as an object for per-product index suggestions
     const [productSuggestions, setProductSuggestions] = useState({});
     const [validationErrors, setValidationErrors] = useState({});
@@ -484,17 +559,65 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     );
 
     // Function to reset the form
-    const resetForm = useCallback(() => {
-        dispatch({ type: "RESET_WORK_ORDER_FORM" });
-        setProductSuggestions({});
-        setValidationErrors({});
-        navigate("/home");
-    }, [dispatch, navigate]);
 
     // GST Rate and HSN Code
     const GST_RATE = 12; // Total GST is 12% (6% CGST + 6% SGST)
 
     // Calculate totals
+    // const calculateTotals = useCallback((entries, discountAmt) => {
+    //     // Initialize variables
+    //     let subtotal = 0;
+    //     let validDiscountAmount = 0;
+    //     let discountedSubtotal = 0;
+    //     let cgst = 0;
+    //     let sgst = 0;
+    //     let totalAmount = 0;
+    //     let totalAmountWithGST = 0;
+    //     let discountedTotal = 0;
+
+    //     // Calculate subtotal (price excluding GST)
+    //     subtotal = entries.reduce((total, product) => {
+    //         const price = parseFloat(product.price) || 0; // MRP including GST
+    //         const quantity = parseInt(product.quantity) || 0;
+    //         const basePrice = price / 1.12; // Adjusted price excluding GST
+    //         return total + basePrice * quantity;
+    //     }, 0);
+
+    //     // Calculate total amount including GST (price * quantity)
+    //     totalAmountWithGST = entries.reduce((total, product) => {
+    //         const price = parseFloat(product.price) || 0; // MRP including GST
+    //         const quantity = parseInt(product.quantity) || 0;
+    //         return total + price * quantity;
+    //     }, 0);
+
+    //     // Apply discount
+    //     validDiscountAmount = Math.min(discountAmt || 0, subtotal);
+    //     discountedSubtotal = Math.max(
+    //         (subtotal * 1.12 - validDiscountAmount) / 1.12,
+    //         0
+    //     ); // Prevent negative subtotal
+
+    //     // Calculate GST amounts
+    //     cgst = discountedSubtotal * 0.06;
+    //     sgst = discountedSubtotal * 0.06;
+
+    //     // Calculate total amount including GST
+    //     totalAmount = discountedSubtotal + cgst + sgst;
+
+    //     discountedTotal = totalAmountWithGST - validDiscountAmount;
+
+    //     return {
+    //         subtotal,
+    //         discountAmount: validDiscountAmount,
+    //         discountedSubtotal,
+    //         cgst,
+    //         sgst,
+    //         totalAmount,
+    //         totalAmountWithGST,
+    //         discountedTotal,
+    //     };
+    // }, []);
+
     const calculateTotals = useCallback((entries, discountAmt) => {
         // Initialize variables
         let subtotal = 0;
@@ -507,35 +630,42 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         let discountedTotal = 0;
 
         // Calculate subtotal (price excluding GST)
-        subtotal = entries.reduce((total, product) => {
-            const price = parseFloat(product.price) || 0; // MRP including GST
-            const quantity = parseInt(product.quantity) || 0;
-            const basePrice = price / 1.12; // Adjusted price excluding GST
-            return total + basePrice * quantity;
-        }, 0);
-
-        // Calculate total amount including GST (price * quantity)
         totalAmountWithGST = entries.reduce((total, product) => {
             const price = parseFloat(product.price) || 0; // MRP including GST
             const quantity = parseInt(product.quantity) || 0;
             return total + price * quantity;
         }, 0);
 
-        // Apply discount
-        validDiscountAmount = Math.min(discountAmt || 0, subtotal);
-        discountedSubtotal = Math.max(
-            (subtotal * 1.12 - validDiscountAmount) / 1.12,
-            0
-        ); // Prevent negative subtotal
+        // Handle full discount case
+        if (parseFloat(discountAmt) >= totalAmountWithGST) {
+            return {
+                subtotal: totalAmountWithGST,
+                discountAmount: totalAmountWithGST,
+                discountedSubtotal: 0,
+                cgst: 0,
+                sgst: 0,
+                totalAmount: 0,
+                totalAmountWithGST,
+                discountedTotal: 0
+            };
+        }
 
-        // Calculate GST amounts
+        // Normal discount case
+        subtotal = entries.reduce((total, product) => {
+            const price = parseFloat(product.price) || 0;
+            const quantity = parseInt(product.quantity) || 0;
+            const basePrice = price / 1.12; // Adjusted price excluding GST
+            return total + basePrice * quantity;
+        }, 0);
+
+        validDiscountAmount = Math.min(discountAmt || 0, totalAmountWithGST);
+        discountedSubtotal = Math.max((subtotal * 1.12 - validDiscountAmount) / 1.12, 0);
+
         cgst = discountedSubtotal * 0.06;
         sgst = discountedSubtotal * 0.06;
 
-        // Calculate total amount including GST
         totalAmount = discountedSubtotal + cgst + sgst;
-
-        discountedTotal = totalAmountWithGST - validDiscountAmount;
+        discountedTotal = Math.max(totalAmountWithGST - validDiscountAmount, 0);
 
         return {
             subtotal,
@@ -548,7 +678,6 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
             discountedTotal,
         };
     }, []);
-
     // Utility function to get today's date in YYYY-MM-DD format
     const getTodayDate = useCallback(() => {
         const today = new Date();
@@ -584,27 +713,9 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     }, [step, isB2B, isEditing, focusFirstFieldOfStep]);
 
     // Handle Exit button functionality
-    const handleExit = useCallback(() => {
-        const confirmExit = window.confirm(
-            isPrinted
-                ? "Form has been printed. Do you want to exit?"
-                : "Are you sure you want to exit without saving or printing?"
-        );
-        if (confirmExit) {
-            resetForm();
-            resetState();
-        } else {
-            dispatch({ type: "SET_WORK_ORDER_FORM", payload: { isPrinted: false } });
-        }
-    }, [isPrinted, resetForm, resetState, dispatch]);
+    
 
-    // Implement handlePrint using window.print()
-    const handlePrint = useCallback(() => {
-        window.print();
-        dispatch({ type: "SET_WORK_ORDER_FORM", payload: { isPrinted: true } });
-        resetForm();
-    }, [dispatch, resetForm]);
-
+    
     // Add a new product entry
     const addNewProductEntry = useCallback(() => {
         dispatch({

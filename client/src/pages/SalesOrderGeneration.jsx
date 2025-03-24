@@ -357,9 +357,6 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
   };
 
   // Reset transient fields on mount (if necessary)
-  useEffect(() => {
-    resetTransientFields();
-  }, []);
 
   const {
     step,
@@ -404,6 +401,51 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
 
   } = salesOrderForm;
 
+
+  useEffect(() => {
+    // Check if there's saved state in sessionStorage
+    const savedState = sessionStorage.getItem('salesOrderFormState');
+
+    if (savedState) {
+      try {
+        // Restore the saved state
+        const parsedState = JSON.parse(savedState);
+        dispatch({
+          type: 'RESTORE_SALES_ORDER_FORM',
+          payload: parsedState
+        });
+
+        // Still reset just the transient fields
+        resetTransientFields();
+      } catch (err) {
+        console.error('Error restoring saved sales order state:', err);
+        // If restoration fails, just reset transient fields
+        resetTransientFields();
+      }
+    } else {
+      // If no saved state, just reset transient fields
+      resetTransientFields();
+    }
+
+    // Save state to sessionStorage when component unmounts
+    return () => {
+      // Don't save if already submitted
+      if (!submitted) {
+        sessionStorage.setItem(
+          'salesOrderFormState',
+          JSON.stringify(salesOrderForm)
+        );
+      }
+    };
+  }, [dispatch, salesOrderForm, submitted]);
+
+  // Add this effect to clear storage after successful submission
+  useEffect(() => {
+    if (submitted && isPrinted) {
+      // Clear saved state after successful completion
+      sessionStorage.removeItem('salesOrderFormState');
+    }
+  }, [submitted, isPrinted]);
   // Local states
   const [originalProductEntries, setOriginalProductEntries] = useState([
     { id: "", product_id: "", name: "", price: "", quantity: "" },
@@ -2499,29 +2541,17 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     setOriginalProductEntries([
       { id: "", product_id: "", name: "", price: "", quantity: "" },
     ]);
-    dispatch({
-      type: "SET_SALES_ORDER_FORM",
-      payload: {
-        validationErrors: {
-          ...validationErrors,
-          generalError: "",
-        },
-      },
-    });
-    setSelectedWorkOrder(null);
-    setShowWorkOrderModal(false);
-
     setProductSuggestions([]);
     setIsGeneratingId(false);
+
+    // Clear session storage when form is reset
+    sessionStorage.removeItem('salesOrderFormState');
   };
 
 
   const handleExit = () => {
-    if (
-      window.confirm(
-        "Are you sure you want to exit?"
-      )
-    ) {
+    if (window.confirm("Are you sure you want to exit?")) {
+      sessionStorage.removeItem('salesOrderFormState');
       dispatch({ type: "RESET_SALES_ORDER_FORM" });
       navigate("/home");
     }

@@ -168,6 +168,30 @@ const globalStateReducer = (state, action) => {
         salesOrderForm: { ...defaultInitialState.salesOrderForm },
       };
 
+    case 'RESTORE_SALES_ORDER_FORM':
+      return {
+        ...state,
+        salesOrderForm: {
+          ...state.salesOrderForm,
+          ...action.payload,
+          isLoading: false, // Reset transient fields
+          isOtpSent: false,
+          isPinVerified: false,
+          validationErrors: {},
+        }
+      };
+
+    case 'RESTORE_WORK_ORDER_FORM':
+      return {
+        ...state,
+        workOrderForm: {
+          ...state.workOrderForm,
+          ...action.payload,
+          isLoading: false, // Reset transient fields
+          validationErrors: {},
+        }
+      };
+
     // WorkOrderForm actions
     case "SET_WORK_ORDER_FORM":
       return {
