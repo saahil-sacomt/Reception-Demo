@@ -437,7 +437,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         );
       }
     };
-  }, [dispatch, salesOrderForm, submitted]);
+  }, [dispatch, submitted]);
 
   // Add this effect to clear storage after successful submission
   useEffect(() => {
