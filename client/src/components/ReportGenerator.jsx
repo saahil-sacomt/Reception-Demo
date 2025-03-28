@@ -643,26 +643,31 @@ const ReportGenerator = ({ isCollapsed }) => {
           fetchedData = data;
           break;
         }
+        // In the case 'compiled_report' section of handleGenerateReport
         case 'compiled_report': {
           console.log("Fetching sales data with params:", { startStr, endStr });
 
+          // Use a more comprehensive query to fetch all necessary data
           const { data: salesData, error: salesError } = await supabase
             .from('sales_orders')
-            .select('total_amount, sales_order_id')
+            .select('total_amount, sales_order_id, work_order_id')
             .gte('created_at', startStr)
             .lte('created_at', endStr);
 
           if (salesError) {
             console.error("Error fetching sales data:", salesError);
-          } else {
-            console.log("Fetched sales data:", salesData);
-            console.log("Number of records:", salesData?.length);
+            throw salesError;
           }
+
+          console.log("Fetched sales data:", salesData);
+          console.log("Number of records:", salesData?.length);
 
           fetchedData = salesData;
           break;
-
         }
+
+        // Then update the tableRows creation in the compiled_report case:
+
 
         case 'privilegecards': {
           let query = supabase
@@ -1425,23 +1430,46 @@ const ReportGenerator = ({ isCollapsed }) => {
         ]);
         break;
       case 'compiled_report':
-        console.log('hui hui', data);
+        console.log('Processing data for compiled report:', data);
 
-        const totalOPD = data
-          .filter(sale => sale.sales_order_id?.startsWith('OPS-'))
-          .reduce((sum, sale) => sum + (parseFloat(sale.total_amount) || 0), 0);
+        // Debug the categories
+        const opdSales = data.filter(sale =>
+          sale.work_order_id?.startsWith('OPW-') ||
+          sale.sales_order_id?.startsWith('OPS-')
+        );
 
-        const totalCounselling = data
-          .filter(sale => sale.sales_order_id?.startsWith('CRS-'))
-          .reduce((sum, sale) => sum + (parseFloat(sale.total_amount) || 0), 0);
+        const counsellingSales = data.filter(sale =>
+          sale.work_order_id?.startsWith('CRW-') ||
+          sale.sales_order_id?.startsWith('CRS-')
+        );
 
-        const totalConsultation = data
-          .filter(sale => !sale.sales_order_id?.includes('-'))
-          .reduce((sum, sale) => sum + (parseFloat(sale.total_amount) || 0), 0);
+        const consultationSales = data.filter(sale =>
+          !sale.work_order_id?.includes('-') ||
+          (!sale.sales_order_id?.startsWith('OPS-') &&
+            !sale.sales_order_id?.startsWith('CNS-'))
+        );
+
+        console.log('OPD sales:', opdSales);
+        console.log('Counselling sales:', counsellingSales);
+        console.log('Consultation sales:', consultationSales);
+
+        const totalOPD = opdSales.reduce((sum, sale) =>
+          sum + (parseFloat(sale.total_amount) || 0), 0);
+
+        const totalCounselling = counsellingSales.reduce((sum, sale) =>
+          sum + (parseFloat(sale.total_amount) || 0), 0);
+
+        const totalConsultation = consultationSales.reduce((sum, sale) =>
+          sum + (parseFloat(sale.total_amount) || 0), 0);
+
+        // Add total calculation
+        const grandTotal = totalOPD + totalCounselling + totalConsultation;
+
         tableRows = [
           ['Total Counselling Sales Amount', totalCounselling.toFixed(2)],
-          ['Total OPD Sales Amount' , totalOPD.toFixed(2)],
-          ['Total Consulting Sales Amount' , totalConsultation.toFixed(2)],
+          ['Total OPD Sales Amount', totalOPD.toFixed(2)],
+          ['Total Consultation Sales Amount', totalConsultation.toFixed(2)],
+          ['Grand Total', grandTotal.toFixed(2)]
         ];
         break;
       case 'work_orders':
