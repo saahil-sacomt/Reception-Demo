@@ -1,6 +1,6 @@
 // client/src/pages/Signup.jsx
 
-import { useState , useEffect} from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { signUp } from '../services/authService';
 import Input from '../components/Input';
@@ -389,7 +389,9 @@ const Signup = () => {
                   <option value="counselling">Counselling</option>
                   <option value="opd">OPD</option>
                   <option value="insurance">Insurance</option>
-                  
+                  <option value="cghs">CGHS</option>
+                  <option value="echs">ECHS</option>
+
                 </select>
               </div>
 
@@ -418,7 +420,7 @@ const Signup = () => {
               </div>
 
               {/* Sub-Department Selection */}
-              {[ 'counselling', 'opd'].includes(role) && (
+              {['counselling', 'opd'].includes(role) && (
 
                 <div>
                   <label htmlFor="subRole" className="block text-sm font-medium text-gray-700 mt-4">

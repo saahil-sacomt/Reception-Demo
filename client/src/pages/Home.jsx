@@ -24,6 +24,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import supabase from '../supabaseClient';
 import { useGlobalState } from "../context/GlobalStateContext";
+import PendingSpecialOrders from './PendingSpecialOrders.jsx';
 
 const Home = ({ isCollapsed }) => {
   // Access Global State
@@ -590,6 +591,7 @@ const Home = ({ isCollapsed }) => {
       {showSplash ? (
         <SplashScreen />
       ) : (
+
         <div className="space-y-5">
           {/* Welcome and Metrics Section */}
           <div className="bg-white p-6 flex flex-col md:flex-row justify-between items-center">
@@ -721,14 +723,45 @@ const Home = ({ isCollapsed }) => {
               </div>
             )}
 
+            {(role === 'echs' || role === 'cghs') && (
+              <div className="flex flex-col lg:flex-row lg:space-x-6 mt-10 lg:mt-0 w-full px-6">
+                {/* Special Work Order Container */}
+                <div
+                  className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 w-full"
+                  onClick={() => navigate('/special-work-order')}
+                >
+                  <WrenchScrewdriverIcon className='h-36 w-36 text-green-500' />
+                  <h2 className="text-xl text-gray-800 mt-4">Sales Order</h2>
+                  <p className="text-sm text-gray-600 mt-2 text-center">Generate Sales orders</p>
+                </div>
+
+                {/* Special Stock Management Container */}
+                <div
+                  className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 w-full mt-6 lg:mt-0"
+                  onClick={() => navigate('/special-stock-management')}
+                >
+                  <ArchiveBoxArrowDownIcon className='h-36 w-36 text-green-500' />
+                  <h2 className="text-xl text-gray-800 mt-4">Special Stock Management</h2>
+                  <p className="text-sm text-gray-600 mt-2 text-center">Manage products inventory</p>
+                </div>
+
+                <div className="w-full px-6 mt-8">
+                  <h2 className="text-xl font-semibold text-gray-800 mb-4">Pending Special Orders</h2>
+                  <PendingSpecialOrders branch={branch} />
+                </div>
+
+              </div>
+            )}
+
+
             {/* Reports - visible to everyone */}
-            <div
+            {role !== 'echs' && role !== 'cghs' && (<div
               className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 h-full"
               onClick={() => navigate('/reportgenerator')}
             >
               <ClipboardDocumentIcon className='h-36 w-36 text-green-500' />
               <h2 className="text-xl text-gray-800 mt-4">Reports</h2>
-            </div>
+            </div>)}
 
             {/* Super Admin - Add New User */}
             {role === 'super_admin' && (
@@ -742,7 +775,7 @@ const Home = ({ isCollapsed }) => {
             )}
 
             {/* Purchase Stock - all except counselling */}
-            {role !== 'counselling' && role !== 'insurance' && (
+            {role !== 'counselling' && role !== 'insurance' && role !== 'echs' && role !== 'cghs' && (
               <div
                 className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 h-full"
                 onClick={() => navigate('/employee-stock-management')}
@@ -764,7 +797,7 @@ const Home = ({ isCollapsed }) => {
             )}
 
             {/* Credit and Debit Notes - not OPD/counselling */}
-            {(role !== 'opd' && role !== 'counselling' && role !== 'insurance') && (
+            {(role !== 'opd' && role !== 'counselling' && role !== 'insurance' && role !== 'echs' && role !== 'cghs') && (
               <div
                 className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 h-full"
                 onClick={() => navigate('/notes')}

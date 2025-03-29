@@ -38,7 +38,8 @@ import AddService from "./pages/AddService";
 import PatientRegistration from "./pages/PatientRegistration";
 import InsuranceCreation from "./pages/Insurance";
 import CheckoutInsurance from "./pages/CheckoutInsurance";
-
+import SpecialEmployeeStockManagement from "./pages/SpecialStockManagement";
+import SpecialWorkOrderGeneration from "./pages/SpecialWorkOrderGeneration";
 const App = () => {
   const location = useLocation();
   const [user, setUser] = useState(null);
@@ -111,7 +112,7 @@ const App = () => {
             <Route
               element={
                 <RequireAuth
-                  allowedRoles={["super_admin", "admin", "employee", "counselling", "opd", "reception", "insurance"]}
+                  allowedRoles={["super_admin", "admin", "employee", "counselling", "opd", "reception", "insurance", "echs", "cghs"]}
                 />
               }
             >
@@ -127,7 +128,7 @@ const App = () => {
                   element={<CheckoutInsurance />}
                 />
               </Route>
-              <Route path="/patient-registration" element={<PatientRegistration />}    />
+              <Route path="/patient-registration" element={<PatientRegistration />} />
               <Route
                 path="/home"
                 element={<Home isCollapsed={isCollapsed} />}
@@ -221,6 +222,20 @@ const App = () => {
                 />
               </Route>
 
+            </Route>
+            <Route
+              element={
+                <RequireAuth allowedRoles={["echs", "cghs"]} />
+              }
+            >
+              <Route
+                path="/special-work-order"
+                element={<SpecialWorkOrderGeneration isCollapsed={isCollapsed} />}
+              />
+              <Route
+                path="/special-stock-management"
+                element={<SpecialEmployeeStockManagement isCollapsed={isCollapsed} />}
+              />
             </Route>
 
             {/* Default Route */}
