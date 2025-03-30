@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import SplashScreen from '../components/SplashScreen';
 import walletImage from '../assets/pngwing.com.png';
 import { ClipboardDocumentCheckIcon } from '@heroicons/react/24/outline';
-import { UserPlusIcon } from '@heroicons/react/24/outline';
+import { UserPlusIcon, ClockIcon } from '@heroicons/react/24/outline';
 import { ShieldCheckIcon } from '@heroicons/react/24/outline';
 
 
@@ -142,20 +142,43 @@ const Home = ({ isCollapsed }) => {
 
     const today = getTodayDate(); // Utility function to get today's date in YYYY-MM-DD format
 
-    const { data, error } = await supabase
-      .from('work_orders')
-      .select('*')
-      .eq('branch', branch)
-      .gte('due_date', today); // Fetch work orders with due_date today or in the future
+    try {
+      if (role === 'cghs' || role === 'echs') {
+        // Only fetch special work orders for CGHS/ECHS roles
+        const { data: specialData, error: specialError } = await supabase
+          .from("specialworkorders")
+          .select("*")
+          .eq("branch", branch) // Add branch filter
+          .eq("is_used", false)
+          .order("created_at", { ascending: false });
 
-    if (!error && data) {
-      dispatch({ type: "SET_PENDING_WORK_ORDERS", payload: data });
-      dispatch({ type: "SET_PENDING_WORK_ORDERS_COUNT", payload: data.length });
-    } else {
-      console.error("Error fetching pending work orders:", error.message);
+        if (specialError) {
+          console.error("Error fetching special work orders:", specialError.message);
+          return;
+        }
+
+        dispatch({ type: "SET_PENDING_WORK_ORDERS", payload: specialData || [] });
+        dispatch({ type: "SET_PENDING_WORK_ORDERS_COUNT", payload: specialData ? specialData.length : 0 });
+      } else {
+        // For non-CGHS/ECHS roles, fetch regular work orders
+        const { data: regularData, error: regularError } = await supabase
+          .from('work_orders')
+          .select('*')
+          .eq('branch', branch)
+          .gte('due_date', today); // Fetch work orders with due_date today or in the future
+
+        if (regularError) {
+          console.error("Error fetching regular work orders:", regularError.message);
+          return;
+        }
+
+        dispatch({ type: "SET_PENDING_WORK_ORDERS", payload: regularData || [] });
+        dispatch({ type: "SET_PENDING_WORK_ORDERS_COUNT", payload: regularData ? regularData.length : 0 });
+      }
+    } catch (err) {
+      console.error("Unexpected error in fetchPendingWorkOrders:", err);
     }
   };
-
   // Fetch sales orders created today
   const fetchSalesOrdersToday = async () => {
     if (!branch) return;
@@ -745,10 +768,16 @@ const Home = ({ isCollapsed }) => {
                   <p className="text-sm text-gray-600 mt-2 text-center">Manage products inventory</p>
                 </div>
 
-                <div className="w-full px-6 mt-8">
-                  <h2 className="text-xl font-semibold text-gray-800 mb-4">Pending Special Orders</h2>
-                  <PendingSpecialOrders branch={branch} />
+                <div
+                  className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 w-full mt-6 lg:mt-0"
+                  onClick={() => navigate('/pending-sales-order')}
+                >
+                  <ClockIcon className='h-36 w-36 text-green-500' />
+                  <h2 className="text-xl text-gray-800 mt-4">Pending sales orders</h2>
+                  {/* <p className="text-sm text-gray-600 mt-2 text-center">Manage products inventory</p> */}
                 </div>
+
+
 
               </div>
             )}

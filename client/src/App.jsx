@@ -40,6 +40,7 @@ import InsuranceCreation from "./pages/Insurance";
 import CheckoutInsurance from "./pages/CheckoutInsurance";
 import SpecialEmployeeStockManagement from "./pages/SpecialStockManagement";
 import SpecialWorkOrderGeneration from "./pages/SpecialWorkOrderGeneration";
+import PendingSpecialOrders from "./pages/PendingSpecialOrders";
 const App = () => {
   const location = useLocation();
   const [user, setUser] = useState(null);
@@ -236,7 +237,12 @@ const App = () => {
                 path="/special-stock-management"
                 element={<SpecialEmployeeStockManagement isCollapsed={isCollapsed} />}
               />
+              <Route
+                path="/pending-sales-order"
+                element={<PendingSpecialOrders isCollapsed={isCollapsed} />}
+              />
             </Route>
+            
 
             {/* Default Route */}
             <Route path="/" element={<Navigate to="/home" replace />} />
