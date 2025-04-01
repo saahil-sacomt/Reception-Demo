@@ -416,6 +416,35 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
 
 
   useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (!submitted && !isPrinted) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [submitted, isPrinted]);
+
+  useEffect(() => {
+    // Only restore saved state if not submitted
+    if (!submitted) {
+      const savedState = sessionStorage.getItem('salesOrderFormState');
+      if (savedState) {
+        try {
+          const parsedState = JSON.parse(savedState);
+          dispatch({
+            type: 'RESTORE_SALES_ORDER_FORM',
+            payload: parsedState
+          });
+        } catch (err) {
+          console.error('Error restoring saved state:', err);
+        }
+      }
+    }
+  }, [dispatch, submitted]);
+  useEffect(() => {
     // Check if there's saved state in sessionStorage
     const savedState = sessionStorage.getItem('salesOrderFormState');
 
@@ -493,11 +522,6 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
       console.error('Error fetching consultants:', err);
     }
   }, []);
-
-  // // Fetch consultants on mount
-  // useEffect(() => {
-  //   fetchConsultants();
-  // }, [fetchConsultants]);
 
 
   // Refs for input fields to control focus
@@ -688,145 +712,6 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
   };
 
 
-  // const generateSalesOrderId = async (branch) => {
-  //   // Define default starting sales_order_id for each branch
-  //   const branchDefaultIds = {
-  //     TVR: 4103, // Default ID for Trivandrum
-  //     NTA: 2570, // Default ID for Neyyantinkara
-  //     KOT1: 3001, // Default ID for Kottarakara 1
-  //     KOT2: 4001, // Default ID for Kottarakara 2
-  //     KAT: 2792, // Default ID for Kattakada
-  //   };
-
-
-  //   if (!branch) {
-  //     console.error("Branch is undefined. Cannot generate Sales Order ID.");
-  //     return;
-  //   }
-
-  //   if (!selectedWorkOrder) {
-  //     // If no work order is selected, generate general sales ID
-  //     return generateGeneralSalesId();
-  //   }
-  //   else {
-  //     console.log("Selected Work Order:", selectedWorkOrder);
-  //   }
-
-  //   try {
-  //     // console.log("Branch passed:", branch); // Debugging: check the branch passed
-  //     console.log(
-  //       "Default Sales Order ID for this branch:",
-  //       branchDefaultIds[branch]
-  //     ); // Debugging: check the default ID for the branch
-
-  //     const { data, error } = await supabase
-  //       .from("sales_orders")
-  //       .select("sales_order_id")
-  //       .eq("branch", branch) // Filter by branch
-  //       .order("sales_order_id", { ascending: false })
-  //       .limit(1);
-
-  //     console.log("Data:", data); // Debugging: check the data
-
-  //     if (error) {
-  //       console.error(
-  //         `Error fetching last sales_order_id for branch ${branch}:`,
-  //         error
-  //       );
-  //       return null;
-  //     }
-
-  //     // Set the default starting sales_order_id for the branch if no orders exist
-
-  //     let lastSalesOrderId = branchDefaultIds[branch] || 1000; // Default to 1000 if branch not found in the map
-
-  //     // If data exists, extract the last sales_order_id for that branch
-  //     if (data && data.length > 0) {
-  //       setSelectedWorkOrder: data[0];
-  //       const str = data[0].sales_order_id
-  //       const match = str.match(/(\d+)$/); //Regex to match digits at the end of the string
-
-  //       if (match) {
-  //         console.log('Regex', match[0]); // Output: 3742
-  //         lastSalesOrderId = parseInt(match[0]);
-  //       } else {
-  //         console.log("No number found");
-  //       }
-
-  //     }
-
-  //     console.log("Calculated lastSalesOrderId:", lastSalesOrderId); // Debugging: check lastSalesOrderId
-
-  //     // Increment the last sales_order_id by 1
-  //     let newSalesOrderId = lastSalesOrderId + 1;
-  //     console.log("Calculated newSalesOrderId:", newSalesOrderId); // Debugging: check newSalesOrderId
-
-
-  //     // Extract OP Number from selected work order
-  //     let opNumber = "01"; // Default OP Number
-  //     if (selectedWorkOrder && selectedWorkOrder.work_order_id) {
-  //       // console.log(selectedWorkOrder.work_order_id);
-
-
-  //       // Assuming work_order_id format is "OPW-XX-XXX" where XX is the OP number
-  //       let match = selectedWorkOrder.work_order_id.match(/CR-(\d+)-/);
-  //       if (!match) {
-  //         match = selectedWorkOrder.work_order_id.match(/OPW-(\d+)-/);
-  //       }
-  //       if (match && match[1]) {
-  //         opNumber = match[1];
-  //         console.log("Extracted OP Number:", opNumber);
-  //       }
-  //       else {
-  //         console.log("No OP Number found");
-  //       }
-
-  //       const workOrderId = selectedWorkOrder.work_order_id;
-
-  //       // Regex to match "OPW" or "CR" at the start of the string
-  //       const opwRegex = /^OPW/;
-  //       const crRegex = /^CR/;
-
-  //       if (opwRegex.test(workOrderId)) {
-  //         console.log("1");
-  //         // Logic specific to OPW work orders
-  //         newSalesOrderId = `OPS-${opNumber}-${String(newSalesOrderId).padStart(3, "0")}`;
-  //         console.log("Handling OPW work order:", workOrderId);
-  //         // Additional actions for OPW
-  //       } else if (crRegex.test(workOrderId)) {
-  //         console.log("2");
-  //         // Logic specific to CR work orders
-  //         newSalesOrderId = `CRS-${opNumber}-${String(newSalesOrderId).padStart(3, "0")}`;
-  //         console.log("Handling CR work order:", workOrderId);
-  //         // Additional actions for CR
-  //       } else {
-  //         console.log("Unknown work order type:", workOrderId);
-  //         // Handle unexpected work order types
-  //       }
-  //     }
-
-
-
-  //     // console.log();
-
-
-
-
-  //     // Optionally, you can update the sales order form with the new ID
-  //     updateSalesOrderForm({ salesOrderId: newSalesOrderId });
-
-  //     return newSalesOrderId.toString();
-  //   } catch (error) {
-  //     console.error(
-  //       `Error generating sales_order_id for branch ${branch}:`,
-  //       error
-  //     );
-  //     return null;
-  //   }
-  // };
-
-  // Add this useEffect to watch for selectedWorkOrder changes
-
 
   const generateSalesOrderId = async (branch) => {
     try {
@@ -901,14 +786,11 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
 
 
   useEffect(() => {
-    if (selectedWorkOrder) {
-      generateSalesOrderId(branch).then(newId => {
-        if (newId) {
-          updateSalesOrderForm({ salesOrderId: newId });
-        }
-      });
+    // Only generate a new SalesOrderId if we don't already have one AND the form hasn't been submitted
+    if (!salesOrderForm.salesOrderId && !isEditing && !submitted) {
+      generateSalesOrderId(branch);
     }
-  }, [selectedWorkOrder, branch]); // Dependencies: selectedWorkOrder and branch
+  }, [selectedWorkOrder, branch, submitted, isEditing]);
 
   // Function to fetch and set a new sales ID when the branch is available
 
@@ -2083,517 +1965,20 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     setSearchQuery(e.target.value);
   };
 
-  // Updated handleOrderCompletion function with correct stock update logic
-  const handleOrderCompletion = async () => {
-    console.log("Submit handler triggered");
-    const currentUTCDateTime = getCurrentUTCDateTime();
-
-    if (isSaving) return;
-    if (submitted) return; // Prevent duplicate clicks
-
-    updateSalesOrderForm({ isSaving: true }); // Set isSaving to true
-    updateSalesOrderForm({
-      validationErrors: {
-        ...validationErrors,
-        generalError: "",
-      },
-    });
-
-    try {
-      let customerId = null;
-
-      // **Step 1: Save Customer Details (if applicable)**
-      if (hasMrNumber === "no") {
-        // Validate Customer Details
-        const customerErrors = {};
-        if (!customerName.trim())
-          customerErrors.customerName = "Name is required.";
-        if (!customerPhone.trim()) {
-          customerErrors.customerPhone = "Phone number is required.";
-        }
-        if (!address.trim()) customerErrors.address = "Address is required.";
-        if (!age || parseInt(age, 10) <= 0)
-          customerErrors.customerAge = "Age must be a positive number.";
-        if (!gender) customerErrors.customerGender = "Gender is required.";
-
-        if (Object.keys(customerErrors).length > 0) {
-          updateSalesOrderForm({
-            validationErrors: {
-              ...validationErrors,
-              ...customerErrors,
-            },
-          });
-          updateSalesOrderForm({ isSaving: false });
-          return;
-        }
-
-        // Call saveCustomerDetails with customer details
-        const savedCustomer = await saveCustomerDetails({
-          name: customerName,
-          phone_number: customerPhone,
-          address,
-          gender,
-          age: parseInt(age, 10),
-        });
-
-        if (savedCustomer && savedCustomer.length > 0) {
-          customerId = savedCustomer[0].customer_id; // Retrieve customer_id from the first inserted record
-        } else {
-          throw new Error("Failed to retrieve customer_id after insertion.");
-        }
-      }
-
-      // **Step 2: Handle Loyalty Points Update (if applicable)**
-      if (privilegeCard && privilegeCardDetails) {
-        const { updatedPoints, pointsToRedeem, pointsToAdd } = calculateLoyaltyPoints(
-          subtotalWithGST,
-          redeemPointsAmount,
-          privilegeCard,
-          privilegeCardDetails,
-          loyaltyPoints
-        );
-
-        const { error: loyaltyError } = await supabase
-          .from("privilegecards")
-          .update({ loyalty_points: updatedPoints })
-          .eq("pc_number", privilegeCardDetails.pc_number);
-
-        if (loyaltyError) {
-          console.error("Error updating loyalty points:", loyaltyError);
-          updateSalesOrderForm({
-            validationErrors: {
-              ...validationErrors,
-              generalError: "Failed to update loyalty points",
-            },
-          });
-          updateSalesOrderForm({ isSaving: false });
-          return;
-        }
-
-        updateSalesOrderForm({
-          loyaltyPoints: updatedPoints,
-          pointsToAdd: pointsToAdd,
-        });
-      }
-
-      // **Step 3: Prepare Variables for Sales Data**
-      const sanitizedRedeemedPoints = privilegeCard
-        ? parseInt(redeemPointsAmount) || 0
-        : 0;
-      const sanitizedPointsAdded = privilegeCard ? pointsToAdd || 0 : 0;
-
-      if (isEditing) {
-        // **Step 4: Update Existing Sales Order**
-        const updatePayload = {
-          work_order_id: selectedWorkOrder
-            ? selectedWorkOrder.work_order_id
-            : null,
-          items: productEntries.map((prod) => ({
-            id: prod.id, // Integer id for stock
-            product_id: prod.product_id, // String product_id for display
-            name: prod.name,
-            price: parseFloat(prod.price),
-            quantity: parseInt(prod.quantity, 10),
-            hsn_code: prod.hsn_code,
-          })),
-          mr_number: hasMrNumber === "yes" ? mrNumber : null,
-          patient_phone:
-            hasMrNumber === "yes" ? patientDetails.phone_number : customerPhone,
-          customer_id: customerId, // Associate with customer_id
-          employee: employee,
-          payment_method: paymentMethod,
-          subtotal: parseFloat(subtotalWithoutGST),
-          discount: parseFloat(totalDiscount),
-          total_amount: amountAfterDiscount,
-          advance_details: parseFloat(advanceDetails) || 0,
-          privilege_discount: parseFloat(privilegeDiscount),
-          cgst: parseFloat(cgstAmount),
-          sgst: parseFloat(sgstAmount),
-          final_amount: parseFloat(balanceDue),
-          loyalty_points_redeemed: sanitizedRedeemedPoints,
-          loyalty_points_added: sanitizedPointsAdded,
-          updated_at: currentUTCDateTime,
-          branch: branch,
-          // **Important:** Do NOT include 'modification_request_id' or any other invalid fields
-        };
-
-        console.log("Update Payload:", updatePayload); // Debugging: Inspect the payload
-
-        const { error: updateError } = await supabase
-          .from("sales_orders")
-          .update(updatePayload)
-          .eq("sales_order_id", salesOrderId);
-
-        if (updateError) {
-          console.error("Error updating sales order:", updateError);
-          updateSalesOrderForm({
-            validationErrors: {
-              ...validationErrors,
-              generalError: "Failed to update sales order.",
-            },
-          });
-          updateSalesOrderForm({ isSaving: false });
-          return;
-        }
-
-        // **Step 5: Handle Stock Updates for Modifications**
-        // Calculate differences between original and updated products
-        const differences = calculateProductDifferences(
-          originalProductEntries,
-          productEntries
-        );
-
-        console.log("Product Differences:", differences);
-
-        // Process each difference
-        for (const diff of differences) {
-          const { productId, diff: quantityChange } = diff;
-          // Fetch current stock for the product
-          const { data: stockData, error: stockError } = await supabase
-            .from("stock")
-            .select("quantity")
-            .eq("product_id", productId)
-            .eq("branch_code", branch)
-            .single();
-
-          if (stockError || !stockData) {
-            console.error(
-              `Error fetching stock for product ID ${productId}:`,
-              stockError
-            );
-            updateSalesOrderForm({
-              validationErrors: {
-                ...validationErrors,
-                generalError: `Failed to fetch stock for product ID ${productId}.`,
-              },
-            });
-            updateSalesOrderForm({ isSaving: false });
-            return;
-          }
-
-          let newQuantity = stockData.quantity + quantityChange;
-
-          if (newQuantity < 0) {
-            updateSalesOrderForm({
-              validationErrors: {
-                ...validationErrors,
-                generalError: `Insufficient stock for product ID ${productId}.`,
-              },
-            });
-            updateSalesOrderForm({ isSaving: false });
-            return;
-          }
-
-          // Update stock
-          const { error: stockUpdateError } = await supabase
-            .from("stock")
-            .update({ quantity: newQuantity })
-            .eq("product_id", productId)
-            .eq("branch_code", branch);
-
-          if (stockUpdateError) {
-            console.error(
-              `Error updating stock for product ID ${productId}:`,
-              stockUpdateError
-            );
-            updateSalesOrderForm({
-              validationErrors: {
-                ...validationErrors,
-                generalError: `Failed to update stock for product ID ${productId}.`,
-              },
-            });
-            updateSalesOrderForm({ isSaving: false });
-            return;
-          }
-        }
-
-        // **Step 6: Update Modification Request Status**
-        // Fetch the 'id' (primary key) of the updated sales order
-        const { data: updatedSalesOrderData, error: fetchUpdatedError } =
-          await supabase
-            .from("sales_orders")
-            .select("id")
-            .eq("sales_order_id", salesOrderId)
-            .single();
-
-        if (fetchUpdatedError || !updatedSalesOrderData) {
-          console.error("Error fetching updated sales order ID:", fetchUpdatedError);
-          alert("Failed to fetch updated sales order ID.");
-        } else {
-          const salesOrderRecordId = updatedSalesOrderData.id;
-
-          // Now, update the corresponding modification request(s)
-          try {
-            // Fetch modification requests related to this sales order
-            const { data: modReqData, error: modReqError } = await supabase
-              .from("modification_requests")
-              .select("id")
-              .eq("order_id", salesOrderId) // Use 'salesOrderRecordId' here
-              .eq("order_type", "sales_order")
-              .eq("status", "approved"); // Assuming 'pending' is the correct status
-
-            if (modReqError) {
-              console.error("Error fetching modification request:", modReqError);
-              // Optionally handle the error as needed
-            } else if (modReqData && modReqData.length > 0) {
-              // Loop through each modification request and update them
-              for (const modReq of modReqData) {
-                const modificationRequestId = modReq.id;
-                console.log(
-                  "Attempting to update modification_request with ID:",
-                  modificationRequestId
-                );
-
-                const { error: modificationError } = await supabase
-                  .from("modification_requests")
-                  .update({ status: "completed" })
-                  .eq("id", modificationRequestId);
-
-                if (modificationError) {
-                  console.error(
-                    "Error updating modification request status:",
-                    modificationError
-                  );
-                  alert(
-                    "Sales order was updated, but failed to update modification request status. Please contact support."
-                  );
-                } else {
-                  console.log("Modification request status updated to 'completed'.");
-                }
-              }
-            } else {
-              console.log("No pending modification request found for this sales order.");
-            }
-          } catch (err) {
-            console.error("Unexpected error updating modification request:", err);
-            alert(
-              "An unexpected error occurred while updating modification request status."
-            );
-          }
-        }
-
-        alert("Sales order updated successfully!");
-        updateSalesOrderForm({
-          allowPrint: true,
-          submitted: true,
-        });
-      } else {
-        // **Step 4: Insert New Sales Order**
-        const newSalesOrderId = await generateSalesOrderId(branch);
-        if (!newSalesOrderId) {
-          updateSalesOrderForm({
-            validationErrors: {
-              ...validationErrors,
-              generalError: "Failed to generate sales order ID.",
-            },
-          });
-          updateSalesOrderForm({ isSaving: false });
-          return;
-        }
-
-        const insertPayload = {
-          sales_order_id: newSalesOrderId,
-          work_order_id: selectedWorkOrder
-            ? selectedWorkOrder.work_order_id
-            : null,
-          items: productEntries.map((prod) => ({
-            id: prod.id, // Integer id for stock
-            product_id: prod.product_id, // String product_id for display
-            name: prod.name,
-            price: parseFloat(prod.price),
-            quantity: parseInt(prod.quantity, 10),
-            hsn_code: prod.hsn_code,
-          })),
-          mr_number: hasMrNumber === "yes" ? mrNumber : null,
-          patient_phone:
-            hasMrNumber === "yes" ? patientDetails.phone_number : customerPhone,
-          customer_id: customerId, // Associate with customer_id
-          employee: employee,
-          payment_method: paymentMethod,
-          subtotal: parseFloat(subtotalWithoutGST),
-          discount: parseFloat(totalDiscount),
-          total_amount: parseFloat(amountAfterDiscount),
-          advance_details: parseFloat(advanceDetails) || 0,
-          privilege_discount: parseFloat(privilegeDiscount),
-          cgst: parseFloat(cgstAmount),
-          sgst: parseFloat(sgstAmount),
-
-          final_amount: parseFloat(balanceDue),
-          loyalty_points_redeemed: sanitizedRedeemedPoints,
-          loyalty_points_added: sanitizedPointsAdded,
-          updated_at: currentUTCDateTime,
-          consultant_name: consultantName,
-          branch: branch,
-          // **Important:** Do NOT include 'modification_request_id' or any other invalid fields
-        };
-
-        const { data: updateData, error: updateError } = await supabase
-          .from('work_orders')
-          .update({ is_used: true })
-          .eq('work_order_id', selectedWorkOrder.work_order_id)
-          .select();
-
-        console.log("Update response:", { updateData, updateError });
-
-        if (updateError) {
-          throw new Error(`Failed to update work order: ${updateError.message}`);
-        }
-
-        console.log("Insert Payload:", insertPayload); // Debugging: Inspect the payload
-
-        const { error: insertError } = await supabase
-          .from("sales_orders")
-          .insert(insertPayload);
-
-        if (insertError) {
-          console.error("Error inserting sales order:", insertError);
-          updateSalesOrderForm({
-            validationErrors: {
-              ...validationErrors,
-              generalError: "Failed to insert sales order.",
-            },
-          });
-          updateSalesOrderForm({ isSaving: false });
-          return;
-        }
-
-
-
-
-        // **Step 5: Mark Work Order as Used (if applicable)**
-
-
-
-        // **Step 6: Deduct Stock for New Orders**
-        const validProducts = productEntries.filter(
-          (product) => product.id && product.quantity > 0
-        );
-
-        if (!validProducts || validProducts.length === 0) {
-          console.error("No valid products to process");
-          updateSalesOrderForm({
-            validationErrors: {
-              ...validationErrors,
-              generalError: "No valid products to deduct stock.",
-            },
-          });
-          updateSalesOrderForm({ isSaving: false });
-          return;
-        }
-
-        console.log("Valid Products for Deduction:", validProducts);
-
-        // Fetch current stock for all valid products in one query
-        const productIds = validProducts.map((prod) => prod.id); // Use integer ids
-        const { data: stockData, error: stockError } = await supabase
-          .from("stock")
-          .select("product_id, quantity")
-          .in("product_id", productIds)
-          .eq("branch_code", branch);
-
-        if (stockError || !stockData) {
-          console.error("Error fetching stock data:", stockError);
-          updateSalesOrderForm({
-            validationErrors: {
-              ...validationErrors,
-              generalError: "Failed to fetch stock data.",
-            },
-          });
-          updateSalesOrderForm({ isSaving: false });
-          return;
-        }
-
-        // Create a map of current stock
-        const stockMap = new Map();
-        stockData.forEach((stock) => {
-          stockMap.set(stock.product_id, stock.quantity);
-        });
-
-        // Validate stock deductions
-        for (const product of validProducts) {
-          const currentStock = stockMap.get(product.id) || 0;
-          const newStock = currentStock - product.quantity;
-
-          if (newStock < 0) {
-            updateSalesOrderForm({
-              validationErrors: {
-                ...validationErrors,
-                generalError: `Insufficient stock for product ID: ${product.product_id}.`,
-              },
-            });
-            updateSalesOrderForm({ isSaving: false });
-            return;
-          }
-        }
-
-        // Update stock quantities in bulk
-        const updateStockPromises = validProducts.map((product) => {
-          const newQuantity = stockMap.get(product.id) - product.quantity;
-          return supabase
-            .from("stock")
-            .update({ quantity: newQuantity })
-            .eq("product_id", product.id)
-            .eq("branch_code", branch);
-        });
-
-        const updateStockResults = await Promise.all(updateStockPromises);
-
-        // Check for any errors in stock updates
-        const stockUpdateErrors = updateStockResults.filter(
-          (result) => result.error
-        );
-
-        if (stockUpdateErrors.length > 0) {
-          console.error("Error updating stock levels:", stockUpdateErrors);
-          updateSalesOrderForm({
-            validationErrors: {
-              ...validationErrors,
-              generalError: "Failed to update stock levels.",
-            },
-          });
-          updateSalesOrderForm({ isSaving: false, submitted: true });
-          return;
-        }
-
-        alert("Sales order created successfully!");
-        updateSalesOrderForm({
-          allowPrint: true,
-          submitted: true,
-        });
-      }
-
-      // **Step 7: Final Steps: Reset Form and Allow Printing**
-      updateSalesOrderForm({ allowPrint: true, submitted: true });
-
-      alert("Order processed successfully!");
-      setTimeout(() => {
-        printButtonRef.current?.focus(); // Move focus to the Print button
-      }, 100);
-    } catch (error) {
-      console.error("Error completing the order:", error);
-      updateSalesOrderForm({
-        validationErrors: {
-          ...validationErrors,
-          generalError: "Failed to complete the order.",
-        },
-      });
-    } finally {
-      updateSalesOrderForm({ isSaving: false, submitted: true }); // Set isSaving to false
-    }
-  };
 
 
   // Function to reset the form
   const resetForm = () => {
-    dispatch({ type: "RESET_SALES_ORDER_FORM" });
-    setOriginalProductEntries([
-      { id: "", product_id: "", name: "", price: "", quantity: "" },
-    ]);
-    setProductSuggestions([]);
-    setIsGeneratingId(false);
-
-    // Clear session storage when form is reset
-    sessionStorage.removeItem('salesOrderFormState');
+    // Only reset if user confirms
+    if (window.confirm("Are you sure you want to reset the form? All unsaved changes will be lost.")) {
+      dispatch({ type: "RESET_SALES_ORDER_FORM" });
+      setOriginalProductEntries([
+        { id: "", product_id: "", name: "", price: "", quantity: "" },
+      ]);
+      setProductSuggestions([]);
+      setIsGeneratingId(false);
+      sessionStorage.removeItem('salesOrderFormState');
+    }
   };
 
 
@@ -2604,31 +1989,41 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
       navigate("/home");
     }
   };
-
   const handlePrint = useCallback(() => {
     window.print();
-    dispatch({ type: "SET_SALES_ORDER_FORM", payload: { isPrinted: true } });
-    resetForm();
-    navigate("/home");
+
+    // Mark as printed but don't reset yet
+    dispatch({
+      type: "SET_SALES_ORDER_FORM",
+      payload: { isPrinted: true }
+    });
+
+    // Ask for confirmation before resetting and navigating
+    if (window.confirm("Print completed. Would you like to start a new sales order?")) {
+      resetForm();
+      navigate("/home");
+    }
   }, [dispatch, navigate]);
 
 
   // Function to save the sales order
   const saveSalesOrder = async () => {
 
-    // console.log("Initial selectedWorkOrder:", selectedWorkOrder);
-    // console.log("saveSalesOrder called"); // Add this line
 
 
-    if (isSaving) {
-      alert("Please wait while the sales order is being saved.");
+    if (isSaving || submitted) {
+      alert(submitted ? "Sales order already submitted" : "Please wait while saving...");
       return;
     }
 
-    if (submitted) {
-      alert("Sales order submitted already");
-      return;
-    }
+    // Set saving state
+    dispatch({
+      type: "SET_SALES_ORDER_FORM",
+      payload: {
+        isSaving: true,
+        validationErrors: {}
+      }
+    });
 
     dispatch({ type: "SET_SALES_ORDER_FORM", payload: { isSaving: true } });
 
@@ -2705,12 +2100,12 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
 
     try {
       // Generate new sales order ID
-      const newSalesOrderId = await generateSalesOrderId(branch);
-      if (!newSalesOrderId) {
-        alert("Failed to generate sales order ID");
-        dispatch({ type: "SET_SALES_ORDER_FORM", payload: { isSaving: false } });
-        return;
-      }
+      // const newSalesOrderId = await generateSalesOrderId(branch);
+      // if (!newSalesOrderId) {
+      //   alert("Failed to generate sales order ID");
+      //   dispatch({ type: "SET_SALES_ORDER_FORM", payload: { isSaving: false } });
+      //   return;
+      // }
 
       // Calculate amounts
       const {
@@ -2748,7 +2143,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
 
       // Prepare the payload
       const payload = {
-        sales_order_id: newSalesOrderId, // Use the formatted ID
+        sales_order_id: salesOrderId, // Use the formatted ID
         branch,
         sub_role: subRole,
         work_order_id: selectedWorkOrder?.work_order_id || 'GENERAL',
@@ -2806,6 +2201,9 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         }
       }
 
+      console.log("Sales order saved successfully:", payload);
+
+
 
 
       // If everything is successful
@@ -2815,17 +2213,35 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         payload: {
           submitted: true,
           allowPrint: true,
-          loyaltyPoints: updatedPoints,
-          pointsToAdd: pointsToAdd,
-        },
+          isSaving: false,
+          isPrinted: false,
+          // salesOrderId: orderId,
+          // Don't reset other form fields
+        }
       });
+      console.log("hui1");
 
-      // Do not reset the form immediately. Allow user to print or exit.
+
+      setTimeout(() => {
+        if (printButtonRef.current) {
+          printButtonRef.current.focus();
+        }
+      }, 300);
+
+      console.log("hui2");
+
+
     } catch (err) {
-      console.error("Unexpected error saving sales order:", err);
-      alert("An unexpected error occurred while saving the sales order.");
-    } finally {
-      dispatch({ type: "SET_SALES_ORDER_FORM", payload: { isSaving: false } });
+      console.error("Error saving sales order:", err);
+      dispatch({
+        type: "SET_SALES_ORDER_FORM",
+        payload: {
+          isSaving: false,
+          validationErrors: {
+            generalError: "Failed to save sales order. Please try again."
+          }
+        }
+      });
     }
   };
 
