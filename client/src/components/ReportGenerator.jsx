@@ -648,25 +648,29 @@ const ReportGenerator = ({ isCollapsed }) => {
           console.log("Fetching sales data with params:", { startStr, endStr });
 
           // Use a more comprehensive query to fetch all necessary data
-          const { data: salesData, error: salesError } = await supabase
+          const compiledQuery = supabase
             .from('sales_orders')
-            .select('total_amount, sales_order_id, work_order_id')
+            .select('*')
             .gte('created_at', startStr)
             .lte('created_at', endStr);
 
-          if (salesError) {
-            console.error("Error fetching sales data:", salesError);
-            throw salesError;
+          // Apply branch filter if not combined
+          if (!isCombined && branchesToReport.length > 0) {
+            compiledQuery.in('branch', branchesToReport);
           }
 
-          console.log("Fetched sales data:", salesData);
-          console.log("Number of records:", salesData?.length);
+          const { data: compiledData, error: compiledError } = await compiledQuery;
+          if (compiledError) throw compiledError;
 
-          fetchedData = salesData;
+          fetchedData = compiledData;
+
+          console.log("Fetched sales data:", fetchedData);
+          console.log("Number of records:", fetchedData?.length);
+
+          // fetchedData = salesData;
           break;
         }
 
-        // Then update the tableRows creation in the compiled_report case:
 
 
         case 'privilegecards': {
@@ -791,6 +795,8 @@ const ReportGenerator = ({ isCollapsed }) => {
           fetchedData = data;
           break;
         }
+
+
         case 'consolidated': {
           const salesQuery = supabase
             .from('sales_orders')
@@ -805,9 +811,10 @@ const ReportGenerator = ({ isCollapsed }) => {
           const { data: salesData, error: salesError } = await salesQuery;
           if (salesError) throw salesError;
 
+          // Also fetch work orders for consolidated view
           const workQuery = supabase
             .from('work_orders')
-            .select('work_order_id, mr_number, advance_details, created_at, updated_at, branch, customer_id')
+            .select('work_order_id, advance_details, mr_number, created_at, updated_at, branch, customer_id')
             .gte('created_at', startStr)
             .lte('created_at', endStr);
 
@@ -818,54 +825,34 @@ const ReportGenerator = ({ isCollapsed }) => {
           const { data: workData, error: workError } = await workQuery;
           if (workError) throw workError;
 
-          const mrNumbers = [
-            ...salesData.map(sale => sale.mr_number),
-            ...workData.map(work => work.mr_number)
-          ].filter(mr => mr !== null && mr !== '');
+          // Create customer and patient maps
+          const customerMap = {};
+          customers.forEach(customer => {
+            customerMap[customer.customer_id] = customer.name;
+          });
 
-          const customerIds = [
-            ...salesData.map(sale => sale.customer_id),
-            ...workData.map(work => work.customer_id)
-          ].filter(id => id !== null && id !== '');
+          const patientMap = {};
+          patients.forEach(patient => {
+            patientMap[patient.mr_number] = patient.name;
+          });
 
-          const { data: patientsData, error: patientsError } = await supabase
-            .from('patients')
-            .select('mr_number, name')
-            .in('mr_number', mrNumbers);
+          // Fix: Correctly identify OPD sales
+          const opdSales = salesData.filter(sale =>
+            sale.work_order_id?.startsWith('OPW-') ||
+            sale.sales_order_id?.startsWith('OPS-')
+          );
 
-          if (patientsError) throw patientsError;
-
-          const { data: customersData, error: customersError } = await supabase
-            .from('customers')
-            .select('customer_id, name')
-            .in('customer_id', customerIds);
-
-          if (customersError) throw customersError;
-
-          const patientMap = Object.fromEntries(patientsData.map(p => [p.mr_number, p.name]));
-          const customerMap = Object.fromEntries(customersData.map(c => [c.customer_id, c.name]));
-
-          const { data: opdSalesData, error: opdError } = await supabase
-            .from('sales_orders')
-            .select('total_amount')
-            .like('work_order_id', 'OPW-%')
-            .gte('created_at', startStr)
-            .lte('created_at', endStr);
-
-          if (opdError) throw opdError;
-
-          const totalOPD = opdSalesData.reduce((sum, order) =>
+          const totalOPD = opdSales.reduce((sum, order) =>
             sum + (parseFloat(order.total_amount) || 0), 0
           );
 
           // Add totalOPD to reportDetails
           reportDetails.totalOPD = totalOPD;
 
+          // Create consolidated sales
           const consolidatedSales = salesData.map(sale => {
             let customerName = customerMap[sale.customer_id] || 'N/A';
             const totalGST = (parseFloat(sale.cgst) || 0) + (parseFloat(sale.sgst) || 0);
-
-
 
             return {
               sales_order_id: sale.sales_order_id || 'N/A',
@@ -874,9 +861,9 @@ const ReportGenerator = ({ isCollapsed }) => {
               total_amount: parseFloat(sale.total_amount) || 0,
               total_gst: totalGST,
               discount: parseFloat(sale.discount) || 0,
-              advance_collected: 0,
-              balance_collected: parseFloat(sale.final_amount) || 0,
-              total_collected: parseFloat(sale.final_amount) || 0,
+              advance_collected: parseFloat(sale.advance_details) || 0,
+              balance_collected: parseFloat(sale.total_amount || 0) - parseFloat(sale.advance_details || 0),
+              total_collected: parseFloat(sale.total_amount) || 0,
               patient_customer_name: patientMap[sale.mr_number] || customerName || 'N/A',
               branch: sale.branch || 'N/A',
               created_at: sale.created_at ? formatDateDDMMYYYY(sale.created_at, true) : 'N/A',
@@ -884,6 +871,7 @@ const ReportGenerator = ({ isCollapsed }) => {
             };
           });
 
+          // Create consolidated work orders
           const consolidatedWork = workData.map(work => {
             let customerName = customerMap[work.customer_id] || 'N/A';
 
@@ -1964,23 +1952,6 @@ const ReportGenerator = ({ isCollapsed }) => {
     }
   };
 
-  // const reportTypes = isEmployee ? [
-  //   { value: 'consolidated', label: 'Consolidated' },
-  //   { value: 'stock_report', label: 'Stock Report' },
-  //   { value: 'purchase_report', label: 'Purchase Report' },
-  //   { value: 'stock_assignments', label: 'Stock Assignments' },
-  // ] : [
-  //   { value: 'sales_orders', label: 'Sales Orders' },
-  //   { value: 'work_orders', label: 'Work Orders' },
-  //   { value: 'privilegecards', label: 'Privilege Cards' },
-  //   { value: 'product_sales', label: 'Product Sales' },
-  //   { value: 'modification_reports', label: 'Modification Reports' },
-  //   { value: 'consolidated', label: 'Consolidated' },
-  //   { value: 'stock_report', label: 'Stock Report' },
-  //   { value: 'purchase_report', label: 'Purchase Report' },
-  //   { value: 'stock_assignments', label: 'Stock Assignments' },
-  //   { value: 'credit_debit_notes', label: 'Credit and Debit Note' },
-  // ];
 
   const reportTypes = isEmployee ? [
     { value: 'consolidated', label: 'Consolidated' },

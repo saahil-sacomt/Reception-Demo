@@ -2008,9 +2008,6 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
 
   // Function to save the sales order
   const saveSalesOrder = async () => {
-
-
-
     if (isSaving || submitted) {
       alert(submitted ? "Sales order already submitted" : "Please wait while saving...");
       return;
@@ -2024,8 +2021,6 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         validationErrors: {}
       }
     });
-
-    dispatch({ type: "SET_SALES_ORDER_FORM", payload: { isSaving: true } });
 
     // Validation Checks
     const validations = [
@@ -2059,12 +2054,17 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
 
     for (const validation of validations) {
       if (validation.condition) {
-        setValidationErrors((prev) => ({
-          ...prev,
-          [validation.errorKey]: validation.message,
-        }));
+        dispatch({
+          type: "SET_SALES_ORDER_FORM",
+          payload: {
+            isSaving: false,
+            validationErrors: {
+              ...validationErrors,
+              [validation.errorKey]: validation.message
+            }
+          }
+        });
         validation.ref.current?.focus();
-        dispatch({ type: "SET_SALES_ORDER_FORM", payload: { isSaving: false } });
         return;
       }
     }
@@ -2084,7 +2084,13 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     });
 
     if (Object.keys(productErrors).length > 0) {
-      setValidationErrors(productErrors);
+      dispatch({
+        type: "SET_SALES_ORDER_FORM",
+        payload: {
+          isSaving: false,
+          validationErrors: productErrors
+        }
+      });
       const firstErrorKey = Object.keys(productErrors)[0];
       if (
         firstErrorKey.startsWith("productId") ||
@@ -2094,19 +2100,10 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         const index = parseInt(firstErrorKey.split("-")[1], 10);
         quantityRefs.current[index]?.focus();
       }
-      dispatch({ type: "SET_SALES_ORDER_FORM", payload: { isSaving: false } });
       return;
     }
 
     try {
-      // Generate new sales order ID
-      // const newSalesOrderId = await generateSalesOrderId(branch);
-      // if (!newSalesOrderId) {
-      //   alert("Failed to generate sales order ID");
-      //   dispatch({ type: "SET_SALES_ORDER_FORM", payload: { isSaving: false } });
-      //   return;
-      // }
-
       // Calculate amounts
       const {
         subtotalWithGST,
@@ -2134,6 +2131,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
 
       // Calculate loyalty points
       const { updatedPoints, pointsToRedeem, pointsToAdd } = calculateLoyaltyPoints(
+        parseFloat(amountAfterDiscount), // Use amountAfterDiscount instead of subtotalWithGST
         parseFloat(subtotalWithGST),
         parseFloat(redeemPointsAmount),
         privilegeCard,
@@ -2143,18 +2141,13 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
 
       // Prepare the payload
       const payload = {
-        sales_order_id: salesOrderId, // Use the formatted ID
+        sales_order_id: salesOrderId,
         branch,
         sub_role: subRole,
         work_order_id: selectedWorkOrder?.work_order_id || 'GENERAL',
         employee,
-        // due_date: dueDate,
         mr_number: mrNumber,
-        // customer_name: customerName,
         patient_phone: customerPhone,
-        // customer_address: address,
-        // customer_age: age,
-        // customer_gender: gender,
         payment_method: paymentMethod,
         discount: parseFloat(discount) || 0,
         advance_details: parseFloat(advanceDetails) || 0,
@@ -2162,8 +2155,6 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         subtotal: parseFloat(subtotalWithoutGST),
         cgst: parseFloat(cgstAmount),
         sgst: parseFloat(sgstAmount),
-        // is_b2b: isB2B,
-        // gst_number: gstNumber,
         product_entries: productEntries.map((entry) => ({
           product_id: entry.id,
           quantity: parseInt(entry.quantity, 10),
@@ -2182,17 +2173,24 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
 
       if (insertError) {
         console.error("Error inserting sales order:", insertError);
-        alert("An error occurred while saving the sales order. Please try again.");
-        dispatch({ type: "SET_SALES_ORDER_FORM", payload: { isSaving: false } });
+        dispatch({
+          type: "SET_SALES_ORDER_FORM",
+          payload: {
+            isSaving: false,
+            validationErrors: {
+              generalError: "An error occurred while saving the sales order. Please try again."
+            }
+          }
+        });
         return;
       }
 
       // Update loyalty points if applicable
-      if (privilegeCard) {
-        const { data, error } = await supabase
+      if (privilegeCard && privilegeCardDetails) {
+        const { error } = await supabase
           .from("privilegecards")
           .update({ loyalty_points: updatedPoints })
-          .eq("pc_number", privilegeCard);
+          .eq("pc_number", privilegeCardDetails.pc_number);
 
         if (error) {
           console.error("Error updating loyalty points:", error);
@@ -2201,13 +2199,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         }
       }
 
-      console.log("Sales order saved successfully:", payload);
-
-
-
-
-      // If everything is successful
-      alert("Sales order saved successfully!");
+      // Update state to show success and enable print button
+      // CRITICAL: Make sure this runs BEFORE the session storage is removed
       dispatch({
         type: "SET_SALES_ORDER_FORM",
         payload: {
@@ -2215,21 +2208,12 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
           allowPrint: true,
           isSaving: false,
           isPrinted: false,
-          // salesOrderId: orderId,
-          // Don't reset other form fields
+          // DON'T reset the step - keep it at 5 to show print and exit buttons
         }
       });
-      console.log("hui1");
 
-
-      setTimeout(() => {
-        if (printButtonRef.current) {
-          printButtonRef.current.focus();
-        }
-      }, 300);
-
-      console.log("hui2");
-
+      // Remove form state from sessionStorage
+      // sessionStorage.removeItem('salesOrderFormState');
 
     } catch (err) {
       console.error("Error saving sales order:", err);
@@ -2244,7 +2228,6 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
       });
     }
   };
-
   return (
     <div
       className={`transition-all duration-300 ${isCollapsed ? "mx-20" : "mx-20 px-20"
@@ -3979,38 +3962,28 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                     </div>
                   </div>
 
-                  {/* Footer Section */}
-                  {/* <div className="flex-col justify-start mx-auto items-start text-left text-md">
-                    <ol className="list-decimal list-inside">
-                      <p className="mt-2 text-xs">
-                        Terms and Conditions:
-                        <li>Work order valid only for two months.</li>
-                        <li>
-                          Branded Frames/Lenses – 12 Months warranty for
-                          manufacturing defects/peeling off.
-                        </li>
-                      </p>
-                    </ol>
-                  </div> */}
+
                 </div>
               </div>
 
               {/* Action Buttons Outside Printable Area */}
+              {/* Action Buttons Outside Printable Area */}
               <div className="flex justify-center text-center space-x-4 mt-6">
-                {!submitted && (
+                {!submitted && step === 5 && (
                   <button
                     type="button"
                     onClick={saveSalesOrder}
                     ref={saveOrderRef}
                     className="flex items-center justify-center w-44 h-12 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition"
-                    disabled={isSaving || submitted}
+                    disabled={isSaving}
                     aria-label="Save Sales Order"
                   >
                     {isSaving ? "Saving..." : "Save Sales Order"}
                   </button>
                 )}
 
-                {submitted && allowPrint && (
+                {/* Critical fix: Force display after submission */}
+                {submitted && (
                   <>
                     <button
                       type="button"
