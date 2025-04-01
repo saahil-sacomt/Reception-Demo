@@ -250,7 +250,8 @@ function calculateAmounts(
   privilegeCard,
   privilegeCardDetails,
   redeemPointsAmount,
-  loyaltyPoints
+  loyaltyPoints,
+  insuranceInfo
 ) {
   // Constants for GST rates
   const CGST_RATE = 0.06; // 6%
@@ -314,6 +315,15 @@ function calculateAmounts(
     balanceDue = Math.max(balanceDue, 0);
   }
 
+  let insuranceDeduction = 0;
+  if (insuranceInfo) {
+    insuranceDeduction = parseFloat(insuranceInfo.approved_amount) || 0;
+    // Ensure deduction doesn't exceed balance
+    insuranceDeduction = Math.min(insuranceDeduction, balanceDue);
+    balanceDue -= insuranceDeduction;
+    balanceDue = Math.max(balanceDue, 0); // Ensure non-negative
+  }
+
   // **Step 6: Final Payment Due**
   const finalAmount = balanceDue.toFixed(2); // Final amount after all deductions
 
@@ -330,6 +340,9 @@ function calculateAmounts(
     balanceDue: balanceDue.toFixed(2),
     privilegeDiscount: privilegeDiscount.toFixed(2),
     finalAmount,
+    insuranceDeduction: insuranceDeduction.toFixed(2),
+    // balanceDue: balanceDue.toFixed(2),
+    // finalAmount,
   };
 }
 
@@ -1218,6 +1231,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     balanceDue,
     privilegeDiscount,
     finalAmount,
+    insuranceDeduction,
   } = useMemo(() => {
     return calculateAmounts(
       productEntries,
@@ -1227,7 +1241,9 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
       privilegeCard,
       privilegeCardDetails,
       redeemPointsAmount,
-      loyaltyPoints
+      loyaltyPoints,
+      salesOrderForm.insuranceInfo // Pass insurance info here
+
     );
   }, [
     productEntries,
@@ -1238,6 +1254,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     privilegeCardDetails,
     redeemPointsAmount,
     loyaltyPoints,
+    salesOrderForm.insuranceInfo,
   ]);
 
   // Function to fetch patient by MR number
@@ -1523,6 +1540,29 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
       return;
     }
 
+    let insuranceInfo = null;
+    if (selectedWorkOrder.is_insurance) {
+      try {
+        // Fetch insurance claim based on MR number
+        const { data: claimData, error: claimError } = await supabase
+          .from("insurance_claims")
+          .select("*")
+          .eq("mr_number", selectedWorkOrder.mr_number)
+          .eq("status", "pending") // Only get approved claims
+          .order("created_at", { ascending: false })
+          .limit(1);
+
+        if (claimError) {
+          console.error("Error fetching insurance claim:", claimError);
+        } else if (claimData && claimData.length > 0) {
+          insuranceInfo = claimData[0];
+          console.log("Insurance claim found:", insuranceInfo);
+        }
+      } catch (err) {
+        console.error("Error processing insurance claim:", err);
+      }
+    }
+
     // Update global state
     updateSalesOrderForm({
       mrNumber: selectedWorkOrder.mr_number,
@@ -1530,12 +1570,17 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
       hasMrNumber: selectedWorkOrder.mr_number ? "yes" : "no",
       productEntries: normalizedProducts,
       workOrderDiscount: selectedWorkOrder.discount_amount || 0,
+      insuranceInfo: insuranceInfo, // Add insurance info to state
     });
 
     setOriginalProductEntries(normalizedProducts);
     setShowWorkOrderModal(false);
 
     // Automatically fetch patient or customer details
+    const consultantFromWorkOrder = selectedWorkOrder.consultant_name || '';
+
+
+
     if (selectedWorkOrder.mr_number) {
       const patient = await fetchPatientByMRNumber(
         selectedWorkOrder.mr_number.trim()
@@ -1639,6 +1684,9 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         });
       }
     }
+    setConsultantName(consultantFromWorkOrder);
+    console.log("Consultant Name from Work Order:", consultantFromWorkOrder);
+
 
     // Move to the next step
     updateSalesOrderForm({ step: 1 });
@@ -4248,6 +4296,23 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                     </div>
                   </div>
 
+                  {step === 5 && salesOrderForm.insuranceInfo && (
+                    <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <h3 className="font-semibold text-blue-800">Insurance Information</h3>
+                      <div className="grid grid-cols-2 gap-2 mt-2">
+                        <div>
+                          <p className="text-sm text-gray-600">Insurance Provider:</p>
+                          <p className="font-medium">{salesOrderForm.insuranceInfo.insurance_name}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-600">Approved Amount:</p>
+                          <p className="font-medium">₹{parseFloat(salesOrderForm.insuranceInfo.approved_amount).toFixed(2)}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+
                   {/* Customer Details */}
                   <div className="mb-6">
                     <p>
@@ -4322,6 +4387,17 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                     </p>
                   </div>
 
+                  {selectedWorkOrder.is_insurance && (
+                    <div className="mt-2 p-2 bg-blue-50 rounded-md">
+                      <p className="font-medium text-blue-800">Insurance Work Order</p>
+                      <p>
+                        <strong>Insurance:</strong>{" "}
+                        {selectedWorkOrder.insurance_name || "Not specified"}
+                      </p>
+                      {/* We'll fetch and show the approved amount during confirmation */}
+                    </div>
+                  )}
+
                   {/* Product Table */}
                   <table className="w-full border-collapse mb-6">
                     <thead>
@@ -4365,81 +4441,30 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
 
                   {/* Financial Summary */}
                   <div className="flex justify-between mb-6 space-x-8">
-                    <div>
-                      {/* Subtotal Including GST */}
-
-                      {/* Work Order and Sales Discounts */}
-                      {/* <p>
-                        Work Order Discount:
-                        <strong>
-                          {" "}
-                          ₹{parseFloat(workOrderDiscount).toFixed(2)}
-                        </strong>
-                      </p>
-                      <p>
-                        Sales Discount:
-                        <strong> ₹{parseFloat(discount || 0).toFixed(2)}</strong>
-                      </p>
-                      <p>
-                        Total Discount:
-                        <strong>
-                          {" "}
-                          ₹{parseFloat(totalDiscount).toFixed(2)}
-                        </strong>
-                      </p> */}
-
-                      {/* Amount After Discounts */}
-                      {/* <p>
-                        Advance Paid:
-                        <strong> ₹{parseFloat(advance).toFixed(2)}</strong>
-                      </p> */}
-                      {/* <p>
-                        Balance paid:{" "}
-                        <strong>
-                          <span>₹{parseFloat(balanceDue).toFixed(2)}</span>
-                        </strong>
-                      </p> */}
-
-                      {/* <p>
-                        Payment Method:
-                        <strong>
-                          {" "}
-                          {paymentMethod.charAt(0).toUpperCase() +
-                            paymentMethod.slice(1)}
-                        </strong>
-                      </p> */}
-                    </div>
 
                     <div>
-                      {/* <p className="text-lg">
-                        <strong>
-                          Amount After Discounts: ₹
-                          {parseFloat(subtotalWithGST).toFixed(2)}
-                        </strong>
-                      </p> */}
-                      {/* Taxable Value and GST Breakdown */}
+
                       <p>
                         Total Amount:
                         <strong> ₹{parseFloat(taxableValue).toFixed(2)}</strong>
                       </p>
-                      {/* <p>
-                        CGST (6%):
-                        <strong> ₹{parseFloat(cgstAmount).toFixed(2)}</strong>
+
+                      {/* Add insurance deduction if applicable */}
+                      {salesOrderForm.insuranceInfo && (
+                        <p className="text-blue-600">
+                          Insurance Coverage:
+                          <strong> -₹{parseFloat(salesOrderForm.insuranceInfo.approved_amount).toFixed(2)}</strong>
+                        </p>
+                      )}
+
+                      <p className="font-bold">
+                        Final Amount Due:
+                        <strong> ₹{
+                          salesOrderForm.insuranceInfo
+                            ? (parseFloat(taxableValue) - parseFloat(salesOrderForm.insuranceInfo.approved_amount)).toFixed(2)
+                            : parseFloat(taxableValue).toFixed(2)
+                        }</strong>
                       </p>
-                      <p>
-                        SGST (6%):
-                        <strong> ₹{parseFloat(sgstAmount).toFixed(2)}</strong>
-                      </p> */}
-                      {/* Advance Paid */}
-
-                      {/* Final Amount Due */}
-
-                      {/* <p className="text-xl">
-                        <strong>
-                          Total Paid (Incl. GST): ₹
-                          {parseFloat(amountAfterDiscount).toFixed(2)}
-                        </strong>
-                      </p> */}
 
                       {/* Billed By */}
                       <div className="mt-4">
