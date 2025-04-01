@@ -785,56 +785,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
   };
 
 
-  useEffect(() => {
-    // Only generate a new SalesOrderId if we don't already have one AND the form hasn't been submitted
-    if (!salesOrderForm.salesOrderId && !isEditing && !submitted) {
-      generateSalesOrderId(branch);
-    }
-  }, [selectedWorkOrder, branch, submitted, isEditing]);
-
-  // Function to fetch and set a new sales ID when the branch is available
-
-  // const generateSalesOrderId = async (branch) => {
-  //   try {
-  //     const { data, error } = await supabase
-  //       .from("sales_orders")
-  //       .select("sales_order_id")
-  //       .order("created_at", { ascending: false })
-  //       .limit(1);
-
-  //     if (error) {
-  //       console.error("Error fetching latest sales order ID:", error);
-  //       return;
-  //     }
-
-  //     const latestSalesOrderId = data.length > 0 ? data[0].sales_order_id : null;
-  //     const currentYear = new Date().getFullYear();
-  //     const branchCode = branch ? branch.substring(0, 3).toUpperCase() : "BRN";
-
-  //     let newSalesOrderId;
-
-  //     if (latestSalesOrderId) {
-  //       const [prefix, year, count] = latestSalesOrderId.split("-");
-  //       const newCount = parseInt(count, 10) + 1;
-  //       newSalesOrderId = `${prefix}-${year}-${String(newCount).padStart(4, "0")}`;
-  //     } else {
-  //       newSalesOrderId = `${branchCode}-${currentYear}-0001`;
-  //     }
-
-  //     // Append OPS or CRS based on selected work order
-  //     if (selectedWorkOrder && selectedWorkOrder.work_order_id) {
-  //       if (selectedWorkOrder.work_order_id.includes("OPD")) {
-  //         newSalesOrderId += "-OPS";
-  //       } else if (selectedWorkOrder.work_order_id.includes("counselling")) {
-  //         newSalesOrderId += "-CRS";
-  //       }
-  //     }
-
-  //     return newSalesOrderId;
-  //   } catch (error) {
-  //     console.error("Error generating new sales order ID:", error);
-  //   }
-  // };
+  
 
   const fetchSalesOrderId = async () => {
     if (branch && !isEditing) {
