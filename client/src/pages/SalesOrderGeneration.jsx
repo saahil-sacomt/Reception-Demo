@@ -759,12 +759,15 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
 
         if (workOrderId && workOrderId.startsWith("OPW")) {
           // Format for OPW work orders
+          console.log("Generating ID for OPW work order");
+
           newSalesOrderId = `OPS-${opNumber}-${String(nextId).padStart(3, "0")}`;
         } else if (workOrderId && workOrderId.startsWith("CR")) {
           // Format for CR work orders
           newSalesOrderId = `CRS-${opNumber}-${String(nextId).padStart(3, "0")}`;
         } else {
           // Default format if work order type cannot be determined
+          console.log("Generating ID for general sales order");
           newSalesOrderId = `GNS-${String(nextId).padStart(5, "0")}`;
         }
       } else {
@@ -785,7 +788,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
   };
 
 
-  
+
 
   const fetchSalesOrderId = async () => {
     if (branch && !isEditing) {
@@ -1043,13 +1046,6 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     }
   }, [orderId]);
 
-  useEffect(() => {
-    if (branch) {
-      console.log("Fetching sales ID for branch:", branch);
-      fetchSalesOrderId();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [branch]);
 
   const {
     subtotalWithGST,
@@ -1358,6 +1354,24 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
       console.error("Branch is undefined. Cannot normalize products.");
       return;
     }
+
+    // IMPORTANT FIX: Generate sales order ID based on selected work order FIRST
+    console.log("Work Order ID:", selectedWorkOrder.work_order_id);
+    const newSalesOrderId = await generateSalesOrderId(branch);
+
+    if (!newSalesOrderId) {
+      updateSalesOrderForm({
+        validationErrors: {
+          ...validationErrors,
+          generalError: "Failed to generate sales order ID"
+        }
+      });
+      return;
+    }
+
+    console.log("Generated Sales Order ID:", newSalesOrderId);
+
+
 
     // Normalize products with branch
     const normalizedProducts = await normalizeWorkOrderProducts(
