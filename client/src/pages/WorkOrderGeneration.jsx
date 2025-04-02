@@ -158,15 +158,47 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   const [showInsuranceModal, setShowInsuranceModal] = useState(false);
   const [consultantName, setConsultantName] = useState('');
   const [consultantList, setConsultantList] = useState([
-    "Dr. Ashad Sivaraman",
-    "Dr. Harshali Yadav",
-    "Dr. Swapna Nair",
-    "Dr. Anoop Sivaraman",
-    "Dr. Anila George",
-    "Dr. Arvin Ponnat",
-    "Dr. Shabna",
-    "Dr. Malavika. G",
+
   ]);
+  useEffect(() => {
+    // Base consultant list for all branches
+    const baseConsultants = [
+      "Dr. Ashad Sivaraman",
+      "Dr. Harshali Yadav",
+      "Dr. Swapna Nair",
+      "Dr. Anoop Sivaraman",
+      "Dr. Anila George",
+      "Dr. Arvin Ponnat",
+      "Dr. Shabna",
+      "Dr. Malavika. G",
+    ];
+
+    // Additional consultants for Kottarakara branch
+    const kottarakaraConsultants = [
+      "Dr. Pinki",
+      "Dr. Anuprabha",
+      "Dr. Shihail Jinna",
+      "Dr. Rajalekshmi",
+      "Dr. Anupama Sreevalsan",
+      "Dr. Devendra Maheswari",
+      "Dr. Renjith Nathan"
+    ];
+
+    // Additional consultants for Trivandrum branch
+    const trivandrumConsultants = [
+      "Dr. Sandton"
+    ];
+
+    // Set appropriate consultant list based on branch
+    if ((branch === "KOT2") || (branch === "KOT1")) {
+      setConsultantList([...baseConsultants, ...kottarakaraConsultants]);
+    } else if (branch === "TVR") {
+      setConsultantList([...baseConsultants, ...trivandrumConsultants]);
+    } else {
+      setConsultantList(baseConsultants);
+    }
+  }, [branch]);
+
   const [useManualConsultant, setUseManualConsultant] = useState(false);
 
 

@@ -357,7 +357,52 @@ const Consulting = memo(({ isCollapsed, onModificationSuccess }) => {
     // console.log("subRole:", subRole); // Destructure subRole from AuthContext
     const [validationErrors, setValidationErrors] = useState({});
 
+    const [selectedConsultant, setSelectedConsultant] = useState('');
+    const [consultantName, setConsultantName] = useState('');
+    const [useManualConsultant, setUseManualConsultant] = useState(false);
+    const [consultantList, setConsultantList] = useState([])
 
+
+    // Add this useEffect to populate consultants based on branch
+    // In WorkOrderGeneration.jsx - Update the useEffect that sets consultantList
+    useEffect(() => {
+        // Base consultant list for all branches
+        const baseConsultants = [
+            "Dr. Ashad Sivaraman",
+            "Dr. Harshali Yadav",
+            "Dr. Swapna Nair",
+            "Dr. Anoop Sivaraman",
+            "Dr. Anila George",
+            "Dr. Arvin Ponnat",
+            "Dr. Shabna",
+            "Dr. Malavika. G",
+        ];
+
+        // Additional consultants for Kottarakara branch
+        const kottarakaraConsultants = [
+            "Dr. Pinki",
+            "Dr. Anuprabha",
+            "Dr. Shihail Jinna",
+            "Dr. Rajalekshmi",
+            "Dr. Anupama Sreevalsan",
+            "Dr. Devendra Maheswari",
+            "Dr. Renjith Nathan"
+        ];
+
+        // Additional consultants for Trivandrum branch
+        const trivandrumConsultants = [
+            "Dr. Sandton"
+        ];
+
+        // Set appropriate consultant list based on branch
+        if ((branch === "KOT2") || (branch === "KOT1")) {
+            setConsultantList([...baseConsultants, ...kottarakaraConsultants]);
+        } else if (branch === "TVR") {
+            setConsultantList([...baseConsultants, ...trivandrumConsultants]);
+        } else {
+            setConsultantList(baseConsultants);
+        }
+    }, [branch]);
 
     const { state, dispatch, resetState } = useGlobalState(); // Access global state
     const { salesOrderForm } = state;
@@ -2705,6 +2750,7 @@ const Consulting = memo(({ isCollapsed, onModificationSuccess }) => {
                 subtotal: parseFloat(subtotalWithoutGST),
                 cgst: parseFloat(cgstAmount),
                 sgst: parseFloat(sgstAmount),
+                consultant_name: consultantName,
                 // is_b2b: isB2B,
                 // gst_number: gstNumber,
                 product_entries: productEntries.map((entry) => ({
@@ -4303,6 +4349,46 @@ const Consulting = memo(({ isCollapsed, onModificationSuccess }) => {
                                                     ? `${patientDetails?.phone_number || "N/A"}`
                                                     : `${customerPhone || "N/A"}`}
                                             </strong>
+                                        </p>
+                                        {/* Add this in the printable area, similar to where patient/customer details are displayed */}
+                                        <p className="mt-2">
+                                            <label>Consultant:</label>
+                                            {!useManualConsultant && (
+                                                <select
+                                                    value={consultantName}
+                                                    onChange={(e) => setConsultantName(e.target.value)}
+                                                    className="border border-gray-300 px-2 py-1 rounded-lg ml-2"
+                                                >
+                                                    <option value="">Select Consultant</option>
+                                                    {consultantList.map((consultant, idx) => (
+                                                        <option key={idx} value={consultant}>
+                                                            {consultant}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            )}
+
+                                            <div className="mt-2">
+                                                <label>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={useManualConsultant}
+                                                        onChange={(e) => setUseManualConsultant(e.target.checked)}
+                                                        className="mr-2"
+                                                    />
+                                                    Enter Manually
+                                                </label>
+                                            </div>
+
+                                            {useManualConsultant && (
+                                                <input
+                                                    type="text"
+                                                    placeholder="Enter consultant name"
+                                                    value={consultantName}
+                                                    onChange={(e) => setConsultantName(e.target.value)}
+                                                    className="border border-gray-300 px-2 py-1 rounded-lg mt-2 w-full"
+                                                />
+                                            )}
                                         </p>
                                     </div>
 
