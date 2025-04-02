@@ -269,80 +269,104 @@ const Home = ({ isCollapsed }) => {
     return data;
   };
 
-  // **Modified: Fetch sales order details along with customer/patient details**
+  // Fetch sales order details with product entries
   const fetchSalesOrderDetails = async (salesOrderId) => {
-    const { data, error } = await supabase
-      .from('sales_orders')
-      .select('*')
-      .eq('sales_order_id', salesOrderId)
-      .single();
+    try {
+      // 1. Fetch the basic sales order data
+      const { data, error } = await supabase
+        .from('sales_orders')
+        .select('*')
+        .eq('sales_order_id', salesOrderId)
+        .single();
 
-    if (error) {
-      console.error("Error fetching sales order details:", error.message);
-      alert("Failed to fetch sales order details.");
+      if (error) {
+        console.error("Error fetching sales order details:", error.message);
+        alert("Failed to fetch sales order details.");
+        return null;
+      }
+
+      // 2. Fetch the product entries for this sales order
+      const { data: productEntries, error: productError } = await supabase
+        .from('product_entries')
+        .select('*')
+        .eq('sales_order_id', salesOrderId);
+
+      if (productError) {
+        console.error("Error fetching product entries:", productError.message);
+      }
+
+      // 3. Get customer details
+      let customerDetails = {};
+
+      if (data.mr_number) {
+        // Fetch patient details
+        const { data: patientData, error: patientError } = await supabase
+          .from('patients')
+          .select('name, age, gender, address')
+          .eq('mr_number', data.mr_number)
+          .single();
+
+        if (!patientError && patientData) {
+          customerDetails = {
+            name: patientData.name,
+            age: patientData.age,
+            gender: patientData.gender,
+            address: patientData.address,
+          };
+        } else {
+          console.error("Error fetching patient details:", patientError?.message);
+          customerDetails = {
+            name: 'N/A',
+            age: 'N/A',
+            gender: 'N/A',
+            address: 'N/A',
+          };
+        }
+      } else if (data.customer_id) {
+        // Fetch customer details
+        const { data: customerData, error: customerError } = await supabase
+          .from('customers')
+          .select('name, age, gender, address')
+          .eq('customer_id', data.customer_id)
+          .single();
+
+        if (!customerError && customerData) {
+          customerDetails = {
+            name: customerData.name,
+            age: customerData.age,
+            gender: customerData.gender,
+            address: customerData.address,
+          };
+        } else {
+          console.error("Error fetching customer details:", customerError?.message);
+          customerDetails = {
+            name: 'N/A',
+            age: 'N/A',
+            gender: 'N/A',
+            address: 'N/A',
+          };
+        }
+      } else {
+        customerDetails = {
+          name: 'N/A',
+          age: 'N/A',
+          gender: 'N/A',
+          address: 'N/A',
+        };
+      }
+
+      // 4. Return combined data
+      return {
+        ...data,
+        items: productEntries || [], // Ensure items is always an array
+        customerDetails
+      };
+
+    } catch (err) {
+      console.error("Error in fetchSalesOrderDetails:", err);
+      alert("An unexpected error occurred while fetching sales order details.");
       return null;
     }
-
-    let customerDetails = {};
-
-    if (data.mr_number) {
-      // Fetch patient details
-      const { data: patientData, error: patientError } = await supabase
-        .from('patients')
-        .select('name, age, gender, address')
-        .eq('mr_number', data.mr_number)
-        .single();
-
-      if (!patientError && patientData) {
-        customerDetails = {
-          name: patientData.name,
-          age: patientData.age,
-          gender: patientData.gender,
-          address: patientData.address,
-        };
-      } else {
-        console.error("Error fetching patient details:", patientError.message);
-        customerDetails = {
-          name: 'N/A',
-          age: 'N/A',
-          gender: 'N/A',
-          address: 'N/A',
-        };
-      }
-    } else if (data.customer_id) {
-      // Fetch customer details
-      const { data: customerData, error: customerError } = await supabase
-        .from('customers')
-        .select('name, age, gender, address')
-        .eq('customer_id', data.customer_id)
-        .single();
-
-      if (!customerError && customerData) {
-        customerDetails = {
-          name: customerData.name,
-          age: customerData.age,
-          gender: customerData.gender,
-          address: customerData.address,
-        };
-      } else {
-        console.error("Error fetching customer details:", customerError.message);
-        customerDetails = {
-          name: 'N/A',
-          age: 'N/A',
-          gender: 'N/A',
-          address: 'N/A',
-        };
-      }
-    } else {
-      customerDetails = {
-        name: 'N/A',
-        age: 'N/A',
-        gender: 'N/A',
-        address: 'N/A',
-      };
-    }
-
-    return { ...data, customerDetails };
   };
 
   // Acknowledge rejection of a modification request
@@ -1386,7 +1410,7 @@ const Home = ({ isCollapsed }) => {
                           </tr>
                         </thead>
                         <tbody>
-                          {selectedSalesOrder.items.map((product, index) => {
+                          {selectedSalesOrder.items && selectedSalesOrder.items.map((product, index) => {
                             const price = parseFloat(product.price) || 0;
                             const quantity = parseInt(product.quantity) || 0;
                             const total = price * quantity;
