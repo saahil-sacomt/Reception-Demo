@@ -402,148 +402,6 @@ import React, {
     // GST Rate and HSN Code
     const GST_RATE = 12; // Total GST is 12% (6% CGST + 6% SGST)
   
-    // Calculate totals
-    // const calculateTotals = useCallback((entries, discountAmt) => {
-    //   // Initialize variables
-    //   let subtotal = 0;
-    //   let validDiscountAmount = 0;
-    //   let discountedSubtotal = 0;
-    //   let cgst = 0;
-    //   let sgst = 0;
-    //   let totalAmount = 0;
-    //   let totalAmountWithGST = 0;
-    //   let discountedTotal = 0;
-    //   let discountedSubtotalwithoutGST = 0;
-  
-    //   // Calculate subtotal (price excluding GST)
-    //   subtotal = entries.reduce((total, product) => {
-    //     const price = parseFloat(product.price) || 0; // MRP including GST
-    //     const quantity = parseInt(product.quantity) || 0;
-    //     const basePrice = price; // Adjusted price excluding GST
-    //     return total + basePrice * quantity;
-    //   }, 0);
-  
-    //   // Calculate total amount including GST (price * quantity)
-    //   totalAmountWithGST = entries.reduce((total, product) => {
-    //     const price = parseFloat(product.price) || 0; // MRP including GST
-    //     const quantity = parseInt(product.quantity) || 0;
-    //     return total + price * quantity;
-    //   }, 0);
-  
-    //   // Apply discount
-    //   validDiscountAmount = Math.min(discountAmt || 0, subtotal);
-    //   discountedSubtotal = Math.max(
-    //     (subtotal - validDiscountAmount),
-    //     0
-    //   ); // Prevent negative subtotal
-    //   discountedSubtotalwithoutGST = discountedSubtotal / 1.12;
-    //   // Calculate GST amounts
-    //   cgst = discountedSubtotalwithoutGST * 0.06;
-    //   sgst = discountedSubtotalwithoutGST * 0.06;
-  
-  
-  
-    //   // Calculate total amount including GST
-    //   totalAmount = discountedSubtotal + cgst + sgst;
-  
-    //   discountedTotal = totalAmountWithGST - validDiscountAmount;
-    //   totalAmountWithGST = discountedSubtotalwithoutGST + cgst + sgst;
-  
-    //   return {
-    //     subtotal,
-    //     discountAmount: validDiscountAmount,
-    //     discountedSubtotal,
-    //     cgst,
-    //     sgst,
-    //     totalAmount,
-    //     totalAmountWithGST,
-    //     discountedTotal,
-    //     discountedSubtotalwithoutGST,
-    //   };
-    // }, []);
-  
-    // Update the calculateTotals function to use product-specific GST rates
-    // Replace your existing calculateTotals function with this updated version
-    // Replace the calculateTotals function with this implementation
-    // const calculateTotals = useCallback((entries, discountAmt) => {
-    //   // Initialize variables
-    //   let subtotal = 0;
-    //   let validDiscountAmount = 0;
-    //   let discountedSubtotal = 0;
-    //   let totalCgst = 0;
-    //   let totalSgst = 0;
-    //   let totalAmount = 0;
-    //   let amtAfterDiscount = 0;
-  
-    //   // Calculate raw subtotal (price * quantity for all products)
-    //   subtotal = entries.reduce((total, product) => {
-    //     const price = parseFloat(product.price) || 0;
-    //     const quantity = parseInt(product.quantity) || 0;
-    //     return total + (price * quantity);
-    //   }, 0);
-  
-    //   // Apply discount
-    //   validDiscountAmount = Math.min(discountAmt || 0, subtotal);
-    //   discountedSubtotal = Math.max(subtotal - validDiscountAmount, 0); // Prevent negative subtotal
-  
-    //   // Calculate tax components for each product
-    //   let productTaxes = [];
-  
-    //   entries.forEach(product => {
-    //     const price = parseFloat(product.price) || 0;
-    //     const quantity = parseInt(product.quantity) || 0;
-    //     const productSubtotal = price * quantity;
-  
-    //     // Calculate this product's share of the discount proportionally
-    //     const discountShare = (productSubtotal / subtotal) * validDiscountAmount;
-    //     const productDiscountedSubtotal = productSubtotal - discountShare;
-  
-    //     // Get product-specific GST rates from database
-    //     const sgstRate = parseFloat(product.sgst || 6);
-    //     const cgstRate = parseFloat(product.cgst || 6);
-    //     const combinedTaxRate = sgstRate + cgstRate;
-  
-    //     // Calculate base amount (removing tax from the discounted price)
-    //     const productBaseAmount = productDiscountedSubtotal / (1 + (combinedTaxRate / 100));
-  
-    //     // Calculate SGST and CGST amounts based on the base amount
-    //     const productSgstAmount = productBaseAmount * (sgstRate / 100);
-    //     const productCgstAmount = productBaseAmount * (cgstRate / 100);
-  
-    //     productTaxes.push({
-    //       baseAmount: productBaseAmount,
-    //       sgstAmount: productSgstAmount,
-    //       cgstAmount: productCgstAmount
-    //     });
-  
-    //     // Add to totals
-    //     totalSgst += productSgstAmount;
-    //     totalCgst += productCgstAmount;
-    //   });
-  
-    //   // Calculate total base amount (amount after discount but before tax)
-    //   amtAfterDiscount = productTaxes.reduce((sum, tax) => sum + tax.baseAmount, 0);
-  
-    //   // Total amount with GST
-    //   totalAmount = amtAfterDiscount + totalSgst + totalCgst;
-  
-    //   return {
-    //     subtotal,
-    //     discountAmount: validDiscountAmount,
-    //     discountedSubtotal,
-    //     cgst: totalCgst,
-    //     sgst: totalSgst,
-    //     totalAmount,
-    //     totalAmountWithGST: totalAmount,
-    //     discountedTotal: totalAmount,
-    //     discountedSubtotalwithoutGST: amtAfterDiscount,
-    //   };
-    // }, []);
-  
-  
-  
-  
-  
   
     // Replace the existing calculateTotals function with this implementation
     const calculateTotals = useCallback((entries, discountAmt) => {
@@ -1167,50 +1025,7 @@ import React, {
               payload: { allowPrint: true, submitted: true },
             });
   
-            // try {
-            //   const { data: modReqData, error: modReqError } = await supabase
-            //     .from("modification_requests")
-            //     .select("id")
-            //     .eq("order_id", workOrderId)
-            //     .eq("order_type", "work_order")
-            //     .eq("status", "approved")
-            //     .single();
-  
-            //   if (modReqError) {
-            //     console.error("Error fetching modification request:", modReqError);
-            //     // Optionally alert the user or handle the error as needed
-            //   } else if (modReqData) {
-            //     const modificationRequestId = modReqData.id;
-            //     console.log(
-            //       "Attempting to update modification_request with ID:",
-            //       modificationRequestId
-            //     );
-  
-            //     const { error: modificationError } = await supabase
-            //       .from("modification_requests")
-            //       .update({ status: "completed" })
-            //       .eq("id", modificationRequestId);
-  
-            //     if (modificationError) {
-            //       console.error(
-            //         "Error updating modification request status:",
-            //         modificationError
-            //       );
-            //       alert(
-            //         "Sales Order was updated, but failed to update modification request status. Please contact support."
-            //       );
-            //     } else {
-            //       console.log("Modification request status updated to 'completed'.");
-            //     }
-            //   } else {
-            //     console.log("No pending modification request found for this Sales Order.");
-            //   }
-            // } catch (err) {
-            //   console.error("Unexpected error updating modification request:", err);
-            //   alert(
-            //     "An unexpected error occurred while updating modification request status."
-            //   );
-            // }
+       
             try {
               const modReqData = await fetchModificationRequest(workOrderId, 'work_order');
   
@@ -1672,7 +1487,7 @@ import React, {
   
               {/* Product Details */}
               <label className="block text-gray-700 font-medium mb-4">
-                Product Details
+                Procedure Details
               </label>
               <div className="space-y-6">
                 {productEntries.map((product, index) => (
@@ -2372,7 +2187,7 @@ import React, {
                       <tr>
                         {/* <th className="border px-4 py-2">#</th> */}
                         <th className="border px-2 py-2">ID</th>
-                        <th className="border px-2 py-2">Product</th>
+                        <th className="border px-2 py-2">Procedure</th>
                         <th className="border px-2 py-2">HSN Code</th>
                         <th className="border px-2 py-2">Price</th>
                         <th className="border px-2 py-2">Quantity</th>
