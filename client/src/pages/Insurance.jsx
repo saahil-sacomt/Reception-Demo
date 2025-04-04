@@ -42,7 +42,7 @@ const Insurance = ({ isCollapsed }) => {
 
   const component = 'insurance';
 
-  // Form State Management
+
   const initialFormState = {
     mrNumber: '',
     insuranceName: '',
@@ -52,6 +52,8 @@ const Insurance = ({ isCollapsed }) => {
     branch: branch,
     status: 'pending',
     createdAt: new Date().toISOString(),
+    // Set a default empty payment method to avoid validation errors
+    paymentMethod: '',
   };
 
   const [formData, setFormData] = useState(initialFormState);
