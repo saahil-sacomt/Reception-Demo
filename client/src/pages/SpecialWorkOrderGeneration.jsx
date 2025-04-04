@@ -2182,7 +2182,7 @@ const SpecialWorkOrderGeneration = ({ isCollapsed }) => {
                     <tr>
                       <th className="border px-2 py-2">ID</th>
                       <th className="border px-2 py-2">Procedure</th>
-                      <th className="border px-2 py-2">HSN Code</th>
+                      {/* <th className="border px-2 py-2">HSN Code</th> */}
                       <th className="border px-2 py-2">Price</th>
                       <th className="border px-2 py-2">Quantity</th>
                       <th className="border px-2 py-2">Total</th>
@@ -2200,9 +2200,9 @@ const SpecialWorkOrderGeneration = ({ isCollapsed }) => {
                           <td className="border px-4 py-2">
                             {product.name || "N/A"}
                           </td>
-                          <td className="border px-4 py-2 text-center">
+                          {/* <td className="border px-4 py-2 text-center">
                             {product.hsn_code || "N/A"}
-                          </td>
+                          </td> */}
                           <td className="border px-4 py-2 text-center">
                             ₹{adjustedPrice.toFixed(2)}
                           </td>
