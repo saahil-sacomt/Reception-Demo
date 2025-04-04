@@ -55,6 +55,31 @@ const getColumnStyles = (reportType, isEmployee = false) => {
         };
       }
 
+    case 'insurance_claims':
+      if (isEmployee) {
+        return {
+          0: { halign: 'center', cellWidth: 25 },
+          1: { halign: 'center', cellWidth: 30 },
+          2: { halign: 'center', cellWidth: 20 },
+          3: { halign: 'center', cellWidth: 20 },
+          4: { halign: 'center', cellWidth: 20 },
+          5: { halign: 'center', cellWidth: 20 },
+          6: { halign: 'center', cellWidth: 25 },
+        };
+      } else {
+        return {
+          0: { halign: 'center', cellWidth: 25 },
+          1: { halign: 'center', cellWidth: 30 },
+          2: { halign: 'center', cellWidth: 20 },
+          3: { halign: 'center', cellWidth: 20 },
+          4: { halign: 'center', cellWidth: 20 },
+          5: { halign: 'center', cellWidth: 20 },
+          6: { halign: 'center', cellWidth: 20 },
+          7: { halign: 'center', cellWidth: 25 },
+          8: { halign: 'center', cellWidth: 25 },
+        };
+      }
+
     case 'work_orders':
       if (isEmployee) {
         return {
@@ -779,6 +804,26 @@ const ReportGenerator = ({ isCollapsed }) => {
           fetchedData = formattedProductIdSummary;
           break;
         }
+        case 'insurance_claims': {
+          // Join with employees to get employee names
+          let query = supabase
+            .from('insurance_claims')
+            .select(`
+              *,
+              employees:employee_id (name)
+            `)
+            .gte('created_at', startStr)
+            .lte('created_at', endStr);
+
+          if (!isCombined) {
+            query = query.in('branch', branchesToReport);
+          }
+
+          ({ data, error } = await query);
+          if (error) throw error;
+          fetchedData = data;
+          break;
+        }
         case 'modification_reports': {
           let query = supabase
             .from('modification_requests')
@@ -1280,6 +1325,28 @@ const ReportGenerator = ({ isCollapsed }) => {
       case 'compiled_report':
         tableColumn = ['Description', 'Amount'];
         break;
+      case 'insurance_claims':
+        tableColumn = isEmployee ? [
+          'MR Number',
+          'Insurance Name',
+          'Total Amount',
+          'Approved Amount',
+          'Status',
+          'Branch',
+          'Created At',
+        ] : [
+          'MR Number',
+          'Insurance Name',
+          'Total Amount',
+          'Approved Amount',
+          'Employee',
+          'Status',
+          'Branch',
+          'Created At',
+          'Updated At',
+        ];
+        break;
+
       case 'work_orders':
         tableColumn = isEmployee ? [
           'Work Order ID',
@@ -1588,6 +1655,29 @@ const ReportGenerator = ({ isCollapsed }) => {
           ['Grand Total', grandTotal.toFixed(2)]
         ];
         break;
+
+      case 'insurance_claims':
+        tableRows = isEmployee ? data.map((record) => [
+          record.mr_number || 'N/A',
+          record.insurance_name || 'N/A',
+          record.total_amount ? Number(record.total_amount).toFixed(2) : '0.00',
+          record.approved_amount ? Number(record.approved_amount).toFixed(2) : '0.00',
+          capitalizeFirstLetter(record.status) || 'N/A',
+          record.branch || 'N/A',
+          record.created_at ? formatDateDDMMYYYY(record.created_at, true) : 'N/A',
+        ]) : data.map((record) => [
+          record.mr_number || 'N/A',
+          record.insurance_name || 'N/A',
+          record.total_amount ? Number(record.total_amount).toFixed(2) : '0.00',
+          record.approved_amount ? Number(record.approved_amount).toFixed(2) : '0.00',
+          record.employees ? record.employees.name : (record.employee_id || 'N/A'),
+          capitalizeFirstLetter(record.status) || 'N/A',
+          record.branch || 'N/A',
+          record.created_at ? formatDateDDMMYYYY(record.created_at, true) : 'N/A',
+          record.updated_at ? formatDateDDMMYYYY(record.updated_at, true) : 'N/A',
+        ]);
+        break;
+
       case 'work_orders':
         tableRows = isEmployee ? data.map((record) => [
           record.work_order_id || 'N/A',
@@ -1895,6 +1985,28 @@ const ReportGenerator = ({ isCollapsed }) => {
         ];
         break;
       }
+      case 'insurance_claims': {
+        const totalClaims = data.length;
+        const totalClaimedAmount = data.reduce((acc, curr) => acc + (parseFloat(curr.total_amount) || 0), 0);
+        const totalApprovedAmount = data.reduce((acc, curr) => acc + (parseFloat(curr.approved_amount) || 0), 0);
+        const pendingClaims = data.filter(record => record.status.toLowerCase() === 'pending').length;
+        const approvedClaims = data.filter(record => record.status.toLowerCase() === 'approved').length;
+        const rejectedClaims = data.filter(record => record.status.toLowerCase() === 'rejected').length;
+
+        // Calculate potential loss (difference between claimed and approved)
+        const potentialLoss = totalClaimedAmount - totalApprovedAmount;
+
+        summaryTable = [
+          ['Total Claims', totalClaims],
+          ['Total Claimed Amount', totalClaimedAmount.toFixed(2)],
+          ['Total Approved Amount', totalApprovedAmount.toFixed(2)],
+          ['Potential Loss', potentialLoss.toFixed(2)],
+          ['Pending Claims', pendingClaims],
+          ['Approved Claims', approvedClaims],
+          ['Rejected Claims', rejectedClaims],
+        ];
+        break;
+      }
       case 'work_orders': {
         const totalWorkAmount = data.reduce((acc, curr) => acc + (parseFloat(curr.total_amount) || 0), 0);
         const totalAdvance = data.reduce((acc, curr) => acc + (parseFloat(curr.advance_details) || 0), 0);
@@ -2087,11 +2199,13 @@ const ReportGenerator = ({ isCollapsed }) => {
     { value: 'purchase_report', label: 'Purchase Report' },
     { value: 'stock_assignments', label: 'Stock Assignments' },
     { value: 'compiled_report', label: 'Compiled Report' },
+    { value: 'insurance_claims', label: 'Insurance Claims' },
   ] : [
     { value: 'sales_orders', label: 'Sales Orders' },
     { value: 'work_orders', label: 'Work Orders' },
     { value: 'consolidated', label: 'Consolidated' },
     { value: 'compiled_report', label: 'Compiled Report' },
+    { value: 'insurance_claims', label: 'Insurance Claims' },
 
   ];
 
