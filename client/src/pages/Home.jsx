@@ -1169,13 +1169,7 @@ const Home = ({ isCollapsed }) => {
 
 
                     {/* Footer */}
-                    <div className="mb-8">
-                      <h3 className="text-xl print:text-sm font-semibold">Terms and Conditions</h3>
-                      <ol className="list-decimal list-inside mt-2 text-sm text-gray-600 space-y-1 print:text-xs">
-                        <li>Work order valid only for two months.</li>
-                        <li>Branded Frames/Lenses – 12 Months warranty for manufacturing defects/peeling off.</li>
-                      </ol>
-                    </div>
+                   
 
                     {/* Billed By */}
                     <div className="mt-8">
@@ -1484,14 +1478,7 @@ const Home = ({ isCollapsed }) => {
                       </div>
                     </div>
 
-                    {/* Footer */}
-                    <div className="mb-8">
-                      <h3 className="text-xl font-semibold print:text-sm">Terms and Conditions</h3>
-                      <ol className="list-decimal list-inside mt-2 text-sm text-gray-600 space-y-1 print:text-xs">
-                        <li>Work order valid only for two months.</li>
-                        <li>Branded Frames/Lenses – 12 Months warranty for manufacturing defects/peeling off.</li>
-                      </ol>
-                    </div>
+
 
                     {/* Billed By */}
                     <div className="mt-8">

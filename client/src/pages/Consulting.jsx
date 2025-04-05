@@ -4606,19 +4606,6 @@ const Consulting = memo(({ isCollapsed, onModificationSuccess }) => {
                                         </div>
                                     </div>
 
-                                    {/* Footer Section */}
-                                    <div className="flex-col justify-start mx-auto items-start text-left text-md">
-                                        <ol className="list-decimal list-inside">
-                                            <p className="mt-2 text-xs">
-                                                Terms and Conditions:
-                                                <li>Work order valid only for two months.</li>
-                                                <li>
-                                                    Branded Frames/Lenses – 12 Months warranty for
-                                                    manufacturing defects/peeling off.
-                                                </li>
-                                            </p>
-                                        </ol>
-                                    </div>
                                 </div>
                             </div>
 

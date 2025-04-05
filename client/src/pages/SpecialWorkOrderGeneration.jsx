@@ -2319,16 +2319,7 @@ const SpecialWorkOrderGeneration = ({ isCollapsed }) => {
                       {gstNumber || "N/A"}
                     </p>
                   )}
-                  <p className="mt-2 text-xs">
-                    Terms and Conditions:
-                    <ol className="list-decimal list-inside">
-                      <li>Sales Order valid only for two months.</li>
-                      <li>
-                        Branded Frames/Lenses – 12 Months warranty for
-                        manufacturing defects/peeling off.
-                      </li>
-                    </ol>
-                  </p>
+                
                 </div>
               </div>
             </div>
