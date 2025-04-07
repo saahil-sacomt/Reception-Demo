@@ -2307,20 +2307,7 @@ const SpecialWorkOrderGeneration = ({ isCollapsed }) => {
                 </div>
 
 
-                {/* Footer Section */}
-                <div className="flex-col justify-start mx-auto items-start text-left text-md">
-                  <p className="mt-2 text-md">
-                    Delivery On:<strong> {dueDate ? formatDate(dueDate) : "N/A"}</strong>
-                  </p>
 
-                  {isB2B && (
-                    <p>
-                      <strong>GST Number of work assigning:</strong>{" "}
-                      {gstNumber || "N/A"}
-                    </p>
-                  )}
-                
-                </div>
               </div>
             </div>
 
