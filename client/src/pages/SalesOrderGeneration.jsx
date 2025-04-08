@@ -3783,14 +3783,14 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                     </p>
                   </div>
 
-                  {selectedWorkOrder.is_insurance && (
+                  {selectedWorkOrder && selectedWorkOrder.is_insurance && (
                     <div className="mt-2 p-2 bg-blue-50 rounded-md">
                       <p className="font-medium text-blue-800">Insurance Work Order</p>
                       <p>
                         <strong>Insurance:</strong>{" "}
                         {selectedWorkOrder.insurance_name || "Not specified"}
                       </p>
-                      {/* We'll fetch and show the approved amount during confirmation */}
+                      {/* ... */}
                     </div>
                   )}
 
