@@ -2220,12 +2220,6 @@ const SpecialWorkOrderGeneration = ({ isCollapsed }) => {
 
                 {/* Financial Summary */}
                 <div className="flex justify-between mb-6 space-x-8">
-                  <div>
-                    <p>
-                      Amt. after discount:<strong> ₹{discountedSubtotalwithoutGST.toFixed(2)}</strong>
-                    </p>
-                    {/* GST lines removed */}
-                  </div>
                   <div className="text-right">
                     <p>
                       Advance Paid:<strong> ₹{advance.toFixed(2)}</strong>
