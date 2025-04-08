@@ -2306,8 +2306,6 @@ const SpecialWorkOrderGeneration = ({ isCollapsed }) => {
                   </div>
                 </div>
 
-
-
               </div>
             </div>
 

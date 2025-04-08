@@ -24,7 +24,6 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import supabase from '../supabaseClient';
 import { useGlobalState } from "../context/GlobalStateContext";
-import PendingSpecialOrders from './PendingSpecialOrders.jsx';
 
 const Home = ({ isCollapsed }) => {
   // Access Global State
@@ -253,22 +252,41 @@ const Home = ({ isCollapsed }) => {
   }, [branch]);
 
   // Fetch work order details by ID
+  // Update the fetchWorkOrderDetails function in Home.jsx
   const fetchWorkOrderDetails = async (workOrderId) => {
-    const { data, error } = await supabase
-      .from('work_orders')
-      .select('*')
-      .eq('work_order_id', workOrderId)
-      .single();
+    // Check role to determine which table to query
+    if (role === 'cghs' || role === 'echs') {
+      // For CGHS/ECHS roles, fetch from specialworkorders table
+      const { data, error } = await supabase
+        .from('specialworkorders')
+        .select('*')
+        .eq('work_order_id', workOrderId)
+        .single();
 
-    if (error) {
-      console.error("Error fetching work order details:", error.message);
-      alert("Failed to fetch work order details.");
-      return null;
+      if (error) {
+        console.error("Error fetching special work order details:", error.message);
+        alert("Failed to fetch work order details.");
+        return null;
+      }
+
+      return data;
+    } else {
+      // For other roles, fetch from regular work_orders table
+      const { data, error } = await supabase
+        .from('work_orders')
+        .select('*')
+        .eq('work_order_id', workOrderId)
+        .single();
+
+      if (error) {
+        console.error("Error fetching work order details:", error.message);
+        alert("Failed to fetch work order details.");
+        return null;
+      }
+
+      return data;
     }
-
-    return data;
   };
-
   // Fetch sales order details with product entries
   const fetchSalesOrderDetails = async (salesOrderId) => {
     try {
@@ -1169,7 +1187,7 @@ const Home = ({ isCollapsed }) => {
 
 
                     {/* Footer */}
-                   
+
 
                     {/* Billed By */}
                     <div className="mt-8">
