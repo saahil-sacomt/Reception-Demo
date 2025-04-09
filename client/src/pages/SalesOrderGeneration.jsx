@@ -428,7 +428,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
   }, [submitted, isPrinted]);
 
   useEffect(() => {
-    // Only restore saved state if not submitted
+    // Only restore from sessionStorage if NOT already submitted
     if (!submitted) {
       const savedState = sessionStorage.getItem('salesOrderFormState');
       if (savedState) {
@@ -438,40 +438,18 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
             type: 'RESTORE_SALES_ORDER_FORM',
             payload: parsedState
           });
+          resetTransientFields();
         } catch (err) {
           console.error('Error restoring saved state:', err);
+          resetTransientFields();
         }
-      }
-    }
-  }, [dispatch, submitted]);
-  useEffect(() => {
-    // Check if there's saved state in sessionStorage
-    const savedState = sessionStorage.getItem('salesOrderFormState');
-
-    if (savedState) {
-      try {
-        // Restore the saved state
-        const parsedState = JSON.parse(savedState);
-        dispatch({
-          type: 'RESTORE_SALES_ORDER_FORM',
-          payload: parsedState
-        });
-
-        // Still reset just the transient fields
-        resetTransientFields();
-      } catch (err) {
-        console.error('Error restoring saved sales order state:', err);
-        // If restoration fails, just reset transient fields
+      } else {
         resetTransientFields();
       }
-    } else {
-      // If no saved state, just reset transient fields
-      resetTransientFields();
     }
 
-    // Save state to sessionStorage when component unmounts
+    // Save state to sessionStorage when unmounting
     return () => {
-      // Don't save if already submitted
       if (!submitted) {
         sessionStorage.setItem(
           'salesOrderFormState',
@@ -479,8 +457,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         );
       }
     };
-  }, [dispatch, submitted]);
-
+  }, [dispatch]); // Remove submitted from dependencies
 
   // Local states
   const [originalProductEntries, setOriginalProductEntries] = useState([
@@ -2183,272 +2160,13 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     }
   };
 
-  // const saveSalesOrder = async () => {
-  //   console.log("Submit handler triggered");
-  //   const currentUTCDateTime = getCurrentUTCDateTime();
+  useEffect(() => {
+    if (submitted && step !== 5) {
+      // Force step back to 5 if it somehow got changed after submission
+      updateSalesOrderForm({ step: 5 });
+    }
+  }, [submitted, step]);
 
-  //   if (isSaving) return;
-  //   if (submitted) return; // Prevent duplicate clicks
-
-  //   updateSalesOrderForm({ isSaving: true }); // Set isSaving to true
-  //   updateSalesOrderForm({
-  //     validationErrors: {
-  //       ...validationErrors,
-  //       generalError: "",
-  //     },
-  //   });
-
-  //   try {
-  //     let customerId = null;
-
-  //     // **Step 1: Save Customer Details (if applicable)**
-  //     if (hasMrNumber === "no") {
-  //       // Validate Customer Details
-  //       const customerErrors = {};
-  //       if (!customerName.trim())
-  //         customerErrors.customerName = "Name is required.";
-  //       if (!customerPhone.trim()) {
-  //         customerErrors.customerPhone = "Phone number is required.";
-  //       }
-  //       if (!address.trim()) customerErrors.address = "Address is required.";
-  //       if (!age || parseInt(age, 10) <= 0)
-  //         customerErrors.customerAge = "Age must be a positive number.";
-  //       if (!gender) customerErrors.customerGender = "Gender is required.";
-
-  //       if (Object.keys(customerErrors).length > 0) {
-  //         updateSalesOrderForm({
-  //           validationErrors: {
-  //             ...validationErrors,
-  //             ...customerErrors,
-  //           },
-  //         });
-  //         updateSalesOrderForm({ isSaving: false });
-  //         return;
-  //       }
-
-  //       // Call saveCustomerDetails with customer details
-  //       const savedCustomer = await saveCustomerDetails({
-  //         name: customerName,
-  //         phone_number: customerPhone,
-  //         address,
-  //         gender,
-  //         age: parseInt(age, 10),
-  //       });
-
-  //       if (savedCustomer && savedCustomer.length > 0) {
-  //         customerId = savedCustomer[0].customer_id; // Retrieve customer_id from the first inserted record
-  //       } else {
-  //         throw new Error("Failed to retrieve customer_id after insertion.");
-  //       }
-  //     }
-
-  //     // **Step 2: Handle Loyalty Points Update (if applicable)**
-  //     if (privilegeCard && privilegeCardDetails) {
-  //       const { updatedPoints, pointsToRedeem, pointsToAdd } = calculateLoyaltyPoints(
-  //         subtotalWithGST,
-  //         redeemPointsAmount,
-  //         privilegeCard,
-  //         privilegeCardDetails,
-  //         loyaltyPoints
-  //       );
-
-  //       const { error: loyaltyError } = await supabase
-  //         .from("privilegecards")
-  //         .update({ loyalty_points: updatedPoints })
-  //         .eq("pc_number", privilegeCardDetails.pc_number);
-
-  //       if (loyaltyError) {
-  //         console.error("Error updating loyalty points:", loyaltyError);
-  //         updateSalesOrderForm({
-  //           validationErrors: {
-  //             ...validationErrors,
-  //             generalError: "Failed to update loyalty points",
-  //           },
-  //         });
-  //         updateSalesOrderForm({ isSaving: false });
-  //         return;
-  //       }
-
-  //       updateSalesOrderForm({
-  //         loyaltyPoints: updatedPoints,
-  //         pointsToAdd: pointsToAdd,
-  //       });
-  //     }
-
-  //     // **Step 3: Prepare Variables for Sales Data**
-  //     const sanitizedRedeemedPoints = privilegeCard
-  //       ? parseInt(redeemPointsAmount) || 0
-  //       : 0;
-  //     const sanitizedPointsAdded = privilegeCard ? pointsToAdd || 0 : 0;
-
-  //     if (isEditing) {
-  //       // **Step 4: Update Existing Sales Order**
-  //       const updatePayload = {
-  //         work_order_id: selectedWorkOrder
-  //           ? selectedWorkOrder.work_order_id
-  //           : null,
-  //         items: productEntries.map((prod) => ({
-  //           id: prod.id, // Integer id for stock
-  //           product_id: prod.product_id, // String product_id for display
-  //           name: prod.name,
-  //           price: parseFloat(prod.price),
-  //           quantity: parseInt(prod.quantity, 10),
-  //           hsn_code: prod.hsn_code,
-  //         })),
-  //         mr_number: hasMrNumber === "yes" ? mrNumber : null,
-  //         patient_phone:
-  //           hasMrNumber === "yes" ? patientDetails.phone_number : customerPhone,
-  //         customer_id: customerId, // Associate with customer_id
-  //         employee: employee,
-  //         payment_method: paymentMethod,
-  //         subtotal: parseFloat(subtotalWithoutGST),
-  //         discount: parseFloat(totalDiscount),
-  //         total_amount: parseFloat(subtotalWithGST),
-  //         advance_details: parseFloat(advanceDetails) || 0,
-  //         privilege_discount: parseFloat(privilegeDiscount),
-  //         cgst: parseFloat(cgstAmount),
-  //         sgst: parseFloat(sgstAmount),
-  //         final_amount: parseFloat(balanceDue),
-  //         loyalty_points_redeemed: sanitizedRedeemedPoints,
-  //         loyalty_points_added: sanitizedPointsAdded,
-  //         updated_at: currentUTCDateTime,
-  //         branch: branch,
-  //         // **Important:** Do NOT include 'modification_request_id' or any other invalid fields
-  //       };
-
-  //       console.log("Update Payload:", updatePayload); // Debugging: Inspect the payload
-
-  //       const { error: updateError } = await supabase
-  //         .from("sales_orders")
-  //         .update(updatePayload)
-  //         .eq("sales_order_id", salesOrderId);
-
-  //       if (updateError) {
-  //         console.error("Error updating sales order:", updateError);
-  //         updateSalesOrderForm({
-  //           validationErrors: {
-  //             ...validationErrors,
-  //             generalError: "Failed to update sales order.",
-  //           },
-  //         });
-  //         updateSalesOrderForm({ isSaving: false });
-  //         return;
-  //       }
-
-     
-        
-
-  //     } else {
-  //       // **Step 4: Insert New Sales Order**
-  //       const newSalesOrderId = salesOrderId;
-  //       if (!newSalesOrderId) {
-  //         updateSalesOrderForm({
-  //           validationErrors: {
-  //             ...validationErrors,
-  //             generalError: "Failed to generate sales order ID.",
-  //           },
-  //         });
-  //         updateSalesOrderForm({ isSaving: false });
-  //         return;
-  //       }
-
-  //       const insertPayload = {
-  //         sales_order_id: newSalesOrderId,
-  //         work_order_id: selectedWorkOrder
-  //           ? selectedWorkOrder.work_order_id
-  //           : null,
-  //         items: productEntries.map((prod) => ({
-  //           id: prod.id, // Integer id for stock
-  //           product_id: prod.product_id, // String product_id for display
-  //           name: prod.name,
-  //           price: parseFloat(prod.price),
-  //           quantity: parseInt(prod.quantity, 10),
-  //           hsn_code: prod.hsn_code,
-  //         })),
-  //         mr_number: hasMrNumber === "yes" ? mrNumber : null,
-  //         patient_phone:
-  //           hasMrNumber === "yes" ? patientDetails.phone_number : customerPhone,
-  //         customer_id: customerId, // Associate with customer_id
-  //         employee: employee,
-  //         payment_method: paymentMethod,
-  //         subtotal: parseFloat(subtotalWithoutGST),
-  //         discount: parseFloat(totalDiscount),
-  //         total_amount: parseFloat(subtotalWithGST),
-  //         advance_details: parseFloat(advanceDetails) || 0,
-  //         privilege_discount: parseFloat(privilegeDiscount),
-  //         cgst: parseFloat(cgstAmount),
-  //         sgst: parseFloat(sgstAmount),
-  //         final_amount: parseFloat(balanceDue),
-  //         loyalty_points_redeemed: sanitizedRedeemedPoints,
-  //         loyalty_points_added: sanitizedPointsAdded,
-  //         updated_at: currentUTCDateTime,
-  //         branch: branch,
-  //       };
-
-  //       console.log("Insert Payload:", insertPayload); // Debugging: Inspect the payload
-
-  //       const { error: insertError } = await supabase
-  //         .from("sales_orders")
-  //         .insert(insertPayload);
-
-  //       if (insertError) {
-  //         console.error("Error inserting sales order:", insertError);
-  //         updateSalesOrderForm({
-  //           validationErrors: {
-  //             ...validationErrors,
-  //             generalError: "Failed to insert sales order.",
-  //           },
-  //         });
-  //         updateSalesOrderForm({ isSaving: false });
-  //         return;
-  //       }
-
-  //       // **Step 5: Mark Work Order as Used (if applicable)**
-  //       if (selectedWorkOrder) {
-  //         const { error: workOrderError } = await supabase
-  //           .from("work_orders")
-  //           .update({ is_used: true })
-  //           .eq("work_order_id", selectedWorkOrder.work_order_id);
-
-  //         if (workOrderError) {
-  //           console.error("Error marking work order as used:", workOrderError);
-  //           updateSalesOrderForm({
-  //             validationErrors: {
-  //               ...validationErrors,
-  //               generalError: "Failed to update work order status.",
-  //             },
-  //           });
-  //           updateSalesOrderForm({ isSaving: false });
-  //           return;
-  //         }
-  //       }
-
-  //       alert("Sales order created successfully!");
-  //       updateSalesOrderForm({
-  //         isSaving: false,
-  //         submitted: true,  // Mark as submitted
-  //         allowPrint: true  // Enable print button
-  //       });
-  //     }
-
-
-
-  //     // alert("Order processed successfully!");
-  //     setTimeout(() => {
-  //       printButtonRef.current?.focus(); // Move focus to the Print button
-  //     }, 100);
-  //   } catch (error) {
-  //     console.error("Error completing the order:", error);
-  //     updateSalesOrderForm({
-  //       validationErrors: {
-  //         ...validationErrors,
-  //         generalError: "Failed to complete the order.",
-  //       },
-  //     });
-  //   } finally {
-  //     updateSalesOrderForm({ isSaving: false, submitted: true }); // Set isSaving to false
-  //   }
-  // };
   return (
     <div
       className={`transition-all duration-300 ${isCollapsed ? "mx-20" : "mx-20 px-20"
@@ -4219,18 +3937,18 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                       : "Save Sales Order"}
                 </button>
 
-                
-                  <button
-                    type="button"
-                    onClick={handlePrint}
-                    ref={printButtonRef}
-                    className="flex items-center justify-center w-44 h-12 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition"
-                    aria-label="Print Sales Order"
-                  >
-                    <PrinterIcon className="w-5 h-5 mr-2" />
-                    Print
-                  </button>
-                
+
+               { allowPrint && (<button
+                  type="button"
+                  onClick={handlePrint}
+                  ref={printButtonRef}
+                  className="flex items-center justify-center w-44 h-12 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition"
+                  aria-label="Print Sales Order"
+                >
+                  <PrinterIcon className="w-5 h-5 mr-2" />
+                  Print
+                </button>)}
+
 
                 {allowPrint && (
                   <button
