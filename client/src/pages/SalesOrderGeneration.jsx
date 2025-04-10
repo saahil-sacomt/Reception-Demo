@@ -3798,7 +3798,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                       )}
 
                       <p className="font-bold">
-                        Final Amount Due:
+                        Final Amount Paid:
                         <strong> ₹{
                           salesOrderForm.insuranceInfo
                             ? (parseFloat(taxableValue) - parseFloat(salesOrderForm.insuranceInfo.approved_amount)).toFixed(2)
