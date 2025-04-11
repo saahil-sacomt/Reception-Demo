@@ -171,6 +171,8 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       "Dr. Arvin Ponnat",
       "Dr. Shabna",
       "Dr. Malavika. G",
+      "Dr.Yasar Safar",
+
     ];
 
     // Additional consultants for Kottarakara branch
