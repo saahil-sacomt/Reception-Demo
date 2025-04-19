@@ -842,7 +842,6 @@ const ReportGenerator = ({ isCollapsed }) => {
         }
 
 
-        // In the case 'consolidated': section of handleGenerateReport function
         // case 'consolidated': {
         //   const salesQuery = supabase
         //     .from('sales_orders')
@@ -857,10 +856,10 @@ const ReportGenerator = ({ isCollapsed }) => {
         //   const { data: salesData, error: salesError } = await salesQuery;
         //   if (salesError) throw salesError;
 
-        //   // Also fetch work orders for consolidated view
+        //   // Include all necessary fields from work orders
         //   const workQuery = supabase
         //     .from('work_orders')
-        //     .select('work_order_id, advance_details, mr_number, created_at, updated_at, branch, customer_id')
+        //     .select('work_order_id, advance_details, mr_number, created_at, updated_at, branch, customer_id, total_amount, cgst, sgst, discount_amount')
         //     .gte('created_at', startStr)
         //     .lte('created_at', endStr);
 
@@ -928,20 +927,23 @@ const ReportGenerator = ({ isCollapsed }) => {
         //     };
         //   });
 
-        //   // Create consolidated work orders (only for those without sales orders)
+        //   // Create consolidated work orders (using actual values from work orders, not zeros)
         //   const consolidatedWork = filteredWorkData.map(work => {
         //     let customerName = customerMap[work.customer_id] || 'N/A';
+        //     const totalGST = (parseFloat(work.cgst) || 0) + (parseFloat(work.sgst) || 0);
+        //     const workTotalAmount = parseFloat(work.total_amount) || 0;
+        //     const advanceCollected = parseFloat(work.advance_details) || 0;
 
         //     return {
         //       sales_order_id: 'N/A',
         //       work_order_id: work.work_order_id || 'N/A',
         //       mr_number: work.mr_number || 'N/A',
-        //       total_amount: 0,
-        //       total_gst: 0,
-        //       discount: 0,
-        //       advance_collected: parseFloat(work.advance_details) || 0,
-        //       balance_collected: 0,
-        //       total_collected: parseFloat(work.advance_details) || 0,
+        //       total_amount: workTotalAmount,
+        //       total_gst: totalGST,
+        //       discount: parseFloat(work.discount_amount) || 0,
+        //       advance_collected: advanceCollected,
+        //       balance_collected: workTotalAmount - advanceCollected,
+        //       total_collected: advanceCollected, // For work orders, only advance is collected
         //       patient_customer_name: patientMap[work.mr_number] || customerName || 'N/A',
         //       branch: work.branch || 'N/A',
         //       created_at: work.created_at ? formatDateDDMMYYYY(work.created_at, true) : 'N/A',
@@ -954,6 +956,7 @@ const ReportGenerator = ({ isCollapsed }) => {
         //   break;
         // }
 
+        // ...existing code...
 
         case 'consolidated': {
           const salesQuery = supabase
@@ -1037,6 +1040,7 @@ const ReportGenerator = ({ isCollapsed }) => {
               branch: sale.branch || 'N/A',
               created_at: sale.created_at ? formatDateDDMMYYYY(sale.created_at, true) : 'N/A',
               updated_at: sale.updated_at ? formatDateDDMMYYYY(sale.updated_at, true) : 'N/A',
+              raw_created_at: sale.created_at // Keep original date for sorting
             };
           });
 
@@ -1061,13 +1065,24 @@ const ReportGenerator = ({ isCollapsed }) => {
               branch: work.branch || 'N/A',
               created_at: work.created_at ? formatDateDDMMYYYY(work.created_at, true) : 'N/A',
               updated_at: work.updated_at ? formatDateDDMMYYYY(work.updated_at, true) : 'N/A',
+              raw_created_at: work.created_at // Keep original date for sorting
             };
           });
 
           const consolidatedData = [...consolidatedSales, ...consolidatedWork];
+
+          // Sort by created_at in descending order (latest first)
+          consolidatedData.sort((a, b) => {
+            if (!a.raw_created_at) return 1;
+            if (!b.raw_created_at) return -1;
+            return new Date(b.raw_created_at) - new Date(a.raw_created_at);
+          });
+
           fetchedData = consolidatedData;
           break;
         }
+
+        // ...existing code...
         case 'stock_report': {
           const { data: productsData, error: productsError } = await supabase
             .from('products')

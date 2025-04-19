@@ -45,12 +45,44 @@ const PatientRegistration = () => {
         return Object.keys(errors).length === 0;
     };
 
-    const savePatientDetails = async () => {
-        if (!validateForm() || isSaving) return;
 
-        setIsSaving(true);
-        try {
-            const { data, error } = await supabase
+
+const savePatientDetails = async () => {
+    if (!validateForm() || isSaving) return;
+
+    setIsSaving(true);
+    try {
+        // First check if patient with this MR number already exists
+        const { data: existingPatient, error: fetchError } = await supabase
+            .from('patients')
+            .select()
+            .eq('mr_number', patientDetails.mr_number)
+            .single();
+
+        if (fetchError && fetchError.code !== 'PGRST116') {
+            // PGRST116 is the "not found" error code, any other error should be handled
+            throw fetchError;
+        }
+
+        let result;
+        if (existingPatient) {
+            // Update existing patient record
+            result = await supabase
+                .from('patients')
+                .update({
+                    name: patientDetails.name,
+                    phone_number: patientDetails.phone_number,
+                    address: patientDetails.address,
+                    age: parseInt(patientDetails.age),
+                    gender: patientDetails.gender
+                })
+                .eq('mr_number', patientDetails.mr_number)
+                .select();
+                
+            alert('Patient details updated successfully!');
+        } else {
+            // Insert new patient record
+            result = await supabase
                 .from('patients')
                 .insert([{
                     name: patientDetails.name,
@@ -61,21 +93,24 @@ const PatientRegistration = () => {
                     mr_number: patientDetails.mr_number
                 }])
                 .select();
-
-            if (error) throw error;
-
+                
             alert('Patient registered successfully!');
-            navigate('/dashboard');
-
-        } catch (error) {
-            console.error('Error saving patient details:', error);
-            setValidationErrors({
-                submit: 'Failed to save patient details. Please try again.'
-            });
-        } finally {
-            setIsSaving(false);
         }
-    };
+
+        if (result.error) throw result.error;
+        navigate('/dashboard');
+
+    } catch (error) {
+        console.error('Error saving patient details:', error);
+        setValidationErrors({
+            submit: 'Failed to save patient details. Please try again.'
+        });
+    } finally {
+        setIsSaving(false);
+    }
+};
+
+
 
     return (
         <div className="max-w-2xl mx-auto mt-10 p-6 bg-white rounded-lg shadow">
