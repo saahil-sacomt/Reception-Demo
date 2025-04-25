@@ -288,6 +288,7 @@ const Home = ({ isCollapsed }) => {
     }
   };
   // Fetch sales order details with product entries
+  // Fetch sales order details with product entries
   const fetchSalesOrderDetails = async (salesOrderId) => {
     try {
       // 1. Fetch the basic sales order data
@@ -303,14 +304,19 @@ const Home = ({ isCollapsed }) => {
         return null;
       }
 
-      // 2. Fetch the product entries for this sales order
-      const { data: productEntries, error: productError } = await supabase
-        .from('product_entries')
-        .select('*')
-        .eq('sales_order_id', salesOrderId);
-
-      if (productError) {
-        console.error("Error fetching product entries:", productError.message);
+      // 2. Product entries are already in the sales_orders table as a JSON column
+      // Parse the product_entries JSON field if it exists
+      let productEntries = [];
+      if (data.product_entries) {
+        try {
+          // If it's a string, parse it, otherwise use as is
+          productEntries = typeof data.product_entries === 'string'
+            ? JSON.parse(data.product_entries)
+            : data.product_entries;
+        } catch (err) {
+          console.error("Error parsing product entries:", err);
+          productEntries = [];
+        }
       }
 
       // 3. Get customer details
@@ -376,7 +382,7 @@ const Home = ({ isCollapsed }) => {
       // 4. Return combined data
       return {
         ...data,
-        items: productEntries || [], // Ensure items is always an array
+        items: productEntries, // Use the parsed JSON array
         customerDetails
       };
 
@@ -624,6 +630,8 @@ const Home = ({ isCollapsed }) => {
     }
   };
 
+  // Update the handleSalesOrderSearch function to include MR number in search
+
   const handleSalesOrderSearch = async () => {
     if (!branch) return;
 
@@ -636,7 +644,7 @@ const Home = ({ isCollapsed }) => {
       .from('sales_orders')
       .select('*')
       .eq('branch', branch)
-      .or(`sales_order_id.ilike.%${salesOrderSearchTerm}%,patient_phone.ilike.%${salesOrderSearchTerm}%`);
+      .or(`sales_order_id.ilike.%${salesOrderSearchTerm}%,patient_phone.ilike.%${salesOrderSearchTerm}%,mr_number.ilike.%${salesOrderSearchTerm}%`);
 
     if (!error) {
       if (data && data.length > 0) {
@@ -650,7 +658,6 @@ const Home = ({ isCollapsed }) => {
       alert('An error occurred while searching sales orders.');
     }
   };
-
   return (
     <div className={`transition-all duration-300 ${isCollapsed ? 'ml-0' : 'ml-14'} my-8 pt-9 min-h-screen`}>
       {showSplash ? (
@@ -1113,7 +1120,6 @@ const Home = ({ isCollapsed }) => {
                             <th className="px-4 py-2 border text-left">#</th>
                             <th className="px-4 py-2 border text-left">Product ID</th>
                             <th className="px-4 py-2 border text-left">Product Name</th>
-                            <th className="px-4 py-2 border text-left">HSN Code</th>
                             <th className="px-4 py-2 border text-right">Price (₹)</th>
                             <th className="px-4 py-2 border text-right">Quantity</th>
                             <th className="px-4 py-2 border text-right">Total (₹)</th>
@@ -1129,7 +1135,6 @@ const Home = ({ isCollapsed }) => {
                                 <td className="px-4 py-2 border">{index + 1}</td>
                                 <td className="px-4 py-2 border">{product.product_id || "N/A"}</td>
                                 <td className="px-4 py-2 border">{product.product_name || "N/A"}</td>
-                                <td className="px-4 py-2 border">{product.hsn_code || "N/A"}</td>
                                 <td className="px-4 py-2 border text-right">₹{price.toFixed(2)}</td>
                                 <td className="px-4 py-2 border text-right">{quantity}</td>
                                 <td className="px-4 py-2 border text-right">₹{total.toFixed(2)}</td>
@@ -1149,14 +1154,7 @@ const Home = ({ isCollapsed }) => {
                           <span className="font-medium">Amount After Discount:</span>{" "}
                           <strong>₹{selectedWorkOrder.discounted_subtotal?.toFixed(2) || '0.00'}</strong>
                         </p>
-                        <p>
-                          <span className="font-medium">CGST (6%):</span>{" "}
-                          <strong>₹{selectedWorkOrder.cgst?.toFixed(2) || '0.00'}</strong>
-                        </p>
-                        <p>
-                          <span className="font-medium">SGST (6%):</span>{" "}
-                          <strong>₹{selectedWorkOrder.sgst?.toFixed(2) || '0.00'}</strong>
-                        </p>
+
                         <p>
                           <span className="font-medium">Payment Method:</span>{" "}
                           <strong>
@@ -1173,11 +1171,7 @@ const Home = ({ isCollapsed }) => {
                           <span className="font-medium">Advance Paid:</span>{" "}
                           <strong>₹{parseFloat(selectedWorkOrder.advance_details || 0).toFixed(2)}</strong>
                         </p>
-                        <p className="text-lg">
-                          <strong>
-                            <span className="font-bold">Total Amount (Incl. GST):</span>{" "}
-                            ₹{selectedWorkOrder.discounted_total?.toFixed(2) || '0.00'}</strong>
-                        </p>
+
                         <p className="text-lg"><strong>
                           <span className="font-bold">Amount Due:</span>{" "}
                           ₹{selectedWorkOrder.amount_due?.toFixed(2) || '0.00'}</strong>
@@ -1246,7 +1240,7 @@ const Home = ({ isCollapsed }) => {
                     type="text"
                     value={salesOrderSearchTerm}
                     onChange={(e) => setSalesOrderSearchTerm(e.target.value)}
-                    placeholder="Search by Sales Order ID"
+                    placeholder="Search by Sales Order ID or MR Number"
                     className="flex-1 px-4 py-2 border border-gray-300 rounded-l-lg focus:outline-none"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
@@ -1415,7 +1409,6 @@ const Home = ({ isCollapsed }) => {
                             <th className="px-4 py-2 border text-left">#</th>
                             <th className="px-4 py-2 border text-left">Product ID</th>
                             <th className="px-4 py-2 border text-left">Product Name</th>
-                            <th className="px-4 py-2 border text-left">HSN Code</th>
                             <th className="px-4 py-2 border text-right">Price (₹)</th>
                             <th className="px-4 py-2 border text-right">Quantity</th>
                             <th className="px-4 py-2 border text-right">Total (₹)</th>
@@ -1431,7 +1424,6 @@ const Home = ({ isCollapsed }) => {
                                 <td className="px-4 py-2 border">{index + 1}</td>
                                 <td className="px-4 py-2 border">{product.product_id || "N/A"}</td>
                                 <td className="px-4 py-2 border">{product.name || "N/A"}</td>
-                                <td className="px-4 py-2 border">{product.hsn_code || "N/A"}</td>
                                 <td className="px-4 py-2 border text-right">₹{price.toFixed(2)}</td>
                                 <td className="px-4 py-2 border text-right">{quantity}</td>
                                 <td className="px-4 py-2 border text-right">₹{total.toFixed(2)}</td>
@@ -1473,25 +1465,6 @@ const Home = ({ isCollapsed }) => {
                         </p>
 
 
-                        <p>
-                          <span className="font-medium">CGST (6%):</span>{" "}
-                          <strong>₹{selectedSalesOrder.cgst?.toFixed(2) || '0.00'}</strong>
-                        </p>
-                        <p>
-                          <span className="font-medium">SGST (6%):</span>{" "}
-                          <strong>₹{selectedSalesOrder.sgst?.toFixed(2) || '0.00'}</strong>
-                        </p>
-                        <p className="text-lg text-gray-800 mt-4">
-                          <strong>
-                            <span className="font-bold">Total Amount (Incl. GST):</span>{" "}
-
-                            ₹{
-                              (parseFloat(selectedSalesOrder.final_amount || 0) +
-                                parseFloat(selectedSalesOrder.advance_details || 0)
-                              ).toFixed(2)
-                            }
-                          </strong>
-                        </p>
 
                       </div>
                     </div>
