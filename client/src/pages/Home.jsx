@@ -289,88 +289,197 @@ const Home = ({ isCollapsed }) => {
   };
   // Fetch sales order details with product entries
   // Fetch sales order details with product entries
-  const fetchSalesOrderDetails = async (salesOrderId) => {
-    try {
-      // 1. Fetch the basic sales order data
-      const { data, error } = await supabase
-        .from('sales_orders')
-        .select('*')
-        .eq('sales_order_id', salesOrderId)
+  // const fetchSalesOrderDetails = async (salesOrderId) => {
+  //   try {
+  //     // 1. Fetch the basic sales order data
+  //     const { data, error } = await supabase
+  //       .from('sales_orders')
+  //       .select('*')
+  //       .eq('sales_order_id', salesOrderId)
+  //       .single();
+
+  //     if (error) {
+  //       console.error("Error fetching sales order details:", error.message);
+  //       alert("Failed to fetch sales order details.");
+  //       return null;
+  //     }
+
+  //     // 2. Product entries are already in the sales_orders table as a JSON column
+  //     // Parse the product_entries JSON field if it exists
+  //     let productEntries = [];
+  //     if (data.product_entries) {
+  //       try {
+  //         // If it's a string, parse it, otherwise use as is
+  //         productEntries = typeof data.product_entries === 'string'
+  //           ? JSON.parse(data.product_entries)
+  //           : data.product_entries;
+  //       } catch (err) {
+  //         console.error("Error parsing product entries:", err);
+  //         productEntries = [];
+  //       }
+  //     }
+
+  //     // 3. Get customer details
+  //     let customerDetails = {};
+
+  //     if (data.mr_number) {
+  //       // Fetch patient details
+  //       const { data: patientData, error: patientError } = await supabase
+  //         .from('patients')
+  //         .select('name, age, gender, address')
+  //         .eq('mr_number', data.mr_number)
+  //         .single();
+
+  //       if (!patientError && patientData) {
+  //         customerDetails = {
+  //           name: patientData.name,
+  //           age: patientData.age,
+  //           gender: patientData.gender,
+  //           address: patientData.address,
+  //         };
+  //       } else {
+  //         console.error("Error fetching patient details:", patientError?.message);
+  //         customerDetails = {
+  //           name: 'N/A',
+  //           age: 'N/A',
+  //           gender: 'N/A',
+  //           address: 'N/A',
+  //         };
+  //       }
+  //     } else if (data.customer_id) {
+  //       // Fetch customer details
+  //       const { data: customerData, error: customerError } = await supabase
+  //         .from('customers')
+  //         .select('name, age, gender, address')
+  //         .eq('customer_id', data.customer_id)
+  //         .single();
+
+  //       if (!customerError && customerData) {
+  //         customerDetails = {
+  //           name: customerData.name,
+  //           age: customerData.age,
+  //           gender: customerData.gender,
+  //           address: customerData.address,
+  //         };
+  //       } else {
+  //         console.error("Error fetching customer details:", customerError?.message);
+  //         customerDetails = {
+  //           name: 'N/A',
+  //           age: 'N/A',
+  //           gender: 'N/A',
+  //           address: 'N/A',
+  //         };
+  //       }
+  //     } else {
+  //       customerDetails = {
+  //         name: 'N/A',
+  //         age: 'N/A',
+  //         gender: 'N/A',
+  //         address: 'N/A',
+  //       };
+  //     }
+
+  //     // 4. Return combined data
+  //     return {
+  //       ...data,
+  //       items: productEntries, // Use the parsed JSON array
+  //       customerDetails
+  //     };
+
+  //   } catch (err) {
+  //     console.error("Error in fetchSalesOrderDetails:", err);
+  //     alert("An unexpected error occurred while fetching sales order details.");
+  //     return null;
+  //   }
+  // };
+
+  // ...existing code...
+
+// Fetch sales order details with product entries
+const fetchSalesOrderDetails = async (salesOrderId) => {
+  try {
+    // 1. Fetch the basic sales order data
+    const { data, error } = await supabase
+      .from('sales_orders')
+      .select('*')
+      .eq('sales_order_id', salesOrderId)
+      .single();
+
+    if (error) {
+      console.error("Error fetching sales order details:", error.message);
+      alert("Failed to fetch sales order details.");
+      return null;
+    }
+
+    // 2. Parse the product_entries JSON field if it exists
+    let productEntries = [];
+    if (data.product_entries) {
+      try {
+        // If it's a string, parse it, otherwise use as is
+        productEntries = typeof data.product_entries === 'string'
+          ? JSON.parse(data.product_entries)
+          : data.product_entries;
+      } catch (err) {
+        console.error("Error parsing product entries:", err);
+        productEntries = [];
+      }
+    }
+
+    // 3. Fetch product names for each product ID
+    const productIds = productEntries.map(item => item.product_id).filter(id => id);
+    const CONSULTING_SERVICES = {
+      "CS01": "Consultation",
+      "CS02": "Follow-up Consultation",
+      "CS03": "Special Consultation"
+    };
+    
+    
+    if (productIds.length > 0) {
+      const { data: productsData, error: productsError } = await supabase
+        .from('products')
+        .select('product_id, product_name')
+        .in('product_id', productIds);
+
+      if (!productsError && productsData) {
+        // Create a map of product_id to product_name for quick lookup
+        const productMap = {};
+        productsData.forEach(product => {
+          productMap[product.product_id] = product.product_name;
+        });
+
+        console.log("Product Map:", productMap);
+        
+        
+        // Add product names to the product entries
+        productEntries = productEntries.map(item => ({
+          ...item,
+          name:   productMap[item.product_id] || CONSULTING_SERVICES[item.product_id] || 'N/A'
+        }));
+      } else {
+        console.error("Error fetching product details:", productsError?.message);
+      }
+    }
+
+    // 4. Get customer details
+    let customerDetails = {};
+
+    if (data.mr_number) {
+      // Fetch patient details
+      const { data: patientData, error: patientError } = await supabase
+        .from('patients')
+        .select('name, age, gender, address')
+        .eq('mr_number', data.mr_number)
         .single();
 
-      if (error) {
-        console.error("Error fetching sales order details:", error.message);
-        alert("Failed to fetch sales order details.");
-        return null;
-      }
-
-      // 2. Product entries are already in the sales_orders table as a JSON column
-      // Parse the product_entries JSON field if it exists
-      let productEntries = [];
-      if (data.product_entries) {
-        try {
-          // If it's a string, parse it, otherwise use as is
-          productEntries = typeof data.product_entries === 'string'
-            ? JSON.parse(data.product_entries)
-            : data.product_entries;
-        } catch (err) {
-          console.error("Error parsing product entries:", err);
-          productEntries = [];
-        }
-      }
-
-      // 3. Get customer details
-      let customerDetails = {};
-
-      if (data.mr_number) {
-        // Fetch patient details
-        const { data: patientData, error: patientError } = await supabase
-          .from('patients')
-          .select('name, age, gender, address')
-          .eq('mr_number', data.mr_number)
-          .single();
-
-        if (!patientError && patientData) {
-          customerDetails = {
-            name: patientData.name,
-            age: patientData.age,
-            gender: patientData.gender,
-            address: patientData.address,
-          };
-        } else {
-          console.error("Error fetching patient details:", patientError?.message);
-          customerDetails = {
-            name: 'N/A',
-            age: 'N/A',
-            gender: 'N/A',
-            address: 'N/A',
-          };
-        }
-      } else if (data.customer_id) {
-        // Fetch customer details
-        const { data: customerData, error: customerError } = await supabase
-          .from('customers')
-          .select('name, age, gender, address')
-          .eq('customer_id', data.customer_id)
-          .single();
-
-        if (!customerError && customerData) {
-          customerDetails = {
-            name: customerData.name,
-            age: customerData.age,
-            gender: customerData.gender,
-            address: customerData.address,
-          };
-        } else {
-          console.error("Error fetching customer details:", customerError?.message);
-          customerDetails = {
-            name: 'N/A',
-            age: 'N/A',
-            gender: 'N/A',
-            address: 'N/A',
-          };
-        }
+      if (!patientError && patientData) {
+        customerDetails = {
+          name: patientData.name,
+          age: patientData.age,
+          gender: patientData.gender,
+          address: patientData.address,
+        };
       } else {
+        console.error("Error fetching patient details:", patientError?.message);
         customerDetails = {
           name: 'N/A',
           age: 'N/A',
@@ -378,20 +487,54 @@ const Home = ({ isCollapsed }) => {
           address: 'N/A',
         };
       }
+    } else if (data.customer_id) {
+      // Fetch customer details
+      const { data: customerData, error: customerError } = await supabase
+        .from('customers')
+        .select('name, age, gender, address')
+        .eq('customer_id', data.customer_id)
+        .single();
 
-      // 4. Return combined data
-      return {
-        ...data,
-        items: productEntries, // Use the parsed JSON array
-        customerDetails
+      if (!customerError && customerData) {
+        customerDetails = {
+          name: customerData.name,
+          age: customerData.age,
+          gender: customerData.gender,
+          address: customerData.address,
+        };
+      } else {
+        console.error("Error fetching customer details:", customerError?.message);
+        customerDetails = {
+          name: 'N/A',
+          age: 'N/A',
+          gender: 'N/A',
+          address: 'N/A',
+        };
+      }
+    } else {
+      customerDetails = {
+        name: 'N/A',
+        age: 'N/A',
+        gender: 'N/A',
+        address: 'N/A',
       };
-
-    } catch (err) {
-      console.error("Error in fetchSalesOrderDetails:", err);
-      alert("An unexpected error occurred while fetching sales order details.");
-      return null;
     }
-  };
+
+    // 5. Return combined data
+    return {
+      ...data,
+      items: productEntries, // Use the processed product entries with names
+      customerDetails
+    };
+
+  } catch (err) {
+    console.error("Error in fetchSalesOrderDetails:", err);
+    alert("An unexpected error occurred while fetching sales order details.");
+    return null;
+  }
+};
+
+// ...existing code...
 
   // Acknowledge rejection of a modification request
   const acknowledgeRejection = async (requestId) => {
@@ -1118,8 +1261,8 @@ const Home = ({ isCollapsed }) => {
                         <thead>
                           <tr className="bg-green-100">
                             <th className="px-4 py-2 border text-left">#</th>
-                            <th className="px-4 py-2 border text-left">Product ID</th>
-                            <th className="px-4 py-2 border text-left">Product Name</th>
+                            {/* <th className="px-4 py-2 border text-left">Product ID</th> */}
+                            <th className="px-4 py-2 border text-left">Service Name</th>
                             <th className="px-4 py-2 border text-right">Price (₹)</th>
                             <th className="px-4 py-2 border text-right">Quantity</th>
                             <th className="px-4 py-2 border text-right">Total (₹)</th>
@@ -1133,7 +1276,7 @@ const Home = ({ isCollapsed }) => {
                             return (
                               <tr key={index} className="">
                                 <td className="px-4 py-2 border">{index + 1}</td>
-                                <td className="px-4 py-2 border">{product.product_id || "N/A"}</td>
+                                {/* <td className="px-4 py-2 border">{product.product_id || "N/A"}</td> */}
                                 <td className="px-4 py-2 border">{product.product_name || "N/A"}</td>
                                 <td className="px-4 py-2 border text-right">₹{price.toFixed(2)}</td>
                                 <td className="px-4 py-2 border text-right">{quantity}</td>
@@ -1407,8 +1550,8 @@ const Home = ({ isCollapsed }) => {
                         <thead>
                           <tr className="bg-green-100">
                             <th className="px-4 py-2 border text-left">#</th>
-                            <th className="px-4 py-2 border text-left">Product ID</th>
-                            <th className="px-4 py-2 border text-left">Product Name</th>
+                            {/* <th className="px-4 py-2 border text-left">Product ID</th> */}
+                            <th className="px-4 py-2 border text-left">Service Name</th>
                             <th className="px-4 py-2 border text-right">Price (₹)</th>
                             <th className="px-4 py-2 border text-right">Quantity</th>
                             <th className="px-4 py-2 border text-right">Total (₹)</th>
@@ -1422,7 +1565,7 @@ const Home = ({ isCollapsed }) => {
                             return (
                               <tr key={index} className="">
                                 <td className="px-4 py-2 border">{index + 1}</td>
-                                <td className="px-4 py-2 border">{product.product_id || "N/A"}</td>
+                                {/* <td className="px-4 py-2 border">{product.product_id || "N/A"}</td> */}
                                 <td className="px-4 py-2 border">{product.name || "N/A"}</td>
                                 <td className="px-4 py-2 border text-right">₹{price.toFixed(2)}</td>
                                 <td className="px-4 py-2 border text-right">{quantity}</td>
