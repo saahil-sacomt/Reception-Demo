@@ -1,0 +1,30 @@
+.duplicate-watermark {
+    position: relative;
+}
+
+.duplicate-watermark::before {
+    content: "DUPLICATE";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(-45deg);
+    font-size: 8rem;
+    font-weight: bold;
+    opacity: 0.15;
+    color: #d3d3d3; /* Changed from #ff0000 (red) to #d3d3d3 (light gray) */
+    z-index: 10;
+    pointer-events: none;
+}
+
+/* Only show watermark when printing */
+@media screen {
+    .duplicate-watermark::before {
+        display: none;
+    }
+}
+
+@media print {
+    .duplicate-watermark::before {
+        display: block;
+    }
+}

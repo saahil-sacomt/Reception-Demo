@@ -24,7 +24,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import supabase from '../supabaseClient';
 import { useGlobalState } from "../context/GlobalStateContext";
-
+import '../watermark.css';
 const Home = ({ isCollapsed }) => {
   // Access Global State
   const { state, dispatch } = useGlobalState();
@@ -395,146 +395,146 @@ const Home = ({ isCollapsed }) => {
 
   // ...existing code...
 
-// Fetch sales order details with product entries
-const fetchSalesOrderDetails = async (salesOrderId) => {
-  try {
-    // 1. Fetch the basic sales order data
-    const { data, error } = await supabase
-      .from('sales_orders')
-      .select('*')
-      .eq('sales_order_id', salesOrderId)
-      .single();
+  // Fetch sales order details with product entries
+  const fetchSalesOrderDetails = async (salesOrderId) => {
+    try {
+      // 1. Fetch the basic sales order data
+      const { data, error } = await supabase
+        .from('sales_orders')
+        .select('*')
+        .eq('sales_order_id', salesOrderId)
+        .single();
 
-    if (error) {
-      console.error("Error fetching sales order details:", error.message);
-      alert("Failed to fetch sales order details.");
+      if (error) {
+        console.error("Error fetching sales order details:", error.message);
+        alert("Failed to fetch sales order details.");
+        return null;
+      }
+
+      // 2. Parse the product_entries JSON field if it exists
+      let productEntries = [];
+      if (data.product_entries) {
+        try {
+          // If it's a string, parse it, otherwise use as is
+          productEntries = typeof data.product_entries === 'string'
+            ? JSON.parse(data.product_entries)
+            : data.product_entries;
+        } catch (err) {
+          console.error("Error parsing product entries:", err);
+          productEntries = [];
+        }
+      }
+
+      // 3. Fetch product names for each product ID
+      const productIds = productEntries.map(item => item.product_id).filter(id => id);
+      const CONSULTING_SERVICES = {
+        "CS01": "Consultation",
+        "CS02": "Follow-up Consultation",
+        "CS03": "Special Consultation"
+      };
+
+
+      if (productIds.length > 0) {
+        const { data: productsData, error: productsError } = await supabase
+          .from('products')
+          .select('product_id, product_name')
+          .in('product_id', productIds);
+
+        if (!productsError && productsData) {
+          // Create a map of product_id to product_name for quick lookup
+          const productMap = {};
+          productsData.forEach(product => {
+            productMap[product.product_id] = product.product_name;
+          });
+
+          console.log("Product Map:", productMap);
+
+
+          // Add product names to the product entries
+          productEntries = productEntries.map(item => ({
+            ...item,
+            name: productMap[item.product_id] || CONSULTING_SERVICES[item.product_id] || 'N/A'
+          }));
+        } else {
+          console.error("Error fetching product details:", productsError?.message);
+        }
+      }
+
+      // 4. Get customer details
+      let customerDetails = {};
+
+      if (data.mr_number) {
+        // Fetch patient details
+        const { data: patientData, error: patientError } = await supabase
+          .from('patients')
+          .select('name, age, gender, address')
+          .eq('mr_number', data.mr_number)
+          .single();
+
+        if (!patientError && patientData) {
+          customerDetails = {
+            name: patientData.name,
+            age: patientData.age,
+            gender: patientData.gender,
+            address: patientData.address,
+          };
+        } else {
+          console.error("Error fetching patient details:", patientError?.message);
+          customerDetails = {
+            name: 'N/A',
+            age: 'N/A',
+            gender: 'N/A',
+            address: 'N/A',
+          };
+        }
+      } else if (data.customer_id) {
+        // Fetch customer details
+        const { data: customerData, error: customerError } = await supabase
+          .from('customers')
+          .select('name, age, gender, address')
+          .eq('customer_id', data.customer_id)
+          .single();
+
+        if (!customerError && customerData) {
+          customerDetails = {
+            name: customerData.name,
+            age: customerData.age,
+            gender: customerData.gender,
+            address: customerData.address,
+          };
+        } else {
+          console.error("Error fetching customer details:", customerError?.message);
+          customerDetails = {
+            name: 'N/A',
+            age: 'N/A',
+            gender: 'N/A',
+            address: 'N/A',
+          };
+        }
+      } else {
+        customerDetails = {
+          name: 'N/A',
+          age: 'N/A',
+          gender: 'N/A',
+          address: 'N/A',
+        };
+      }
+
+      // 5. Return combined data
+      return {
+        ...data,
+        items: productEntries, // Use the processed product entries with names
+        customerDetails
+      };
+
+    } catch (err) {
+      console.error("Error in fetchSalesOrderDetails:", err);
+      alert("An unexpected error occurred while fetching sales order details.");
       return null;
     }
+  };
 
-    // 2. Parse the product_entries JSON field if it exists
-    let productEntries = [];
-    if (data.product_entries) {
-      try {
-        // If it's a string, parse it, otherwise use as is
-        productEntries = typeof data.product_entries === 'string'
-          ? JSON.parse(data.product_entries)
-          : data.product_entries;
-      } catch (err) {
-        console.error("Error parsing product entries:", err);
-        productEntries = [];
-      }
-    }
-
-    // 3. Fetch product names for each product ID
-    const productIds = productEntries.map(item => item.product_id).filter(id => id);
-    const CONSULTING_SERVICES = {
-      "CS01": "Consultation",
-      "CS02": "Follow-up Consultation",
-      "CS03": "Special Consultation"
-    };
-    
-    
-    if (productIds.length > 0) {
-      const { data: productsData, error: productsError } = await supabase
-        .from('products')
-        .select('product_id, product_name')
-        .in('product_id', productIds);
-
-      if (!productsError && productsData) {
-        // Create a map of product_id to product_name for quick lookup
-        const productMap = {};
-        productsData.forEach(product => {
-          productMap[product.product_id] = product.product_name;
-        });
-
-        console.log("Product Map:", productMap);
-        
-        
-        // Add product names to the product entries
-        productEntries = productEntries.map(item => ({
-          ...item,
-          name:   productMap[item.product_id] || CONSULTING_SERVICES[item.product_id] || 'N/A'
-        }));
-      } else {
-        console.error("Error fetching product details:", productsError?.message);
-      }
-    }
-
-    // 4. Get customer details
-    let customerDetails = {};
-
-    if (data.mr_number) {
-      // Fetch patient details
-      const { data: patientData, error: patientError } = await supabase
-        .from('patients')
-        .select('name, age, gender, address')
-        .eq('mr_number', data.mr_number)
-        .single();
-
-      if (!patientError && patientData) {
-        customerDetails = {
-          name: patientData.name,
-          age: patientData.age,
-          gender: patientData.gender,
-          address: patientData.address,
-        };
-      } else {
-        console.error("Error fetching patient details:", patientError?.message);
-        customerDetails = {
-          name: 'N/A',
-          age: 'N/A',
-          gender: 'N/A',
-          address: 'N/A',
-        };
-      }
-    } else if (data.customer_id) {
-      // Fetch customer details
-      const { data: customerData, error: customerError } = await supabase
-        .from('customers')
-        .select('name, age, gender, address')
-        .eq('customer_id', data.customer_id)
-        .single();
-
-      if (!customerError && customerData) {
-        customerDetails = {
-          name: customerData.name,
-          age: customerData.age,
-          gender: customerData.gender,
-          address: customerData.address,
-        };
-      } else {
-        console.error("Error fetching customer details:", customerError?.message);
-        customerDetails = {
-          name: 'N/A',
-          age: 'N/A',
-          gender: 'N/A',
-          address: 'N/A',
-        };
-      }
-    } else {
-      customerDetails = {
-        name: 'N/A',
-        age: 'N/A',
-        gender: 'N/A',
-        address: 'N/A',
-      };
-    }
-
-    // 5. Return combined data
-    return {
-      ...data,
-      items: productEntries, // Use the processed product entries with names
-      customerDetails
-    };
-
-  } catch (err) {
-    console.error("Error in fetchSalesOrderDetails:", err);
-    alert("An unexpected error occurred while fetching sales order details.");
-    return null;
-  }
-};
-
-// ...existing code...
+  // ...existing code...
 
   // Acknowledge rejection of a modification request
   const acknowledgeRejection = async (requestId) => {
@@ -1200,57 +1200,60 @@ const fetchSalesOrderDetails = async (salesOrderId) => {
               <>
                 {/* If a work order is selected, show its details */}
                 <div className="bg-white rounded-lg text-gray-800 print:p-0 print:m-0">
-                  <div className="printable-area bg-white p-6 print:w-full print:p-0 print:m-0 print:text-lg">
-                    {/* Header Information */}
-                    <div className="flex justify-between items-start mb-8">
-                      <div className="flex justify-between w-full">
-                        <h2 className="text-xl font-semibold">Work Order</h2>
-                        {/* **Modified: Date and Order ID on the Right Side** */}
-                        <div className="text-right">
-                          <p className="text-sm ">
-                            Date: <strong>{formatDate(selectedWorkOrder.created_at)}</strong>
-                          </p>
-                          <p className="text-sm ">
-                            Work Order No: <strong>{selectedWorkOrder.work_order_id || 'N/A'}</strong>
-                          </p>
-                          {selectedWorkOrder.mr_number && (
+                  <div className="printable-area duplicate-watermark bg-white p-6 print:w-full print:p-0 print:m-0 w-full">
+
+                    <div className="printable-area bg-white p-6 print:w-full print:p-0 print:m-0 print:text-lg">
+                      {/* Header Information */}
+                      <div className="flex justify-between items-start mb-8">
+                        <div className="flex justify-between w-full">
+                          <h2 className="text-xl font-semibold">Work Order</h2>
+                          {/* **Modified: Date and Order ID on the Right Side** */}
+                          <div className="text-right">
                             <p className="text-sm ">
-                              MR Number: <strong>{selectedWorkOrder.mr_number}</strong>
+                              Date: <strong>{formatDate(selectedWorkOrder.created_at)}</strong>
                             </p>
-                          )}
+                            <p className="text-sm ">
+                              Work Order No: <strong>{selectedWorkOrder.work_order_id || 'N/A'}</strong>
+                            </p>
+                            {selectedWorkOrder.mr_number && (
+                              <p className="text-sm ">
+                                MR Number: <strong>{selectedWorkOrder.mr_number}</strong>
+                              </p>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    {/* **Modified: Customer Details Arranged in Two Columns** */}
-                    <div className="mb-8">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* Left Column */}
-                        <div>
-                          <p>
-                            <span className="font-medium">Name:</span>{" "}
-                            <strong>
-                              {selectedWorkOrder.mr_number
-                                ? `${selectedWorkOrder.patient_details?.name || "N/A"} |  ${selectedWorkOrder.patient_details?.age || "N/A"} |  ${selectedWorkOrder.patient_details?.gender || "N/A"}`
-                                : `${selectedWorkOrder.patient_details?.name || "N/A"} |  ${selectedWorkOrder.patient_details?.age || "N/A"} |  ${selectedWorkOrder.patient_details?.gender || "N/A"}`}
-                            </strong>
-                          </p>
-                          <p>
-                            <span className="font-medium">Address:</span>{" "}
-                            <strong>
-                              {selectedWorkOrder.mr_number
-                                ? selectedWorkOrder.patient_details?.address || "N/A"
-                                : selectedWorkOrder.patient_details?.address || "N/A"}
-                            </strong>
-                          </p>
-                          <p>
-                            <span className="font-medium">Phone:</span>{" "}
-                            <strong>
-                              {selectedWorkOrder.mr_number
-                                ? selectedWorkOrder.patient_details?.phone_number || "N/A"
-                                : selectedWorkOrder.patient_details?.phone_number || "N/A"}
-                            </strong>
-                          </p>
+                      {/* **Modified: Customer Details Arranged in Two Columns** */}
+                      <div className="mb-8">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {/* Left Column */}
+                          <div>
+                            <p>
+                              <span className="font-medium">Name:</span>{" "}
+                              <strong>
+                                {selectedWorkOrder.mr_number
+                                  ? `${selectedWorkOrder.patient_details?.name || "N/A"} |  ${selectedWorkOrder.patient_details?.age || "N/A"} |  ${selectedWorkOrder.patient_details?.gender || "N/A"}`
+                                  : `${selectedWorkOrder.patient_details?.name || "N/A"} |  ${selectedWorkOrder.patient_details?.age || "N/A"} |  ${selectedWorkOrder.patient_details?.gender || "N/A"}`}
+                              </strong>
+                            </p>
+                            <p>
+                              <span className="font-medium">Address:</span>{" "}
+                              <strong>
+                                {selectedWorkOrder.mr_number
+                                  ? selectedWorkOrder.patient_details?.address || "N/A"
+                                  : selectedWorkOrder.patient_details?.address || "N/A"}
+                              </strong>
+                            </p>
+                            <p>
+                              <span className="font-medium">Phone:</span>{" "}
+                              <strong>
+                                {selectedWorkOrder.mr_number
+                                  ? selectedWorkOrder.patient_details?.phone_number || "N/A"
+                                  : selectedWorkOrder.patient_details?.phone_number || "N/A"}
+                              </strong>
+                            </p>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1485,61 +1488,64 @@ const fetchSalesOrderDetails = async (salesOrderId) => {
               <>
                 {/* If a sales order is selected, show its details */}
                 <div className="bg-white rounded-lg text-gray-800 print:p-0 print:m-0">
-                  <div className="printable-area bg-white p-6 print:w-full print:p-0 print:m-0 print:text-lg">
-                    {/* Header Information */}
-                    <div className="flex justify-between items-start mb-8">
-                      <div className="flex justify-between w-full">
-                        <h2 className="text-3xl font-bold">Tax Invoice</h2>
-                        {/* **Modified: Date and Order ID on the Right Side** */}
-                        <div className="text-right">
-                          <p className="text-sm ">
-                            Date: <strong>{formatDate(selectedSalesOrder.created_at)}</strong>
-                          </p>
-                          <p className="text-sm ">
-                            Sales Order No: <strong>{selectedSalesOrder.sales_order_id || 'N/A'}</strong>
-                          </p>
-                          {selectedSalesOrder.mr_number && (
+                  <div className="printable-area duplicate-watermark bg-white p-6 print:w-full print:p-0 print:m-0 w-full">
+
+                    <div className="printable-area bg-white p-6 print:w-full print:p-0 print:m-0 print:text-lg">
+                      {/* Header Information */}
+                      <div className="flex justify-between items-start mb-8">
+                        <div className="flex justify-between w-full">
+                          <h2 className="text-3xl font-bold">Tax Invoice</h2>
+                          {/* **Modified: Date and Order ID on the Right Side** */}
+                          <div className="text-right">
                             <p className="text-sm ">
-                              MR Number: <strong>{selectedSalesOrder.mr_number}</strong>
+                              Date: <strong>{formatDate(selectedSalesOrder.created_at)}</strong>
                             </p>
-                          )}
+                            <p className="text-sm ">
+                              Sales Order No: <strong>{selectedSalesOrder.sales_order_id || 'N/A'}</strong>
+                            </p>
+                            {selectedSalesOrder.mr_number && (
+                              <p className="text-sm ">
+                                MR Number: <strong>{selectedSalesOrder.mr_number}</strong>
+                              </p>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    {/* **Modified: Customer Details Arranged in Two Columns** */}
-                    <div className="mb-8">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* Left Column */}
-                        <div>
-                          <p>
-                            <span className="font-medium">Name:</span>{" "}
-                            <strong>
-                              {selectedSalesOrder.mr_number
-                                ? `${selectedSalesOrder.customerDetails?.name || "N/A"} |  ${selectedSalesOrder.customerDetails?.age || "N/A"} |  ${selectedSalesOrder.customerDetails?.gender || "N/A"}`
-                                : `${selectedSalesOrder.customerDetails?.name || "N/A"} |  ${selectedSalesOrder.customerDetails?.age || "N/A"} |  ${selectedSalesOrder.customerDetails?.gender || "N/A"}`}
-                            </strong>
-                          </p>
-                          <p>
-                            <span className="font-medium">Address:</span>{" "}
-                            <strong>
-                              {selectedSalesOrder.mr_number
-                                ? selectedSalesOrder.customerDetails?.address || "N/A"
-                                : selectedSalesOrder.customerDetails?.address || "N/A"}
-                            </strong>
-                          </p>
-                          <p>
-                            <span className="font-medium">Phone:</span>{" "}
-                            <strong>
-                              {selectedSalesOrder.mr_number
-                                ? selectedSalesOrder.patient_phone || "N/A"
-                                : selectedSalesOrder.patient_phone || "N/A"}
-                            </strong>
-                          </p>
-                        </div>
-                        {/* Right Column */}
-                        <div>
+                      {/* **Modified: Customer Details Arranged in Two Columns** */}
+                      <div className="mb-8">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {/* Left Column */}
+                          <div>
+                            <p>
+                              <span className="font-medium">Name:</span>{" "}
+                              <strong>
+                                {selectedSalesOrder.mr_number
+                                  ? `${selectedSalesOrder.customerDetails?.name || "N/A"} |  ${selectedSalesOrder.customerDetails?.age || "N/A"} |  ${selectedSalesOrder.customerDetails?.gender || "N/A"}`
+                                  : `${selectedSalesOrder.customerDetails?.name || "N/A"} |  ${selectedSalesOrder.customerDetails?.age || "N/A"} |  ${selectedSalesOrder.customerDetails?.gender || "N/A"}`}
+                              </strong>
+                            </p>
+                            <p>
+                              <span className="font-medium">Address:</span>{" "}
+                              <strong>
+                                {selectedSalesOrder.mr_number
+                                  ? selectedSalesOrder.customerDetails?.address || "N/A"
+                                  : selectedSalesOrder.customerDetails?.address || "N/A"}
+                              </strong>
+                            </p>
+                            <p>
+                              <span className="font-medium">Phone:</span>{" "}
+                              <strong>
+                                {selectedSalesOrder.mr_number
+                                  ? selectedSalesOrder.patient_phone || "N/A"
+                                  : selectedSalesOrder.patient_phone || "N/A"}
+                              </strong>
+                            </p>
+                          </div>
+                          {/* Right Column */}
+                          <div>
 
+                          </div>
                         </div>
                       </div>
                     </div>
