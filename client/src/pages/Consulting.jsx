@@ -4377,8 +4377,8 @@ const Consulting = memo(({ isCollapsed, onModificationSuccess }) => {
                                             </strong>
                                         </p>
                                         {/* Add this in the printable area, similar to where patient/customer details are displayed */}
-                                        <p className="mt-2">
-                                            <label>Consultant:</label>
+                                        <p className="mt-6 print:mt-6 print:block print:clear-both">
+                                            <label className="inline-block min-w-[80px]">Consultant:</label>
                                             {!useManualConsultant && (
                                                 <select
                                                     value={consultantName}
@@ -4394,7 +4394,7 @@ const Consulting = memo(({ isCollapsed, onModificationSuccess }) => {
                                                 </select>
                                             )}
 
-                                            <div className="mt-2">
+                                            <div className="mt-2 print:hidden">
                                                 <label>
                                                     <input
                                                         type="checkbox"
@@ -4414,6 +4414,12 @@ const Consulting = memo(({ isCollapsed, onModificationSuccess }) => {
                                                     onChange={(e) => setConsultantName(e.target.value)}
                                                     className="border border-gray-300 px-2 py-1 rounded-lg mt-2 w-full"
                                                 />
+                                            )}
+
+                                            {submitted && (
+                                                <strong className="print:hidden text-green-600 ml-2">
+                                                    Order Submitted
+                                                </strong>
                                             )}
                                         </p>
                                     </div>
