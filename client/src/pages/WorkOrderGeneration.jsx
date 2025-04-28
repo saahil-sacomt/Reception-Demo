@@ -35,7 +35,17 @@ const formatDate = (date) => {
   const yyyy = d.getFullYear();
   return `${dd}/${mm}/${yyyy}`;
 };
-
+const getCurrentISTTime = () => {
+  const now = new Date();
+  const options = {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true,
+    timeZone: 'Asia/Kolkata'
+  };
+  return now.toLocaleTimeString('en-IN', options);
+};
 
 const WorkOrderGeneration = ({ isCollapsed }) => {
 
@@ -202,6 +212,18 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   }, [branch]);
 
   const [useManualConsultant, setUseManualConsultant] = useState(false);
+  const [currentTime, setCurrentTime] = useState(getCurrentISTTime());
+
+  // Add this useEffect to update the time when the invoice is shown (step 3 for consulting)
+  useEffect(() => {
+    if (step === 3) {
+      const timer = setInterval(() => {
+        setCurrentTime(getCurrentISTTime());
+      }, 1000);
+
+      return () => clearInterval(timer);
+    }
+  }, [step]);
 
 
   const fetchConsultants = useCallback(async () => {
@@ -2260,6 +2282,9 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                   <div className="text-right">
                     <p>
                       Date: <strong>{formattedDate}</strong>
+                    </p>
+                    <p>
+                      Time:<strong> {currentTime}</strong>
                     </p>
                     <p>
                       Work Order No:<strong> {workOrderId}</strong>
