@@ -23,7 +23,17 @@ const yyyy = today.getFullYear();
 
 const formattedDate = `${dd}/${mm}/${yyyy}`;
 
-
+const getCurrentISTTime = () => {
+    const now = new Date();
+    const options = {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true,
+        timeZone: 'Asia/Kolkata'
+    };
+    return now.toLocaleTimeString('en-IN', options);
+};
 const DEFAULT_CONSULTING_SERVICE = {
     product_id: "CS01",  // Consulting Service ID
     name: "Consultation",
@@ -521,6 +531,18 @@ const Consulting = memo(({ isCollapsed, onModificationSuccess }) => {
     const productRefs = useRef([]);
     const quantityRefs = useRef([]);
     const gstNumberRef = useRef(null);
+    const [currentTime, setCurrentTime] = useState(getCurrentISTTime());
+
+    // Add this useEffect to update the time when the invoice is shown (step 3 for consulting)
+    useEffect(() => {
+        if (step === 3) {
+            const timer = setInterval(() => {
+                setCurrentTime(getCurrentISTTime());
+            }, 1000);
+
+            return () => clearInterval(timer);
+        }
+    }, [step]);
 
 
     const navigate = useNavigate();
@@ -4307,6 +4329,9 @@ const Consulting = memo(({ isCollapsed, onModificationSuccess }) => {
                                         <div className="text-right">
                                             <p>
                                                 Date:<strong> {formattedDate}</strong>
+                                            </p>
+                                            <p>
+                                                Time:<strong> {currentTime}</strong>
                                             </p>
                                             <p>
                                                 Invoice No:<strong> {salesOrderId}</strong>

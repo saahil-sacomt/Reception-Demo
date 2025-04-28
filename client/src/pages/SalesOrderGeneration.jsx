@@ -414,7 +414,27 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
 
   } = salesOrderForm;
 
+  const getCurrentISTTime = () => {
+    const now = new Date();
+    const options = {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true,
+      timeZone: 'Asia/Kolkata'
+    };
+    return now.toLocaleTimeString('en-IN', options);
+  };
+  const [currentTime, setCurrentTime] = useState(getCurrentISTTime());
+  useEffect(() => {
+    if (step === 5) {
+      const timer = setInterval(() => {
+        setCurrentTime(getCurrentISTTime());
+      }, 1000);
 
+      return () => clearInterval(timer);
+    }
+  }, [step]);
   useEffect(() => {
     const handleBeforeUnload = (e) => {
       if (!submitted && !isPrinted) {
@@ -2446,9 +2466,6 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                               <strong>Work Order ID:</strong>{" "}
                               {workOrder.work_order_id}
                             </p>
-                            {/* <p>
-                              <strong>Due Date:</strong> {workOrder.due_date}
-                            </p> */}
                             <p>
                               <strong>Advance Paid:</strong> ₹
                               {parseFloat(workOrder.advance_details).toFixed(2)}
@@ -3624,6 +3641,9 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                         Date:<strong> {formattedDate}</strong>
                       </p>
                       <p>
+                        Time:<strong> {currentTime}</strong>
+                      </p>
+                      <p>
                         Invoice No:<strong> {salesOrderId}</strong>
                       </p>
 
@@ -3939,7 +3959,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                 </button>
 
 
-               { allowPrint && (<button
+                {allowPrint && (<button
                   type="button"
                   onClick={handlePrint}
                   ref={printButtonRef}
