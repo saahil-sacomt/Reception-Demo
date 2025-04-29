@@ -461,48 +461,53 @@ const Home = ({ isCollapsed }) => {
       // }
       // In the fetchSalesOrderDetails function:
 
-      const productIds = productEntries.map(item => item.product_id).filter(id => id);
-      const CONSULTING_SERVICES = {
-        "CS01": "Consultation",
-        "CS02": "Follow-up Consultation",
-        "CS03": "Special Consultation"
-      };
+const productIds = productEntries.map(item => item.product_id).filter(id => id);
+const CONSULTING_SERVICES = {
+  "CS01": "Consultation",
+  "CS02": "Follow-up Consultation",
+  "CS03": "Special Consultation"
+};
 
-      if (productIds.length > 0) {
-        // Filter out consulting service IDs (non-numeric IDs) before querying the database
-        const numericProductIds = productIds.filter(id => !id.startsWith('CS') && !isNaN(id));
+if (productIds.length > 0) {
+  // Fix: Check if id is a string before calling startsWith
+  const numericProductIds = productIds.filter(id => {
+    // Convert to string if it's not already
+    const idStr = String(id);
+    // Then check if it doesn't start with CS and is a valid number
+    return !idStr.startsWith('CS') && !isNaN(idStr);
+  });
 
-        if (numericProductIds.length > 0) {
-          const { data: productsData, error: productsError } = await supabase
-            .from('products')
-            .select('id, product_name')
-            .in('id', numericProductIds);
+  if (numericProductIds.length > 0) {
+    const { data: productsData, error: productsError } = await supabase
+      .from('products')
+      .select('id, product_name')
+      .in('id', numericProductIds);
 
-          if (!productsError && productsData) {
-            // Create a map of product_id to product_name for quick lookup
-            const productMap = {};
-            productsData.forEach(product => {
-              productMap[product.id] = product.product_name;  // Use product.id, not product.product_id
-            });
+    if (!productsError && productsData) {
+      // Create a map of product_id to product_name for quick lookup
+      const productMap = {};
+      productsData.forEach(product => {
+        productMap[product.id] = product.product_name;
+      });
 
-            console.log("Product Map:", productMap);
+      console.log("Product Map:", productMap);
 
-            // Add product names to the product entries
-            productEntries = productEntries.map(item => ({
-              ...item,
-              name: productMap[item.product_id] || CONSULTING_SERVICES[item.product_id] || 'N/A'
-            }));
-          } else {
-            console.error("Error fetching product details:", productsError?.message);
-          }
-        } else {
-          // If we only have consulting service IDs, just map those
-          productEntries = productEntries.map(item => ({
-            ...item,
-            name: CONSULTING_SERVICES[item.product_id] || 'N/A'
-          }));
-        }
-      }
+      // Add product names to the product entries
+      productEntries = productEntries.map(item => ({
+        ...item,
+        name: productMap[item.product_id] || CONSULTING_SERVICES[item.product_id] || 'N/A'
+      }));
+    } else {
+      console.error("Error fetching product details:", productsError?.message);
+    }
+  } else {
+    // If we only have consulting service IDs, just map those
+    productEntries = productEntries.map(item => ({
+      ...item,
+      name: CONSULTING_SERVICES[item.product_id] || 'N/A'
+    }));
+  }
+}
       // 4. Get customer details
       let customerDetails = {};
 
