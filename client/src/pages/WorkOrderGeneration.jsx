@@ -69,10 +69,19 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
     }
   }, []);
 
+  const [insuranceInitialName, setInsuranceInitialName] = useState('');
+  const [showInsuranceModal, setShowInsuranceModal] = useState(false);
+
+  // When opening the modal, save the initial name
+  const openInsuranceModal = () => {
+    setInsuranceInitialName(workOrderForm.insuranceName);
+    setShowInsuranceModal(true);
+  };
+
+
   const { branch, subRole, role } = useAuth();
   // console.log("Branch in WorkOrderGeneration:", branch);
-  console.log("SubRole in WorkOrderGeneration:", subRole);
-  console.log("Branch:", branch);
+  console.log("rerender");
 
 
   const { orderId } = useParams(); // Get orderId from route params
@@ -165,7 +174,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   }, [submitted, isPrinted]);
 
 
-  const [showInsuranceModal, setShowInsuranceModal] = useState(false);
+
   const [consultantName, setConsultantName] = useState('');
   const [consultantList, setConsultantList] = useState([
 
@@ -246,44 +255,59 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   useEffect(() => {
     fetchConsultants();
   }, [fetchConsultants]);
-  const InsuranceModal = ({ isOpen, onClose, onSubmit }) => {
+
+  const InsuranceModal = ({ isOpen, onClose, onSubmit, initialName }) => {
     const [name, setName] = useState('');
 
+    const wasOpen = useRef(false);
+
+    useEffect(() => {
+      if (isOpen && !wasOpen.current) {
+        setName(initialName || '');
+      }
+      wasOpen.current = isOpen;
+    }, [isOpen, initialName]);
+
+
+    if (!isOpen) return null;
+
+    const handleSubmit = () => {
+      onSubmit(name);
+      onClose();
+    };
+
     return (
-      isOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg w-96">
-            <h3 className="text-lg font-semibold mb-4">Enter Insurance Details</h3>
-            <input
-              type="text"
-              placeholder="Enter Insurance Provider Name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-4 py-2 mb-4"
-              autoFocus
-            />
-            <div className="flex justify-end space-x-3">
-              <button
-                onClick={onClose}
-                className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  onSubmit(name);
-                  onClose();
-                }}
-                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
-              >
-                Submit
-              </button>
-            </div>
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white p-6 rounded-lg w-96">
+          <h3 className="text-lg font-semibold mb-4">Enter Insurance Details</h3>
+          <input
+            type="text"
+            placeholder="Enter Insurance Provider Name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="w-full border border-gray-300 rounded-lg px-4 py-2 mb-4"
+            autoFocus
+          />
+          <div className="flex justify-end space-x-3">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSubmit}
+              className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+            >
+              Submit
+            </button>
           </div>
         </div>
-      )
+      </div>
     );
   };
+
+  // ...existing code...
 
   // Initialize productSuggestions as an object for per-product index suggestions
   const [productSuggestions, setProductSuggestions] = useState({});
@@ -599,60 +623,6 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
   // GST Rate and HSN Code
   const GST_RATE = 12; // Total GST is 12% (6% CGST + 6% SGST)
 
-  // Calculate totals
-  // const calculateTotals = useCallback((entries, discountAmt) => {
-  //   // Initialize variables
-  //   let subtotal = 0;
-  //   let validDiscountAmount = 0;
-  //   let discountedSubtotal = 0;
-  //   let cgst = 0;
-  //   let sgst = 0;
-  //   let totalAmount = 0;
-  //   let totalAmountWithGST = 0;
-  //   let discountedTotal = 0;
-
-  //   // Calculate subtotal (price excluding GST)
-  //   subtotal = entries.reduce((total, product) => {
-  //     const price = parseFloat(product.price) || 0; // MRP including GST
-  //     const quantity = parseInt(product.quantity) || 0;
-  //     const basePrice = price / 1.12; // Adjusted price excluding GST
-  //     return total + basePrice * quantity;
-  //   }, 0);
-
-  //   // Calculate total amount including GST (price * quantity)
-  //   totalAmountWithGST = entries.reduce((total, product) => {
-  //     const price = parseFloat(product.price) || 0; // MRP including GST
-  //     const quantity = parseInt(product.quantity) || 0;
-  //     return total + price * quantity;
-  //   }, 0);
-
-  //   // Apply discount
-  //   validDiscountAmount = Math.min(discountAmt || 0, subtotal);
-  //   discountedSubtotal = Math.max(
-  //     (subtotal * 1.12 - validDiscountAmount) / 1.12,
-  //     0
-  //   ); // Prevent negative subtotal
-
-  //   // Calculate GST amounts
-  //   cgst = discountedSubtotal * 0.06;
-  //   sgst = discountedSubtotal * 0.06;
-
-  //   // Calculate total amount including GST
-  //   totalAmount = discountedSubtotal + cgst + sgst;
-
-  //   discountedTotal = totalAmountWithGST - validDiscountAmount;
-
-  //   return {
-  //     subtotal,
-  //     discountAmount: validDiscountAmount,
-  //     discountedSubtotal,
-  //     cgst,
-  //     sgst,
-  //     totalAmount,
-  //     totalAmountWithGST,
-  //     discountedTotal,
-  //   };
-  // }, []);
 
   const calculateTotals = useCallback((entries, discountAmt) => {
     // Initialize variables
@@ -1912,21 +1882,13 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                 onClick={() => {
                   dispatch({
                     type: "SET_WORK_ORDER_FORM",
-                    payload: { hasMrNumber: true },
+                    payload: { hasMrNumber: true }
                   });
-                  setValidationErrors((prev) => {
-                    const { hasMrNumber, ...rest } = prev;
-                    return rest;
-                  });
-                  // Move focus to MR Number input
-                  setTimeout(() => {
-                    mrNumberRef.current?.focus();
-                  }, 0);
                 }}
                 ref={yesButtonRef}
                 className={`px-4 py-2 rounded-lg focus:outline-none ${hasMrNumber === true
                   ? "bg-green-600 text-white"
-                  : "bg-green-500 text-white hover:bg-green-600"
+                  : "bg-green-100 text-green-600 hover:bg-green-300"
                   }`}
                 aria-pressed={hasMrNumber === true}
                 aria-label="Select Yes for MR Number"
@@ -2119,69 +2081,68 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
 
 
             {subRole?.includes("Counselling") ? (
-              // Insurance Section for Counselling
               <div className="space-y-4 mt-6">
                 <div className="flex items-center space-x-4">
                   <span className="font-medium">Is Insurance?</span>
+
                   <button
                     type="button"
                     onClick={() => {
                       dispatch({
                         type: "SET_WORK_ORDER_FORM",
-                        payload: { isInsurance: true }
+                        payload: { isInsurance: true },
                       });
-                      setShowInsuranceModal(true);
                     }}
                     className={`px-4 py-2 rounded-lg ${workOrderForm.isInsurance
-                      ? "bg-green-600 text-white"
-                      : "bg-green-100 text-green-600"
+                        ? "bg-green-600 text-white"
+                        : "bg-green-100 text-green-600"
                       }`}
                   >
                     Yes
                   </button>
+
                   <button
                     type="button"
                     onClick={() => {
                       dispatch({
                         type: "SET_WORK_ORDER_FORM",
-                        payload: {
-                          isInsurance: false,
-                          insuranceName: ''
-                        }
+                        payload: { isInsurance: false, insuranceName: '' },
                       });
                     }}
                     className={`px-4 py-2 rounded-lg ${workOrderForm.isInsurance === false
-                      ? "bg-red-600 text-white"
-                      : "bg-red-100 text-red-600"
+                        ? "bg-red-600 text-white"
+                        : "bg-red-100 text-red-600"
                       }`}
                   >
                     No
                   </button>
                 </div>
 
-                {workOrderForm.isInsurance && workOrderForm.insuranceName && (
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <p className="text-sm">
-                      <span className="font-medium">Insurance Provider:</span> {workOrderForm.insuranceName}
-                    </p>
+                {workOrderForm.isInsurance && (
+                  <div className="space-y-2">
+                    <label className="block font-medium text-gray-700">
+                      Insurance Provider Name
+                    </label>
+                    <input
+                      type="text"
+                      value={workOrderForm.insuranceName}
+                      onChange={(e) =>
+                        dispatch({
+                          type: "SET_WORK_ORDER_FORM",
+                          payload: { insuranceName: e.target.value },
+                        })
+                      }
+                      placeholder="Enter Insurance Provider Name"
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2"
+                    />
                   </div>
                 )}
-
-                <InsuranceModal
-                  isOpen={showInsuranceModal}
-                  onClose={() => setShowInsuranceModal(false)}
-                  onSubmit={(name) => {
-                    dispatch({
-                      type: "SET_WORK_ORDER_FORM",
-                      payload: { insuranceName: name }
-                    });
-                  }}
-                />
               </div>
             ) : (
               <div className="space-y-4 mt-6">
                 <div className="flex items-center space-x-4">
                   <span className="font-medium">B2B Customer?</span>
+
                   <button
                     type="button"
                     onClick={() => {
@@ -2195,6 +2156,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                   >
                     Yes
                   </button>
+
                   <button
                     type="button"
                     onClick={() => {
@@ -2232,6 +2194,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                 )}
               </div>
             )}
+
 
 
             {/* GST Number Input for B2B Orders */}
@@ -2419,21 +2382,6 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                 {/* Financial Summary */}
                 <div className="flex justify-between mb-6 space-x-8">
                   <div>
-                    {/* <p>
-                      Amt. after discount:<strong> ₹{subtotal.toFixed(2)}</strong>
-                    </p> */}
-
-                    {/* <p>
-                      Amt. after discount:
-                      <strong> ₹{discountedSubtotal.toFixed(2)}</strong>
-                    </p> */}
-
-                    {/* <p>
-                      CGST (6%):<strong> ₹{cgst.toFixed(2)}</strong>
-                    </p>
-                    <p>
-                      SGST (6%):<strong> ₹{sgst.toFixed(2)}</strong>
-                    </p> */}
                     <p>
                       Payment Method:
                       <strong>
@@ -2444,18 +2392,6 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                     </p>
                   </div>
                   <div className="text-right">
-                    {/* <p>
-                      Total Amount (Incl. GST):
-                      <strong> ₹{totalAmountWithGST.toFixed(2)}</strong>
-                    </p> */}
-                    {/* <p>
-                      Discount Amount:
-                      <strong> ₹{validDiscountAmount.toFixed(2)}</strong>
-                    </p> */}
-
-                    {/* <p>
-                      Advance Paid:<strong> ₹{advance.toFixed(2)}</strong>
-                    </p> */}
                     <p className="text-xl">
                       <strong>Sub total :{" "}
                         ₹{discountedTotal.toFixed(2)}</strong>
@@ -2463,10 +2399,6 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                     <p className="text-xl">
                       <strong>Total Amt.: ₹{balanceDue.toFixed(2)}</strong>
                     </p>
-
-                    {/* <p className="text-red-500">
-                        Advance paid exceeds the total amount by ₹{excessAmount.toFixed(2)}.
-                      </p> */}
 
                     <div className="mt-10 space-x-8">
                       <p>
