@@ -437,8 +437,8 @@ const Home = ({ isCollapsed }) => {
       if (productIds.length > 0) {
         const { data: productsData, error: productsError } = await supabase
           .from('products')
-          .select('product_id, product_name')
-          .in('product_id', productIds);
+          .select('id, product_name')
+          .in('id', productIds);
 
         if (!productsError && productsData) {
           // Create a map of product_id to product_name for quick lookup
