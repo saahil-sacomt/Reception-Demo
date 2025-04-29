@@ -426,6 +426,41 @@ const Home = ({ isCollapsed }) => {
       }
 
       // 3. Fetch product names for each product ID
+      // const productIds = productEntries.map(item => item.product_id).filter(id => id);
+      // const CONSULTING_SERVICES = {
+      //   "CS01": "Consultation",
+      //   "CS02": "Follow-up Consultation",
+      //   "CS03": "Special Consultation"
+      // };
+
+
+      // if (productIds.length > 0) {
+      //   const { data: productsData, error: productsError } = await supabase
+      //     .from('products')
+      //     .select('id, product_name')
+      //     .in('id', productIds);
+
+      //   if (!productsError && productsData) {
+      //     // Create a map of product_id to product_name for quick lookup
+      //     const productMap = {};
+      //     productsData.forEach(product => {
+      //       productMap[product.product_id] = product.product_name;
+      //     });
+
+      //     console.log("Product Map:", productMap);
+
+
+      //     // Add product names to the product entries
+      //     productEntries = productEntries.map(item => ({
+      //       ...item,
+      //       name: productMap[item.product_id] || CONSULTING_SERVICES[item.product_id] || 'N/A'
+      //     }));
+      //   } else {
+      //     console.error("Error fetching product details:", productsError?.message);
+      //   }
+      // }
+      // In the fetchSalesOrderDetails function:
+
       const productIds = productEntries.map(item => item.product_id).filter(id => id);
       const CONSULTING_SERVICES = {
         "CS01": "Consultation",
@@ -433,33 +468,41 @@ const Home = ({ isCollapsed }) => {
         "CS03": "Special Consultation"
       };
 
-
       if (productIds.length > 0) {
-        const { data: productsData, error: productsError } = await supabase
-          .from('products')
-          .select('id, product_name')
-          .in('id', productIds);
+        // Filter out consulting service IDs (non-numeric IDs) before querying the database
+        const numericProductIds = productIds.filter(id => !id.startsWith('CS') && !isNaN(id));
 
-        if (!productsError && productsData) {
-          // Create a map of product_id to product_name for quick lookup
-          const productMap = {};
-          productsData.forEach(product => {
-            productMap[product.product_id] = product.product_name;
-          });
+        if (numericProductIds.length > 0) {
+          const { data: productsData, error: productsError } = await supabase
+            .from('products')
+            .select('id, product_name')
+            .in('id', numericProductIds);
 
-          console.log("Product Map:", productMap);
+          if (!productsError && productsData) {
+            // Create a map of product_id to product_name for quick lookup
+            const productMap = {};
+            productsData.forEach(product => {
+              productMap[product.id] = product.product_name;  // Use product.id, not product.product_id
+            });
 
+            console.log("Product Map:", productMap);
 
-          // Add product names to the product entries
+            // Add product names to the product entries
+            productEntries = productEntries.map(item => ({
+              ...item,
+              name: productMap[item.product_id] || CONSULTING_SERVICES[item.product_id] || 'N/A'
+            }));
+          } else {
+            console.error("Error fetching product details:", productsError?.message);
+          }
+        } else {
+          // If we only have consulting service IDs, just map those
           productEntries = productEntries.map(item => ({
             ...item,
-            name: productMap[item.product_id] || CONSULTING_SERVICES[item.product_id] || 'N/A'
+            name: CONSULTING_SERVICES[item.product_id] || 'N/A'
           }));
-        } else {
-          console.error("Error fetching product details:", productsError?.message);
         }
       }
-
       // 4. Get customer details
       let customerDetails = {};
 
