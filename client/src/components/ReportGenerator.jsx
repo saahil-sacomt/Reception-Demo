@@ -21,37 +21,33 @@ const getColumnStyles = (reportType, isEmployee = false) => {
     case 'sales_orders':
       if (isEmployee) {
         return {
-          0: { halign: 'center', cellWidth: 24 },
-          1: { halign: 'center', cellWidth: 19 },
-          2: { halign: 'center', cellWidth: 14 },
-          3: { halign: 'center', cellWidth: 19 },
-          4: { halign: 'center', cellWidth: 14 },
-          5: { halign: 'center', cellWidth: 14 },
-          6: { halign: 'center', cellWidth: 19 },
-          7: { halign: 'center', cellWidth: 19 },
-          8: { halign: 'center', cellWidth: 20 },
-          9: { halign: 'center', cellWidth: 19 },
-          10: { halign: 'center', cellWidth: 19 },
-          11: { halign: 'center', cellWidth: 22 },
-          12: { halign: 'center', cellWidth: 22 },
+          0: { halign: 'center', cellWidth: 30 },
+          1: { halign: 'center', cellWidth: 25 },
+          2: { halign: 'center', cellWidth: 25 },
+          3: { halign: 'center', cellWidth: 20 },
+          4: { halign: 'center', cellWidth: 20 },
+          5: { halign: 'center', cellWidth: 20 },
+          6: { halign: 'center', cellWidth: 25 },
+          7: { halign: 'center', cellWidth: 25 },
+          8: { halign: 'center', cellWidth: 25 },
+          9: { halign: 'center', cellWidth: 25 },
+          10: { halign: 'center', cellWidth: 25 },
         };
       } else {
         return {
-          0: { halign: 'center', cellWidth: 24 },
-          1: { halign: 'center', cellWidth: 19 },
-          2: { halign: 'center', cellWidth: 14 },
-          3: { halign: 'center', cellWidth: 19 },
-          4: { halign: 'center', cellWidth: 14 },
-          5: { halign: 'center', cellWidth: 14 },
-          6: { halign: 'center', cellWidth: 19 },
-          7: { halign: 'center', cellWidth: 19 },
-          8: { halign: 'center', cellWidth: 20 },
-          9: { halign: 'center', cellWidth: 19 },
-          10: { halign: 'center', cellWidth: 19 },
-          11: { halign: 'center', cellWidth: 22 },
-          12: { halign: 'center', cellWidth: 22 },
-          13: { halign: 'center', cellWidth: 20 },
-          14: { halign: 'center', cellWidth: 20 },
+          0: { halign: 'center', cellWidth: 35 },
+          1: { halign: 'center', cellWidth: 28 },
+          2: { halign: 'center', cellWidth: 20 },
+          3: { halign: 'center', cellWidth: 25 },
+          4: { halign: 'center', cellWidth: 25 },
+          5: { halign: 'center', cellWidth: 16 },
+          6: { halign: 'center', cellWidth: 18 },
+          7: { halign: 'center', cellWidth: 16 },
+          8: { halign: 'center', cellWidth: 16 },
+          9: { halign: 'center', cellWidth: 20 },
+          10: { halign: 'center', cellWidth: 20 },
+          11: { halign: 'center', cellWidth: 28 },
+          12: { halign: 'center', cellWidth: 28 },
         };
       }
 
@@ -68,15 +64,15 @@ const getColumnStyles = (reportType, isEmployee = false) => {
         };
       } else {
         return {
-          0: { halign: 'center', cellWidth: 25 },
-          1: { halign: 'center', cellWidth: 30 },
-          2: { halign: 'center', cellWidth: 20 },
-          3: { halign: 'center', cellWidth: 20 },
-          4: { halign: 'center', cellWidth: 20 },
-          5: { halign: 'center', cellWidth: 20 },
-          6: { halign: 'center', cellWidth: 20 },
-          7: { halign: 'center', cellWidth: 25 },
-          8: { halign: 'center', cellWidth: 25 },
+          0: { halign: 'center', cellWidth: 30 },
+          1: { halign: 'center', cellWidth: 40 },
+          2: { halign: 'center', cellWidth: 25 },
+          3: { halign: 'center', cellWidth: 25 },
+          4: { halign: 'center', cellWidth: 35 },
+          5: { halign: 'center', cellWidth: 28 },
+          6: { halign: 'center', cellWidth: 28 },
+          7: { halign: 'center', cellWidth: 35 },
+          8: { halign: 'center', cellWidth: 30 },
         };
       }
 
@@ -94,24 +90,22 @@ const getColumnStyles = (reportType, isEmployee = false) => {
           8: { halign: 'center', cellWidth: 15 },
           9: { halign: 'center', cellWidth: 15 },
           10: { halign: 'center', cellWidth: 20 },
-          11: { halign: 'center', cellWidth: 20 },
         };
       } else {
         return {
-          0: { halign: 'center', cellWidth: 25 },
+          0: { halign: 'center', cellWidth: 35 },
           1: { halign: 'center', cellWidth: 20 },
           2: { halign: 'center', cellWidth: 20 },
-          3: { halign: 'center', cellWidth: 20 },
+          3: { halign: 'center', cellWidth: 28 },
           4: { halign: 'center', cellWidth: 20 },
           5: { halign: 'center', cellWidth: 20 },
-          6: { halign: 'center', cellWidth: 20 },
-          7: { halign: 'center', cellWidth: 15 },
-          8: { halign: 'center', cellWidth: 15 },
+          6: { halign: 'center', cellWidth: 28 },
+          7: { halign: 'center', cellWidth: 19 },
+          8: { halign: 'center', cellWidth: 19 },
           9: { halign: 'center', cellWidth: 15 },
           10: { halign: 'center', cellWidth: 20 },
           11: { halign: 'center', cellWidth: 25 },
-          12: { halign: 'center', cellWidth: 25 },
-          13: { halign: 'center', cellWidth: 20 },
+          12: { halign: 'center', cellWidth: 22 },
         };
       }
 
@@ -212,9 +206,9 @@ const getColumnStyles = (reportType, isEmployee = false) => {
         };
       } else {
         return {
-          0: { halign: 'center', cellWidth: 25 },
+          0: { halign: 'center', cellWidth: 29 },
           1: { halign: 'center', cellWidth: 25 },
-          2: { halign: 'center', cellWidth: 20 },
+          2: { halign: 'center', cellWidth: 25 },
           3: { halign: 'center', cellWidth: 20 },
           4: { halign: 'center', cellWidth: 20 },
           5: { halign: 'center', cellWidth: 20 },
@@ -337,24 +331,12 @@ const getColumnStyles = (reportType, isEmployee = false) => {
 };
 
 const addHeader = (doc, logoDataUrl, reportDetails) => {
-  if (logoDataUrl) {
-    const imgProps = doc.getImageProperties(logoDataUrl);
-    const pdfWidth = doc.internal.pageSize.getWidth();
-    const imgWidth = 30;
-    const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
-    const xPos = (pdfWidth - imgWidth) / 2;
-    const yPos = 10;
-    doc.addImage(logoDataUrl, 'PNG', xPos, yPos, imgWidth, imgHeight);
-  }
-
-  doc.setFontSize(10);
-  doc.text('GSTIN: 32AAUCS7002H1ZB', doc.internal.pageSize.getWidth() / 2, 35, { align: 'center' });
 
   doc.setFontSize(14);
   const reportTitle = `${capitalizeFirstLetter(reportDetails.type)} Report - ${capitalizeFirstLetter(
     reportDetails.reportTypeLabel
   )}`;
-  doc.text(reportTitle, doc.internal.pageSize.getWidth() / 2, 45, { align: 'center' });
+  doc.text(reportTitle, doc.internal.pageSize.getWidth() / 2, 15, { align: 'center' });
 
   doc.setFontSize(10);
   let periodText = '';
@@ -498,33 +480,106 @@ const ReportGenerator = ({ isCollapsed }) => {
     fetchPurchaseFromForPurchases();
   }, [reportType]);
 
-  useEffect(() => {
-    const fetchPatientsAndCustomers = async () => {
-      try {
-        const { data: patientsData, error: patientsError } = await supabase
-          .from('patients')
-          .select('mr_number, name');
+  // useEffect(() => {
+  //   const fetchPatientsAndCustomers = async () => {
+  //     try {
+  //       const { data: patientsData, error: patientsError } = await supabase
+  //         .from('patients')
+  //         .select('mr_number, name');
 
-        if (patientsError) throw patientsError;
+  //       if (patientsError) throw patientsError;
 
-        setPatients(patientsData);
+  //       setPatients(patientsData);
 
-        const { data: customersData, error: customersError } = await supabase
-          .from('customers')
-          .select('customer_id, name');
+  //       const { data: customersData, error: customersError } = await supabase
+  //         .from('customers')
+  //         .select('customer_id, name');
 
-        if (customersError) throw customersError;
 
-        setCustomers(customersData);
-      } catch (err) {
-        console.error('Error fetching patients or customers:', err);
-      }
-    };
 
-    if (reportType === 'consolidated') {
-      fetchPatientsAndCustomers();
-    }
-  }, [reportType]);
+  //       if (customersError) throw customersError;
+
+  //       console.log("Fetched customers data:", patientsData);
+  //       setPatients(patientsData);
+
+
+  //       setCustomers(customersData);
+  //     } catch (err) {
+  //       console.error('Error fetching patients or customers:', err);
+  //     }
+  //   };
+
+  //   if (reportType === 'consolidated') {
+  //     fetchPatientsAndCustomers();
+  //   }
+  // }, [reportType]);
+
+  // useEffect(() => {
+  //   const fetchPatients = async () => {
+  //     try {
+  //       setLoading(true);
+  //       let allPatients = [];
+  //       let currentPage = 0;
+  //       const pageSize = 1000;
+  //       let hasMoreRecords = true;
+
+  //       console.log("Starting to fetch all patient records...");
+
+  //       // Keep fetching until no more records
+  //       while (hasMoreRecords) {
+  //         const from = currentPage * pageSize;
+  //         const to = from + pageSize - 1;
+
+  //         console.log(`Fetching patients batch ${currentPage + 1} (range: ${from}-${to})...`);
+
+  //         const { data, error, count } = await supabase
+  //           .from('patients')
+  //           .select('id, mr_number, name', { count: 'exact' })
+  //           .range(from, to);
+
+  //         if (error) throw error;
+
+  //         if (data.length > 0) {
+  //           console.log(`Received ${data.length} patients in batch ${currentPage + 1}`);
+  //           allPatients = [...allPatients, ...data];
+  //           currentPage++;
+
+  //           // Show progress
+  //           if (count && count > 0) {
+  //             const progress = Math.round((allPatients.length / count) * 100);
+  //             console.log(`Progress: ${progress}% (${allPatients.length}/${count})`);
+  //           }
+  //         }
+
+  //         // If we got fewer records than requested, we've reached the end
+  //         if (!data || data.length < pageSize) {
+  //           hasMoreRecords = false;
+  //         }
+  //       }
+
+  //       console.log(`✓ Total patients fetched: ${allPatients.length}`);
+  //       setPatients(allPatients);
+
+  //       // Fetch customers (keep as is)
+  //       const { data: customersData, error: customersError } = await supabase
+  //         .from('customers')
+  //         .select('customer_id, name');
+
+  //       if (customersError) throw customersError;
+  //       setCustomers(customersData);
+
+  //     } catch (err) {
+  //       console.error('Error fetching patients data:', err.message);
+  //       setError(`Failed to fetch all patient data: ${err.message}`);
+  //     } finally {
+  //       setLoading(false);
+  //     }
+  //   };
+
+  //   if (reportType === 'consolidated') {
+  //     fetchPatients();
+  //   }
+  // }, [reportType]);
 
   const getLastDayOfMonth = (year, month) => {
     return new Date(year, month, 0).getDate();
@@ -842,6 +897,7 @@ const ReportGenerator = ({ isCollapsed }) => {
         }
 
 
+
         // case 'consolidated': {
         //   const salesQuery = supabase
         //     .from('sales_orders')
@@ -877,9 +933,14 @@ const ReportGenerator = ({ isCollapsed }) => {
         //   });
 
         //   const patientMap = {};
+        //   console.log("Creating patient map from", patients.length, "patients");
         //   patients.forEach(patient => {
-        //     patientMap[patient.mr_number] = patient.name;
+        //     if (patient.mr_number) {
+        //       patientMap[String(patient.mr_number)] = patient.name;
+        //     }
         //   });
+
+        //   console.log("Patient map sample:", Object.entries(patientMap).slice(0, 5));
 
         //   // Track which work orders have sales orders
         //   const workOrdersWithSales = new Set();
@@ -888,77 +949,8 @@ const ReportGenerator = ({ isCollapsed }) => {
         //       workOrdersWithSales.add(sale.work_order_id);
         //     }
         //   });
-
-        //   // Filter work orders to include only those without corresponding sales orders
-        //   const filteredWorkData = workData.filter(work => !workOrdersWithSales.has(work.work_order_id));
-
-        //   // Identify OPD sales
-        //   const opdSales = salesData.filter(sale =>
-        //     sale.work_order_id?.startsWith('OPW-') ||
-        //     sale.sales_order_id?.startsWith('OPS-')
-        //   );
-
-        //   const totalOPD = opdSales.reduce((sum, order) =>
-        //     sum + (parseFloat(order.total_amount) || 0), 0
-        //   );
-
-        //   // Add totalOPD to reportDetails
-        //   reportDetails.totalOPD = totalOPD;
-
-        //   // Create consolidated sales data
-        //   const consolidatedSales = salesData.map(sale => {
-        //     let customerName = customerMap[sale.customer_id] || 'N/A';
-        //     const totalGST = (parseFloat(sale.cgst) || 0) + (parseFloat(sale.sgst) || 0);
-
-        //     return {
-        //       sales_order_id: sale.sales_order_id || 'N/A',
-        //       work_order_id: sale.work_order_id || 'N/A',
-        //       mr_number: sale.mr_number || 'N/A',
-        //       total_amount: parseFloat(sale.total_amount) || 0,
-        //       total_gst: totalGST,
-        //       discount: parseFloat(sale.discount) || 0,
-        //       advance_collected: parseFloat(sale.advance_details) || 0,
-        //       balance_collected: parseFloat(sale.total_amount || 0) - parseFloat(sale.advance_details || 0),
-        //       total_collected: parseFloat(sale.total_amount) || 0,
-        //       patient_customer_name: patientMap[sale.mr_number] || customerName || 'N/A',
-        //       branch: sale.branch || 'N/A',
-        //       created_at: sale.created_at ? formatDateDDMMYYYY(sale.created_at, true) : 'N/A',
-        //       updated_at: sale.updated_at ? formatDateDDMMYYYY(sale.updated_at, true) : 'N/A',
-        //     };
-        //   });
-
-        //   // Create consolidated work orders (using actual values from work orders, not zeros)
-        //   const consolidatedWork = filteredWorkData.map(work => {
-        //     let customerName = customerMap[work.customer_id] || 'N/A';
-        //     const totalGST = (parseFloat(work.cgst) || 0) + (parseFloat(work.sgst) || 0);
-        //     const workTotalAmount = parseFloat(work.total_amount) || 0;
-        //     const advanceCollected = parseFloat(work.advance_details) || 0;
-
-        //     return {
-        //       sales_order_id: 'N/A',
-        //       work_order_id: work.work_order_id || 'N/A',
-        //       mr_number: work.mr_number || 'N/A',
-        //       total_amount: workTotalAmount,
-        //       total_gst: totalGST,
-        //       discount: parseFloat(work.discount_amount) || 0,
-        //       advance_collected: advanceCollected,
-        //       balance_collected: workTotalAmount - advanceCollected,
-        //       total_collected: advanceCollected, // For work orders, only advance is collected
-        //       patient_customer_name: patientMap[work.mr_number] || customerName || 'N/A',
-        //       branch: work.branch || 'N/A',
-        //       created_at: work.created_at ? formatDateDDMMYYYY(work.created_at, true) : 'N/A',
-        //       updated_at: work.updated_at ? formatDateDDMMYYYY(work.updated_at, true) : 'N/A',
-        //     };
-        //   });
-
-        //   const consolidatedData = [...consolidatedSales, ...consolidatedWork];
-        //   fetchedData = consolidatedData;
-        //   break;
-        // }
-
-        // ...existing code...
-
         case 'consolidated': {
+          // Fetch sales and work data first
           const salesQuery = supabase
             .from('sales_orders')
             .select('sales_order_id, work_order_id, mr_number, final_amount, cgst, sgst, total_amount, created_at, updated_at, branch, customer_id, discount, advance_details')
@@ -972,7 +964,6 @@ const ReportGenerator = ({ isCollapsed }) => {
           const { data: salesData, error: salesError } = await salesQuery;
           if (salesError) throw salesError;
 
-          // Include all necessary fields from work orders
           const workQuery = supabase
             .from('work_orders')
             .select('work_order_id, advance_details, mr_number, created_at, updated_at, branch, customer_id, total_amount, cgst, sgst, discount_amount')
@@ -986,17 +977,36 @@ const ReportGenerator = ({ isCollapsed }) => {
           const { data: workData, error: workError } = await workQuery;
           if (workError) throw workError;
 
-          // Create customer and patient maps
-          const customerMap = {};
-          customers.forEach(customer => {
-            customerMap[customer.customer_id] = customer.name;
+          // Extract unique MR numbers from sales and work orders
+          const mrNumbers = new Set();
+          salesData.forEach(sale => {
+            if (sale.mr_number) mrNumbers.add(String(sale.mr_number));
+          });
+          workData.forEach(work => {
+            if (work.mr_number) mrNumbers.add(String(work.mr_number));
           });
 
+          const mrNumbersArray = Array.from(mrNumbers);
+          console.log(`Found ${mrNumbersArray.length} unique MR numbers to look up`);
+
+          // Only fetch patients that match these MR numbers
+          const { data: patientsData, error: patientsError } = await supabase
+            .from('patients')
+            .select('mr_number, name')
+            .in('mr_number', mrNumbersArray);
+
+          if (patientsError) throw patientsError;
+          console.log(`Fetched ${patientsData?.length || 0} matching patient records`);
+
+          // Create patient map using fetched data
           const patientMap = {};
-          patients.forEach(patient => {
-            patientMap[patient.mr_number] = patient.name;
+          patientsData.forEach(patient => {
+            if (patient.mr_number) {
+              patientMap[String(patient.mr_number)] = patient.name;
+            }
           });
 
+          // Continue with the rest of the code...
           // Track which work orders have sales orders
           const workOrdersWithSales = new Set();
           salesData.forEach(sale => {
@@ -1023,7 +1033,7 @@ const ReportGenerator = ({ isCollapsed }) => {
 
           // Create consolidated sales data
           const consolidatedSales = salesData.map(sale => {
-            let customerName = customerMap[sale.customer_id] || 'N/A';
+            let customerName =  'N/A';
             const totalGST = (parseFloat(sale.cgst) || 0) + (parseFloat(sale.sgst) || 0);
 
             return {
@@ -1046,7 +1056,7 @@ const ReportGenerator = ({ isCollapsed }) => {
 
           // Create consolidated work orders (using actual values from work orders, not zeros)
           const consolidatedWork = filteredWorkData.map(work => {
-            let customerName = customerMap[work.customer_id] || 'N/A';
+            let customerName = 'N/A';
             const totalGST = (parseFloat(work.cgst) || 0) + (parseFloat(work.sgst) || 0);
             const workTotalAmount = parseFloat(work.total_amount) || 0;
             const advanceCollected = parseFloat(work.advance_details) || 0;
@@ -1317,8 +1327,8 @@ const ReportGenerator = ({ isCollapsed }) => {
           'Balance Due',
           'Employee',
           'Payment Method',
-          'Loyalty Points Redeemed',
-          'Loyalty Points Added',
+          // 'Loyalty Points Redeemed',
+          // 'Loyalty Points Added',
         ] : [
           'Sales Order ID',
           'MR Number',
@@ -1331,8 +1341,8 @@ const ReportGenerator = ({ isCollapsed }) => {
           'Balance Due',
           'Employee',
           'Payment Method',
-          'Loyalty Points Redeemed',
-          'Loyalty Points Added',
+          // 'Loyalty Points Redeemed',
+          // 'Loyalty Points Added',
           'Created At',
           'Updated At',
         ];
@@ -1374,7 +1384,6 @@ const ReportGenerator = ({ isCollapsed }) => {
           'CGST',
           'SGST',
           'Is B2B',
-          'HSN Code',
         ] : [
           'Work Order ID',
           'Advance Details',
@@ -1386,7 +1395,6 @@ const ReportGenerator = ({ isCollapsed }) => {
           'CGST',
           'SGST',
           'Is B2B',
-          'HSN Code',
           'Created At',
           'Updated At',
           'Branch',
@@ -1592,12 +1600,12 @@ const ReportGenerator = ({ isCollapsed }) => {
             : '0.00', // Balance Due
           record.employee || 'N/A',
           record.payment_method || 'N/A',
-          record.loyalty_points_redeemed !== undefined
-            ? record.loyalty_points_redeemed
-            : '0',
-          record.loyalty_points_added !== undefined
-            ? record.loyalty_points_added
-            : '0',
+          // record.loyalty_points_redeemed !== undefined
+          //   ? record.loyalty_points_redeemed
+          //   : '0',
+          // record.loyalty_points_added !== undefined
+          //   ? record.loyalty_points_added
+          //   : '0',
         ]) : data.map((record) => [
           record.sales_order_id || 'N/A',
           record.mr_number || 'N/A',
@@ -1612,12 +1620,12 @@ const ReportGenerator = ({ isCollapsed }) => {
             : '0.00', // Balance Due
           record.employee || 'N/A',
           record.payment_method || 'N/A',
-          record.loyalty_points_redeemed !== undefined
-            ? record.loyalty_points_redeemed
-            : '0',
-          record.loyalty_points_added !== undefined
-            ? record.loyalty_points_added
-            : '0',
+          // record.loyalty_points_redeemed !== undefined
+          //   ? record.loyalty_points_redeemed
+          //   : '0',
+          // record.loyalty_points_added !== undefined
+          //   ? record.loyalty_points_added
+          //   : '0',
           record.created_at
             ? formatDateDDMMYYYY(record.created_at, true)
             : 'N/A',
@@ -1710,7 +1718,6 @@ const ReportGenerator = ({ isCollapsed }) => {
           record.cgst ? Number(record.cgst).toFixed(2) : '0.00',
           record.sgst ? Number(record.sgst).toFixed(2) : '0.00',
           record.is_b2b ? 'Yes' : 'No',
-          record.hsn_code || 'N/A',
         ]) : data.map((record) => [
           record.work_order_id || 'N/A',
           record.advance_details
@@ -1727,7 +1734,6 @@ const ReportGenerator = ({ isCollapsed }) => {
           record.cgst ? Number(record.cgst).toFixed(2) : '0.00',
           record.sgst ? Number(record.sgst).toFixed(2) : '0.00',
           record.is_b2b ? 'Yes' : 'No',
-          record.hsn_code || 'N/A',
           record.created_at
             ? formatDateDDMMYYYY(record.created_at, true)
             : 'N/A',
@@ -1949,10 +1955,38 @@ const ReportGenerator = ({ isCollapsed }) => {
     setReportData([tableColumn, ...tableRows]);
 
     // Generate the main table
+    // doc.autoTable({
+    //   head: [tableColumn],
+    //   body: tableRows,
+    //   startY: 65, // Adjusted to utilize more vertical space
+    //   styles: {
+    //     fontSize: 7,
+    //     cellPadding: 2,
+    //     halign: 'center',
+    //     valign: 'middle',
+    //     overflow: 'linebreak',
+    //     cellWidth: 'wrap',
+    //   }, // Smaller font, linebreak for overflow
+    //   headStyles: {
+    //     fillColor: [0, 160, 0], // Green header
+    //     halign: 'center',
+    //     textColor: 255,
+    //     fontSize: 9,
+    //     overflow: 'linebreak',
+    //     cellWidth: 'wrap',
+    //   },
+    //   alternateRowStyles: { fillColor: [245, 245, 245] },
+    //   margin: { left: 10, right: 10 },
+    //   theme: 'striped',
+    //   showHead: 'everyPage',
+    //   pageBreak: 'auto',
+    //   columnStyles: getColumnStyles(reportType, isEmployee),
+    // });
+
     doc.autoTable({
       head: [tableColumn],
       body: tableRows,
-      startY: 65, // Adjusted to utilize more vertical space
+      startY: 30, // Adjusted to utilize more vertical space
       styles: {
         fontSize: 7,
         cellPadding: 2,
@@ -1960,22 +1994,36 @@ const ReportGenerator = ({ isCollapsed }) => {
         valign: 'middle',
         overflow: 'linebreak',
         cellWidth: 'wrap',
-      }, // Smaller font, linebreak for overflow
+      },
       headStyles: {
-        fillColor: [0, 160, 0], // Green header
+        fillColor: [0, 0, 0], // Changed to black
         halign: 'center',
         textColor: 255,
         fontSize: 9,
         overflow: 'linebreak',
         cellWidth: 'wrap',
       },
-      alternateRowStyles: { fillColor: [245, 245, 245] },
-      margin: { left: 10, right: 10 },
-      theme: 'striped',
+      alternateRowStyles: { fillColor: [240, 240, 240] }, // Light gray alternating rows
+      margin: { left: 0, right: 0 },
+      theme: 'grid', // Changed to 'grid' for better B&W printing
       showHead: 'everyPage',
       pageBreak: 'auto',
       columnStyles: getColumnStyles(reportType, isEmployee),
+
+      // Adding custom cell rendering for number cells
+      didParseCell: function (data) {
+        const cell = data.cell;
+        const value = cell.raw;
+
+        // Check if the cell contains a numeric value and isn't a header
+        if (!data.row.index && data.section === 'head') return;
+
+        cell.styles.fontSize = 12; // Larger font size for numbers
+        cell.styles.textColor = [0, 0, 0];
+        // cell.styles.fontStyle = 'bold'; // Make numbers bold for emphasis
+      }
     });
+
 
     // Calculate and Add Summary
     let summaryStartY = doc.lastAutoTable.finalY + 10;
