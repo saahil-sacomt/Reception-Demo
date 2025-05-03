@@ -4415,12 +4415,6 @@ const Consulting = memo(({ isCollapsed, onModificationSuccess }) => {
                                                     className="border border-gray-300 px-2 py-1 rounded-lg mt-2 w-full"
                                                 />
                                             )}
-
-                                            {submitted && (
-                                                <strong className="print:hidden text-green-600 ml-2">
-                                                    Order Submitted
-                                                </strong>
-                                            )}
                                         </p>
                                     </div>
 
