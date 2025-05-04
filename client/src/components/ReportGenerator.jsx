@@ -895,60 +895,7 @@ const ReportGenerator = ({ isCollapsed }) => {
           fetchedData = data;
           break;
         }
-
-
-
-        // case 'consolidated': {
-        //   const salesQuery = supabase
-        //     .from('sales_orders')
-        //     .select('sales_order_id, work_order_id, mr_number, final_amount, cgst, sgst, total_amount, created_at, updated_at, branch, customer_id, discount, advance_details')
-        //     .gte('created_at', startStr)
-        //     .lte('created_at', endStr);
-
-        //   if (!isCombined) {
-        //     salesQuery.in('branch', branchesToReport);
-        //   }
-
-        //   const { data: salesData, error: salesError } = await salesQuery;
-        //   if (salesError) throw salesError;
-
-        //   // Include all necessary fields from work orders
-        //   const workQuery = supabase
-        //     .from('work_orders')
-        //     .select('work_order_id, advance_details, mr_number, created_at, updated_at, branch, customer_id, total_amount, cgst, sgst, discount_amount')
-        //     .gte('created_at', startStr)
-        //     .lte('created_at', endStr);
-
-        //   if (!isCombined) {
-        //     workQuery.in('branch', branchesToReport);
-        //   }
-
-        //   const { data: workData, error: workError } = await workQuery;
-        //   if (workError) throw workError;
-
-        //   // Create customer and patient maps
-        //   const customerMap = {};
-        //   customers.forEach(customer => {
-        //     customerMap[customer.customer_id] = customer.name;
-        //   });
-
-        //   const patientMap = {};
-        //   console.log("Creating patient map from", patients.length, "patients");
-        //   patients.forEach(patient => {
-        //     if (patient.mr_number) {
-        //       patientMap[String(patient.mr_number)] = patient.name;
-        //     }
-        //   });
-
-        //   console.log("Patient map sample:", Object.entries(patientMap).slice(0, 5));
-
-        //   // Track which work orders have sales orders
-        //   const workOrdersWithSales = new Set();
-        //   salesData.forEach(sale => {
-        //     if (sale.work_order_id) {
-        //       workOrdersWithSales.add(sale.work_order_id);
-        //     }
-        //   });
+        
         case 'consolidated': {
           // Fetch sales and work data first
           const salesQuery = supabase
