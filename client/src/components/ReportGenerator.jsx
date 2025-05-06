@@ -14,6 +14,13 @@ const capitalizeFirstLetter = (string) => {
   return string.charAt(0).toUpperCase() + string.slice(1);
 };
 
+const CONSULTING_SERVICES = {
+  "CS01": "Consultation",
+  "CS02": "Follow-up Consultation",
+  "CS03": "Special Consultation"
+};
+
+
 // Define column styles outside the component for better reusability
 const getColumnStyles = (reportType, isEmployee = false) => {
   // (No changes to this function, keep it as is.)
@@ -75,6 +82,24 @@ const getColumnStyles = (reportType, isEmployee = false) => {
           8: { halign: 'center', cellWidth: 30 },
         };
       }
+    case 'product_sales':
+      if (isEmployee) {
+        return {
+          0: { halign: 'center', cellWidth: 100 },
+          2: { halign: 'center', cellWidth: 70 },
+          3: { halign: 'center', cellWidth: 55 },
+          4: { halign: 'center', cellWidth: 55 },
+          5: { halign: 'center', cellWidth: 60 },
+        };
+      } else {
+        return {
+          0: { halign: 'center', cellWidth: 100 },
+          2: { halign: 'center', cellWidth: 70 },
+          3: { halign: 'center', cellWidth: 55 },
+          4: { halign: 'center', cellWidth: 55 },
+          5: { halign: 'center', cellWidth: 60 },
+        };
+      }
 
     case 'work_orders':
       if (isEmployee) {
@@ -109,6 +134,7 @@ const getColumnStyles = (reportType, isEmployee = false) => {
         };
       }
 
+
     case 'privilegecards':
       if (isEmployee) {
         return {
@@ -135,32 +161,6 @@ const getColumnStyles = (reportType, isEmployee = false) => {
         };
       }
 
-    case 'product_sales':
-      if (isEmployee) {
-        return {
-          0: { halign: 'center', cellWidth: 20 },
-          1: { halign: 'center', cellWidth: 40 },
-          2: { halign: 'center', cellWidth: 20 },
-          3: { halign: 'center', cellWidth: 20 },
-          4: { halign: 'center', cellWidth: 20 },
-          5: { halign: 'center', cellWidth: 20 },
-          6: { halign: 'center', cellWidth: 20 },
-          7: { halign: 'center', cellWidth: 20 },
-        };
-      } else {
-        return {
-          0: { halign: 'center', cellWidth: 20 },
-          1: { halign: 'center', cellWidth: 40 },
-          2: { halign: 'center', cellWidth: 20 },
-          3: { halign: 'center', cellWidth: 20 },
-          4: { halign: 'center', cellWidth: 20 },
-          5: { halign: 'center', cellWidth: 20 },
-          6: { halign: 'center', cellWidth: 20 },
-          7: { halign: 'center', cellWidth: 25 },
-          8: { halign: 'center', cellWidth: 25 },
-          9: { halign: 'center', cellWidth: 20 },
-        };
-      }
 
     case 'modification_reports':
       if (isEmployee) {
@@ -480,107 +480,6 @@ const ReportGenerator = ({ isCollapsed }) => {
     fetchPurchaseFromForPurchases();
   }, [reportType]);
 
-  // useEffect(() => {
-  //   const fetchPatientsAndCustomers = async () => {
-  //     try {
-  //       const { data: patientsData, error: patientsError } = await supabase
-  //         .from('patients')
-  //         .select('mr_number, name');
-
-  //       if (patientsError) throw patientsError;
-
-  //       setPatients(patientsData);
-
-  //       const { data: customersData, error: customersError } = await supabase
-  //         .from('customers')
-  //         .select('customer_id, name');
-
-
-
-  //       if (customersError) throw customersError;
-
-  //       console.log("Fetched customers data:", patientsData);
-  //       setPatients(patientsData);
-
-
-  //       setCustomers(customersData);
-  //     } catch (err) {
-  //       console.error('Error fetching patients or customers:', err);
-  //     }
-  //   };
-
-  //   if (reportType === 'consolidated') {
-  //     fetchPatientsAndCustomers();
-  //   }
-  // }, [reportType]);
-
-  // useEffect(() => {
-  //   const fetchPatients = async () => {
-  //     try {
-  //       setLoading(true);
-  //       let allPatients = [];
-  //       let currentPage = 0;
-  //       const pageSize = 1000;
-  //       let hasMoreRecords = true;
-
-  //       console.log("Starting to fetch all patient records...");
-
-  //       // Keep fetching until no more records
-  //       while (hasMoreRecords) {
-  //         const from = currentPage * pageSize;
-  //         const to = from + pageSize - 1;
-
-  //         console.log(`Fetching patients batch ${currentPage + 1} (range: ${from}-${to})...`);
-
-  //         const { data, error, count } = await supabase
-  //           .from('patients')
-  //           .select('id, mr_number, name', { count: 'exact' })
-  //           .range(from, to);
-
-  //         if (error) throw error;
-
-  //         if (data.length > 0) {
-  //           console.log(`Received ${data.length} patients in batch ${currentPage + 1}`);
-  //           allPatients = [...allPatients, ...data];
-  //           currentPage++;
-
-  //           // Show progress
-  //           if (count && count > 0) {
-  //             const progress = Math.round((allPatients.length / count) * 100);
-  //             console.log(`Progress: ${progress}% (${allPatients.length}/${count})`);
-  //           }
-  //         }
-
-  //         // If we got fewer records than requested, we've reached the end
-  //         if (!data || data.length < pageSize) {
-  //           hasMoreRecords = false;
-  //         }
-  //       }
-
-  //       console.log(`✓ Total patients fetched: ${allPatients.length}`);
-  //       setPatients(allPatients);
-
-  //       // Fetch customers (keep as is)
-  //       const { data: customersData, error: customersError } = await supabase
-  //         .from('customers')
-  //         .select('customer_id, name');
-
-  //       if (customersError) throw customersError;
-  //       setCustomers(customersData);
-
-  //     } catch (err) {
-  //       console.error('Error fetching patients data:', err.message);
-  //       setError(`Failed to fetch all patient data: ${err.message}`);
-  //     } finally {
-  //       setLoading(false);
-  //     }
-  //   };
-
-  //   if (reportType === 'consolidated') {
-  //     fetchPatients();
-  //   }
-  // }, [reportType]);
-
   const getLastDayOfMonth = (year, month) => {
     return new Date(year, month, 0).getDate();
   };
@@ -770,95 +669,7 @@ const ReportGenerator = ({ isCollapsed }) => {
           break;
         }
 
-        case 'product_sales': {
-          const { data: productsData, error: productsError } = await supabase
-            .from('products')
-            .select('*');
 
-          if (productsError) throw productsError;
-
-          const stockQuery = supabase.from('stock').select('*');
-          if (!isCombined) {
-            stockQuery.in('branch_code', branchesToReport);
-          }
-
-          const { data: stockData, error: stockError } = await stockQuery;
-          if (stockError) throw stockError;
-
-          const salesQuery = supabase
-            .from('sales_orders')
-            .select('items')
-            .gte('created_at', startStr)
-            .lte('created_at', endStr);
-          if (!isCombined) {
-            salesQuery.in('branch', branchesToReport);
-          }
-
-          const { data: salesData, error: salesError } = await salesQuery;
-          if (salesError) throw salesError;
-
-          const workQuery = supabase
-            .from('work_orders')
-            .select('product_entries')
-            .gte('created_at', startStr)
-            .lte('created_at', endStr);
-          if (!isCombined) {
-            workQuery.in('branch', branchesToReport);
-          }
-
-          const { data: workData, error: workError } = await workQuery;
-          if (workError) throw workError;
-
-          const salesAggregated = {};
-          salesData.forEach(sale => {
-            const items = sale.items || [];
-            items.forEach(item => {
-              const pid = item.id;
-              const quantity = parseInt(item.quantity, 10) || 0;
-              if (!salesAggregated[pid]) {
-                salesAggregated[pid] = 0;
-              }
-              salesAggregated[pid] += quantity;
-            });
-          });
-
-          workData.forEach(work => {
-            const products = work.product_entries || [];
-            products.forEach(product => {
-              const pid = product.id;
-              const quantity = parseInt(product.quantity, 10) || 0;
-              if (!salesAggregated[pid]) {
-                salesAggregated[pid] = 0;
-              }
-              salesAggregated[pid] += quantity;
-            });
-          });
-
-          formattedProductIdSummary = productsData.map(product => {
-            const pid = product.id;
-            const productStock = stockData.filter(stock => stock.product_id === pid);
-            const currentStock = productStock.reduce((acc, curr) => acc + (curr.quantity || 0), 0);
-            const totalSold = salesAggregated[pid] || 0;
-            const totalRevenue = (product.mrp || 0) * totalSold;
-
-            return {
-              'Product ID': product.product_id || 'N/A',
-              'Product Name': product.product_name || 'N/A',
-              'MRP': product.mrp ? Number(product.mrp).toFixed(2) : '0.00',
-              'Rate': product.rate ? Number(product.rate).toFixed(2) : '0.00',
-              'HSN Code': product.hsn_code || 'N/A',
-              'Total Quantity Sold': totalSold,
-              'Total Revenue': totalRevenue.toFixed(2),
-              'Stock Created At': formatDateDDMMYYYY(product.created_at, false),
-              'Stock Updated At': formatDateDDMMYYYY(product.updated_at, false),
-              'Current Stock Count': currentStock,
-            };
-          });
-
-          formattedProductIdSummary.sort((a, b) => a['Product Name'].localeCompare(b['Product Name']));
-          fetchedData = formattedProductIdSummary;
-          break;
-        }
         case 'insurance_claims': {
           // Join with employees to get employee names
           let query = supabase
@@ -895,7 +706,159 @@ const ReportGenerator = ({ isCollapsed }) => {
           fetchedData = data;
           break;
         }
-        
+        // case 'product_sales': {
+        //   // 1. Fetch sales_orders in date range and branch
+        //   let salesQuery = supabase
+        //     .from('sales_orders')
+        //     .select('product_entries, branch, created_at')
+        //     .gte('created_at', startStr)
+        //     .lte('created_at', endStr);
+
+        //   if (!isCombined) {
+        //     salesQuery = salesQuery.in('branch', branchesToReport);
+        //   }
+
+        //   const { data: salesData, error: salesError } = await salesQuery;
+        //   if (salesError) throw salesError;
+
+        //   // 2. Aggregate product sales
+        //   const productSalesMap = {};
+        //   salesData.forEach(order => {
+        //     const entries = order.product_entries || [];
+        //     entries.forEach(item => {
+        //       const pid = item.product_id;
+        //       if (!productSalesMap[pid]) {
+        //         productSalesMap[pid] = {
+        //           product_id: pid,
+        //           quantity: 0,
+        //           total_sales: 0,
+        //         };
+        //       }
+        //       productSalesMap[pid].quantity += Number(item.quantity) || 0;
+        //       productSalesMap[pid].total_sales += (Number(item.price) || 0) * (Number(item.quantity) || 0);
+        //     });
+        //   });
+
+        //   const productIds = Object.keys(productSalesMap).map(Number).filter(id => !isNaN(id));
+        //   if (productIds.length === 0) {
+        //     setError('No product sales found for the selected period and branch.');
+        //     setLoading(false);
+        //     return;
+        //   }
+
+        //   // 3. Fetch product details
+        //   const { data: productsData, error: productsError } = await supabase
+        //     .from('products')
+        //     .select('id, product_id, product_name, mrp, rate, hsn_code')
+        //     .in('id', productIds);
+
+        //   if (productsError) throw productsError;
+
+        //   // 4. Combine product info with sales
+        //   const combinedData = productsData.map(product => ({
+        //     product_id: product.product_id || 'N/A',
+        //     product_name: product.product_name || 'N/A',
+        //     mrp: product.mrp ? Number(product.mrp).toFixed(2) : '0.00',
+        //     rate: product.rate ? Number(product.rate).toFixed(2) : '0.00',
+        //     hsn_code: product.hsn_code || 'N/A',
+        //     quantity_sold: productSalesMap[product.id]?.quantity || 0,
+        //     total_sales: productSalesMap[product.id]?.total_sales.toFixed(2) || '0.00',
+        //   }));
+
+        //   // Sort by product_name
+        //   combinedData.sort((a, b) => a.product_name.localeCompare(b.product_name));
+        //   fetchedData = combinedData;
+        //   break;
+        // }
+
+
+
+        case 'product_sales': {
+          // 1. Fetch sales_orders in date range and branch
+          let salesQuery = supabase
+            .from('sales_orders')
+            .select('product_entries, branch, created_at')
+            .gte('created_at', startStr)
+            .lte('created_at', endStr);
+
+          if (!isCombined) {
+            salesQuery = salesQuery.in('branch', branchesToReport);
+          }
+
+          const { data: salesData, error: salesError } = await salesQuery;
+          if (salesError) throw salesError;
+
+          // 2. Aggregate product sales
+          const productSalesMap = {};
+          salesData.forEach(order => {
+            const entries = order.product_entries || [];
+            entries.forEach(item => {
+              const pid = item.product_id;
+              if (!productSalesMap[pid]) {
+                productSalesMap[pid] = {
+                  product_id: pid,
+                  quantity: 0,
+                  total_sales: 0,
+                };
+              }
+              productSalesMap[pid].quantity += Number(item.quantity) || 0;
+              productSalesMap[pid].total_sales += (Number(item.price) || 0) * (Number(item.quantity) || 0);
+            });
+          });
+
+          // Separate numeric and non-numeric product_ids
+          const numericProductIds = Object.keys(productSalesMap)
+            .map(id => Number(id))
+            .filter(id => !isNaN(id));
+          const nonNumericProductIds = Object.keys(productSalesMap)
+            .filter(id => isNaN(Number(id)));
+
+          let productsData = [];
+          if (numericProductIds.length > 0) {
+            const { data: fetchedProducts, error: productsError } = await supabase
+              .from('products')
+              .select('id, product_id, product_name, mrp, rate, hsn_code')
+              .in('id', numericProductIds);
+            if (productsError) throw productsError;
+            productsData = fetchedProducts;
+          }
+
+          // 3. Combine product info with sales
+          const combinedData = [];
+
+          // Add numeric products from DB
+          productsData.forEach(product => {
+            combinedData.push({
+              product_id: product.product_id || product.id || 'N/A',
+              product_name: product.product_name || 'N/A',
+              mrp: product.mrp ? Number(product.mrp).toFixed(2) : '0.00',
+              rate: product.rate ? Number(product.rate).toFixed(2) : '0.00',
+              hsn_code: product.hsn_code || 'N/A',
+              quantity_sold: productSalesMap[product.id]?.quantity || 0,
+              total_sales: productSalesMap[product.id]?.total_sales.toFixed(2) || '0.00',
+            });
+          });
+
+          // Add non-numeric products (consulting services)
+          nonNumericProductIds.forEach(pid => {
+            combinedData.push({
+              product_id: pid,
+              product_name: CONSULTING_SERVICES[pid] || 'Unknown Service',
+              mrp: '0.00',
+              rate: '0.00',
+              hsn_code: '',
+              quantity_sold: productSalesMap[pid]?.quantity || 0,
+              total_sales: productSalesMap[pid]?.total_sales.toFixed(2) || '0.00',
+            });
+          });
+
+          // Sort by product_name
+          combinedData.sort((a, b) => a.product_name.localeCompare(b.product_name));
+          fetchedData = combinedData;
+          break;
+        }
+
+
         case 'consolidated': {
           // Fetch sales and work data first
           const salesQuery = supabase
@@ -980,7 +943,7 @@ const ReportGenerator = ({ isCollapsed }) => {
 
           // Create consolidated sales data
           const consolidatedSales = salesData.map(sale => {
-            let customerName =  'N/A';
+            let customerName = 'N/A';
             const totalGST = (parseFloat(sale.cgst) || 0) + (parseFloat(sale.sgst) || 0);
 
             return {
@@ -1369,29 +1332,7 @@ const ReportGenerator = ({ isCollapsed }) => {
           'Employee',
         ];
         break;
-      case 'product_sales':
-        tableColumn = isEmployee ? [
-          'Product ID',
-          'Product Name',
-          'MRP',
-          'Rate',
-          'HSN Code',
-          'Total Quantity Sold',
-          'Total Revenue',
-          'Current Stock Count',
-        ] : [
-          'Product ID',
-          'Product Name',
-          'MRP',
-          'Rate',
-          'HSN Code',
-          'Total Quantity Sold',
-          'Total Revenue',
-          'Stock Created At',
-          'Stock Updated At',
-          'Current Stock Count',
-        ];
-        break;
+
       case 'modification_reports':
         tableColumn = isEmployee ? [
           'Request ID',
@@ -1413,6 +1354,15 @@ const ReportGenerator = ({ isCollapsed }) => {
           'Rejection Reason',
           'Created At',
           'Updated At',
+        ];
+        break;
+      case 'product_sales':
+        tableColumn = [
+          'Service Name',
+          'MRP',
+          'Rate',
+          'Quantity Sold',
+          'Total Sales',
         ];
         break;
       case 'consolidated':
@@ -1722,29 +1672,6 @@ const ReportGenerator = ({ isCollapsed }) => {
           record.employee_name || 'N/A', // Employee
         ]);
         break;
-      case 'product_sales':
-        tableRows = isEmployee ? formattedProductIdSummary.map((item) => [
-          item['Product ID'],
-          item['Product Name'],
-          item['MRP'],
-          item['Rate'],
-          item['HSN Code'],
-          item['Total Quantity Sold'],
-          item['Total Revenue'],
-          item['Current Stock Count'], // New Field
-        ]) : formattedProductIdSummary.map((item) => [
-          item['Product ID'],
-          item['Product Name'],
-          item['MRP'],
-          item['Rate'],
-          item['HSN Code'],
-          item['Total Quantity Sold'],
-          item['Total Revenue'],
-          item['Stock Created At'],
-          item['Stock Updated At'],
-          item['Current Stock Count'], // New Field
-        ]);
-        break;
       case 'modification_reports':
         tableRows = isEmployee ? data.map((record) => [
           record.request_id || 'N/A',
@@ -1770,6 +1697,15 @@ const ReportGenerator = ({ isCollapsed }) => {
           record.updated_at
             ? formatDateDDMMYYYY(record.updated_at, true)
             : 'N/A',
+        ]);
+        break;
+      case 'product_sales':
+        tableRows = data.map(item => [
+          item.product_name,
+          item.mrp,
+          item.rate,
+          item.quantity_sold,
+          item.total_sales,
         ]);
         break;
       case 'consolidated':
@@ -2036,17 +1972,7 @@ const ReportGenerator = ({ isCollapsed }) => {
         ];
         break;
       }
-      case 'product_sales': {
-        const totalQuantity = formattedProductIdSummary.reduce((acc, curr) => acc + Number(curr['Total Quantity Sold']), 0);
-        const totalRevenue = formattedProductIdSummary.reduce((acc, curr) => acc + Number(curr['Total Revenue']), 0);
-        const totalCurrentStock = formattedProductIdSummary.reduce((acc, curr) => acc + Number(curr['Current Stock Count']), 0);
-        summaryTable = [
-          ['Total Quantity Sold', totalQuantity],
-          ['Total Revenue', totalRevenue.toFixed(2)],
-          ['Total Current Stock Count', totalCurrentStock],
-        ];
-        break;
-      }
+
       case 'modification_reports': {
         const totalModifications = data.length;
         const approvedModifications = data.filter(record => record.status.toLowerCase() === 'approved').length;
@@ -2057,6 +1983,17 @@ const ReportGenerator = ({ isCollapsed }) => {
           ['Approved', approvedModifications],
           ['Pending', pendingModifications],
           ['Rejected', rejectedModifications],
+        ];
+        break;
+      }
+      case 'product_sales': {
+        const totalProducts = data.length;
+        const totalQuantity = data.reduce((acc, curr) => acc + (curr.quantity_sold || 0), 0);
+        const totalSales = data.reduce((acc, curr) => acc + parseFloat(curr.total_sales || 0), 0);
+        summaryTable = [
+          ['Total Products Sold', totalProducts],
+          ['Total Quantity Sold', totalQuantity],
+          ['Total Sales Amount', totalSales.toFixed(2)],
         ];
         break;
       }
@@ -2210,12 +2147,15 @@ const ReportGenerator = ({ isCollapsed }) => {
     { value: 'stock_assignments', label: 'Stock Assignments' },
     { value: 'compiled_report', label: 'Compiled Report' },
     { value: 'insurance_claims', label: 'Insurance Claims' },
+    { value: 'product_sales', label: 'Product Sales' },
   ] : [
     { value: 'sales_orders', label: 'Sales Orders' },
     { value: 'work_orders', label: 'Work Orders' },
     { value: 'consolidated', label: 'Consolidated' },
     { value: 'compiled_report', label: 'Compiled Report' },
     { value: 'insurance_claims', label: 'Insurance Claims' },
+    { value: 'product_sales', label: 'Product Sales' },
+
 
   ];
 

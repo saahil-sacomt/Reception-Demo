@@ -133,12 +133,12 @@ const getColumnStyles = (reportType, isEmployee = false) => {
         };
       } else {
         return {
-          0: { halign: 'center', cellWidth: 20 },
-          1: { halign: 'center', cellWidth: 40 },
-          2: { halign: 'center', cellWidth: 20 },
-          3: { halign: 'center', cellWidth: 20 },
-          4: { halign: 'center', cellWidth: 20 },
-          5: { halign: 'center', cellWidth: 20 },
+          0: { halign: 'center', cellWidth: 27 },
+          1: { halign: 'center', cellWidth: 75 },
+          2: { halign: 'center', cellWidth: 26 },
+          3: { halign: 'center', cellWidth: 25 },
+          4: { halign: 'center', cellWidth: 25 },
+          5: { halign: 'center', cellWidth: 25 },
           6: { halign: 'center', cellWidth: 20 },
           7: { halign: 'center', cellWidth: 25 },
           8: { halign: 'center', cellWidth: 25 },
@@ -704,99 +704,133 @@ const ReportGenerator = ({ isCollapsed }) => {
           fetchedData = data;
           break;
         }
-        case 'product_sales':
-          // (No changes, just the block as previously implemented)
-          // ... code for product_sales ...
-          // (Same code as given previously for product_sales, no changes needed.)
-          {
+
+
+        case 'product_sales': {
+          // First fetch all sales orders in the date range
+          let salesQuery = supabase
+            .from('sales_orders')
+            .select('items, created_at, branch')
+            .gte('created_at', startDate)
+            .lte('created_at', endDate);
+
+          if (!isCombined) {
+            salesQuery = salesQuery.in('branch', branchesToReport);
+          }
+
+          const { data: salesOrders, error: salesError } = await salesQuery;
+          if (salesError) throw salesError;
+
+          // Extract product information from items array and create a product sales summary
+          const productSalesMap = {};
+
+          // Process each sales order
+          salesOrders.forEach(order => {
+            if (!order.items || !Array.isArray(order.items)) return;
+
+            // Process each item in the order
+            order.items.forEach(item => {
+              const productId = item.id;
+              if (!productId) return;
+
+              // Initialize product data if not already in map
+              if (!productSalesMap[productId]) {
+                productSalesMap[productId] = {
+                  id: productId,
+                  product_id: item.product_id || 'N/A',
+                  name: item.name || 'N/A',
+                  hsn_code: item.hsn_code || 'N/A',
+                  price: parseFloat(item.price) || 0,
+                  total_quantity: 0,
+                  total_revenue: 0
+                };
+              }
+
+              // Add this sale to the product's totals
+              const quantity = parseInt(item.quantity) || 0;
+              const revenue = quantity * (parseFloat(item.price) || 0);
+
+              productSalesMap[productId].total_quantity += quantity;
+              productSalesMap[productId].total_revenue += revenue;
+            });
+          });
+
+          // Fetch current stock counts for all products
+          if (Object.keys(productSalesMap).length > 0) {
+            // Get unique product IDs
+            const productIds = Object.keys(productSalesMap);
+
+            // Fetch additional product details from products table
             const { data: productsData, error: productsError } = await supabase
               .from('products')
-              .select('*');
+              .select('id, product_id, product_name, rate, mrp')
+              .in('id', productIds);
 
             if (productsError) throw productsError;
 
-            const stockQuery = supabase.from('stock').select('*');
-            if (!isCombined) {
-              stockQuery.in('branch_code', branchesToReport);
+            // Update product details
+            if (productsData) {
+              productsData.forEach(product => {
+                if (productSalesMap[product.id]) {
+                  productSalesMap[product.id].rate = parseFloat(product.rate) || 0;
+                  productSalesMap[product.id].mrp = parseFloat(product.mrp) || 0;
+                }
+              });
             }
 
-            const { data: stockData, error: stockError } = await stockQuery;
+            // Fetch current stock counts
+            const { data: stockData, error: stockError } = await supabase
+              .from('stock')
+              .select('product_id, quantity, created_at, updated_at')
+              .in('product_id', productIds);
+
             if (stockError) throw stockError;
 
-            const salesQuery = supabase
-              .from('sales_orders')
-              .select('items')
-              .gte('created_at', startDate)
-              .lte('created_at', endDate);
-            if (!isCombined) {
-              salesQuery.in('branch', branchesToReport);
-            }
+            // Group stock by product_id and sum quantities
+            const stockByProduct = {};
 
-            const { data: salesData, error: salesError } = await salesQuery;
-            if (salesError) throw salesError;
-
-            const workQuery = supabase
-              .from('work_orders')
-              .select('product_entries')
-              .gte('created_at', startDate)
-              .lte('created_at', endDate);
-            if (!isCombined) {
-              workQuery.in('branch', branchesToReport);
-            }
-
-            const { data: workData, error: workError } = await workQuery;
-            if (workError) throw workError;
-
-            const salesAggregated = {};
-            salesData.forEach(sale => {
-              const items = sale.items || [];
-              items.forEach(item => {
-                const pid = item.id;
-                const quantity = parseInt(item.quantity, 10) || 0;
-                if (!salesAggregated[pid]) {
-                  salesAggregated[pid] = 0;
+            if (stockData) {
+              stockData.forEach(stock => {
+                const productId = stock.product_id;
+                if (!stockByProduct[productId]) {
+                  stockByProduct[productId] = {
+                    total_quantity: 0,
+                    created_at: stock.created_at,
+                    updated_at: stock.updated_at
+                  };
                 }
-                salesAggregated[pid] += quantity;
+                stockByProduct[productId].total_quantity += parseInt(stock.quantity) || 0;
               });
-            });
 
-            workData.forEach(work => {
-              const products = work.product_entries || [];
-              products.forEach(product => {
-                const pid = product.id;
-                const quantity = parseInt(product.quantity, 10) || 0;
-                if (!salesAggregated[pid]) {
-                  salesAggregated[pid] = 0;
-                }
-                salesAggregated[pid] += quantity;
+              // Update stock information in product sales map
+              Object.keys(productSalesMap).forEach(productId => {
+                const stockInfo = stockByProduct[productId] || {};
+                productSalesMap[productId].current_stock = stockInfo.total_quantity || 0;
+                productSalesMap[productId].stock_created_at = stockInfo.created_at;
+                productSalesMap[productId].stock_updated_at = stockInfo.updated_at;
               });
-            });
-
-            formattedProductIdSummary = productsData.map(product => {
-              const pid = product.id;
-              const productStock = stockData.filter(stock => stock.product_id === pid);
-              const currentStock = productStock.reduce((acc, curr) => acc + (curr.quantity || 0), 0);
-              const totalSold = salesAggregated[pid] || 0;
-              const totalRevenue = (product.mrp || 0) * totalSold;
-
-              return {
-                'Product ID': product.product_id || 'N/A',
-                'Product Name': product.product_name || 'N/A',
-                'MRP': product.mrp ? Number(product.mrp).toFixed(2) : '0.00',
-                'Rate': product.rate ? Number(product.rate).toFixed(2) : '0.00',
-                'HSN Code': product.hsn_code || 'N/A',
-                'Total Quantity Sold': totalSold,
-                'Total Revenue': totalRevenue.toFixed(2),
-                'Stock Created At': formatDateDDMMYYYY(product.created_at, false),
-                'Stock Updated At': formatDateDDMMYYYY(product.updated_at, false),
-                'Current Stock Count': currentStock,
-              };
-            });
-
-            formattedProductIdSummary.sort((a, b) => a['Product Name'].localeCompare(b['Product Name']));
-            fetchedData = formattedProductIdSummary;
+            }
           }
+
+          // Convert map to array for the report
+          fetchedData = Object.values(productSalesMap);
+          formattedProductIdSummary = fetchedData.map(product => ({
+            'Product ID': product.product_id,
+            'Product Name': product.name,
+            'MRP': product.mrp ? product.mrp.toFixed(2) : '0.00',
+            'Rate': product.rate ? product.rate.toFixed(2) : '0.00',
+            'HSN Code': product.hsn_code,
+            'Total Quantity Sold': product.total_quantity,
+            'Total Revenue': product.total_revenue.toFixed(2),
+            'Stock Created At': product.stock_created_at ? formatDateDDMMYYYY(product.stock_created_at, true) : 'N/A',
+            'Stock Updated At': product.stock_updated_at ? formatDateDDMMYYYY(product.stock_updated_at, true) : 'N/A',
+            'Current Stock Count': product.current_stock || 0
+          }));
+
           break;
+        }
+
+
         case 'modification_reports': {
           let query = supabase
             .from('modification_requests')
@@ -1964,7 +1998,7 @@ const ReportGenerator = ({ isCollapsed }) => {
           item['HSN Code'],
           item['Total Quantity Sold'],
           item['Total Revenue'],
-          item['Current Stock Count'], // New Field
+          item['Current Stock Count'],
         ]) : formattedProductIdSummary.map((item) => [
           item['Product ID'],
           item['Product Name'],
@@ -1975,7 +2009,7 @@ const ReportGenerator = ({ isCollapsed }) => {
           item['Total Revenue'],
           item['Stock Created At'],
           item['Stock Updated At'],
-          item['Current Stock Count'], // New Field
+          item['Current Stock Count'],
         ]);
         break;
       case 'modification_reports':
@@ -2278,12 +2312,13 @@ const ReportGenerator = ({ isCollapsed }) => {
       }
       case 'product_sales': {
         const totalQuantity = formattedProductIdSummary.reduce((acc, curr) => acc + Number(curr['Total Quantity Sold']), 0);
-        const totalRevenue = formattedProductIdSummary.reduce((acc, curr) => acc + Number(curr['Total Revenue']), 0);
+        const totalRevenue = formattedProductIdSummary.reduce((acc, curr) => acc + parseFloat(curr['Total Revenue']), 0);
         const totalCurrentStock = formattedProductIdSummary.reduce((acc, curr) => acc + Number(curr['Current Stock Count']), 0);
         summaryTable = [
+          ['Total Products', formattedProductIdSummary.length],
           ['Total Quantity Sold', totalQuantity],
           ['Total Revenue', totalRevenue.toFixed(2)],
-          ['Total Current Stock Count', totalCurrentStock],
+          ['Total Current Stock', totalCurrentStock],
         ];
         break;
       }
