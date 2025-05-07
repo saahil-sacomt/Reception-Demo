@@ -37,23 +37,45 @@ export const formatDateToIST = (date, format = "dd-MM-yyyy hh:mm a") => {
 };
 
 // Function to format date as dd/mm/yyyy or dd/mm/yyyy hh:mm a
-export const formatDateDDMMYYYY = (dateString, withTime = false) => {
-  if (!dateString) return 'N/A';
-  const date = new Date(dateString);
-  if (isNaN(date.getTime())) return 'N/A';
+// export const formatDateDDMMYYYY = (dateString, withTime = false) => {
+//   if (!dateString) return 'N/A';
+//   const date = new Date(dateString);
+//   if (isNaN(date.getTime())) return 'N/A';
 
-  const day = String(date.getDate()).padStart(2, '0');
-  const month = String(date.getMonth() + 1).padStart(2, '0'); // Months are zero-based
+//   const day = String(date.getDate()).padStart(2, '0');
+//   const month = String(date.getMonth() + 1).padStart(2, '0'); // Months are zero-based
+//   const year = date.getFullYear();
+
+//   if (withTime) {
+//     let hours = date.getHours();
+//     const minutes = String(date.getMinutes()).padStart(2, '0');
+//     const ampm = hours >= 12 ? 'PM' : 'AM';
+//     hours = hours % 12;
+//     hours = hours ? hours : 12; // the hour '0' should be '12'
+//     const formattedHours = String(hours).padStart(2, '0');
+//     return `${day}/${month}/${year} ${formattedHours}:${minutes} ${ampm}`;
+//   }
+
+//   return `${day}/${month}/${year}`;
+// };
+// Modify formatDateDDMMYYYY in utils/dateUtils.js or add this version to ReportGenerator.jsx
+export const formatDateDDMMYYYY = (dateString, includeTime = false) => {
+  if (!dateString) return 'N/A';
+
+  const date = new Date(dateString);
+
+  // Add 5 hours and 30 minutes to convert from UTC to IST
+  date.setHours(date.getHours() + 5);
+  date.setMinutes(date.getMinutes() + 30);
+
+  const day = date.getDate().toString().padStart(2, '0');
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
   const year = date.getFullYear();
 
-  if (withTime) {
-    let hours = date.getHours();
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    const ampm = hours >= 12 ? 'PM' : 'AM';
-    hours = hours % 12;
-    hours = hours ? hours : 12; // the hour '0' should be '12'
-    const formattedHours = String(hours).padStart(2, '0');
-    return `${day}/${month}/${year} ${formattedHours}:${minutes} ${ampm}`;
+  if (includeTime) {
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    return `${day}/${month}/${year} ${hours}:${minutes}`;
   }
 
   return `${day}/${month}/${year}`;
@@ -64,7 +86,7 @@ export const convertUTCToIST = (utcDateString, format) => {
   if (!utcDateString) return 'N/A';
   const date = new Date(utcDateString);
   if (isNaN(date.getTime())) return 'N/A';
-  
+
   // Implement timezone conversion logic here if needed
   // Then format the date
   // Example using formatDateDDMMYYYY
