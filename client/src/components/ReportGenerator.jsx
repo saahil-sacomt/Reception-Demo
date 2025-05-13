@@ -457,6 +457,21 @@ const ReportGenerator = ({ isCollapsed }) => {
     getBranches();
   }, [fetchAllBranches, isEmployee]);
 
+  const convertToUTC = (dateStr, isStartDate = true) => {
+    const date = new Date(dateStr);
+    // For start date: 00:00:00 IST = 18:30:00 UTC (previous day)
+    // For end date: 23:59:59 IST = 18:29:59 UTC (same day)
+    if (isStartDate) {
+      date.setHours(0, 0, 0, 0);
+    } else {
+      date.setHours(23, 59, 59, 999);
+    }
+
+    // Convert to UTC by subtracting 5:30 hours
+    date.setHours(date.getHours() - 5.5);
+    return date.toISOString();
+  };
+
   useEffect(() => {
     const fetchPurchaseFromForPurchases = async () => {
       if (reportType === 'purchase_report') {
