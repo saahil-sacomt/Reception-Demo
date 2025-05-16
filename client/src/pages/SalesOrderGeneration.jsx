@@ -425,6 +425,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
     };
     return now.toLocaleTimeString('en-IN', options);
   };
+  const [hasProceededWithoutWorkOrder, setHasProceededWithoutWorkOrder] = useState(false);
+
   const [currentTime, setCurrentTime] = useState(getCurrentISTTime());
   useEffect(() => {
     if (step === 5) {
@@ -723,6 +725,9 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
 
   const handleProceedWithoutWorkOrder = async () => {
     const generalSalesId = await generateGeneralSalesId();
+
+    setHasProceededWithoutWorkOrder(true);
+
 
     updateSalesOrderForm({
       step: 1,
@@ -1192,6 +1197,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
   const prevStep = useCallback(() => {
     if (!submitted) {
       updateSalesOrderForm({ step: Math.max(step - 1, 0) });
+      // We don't reset hasProceededWithoutWorkOrder when going back
     }
   }, [step, submitted]);
   // Fetch privilege card details via phone number
@@ -2435,10 +2441,14 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
               )}
 
               <button
-                type="button" // Added type="button"
+                type="button"
                 onClick={handleFetchWorkOrders}
                 ref={fetchButtonRef}
-                className="mt-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition"
+                disabled={hasProceededWithoutWorkOrder}
+                className={`mt-2 ${hasProceededWithoutWorkOrder
+                    ? "bg-gray-400 cursor-not-allowed"
+                    : "bg-green-500 hover:bg-green-600"
+                  } text-white px-4 py-2 rounded-lg transition`}
                 onKeyDown={(e) => {
                   if (e.key === "ArrowUp") {
                     e.preventDefault();

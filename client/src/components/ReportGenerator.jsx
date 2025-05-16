@@ -675,19 +675,27 @@ const ReportGenerator = ({ isCollapsed }) => {
           let query = supabase
             .from('insurance_claims')
             .select(`
-              *,
-              employees:employee_id (name)
-            `)
+      *,
+      employees:employee_id (name)
+    `)
             .gte('created_at', startStr)
             .lte('created_at', endStr);
 
-          if (!isCombined) {
-            query = query.in('branch', branchesToReport);
+          // Don't filter by branch when viewing all branches
+          if (!isCombined && branchesToReport.length > 0) {
+            // Using or() to include records with null branches as well
+            query = query.or(`branch.in.(${branchesToReport.join(',')}),branch.is.null`);
           }
 
-          ({ data, error } = await query);
+          const { data: insuranceData, error } = await query;
           if (error) throw error;
-          fetchedData = data;
+
+          // Post-process to assign default branch to null values
+          fetchedData = insuranceData.map(record => ({
+            ...record,
+            // If branch is null/empty, use default branch (user's branch for employees)
+            branch: record.branch || (isEmployee ? userBranch : 'Unknown')
+          }));
           break;
         }
         case 'modification_reports': {
@@ -1266,7 +1274,6 @@ const ReportGenerator = ({ isCollapsed }) => {
           'Insurance Name',
           'Total Amount',
           'Approved Amount',
-          'Status',
           'Branch',
           'Created At',
         ] : [
@@ -1276,7 +1283,6 @@ const ReportGenerator = ({ isCollapsed }) => {
           'Approved Amount',
           'Employee',
           'Status',
-          'Branch',
           'Created At',
           'Updated At',
         ];
@@ -1582,7 +1588,6 @@ const ReportGenerator = ({ isCollapsed }) => {
           record.insurance_name || 'N/A',
           record.total_amount ? Number(record.total_amount).toFixed(2) : '0.00',
           record.approved_amount ? Number(record.approved_amount).toFixed(2) : '0.00',
-          capitalizeFirstLetter(record.status) || 'N/A',
           record.branch || 'N/A',
           record.created_at ? formatDateDDMMYYYY(record.created_at, true) : 'N/A',
         ]) : data.map((record) => [
@@ -1591,7 +1596,6 @@ const ReportGenerator = ({ isCollapsed }) => {
           record.total_amount ? Number(record.total_amount).toFixed(2) : '0.00',
           record.approved_amount ? Number(record.approved_amount).toFixed(2) : '0.00',
           record.employees ? record.employees.name : (record.employee_id || 'N/A'),
-          capitalizeFirstLetter(record.status) || 'N/A',
           record.branch || 'N/A',
           record.created_at ? formatDateDDMMYYYY(record.created_at, true) : 'N/A',
           record.updated_at ? formatDateDDMMYYYY(record.updated_at, true) : 'N/A',
