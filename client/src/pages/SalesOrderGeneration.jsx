@@ -2446,8 +2446,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                 ref={fetchButtonRef}
                 disabled={hasProceededWithoutWorkOrder}
                 className={`mt-2 ${hasProceededWithoutWorkOrder
-                    ? "bg-gray-400 cursor-not-allowed"
-                    : "bg-green-500 hover:bg-green-600"
+                  ? "bg-gray-400 cursor-not-allowed"
+                  : "bg-green-500 hover:bg-green-600"
                   } text-white px-4 py-2 rounded-lg transition`}
                 onKeyDown={(e) => {
                   if (e.key === "ArrowUp") {
@@ -3952,7 +3952,8 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
 
 
 
-              <div className="flex justify-center text-center space-x-4 mt-6">
+              {/* Replace the buttons container div with this updated version */}
+              <div className="flex justify-center text-center space-x-4 mt-6 print:hidden">
                 <button
                   type="button"
                   onClick={saveSalesOrder}
@@ -3968,18 +3969,18 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                       : "Save Sales Order"}
                 </button>
 
-
-                {allowPrint && (<button
-                  type="button"
-                  onClick={handlePrint}
-                  ref={printButtonRef}
-                  className="flex items-center justify-center w-44 h-12 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition"
-                  aria-label="Print Sales Order"
-                >
-                  <PrinterIcon className="w-5 h-5 mr-2" />
-                  Print
-                </button>)}
-
+                {allowPrint && (
+                  <button
+                    type="button"
+                    onClick={handlePrint}
+                    ref={printButtonRef}
+                    className="flex items-center justify-center w-44 h-12 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition"
+                    aria-label="Print Sales Order"
+                  >
+                    <PrinterIcon className="w-5 h-5 mr-2" />
+                    Print
+                  </button>
+                )}
 
                 {allowPrint && (
                   <button

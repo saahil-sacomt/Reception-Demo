@@ -926,15 +926,21 @@ const ReportGenerator = ({ isCollapsed }) => {
 
           // Continue with the rest of the code...
           // Track which work orders have sales orders
+          // Track which work orders have sales orders
           const workOrdersWithSales = new Set();
           salesData.forEach(sale => {
             if (sale.work_order_id) {
-              workOrdersWithSales.add(sale.work_order_id);
+              // Normalize the work order ID (trim and convert to uppercase)
+              workOrdersWithSales.add(String(sale.work_order_id).trim().toUpperCase());
             }
           });
 
           // Filter work orders to include only those without corresponding sales orders
-          const filteredWorkData = workData.filter(work => !workOrdersWithSales.has(work.work_order_id));
+          const filteredWorkData = workData.filter(work => {
+            // Normalize the work order ID for comparison
+            const normalizedWorkOrderId = String(work.work_order_id).trim().toUpperCase();
+            return !workOrdersWithSales.has(normalizedWorkOrderId);
+          });
 
           // Identify OPD sales
           const opdSales = salesData.filter(sale =>
