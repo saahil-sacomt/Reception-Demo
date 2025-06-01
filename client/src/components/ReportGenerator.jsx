@@ -21,6 +21,20 @@ const CONSULTING_SERVICES = {
 };
 
 
+const convertToUTC = (dateStr, isStartDate = true) => {
+  // Create date
+  const [year, month, day] = dateStr.split('-').map(Number);
+
+  // Explicitly create Date objects for start/end in our timezone
+  if (isStartDate) {
+    // For start date: Create "00:00:00" of this day in UTC directly
+    // This avoids all timezone conversion issues
+    return new Date(Date.UTC(year, month - 1, day, 0, 0, 0)).toISOString();
+  } else {
+    // For end date: Create "23:59:59.999" of this day in UTC directly
+    return new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999)).toISOString();
+  }
+};
 // Define column styles outside the component for better reusability
 const getColumnStyles = (reportType, isEmployee = false) => {
   // (No changes to this function, keep it as is.)
@@ -512,8 +526,9 @@ const ReportGenerator = ({ isCollapsed }) => {
           return;
         }
 
-        startStr = `${date} 00:00:00`;
-        endStr = `${date} 23:59:59`;
+        // Fix: Use 'date' instead of 'fromDate' and 'toDate' for daily reports
+        startStr = convertToUTC(date, true);
+        endStr = convertToUTC(date, false);
 
         reportDetails = {
           type: 'Daily',
@@ -529,17 +544,25 @@ const ReportGenerator = ({ isCollapsed }) => {
           setLoading(false);
           return;
         }
+
         const [year, month] = monthYear.split('-').map(Number);
         if (isNaN(year) || isNaN(month) || month < 1 || month > 12) {
           setError('Invalid month and year selected.');
           setLoading(false);
           return;
         }
+
         const lastDay = getLastDayOfMonth(year, month);
 
-        const paddedMonth = month.toString().padStart(2, '0');
-        startStr = `${year}-${paddedMonth}-01 00:00:00`;
-        endStr = `${year}-${paddedMonth}-${lastDay} 23:59:59`;
+        // CRITICAL FIX: Use convertToUTC function for consistency
+        const firstDayOfMonth = `${year}-${month.toString().padStart(2, '0')}-01`;
+        const lastDayOfMonth = `${year}-${month.toString().padStart(2, '0')}-${lastDay.toString().padStart(2, '0')}`;
+
+        startStr = convertToUTC(firstDayOfMonth, true);
+        endStr = convertToUTC(lastDayOfMonth, false);
+
+        console.log("QUERY DATE RANGE:", startStr, "to", endStr);
+        console.log("Month details:", { year, month, lastDay, firstDayOfMonth, lastDayOfMonth });
 
         reportDetails = {
           type: 'Monthly',
@@ -569,9 +592,8 @@ const ReportGenerator = ({ isCollapsed }) => {
           return;
         }
 
-        startStr = `${fromDate} 00:00:00`;
-        endStr = `${toDate} 23:59:59`;
-
+        startStr = convertToUTC(fromDate, true);
+        endStr = convertToUTC(toDate, false);
         reportDetails = {
           type: 'Date Range',
           fromDate: formatDateDDMMYYYY(fromDate),
@@ -865,32 +887,92 @@ const ReportGenerator = ({ isCollapsed }) => {
 
 
         case 'consolidated': {
+          // Debug branch filtering
+          console.log("Branch filtering:", { isCombined, branchesToReport });
+          const fetchAllRecords = async (tableName, selectFields, filters) => {
+            let allData = [];
+            let from = 0;
+            const batchSize = 1000;
+            let hasMoreData = true;
+
+            while (hasMoreData) {
+              let query = supabase
+                .from(tableName)
+                .select(selectFields)
+                .range(from, from + batchSize - 1)
+                .order('created_at', { ascending: false }); // Add ordering for consistent pagination
+
+              // Apply date filters
+              if (filters.startStr && filters.endStr) {
+                query = query.gte('created_at', filters.startStr).lte('created_at', filters.endStr);
+              }
+
+              // Apply branch filters
+              if (filters.branches && filters.branches.length > 0) {
+                query = query.in('branch', filters.branches);
+              }
+
+              const { data, error } = await query;
+              if (error) throw error;
+
+              if (data && data.length > 0) {
+                allData = [...allData, ...data];
+                from += batchSize;
+                hasMoreData = data.length === batchSize; // If we got less than batchSize, we're done
+                console.log(`Fetched batch of ${data.length} records from ${tableName}, total so far: ${allData.length}`);
+              } else {
+                hasMoreData = false;
+              }
+            }
+
+            return allData;
+          };
+
+
           // Fetch sales and work data first
-          const salesQuery = supabase
+          let salesQuery = supabase
             .from('sales_orders')
             .select('sales_order_id, work_order_id, mr_number, subtotal, total_amount, created_at, updated_at, branch, customer_id, discount, advance_details')
             .gte('created_at', startStr)
-            .lte('created_at', endStr);
+            .lte('created_at', endStr)
+            .limit(5000);
 
-          if (!isCombined) {
-            salesQuery.in('branch', branchesToReport);
+          if (!isCombined && branchesToReport.length > 0) {
+            salesQuery = salesQuery.in('branch', branchesToReport);
           }
 
-          const { data: salesData, error: salesError } = await salesQuery;
-          if (salesError) throw salesError;
+          const salesData = await fetchAllRecords(
+            'sales_orders',
+            'sales_order_id, work_order_id, mr_number, subtotal, total_amount, created_at, updated_at, branch, customer_id, discount, advance_details',
+            {
+              startStr,
+              endStr,
+              branches: !isCombined && branchesToReport.length > 0 ? branchesToReport : null
+            }
+          );
+          console.log(`Fetched total ${salesData.length} sales records`);
 
-          const workQuery = supabase
+          let workQuery = supabase
             .from('work_orders')
             .select('work_order_id, advance_details, mr_number, created_at, updated_at, branch, customer_id, total_amount, discount_amount, is_used')
             .gte('created_at', startStr)
-            .lte('created_at', endStr);
+            .lte('created_at', endStr)
+            .limit(5000);
 
-          if (!isCombined) {
-            workQuery.in('branch', branchesToReport);
+          if (!isCombined && branchesToReport.length > 0) {
+            workQuery = workQuery.in('branch', branchesToReport);
           }
 
-          const { data: workData, error: workError } = await workQuery;
-          if (workError) throw workError;
+          const workData = await fetchAllRecords(
+            'work_orders',
+            'work_order_id, advance_details, mr_number, created_at, updated_at, branch, customer_id, total_amount, discount_amount, is_used',
+            {
+              startStr,
+              endStr,
+              branches: !isCombined && branchesToReport.length > 0 ? branchesToReport : null
+            }
+          );
+          console.log(`Fetched total ${workData.length} work order records`);
 
           // Extract unique MR numbers from sales and work orders
           const mrNumbers = new Set();
@@ -904,39 +986,57 @@ const ReportGenerator = ({ isCollapsed }) => {
           const mrNumbersArray = Array.from(mrNumbers);
           console.log(`Found ${mrNumbersArray.length} unique MR numbers to look up`);
 
-          // Only fetch patients that match these MR numbers
-          const { data: patientsData, error: patientsError } = await supabase
-            .from('patients')
-            .select('mr_number, name')
-            .in('mr_number', mrNumbersArray);
+          // NEW CODE: Split into batches of 1000 to overcome Supabase limits
+          const patientMap = {};
+          const batchSize = 1000;
+          let allPatientsData = [];
 
-          if (patientsError) throw patientsError;
-          console.log(`Fetched ${patientsData?.length || 0} matching patient records`);
+          // Process in batches
+          for (let i = 0; i < mrNumbersArray.length; i += batchSize) {
+            const batch = mrNumbersArray.slice(i, i + batchSize);
+
+            const { data: batchPatientsData, error: batchError } = await supabase
+              .from('patients')
+              .select('mr_number, name')
+              .in('mr_number', batch);
+
+            if (batchError) {
+              console.error("Error fetching patient batch:", batchError);
+              continue;
+            }
+
+            allPatientsData = [...allPatientsData, ...batchPatientsData];
+            console.log(`Fetched batch of ${batchPatientsData.length} patient records`);
+          }
+
+          console.log(`Fetched total of ${allPatientsData.length} matching patient records`);
 
           // Create patient map using fetched data
-          const patientMap = {};
-          patientsData.forEach(patient => {
+          allPatientsData.forEach(patient => {
             if (patient.mr_number) {
               patientMap[String(patient.mr_number)] = patient.name;
             }
           });
 
-          // Filter work orders to include only those that have NOT been converted (is_used = false)
+          // CRITICAL FIX: Filter work orders to include only those that have NOT been converted (is_used = false)
           const unconvertedWorkOrders = workData.filter(work => work.is_used === false);
 
-          // Only include sales orders that have corresponding work orders with is_used = true
-          // This ensures we don't double count and only show completed transactions
+          // CRITICAL FIX: Match sales orders to work orders using BOTH work_order_id AND branch
           const validSalesOrders = salesData.filter(sale => {
-            if (!sale.work_order_id) return true; // General sales orders (no work order)
+            // Include sales orders with no work_order_id or with work_order_id = "GENERAL"
+            if (!sale.work_order_id || sale.work_order_id === "GENERAL") return true;
 
-            // Find the corresponding work order
+            // Find the corresponding work order using BOTH work_order_id AND branch
             const correspondingWorkOrder = workData.find(work =>
-              work.work_order_id === sale.work_order_id
+              work.work_order_id === sale.work_order_id && work.branch === sale.branch
             );
 
-            // Only include if work order is marked as used (converted)
+            // Only include if work order is marked as used (converted) AND from same branch
             return correspondingWorkOrder && correspondingWorkOrder.is_used === true;
           });
+
+          console.log(`Valid sales orders after branch-aware filtering: ${validSalesOrders.length}`);
+          console.log(`Unconverted work orders: ${unconvertedWorkOrders.length}`);
 
           // Identify OPD sales for summary
           const opdSales = validSalesOrders.filter(sale =>
