@@ -642,32 +642,71 @@ const ReportGenerator = ({ isCollapsed }) => {
           break;
         }
         // In the case 'compiled_report' section of handleGenerateReport
+        // ...existing code...
+
         case 'compiled_report': {
           console.log("Fetching sales data with params:", { startStr, endStr });
 
-          // Use a more comprehensive query to fetch all necessary data
-          const compiledQuery = supabase
-            .from('sales_orders')
-            .select('*')
-            .gte('created_at', startStr)
-            .lte('created_at', endStr);
+          // Function to fetch all records with pagination (same as consolidated)
+          const fetchAllRecords = async (tableName, selectFields, filters) => {
+            let allData = [];
+            let from = 0;
+            const batchSize = 1000;
+            let hasMoreData = true;
 
-          // Apply branch filter if not combined
-          if (!isCombined && branchesToReport.length > 0) {
-            compiledQuery.in('branch', branchesToReport);
-          }
+            while (hasMoreData) {
+              let query = supabase
+                .from(tableName)
+                .select(selectFields)
+                .range(from, from + batchSize - 1)
+                .order('created_at', { ascending: false }); // Add ordering for consistent pagination
 
-          const { data: compiledData, error: compiledError } = await compiledQuery;
-          if (compiledError) throw compiledError;
+              // Apply date filters
+              if (filters.startStr && filters.endStr) {
+                query = query.gte('created_at', filters.startStr).lte('created_at', filters.endStr);
+              }
+
+              // Apply branch filters
+              if (filters.branches && filters.branches.length > 0) {
+                query = query.in('branch', filters.branches);
+              }
+
+              const { data, error } = await query;
+              if (error) throw error;
+
+              if (data && data.length > 0) {
+                allData = [...allData, ...data];
+                from += batchSize;
+                hasMoreData = data.length === batchSize; // If we got less than batchSize, we're done
+                console.log(`Fetched batch of ${data.length} records from ${tableName}, total so far: ${allData.length}`);
+              } else {
+                hasMoreData = false;
+              }
+            }
+
+            return allData;
+          };
+
+          // Fetch sales data with pagination
+          const compiledData = await fetchAllRecords(
+            'sales_orders',
+            '*',
+            {
+              startStr,
+              endStr,
+              branches: !isCombined && branchesToReport.length > 0 ? branchesToReport : null
+            }
+          );
 
           fetchedData = compiledData;
 
           console.log("Fetched sales data:", fetchedData);
           console.log("Number of records:", fetchedData?.length);
 
-          // fetchedData = salesData;
           break;
         }
+
+
 
 
 
@@ -1645,7 +1684,7 @@ const ReportGenerator = ({ isCollapsed }) => {
         );
 
         const counsellingSales = data.filter(sale =>
-          sale.work_order_id?.startsWith('CR-')
+          sale.work_order_id?.startsWith('CR-') || sale.sales_order_id?.startsWith('CRS-')
         );
 
         const consultationSales = data.filter(sale =>
