@@ -397,13 +397,19 @@ const Consulting = memo(({ isCollapsed, onModificationSuccess }) => {
             "Dr. Rajalekshmi",
             "Dr. Anupama Sreevalsan",
             "Dr. Devendra Maheswari",
-            "Dr. Renjith Nathan"
+            "Dr. Renjith Nathan",
+            "Dr. Krishna",
+            "Dr. Rekha",
+            "Dr. Soumya",
         ];
 
         // Additional consultants for Trivandrum branch
         const trivandrumConsultants = [
-            "Dr. Sandton"
+            "Dr. Sandton",
+            "Dr. Mahadevan",
         ];
+
+
 
         // Set appropriate consultant list based on branch
         if ((branch === "KOT2") || (branch === "KOT1")) {

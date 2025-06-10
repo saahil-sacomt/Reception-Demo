@@ -202,12 +202,16 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
       "Dr. Rajalekshmi",
       "Dr. Anupama Sreevalsan",
       "Dr. Devendra Maheswari",
-      "Dr. Renjith Nathan"
+      "Dr. Renjith Nathan",
+        "Dr. Krishna",
+      "Dr. Rekha",
+      "Dr. Soumya",
     ];
 
     // Additional consultants for Trivandrum branch
     const trivandrumConsultants = [
-      "Dr. Sandton"
+      "Dr. Sandton",
+      "Dr. Mahadevan",
     ];
 
     // Set appropriate consultant list based on branch
@@ -2094,8 +2098,8 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                       });
                     }}
                     className={`px-4 py-2 rounded-lg ${workOrderForm.isInsurance
-                        ? "bg-green-600 text-white"
-                        : "bg-green-100 text-green-600"
+                      ? "bg-green-600 text-white"
+                      : "bg-green-100 text-green-600"
                       }`}
                   >
                     Yes
@@ -2110,8 +2114,8 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                       });
                     }}
                     className={`px-4 py-2 rounded-lg ${workOrderForm.isInsurance === false
-                        ? "bg-red-600 text-white"
-                        : "bg-red-100 text-red-600"
+                      ? "bg-red-600 text-white"
+                      : "bg-red-100 text-red-600"
                       }`}
                   >
                     No
