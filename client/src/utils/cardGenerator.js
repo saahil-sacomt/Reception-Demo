@@ -2,7 +2,7 @@
 import JsBarcode from 'jsbarcode';
 import { createCanvas, loadImage } from 'canvas';
 import cardTemplate from '../assets/Sreenetra Final Proposal-2_page-0001.jpg';
-import logo from '../assets/SreenethraLogoWhite.png';
+import logo from '../assets/SACOMTLogoWhite.png';
 
 // Generate barcode as a high-resolution image
 async function generateBarcode(pcNumber) {

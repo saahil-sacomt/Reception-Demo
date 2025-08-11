@@ -4,7 +4,7 @@ import supabase from '../supabaseClient';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { formatDateDDMMYYYY } from '../utils/dateUtils'; // Ensure formatDateDDMMYYYY is properly exported
-import logo from '../assets/sreenethraenglishisolated.png';
+import logo from '../assets/SACOMTLogoWhite.png';
 import { useAuth } from '../context/AuthContext';
 import { CheckCircleIcon, ExclamationCircleIcon } from "@heroicons/react/24/outline";
 import { CSVLink } from 'react-csv';
@@ -1985,7 +1985,7 @@ const ReportGenerator = ({ isCollapsed }) => {
     //     cellWidth: 'wrap',
     //   }, // Smaller font, linebreak for overflow
     //   headStyles: {
-    //     fillColor: [0, 160, 0], // Green header
+    //     fillColor: [0, 160, 0], // blue header
     //     halign: 'center',
     //     textColor: 255,
     //     fontSize: 9,
@@ -2310,7 +2310,7 @@ const ReportGenerator = ({ isCollapsed }) => {
           </div>
         )}
         {success && (
-          <div className="flex items-center mb-6 p-4 rounded-lg bg-green-100 text-green-700">
+          <div className="flex items-center mb-6 p-4 rounded-lg bg-blue-100 text-blue-700">
             <CheckCircleIcon className="w-6 h-6 mr-2" />
             <span>{success}</span>
           </div>
@@ -2328,7 +2328,7 @@ const ReportGenerator = ({ isCollapsed }) => {
                 value={reportType}
                 onChange={(e) => setReportType(e.target.value)}
                 onKeyDown={(e) => handleKeyDown(e, reportPeriodRef)}
-                className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
+                className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 aria-label="Select Report Type"
               >
                 {reportTypes.map((type) => (
@@ -2362,7 +2362,7 @@ const ReportGenerator = ({ isCollapsed }) => {
                         : fromDateRef
                   )
                 }
-                className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
+                className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 aria-label="Select Report Period"
               >
                 <option value="daily">Daily</option>
@@ -2383,9 +2383,9 @@ const ReportGenerator = ({ isCollapsed }) => {
                   onClick={() => toggleReportScope('branch')}
                   onKeyDown={(e) => handleKeyDown(e, isCombined ? generateButtonRef : branchSelectionRef)}
                   className={`px-4 py-2 rounded-md border ${!isCombined
-                    ? 'bg-green-500 text-white border-green-500'
+                    ? 'bg-blue-500 text-white border-blue-500'
                     : 'bg-white text-gray-700 border-gray-300'
-                    } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500`}
+                    } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500`}
                   aria-label="Select Branch-wise Report Scope"
                 >
                   Branch-wise
@@ -2395,9 +2395,9 @@ const ReportGenerator = ({ isCollapsed }) => {
                   onClick={() => toggleReportScope('combined')}
                   onKeyDown={(e) => handleKeyDown(e, generateButtonRef)}
                   className={`px-4 py-2 rounded-md border ${isCombined
-                    ? 'bg-green-500 text-white border-green-500'
+                    ? 'bg-blue-500 text-white border-blue-500'
                     : 'bg-white text-gray-700 border-gray-300'
-                    } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500`}
+                    } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500`}
                   aria-label="Select Combined Report Scope"
                 >
                   Combined (All Branches)
@@ -2419,9 +2419,9 @@ const ReportGenerator = ({ isCollapsed }) => {
                     onClick={() => toggleBranch(branch.code)}
                     onKeyDown={(e) => handleKeyDown(e, e.target.nextSibling || generateButtonRef)}
                     className={`px-4 py-2 rounded-md border ${selectedBranches.includes(branch.code)
-                      ? 'bg-green-500 text-white border-green-500'
+                      ? 'bg-blue-500 text-white border-blue-500'
                       : 'bg-white text-gray-700 border-gray-300'
-                      } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500`}
+                      } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500`}
                     aria-label={`Toggle branch ${branch.name}`}
                   >
                     {branch.name}
@@ -2443,7 +2443,7 @@ const ReportGenerator = ({ isCollapsed }) => {
                 id="purchaseFromFilter"
                 value={selectedPurchaseFrom}
                 onChange={(e) => setSelectedPurchaseFrom(e.target.value)}
-                className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
+                className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
               >
                 {purchaseFromOptions.map((option, idx) => (
                   <option key={idx} value={option}>{option}</option>
@@ -2465,7 +2465,7 @@ const ReportGenerator = ({ isCollapsed }) => {
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
                 onKeyDown={(e) => handleKeyDown(e, isEmployee ? generateButtonRef : isCombined ? generateButtonRef : branchSelectionRef)}
-                className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
+                className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 required
                 aria-required="true"
               />
@@ -2482,7 +2482,7 @@ const ReportGenerator = ({ isCollapsed }) => {
                 value={monthYear}
                 onChange={(e) => setMonthYear(e.target.value)}
                 onKeyDown={(e) => handleKeyDown(e, isEmployee ? generateButtonRef : isCombined ? generateButtonRef : branchSelectionRef)}
-                className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
+                className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 required
                 aria-required="true"
               />
@@ -2500,7 +2500,7 @@ const ReportGenerator = ({ isCollapsed }) => {
                   ref={fromDateRef}
                   onChange={(e) => setFromDate(e.target.value)}
                   onKeyDown={(e) => handleKeyDown(e, toDateRef)}
-                  className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
+                  className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                   required
                   aria-required="true"
                 />
@@ -2514,7 +2514,7 @@ const ReportGenerator = ({ isCollapsed }) => {
                   ref={toDateRef}
                   onChange={(e) => setToDate(e.target.value)}
                   onKeyDown={(e) => handleKeyDown(e, generateButtonRef)}
-                  className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
+                  className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                   required
                   aria-required="true"
                 />
@@ -2532,7 +2532,7 @@ const ReportGenerator = ({ isCollapsed }) => {
                   handleGenerateReport();
                 }
               }}
-              className={`w-full sm:w-1/2 px-4 py-2 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-md flex items-center justify-center transition ${loading || (!isCombined && !isEmployee && selectedBranches.length === 0) ? 'opacity-50 cursor-not-allowed' : ''
+              className={`w-full sm:w-1/2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-md flex items-center justify-center transition ${loading || (!isCombined && !isEmployee && selectedBranches.length === 0) ? 'opacity-50 cursor-not-allowed' : ''
                 }`}
               disabled={loading || (!isCombined && !isEmployee && selectedBranches.length === 0)}
               aria-label="Generate Report"

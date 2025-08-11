@@ -1,7 +1,7 @@
 // client/src/components/SplashScreen.jsx
 import { useEffect } from 'react';
-import topLogo from '../assets/sreenethraenglishisolated.png';
-import bottomLogo from '../assets/Retrato Black PNG.png';
+import topLogo from '../assets/SACOMTLogoWhite.png';
+// import bottomLogo from '../assets/SACOMTLogoWhite.png';
 
 const SplashScreen = ({ onAnimationEnd }) => {
     useEffect(() => {
@@ -17,8 +17,8 @@ const SplashScreen = ({ onAnimationEnd }) => {
             <div className="flex flex-col items-center space-y-8 animate-disintegrate">
             <div className="flex items-center space-x-10">
                 <img src={topLogo} alt="Top Logo" className="h-24 w-auto" />
-                <div className="text-6xl font-bold text-gray-500">X</div>
-                <img src={bottomLogo} alt="Bottom Logo" className="h-24 w-auto" />
+                {/* <div className="text-6xl font-bold text-gray-500">X</div>
+                <img src={bottomLogo} alt="Bottom Logo" className="h-24 w-auto" /> */}
             </div>
             </div>
         </div>

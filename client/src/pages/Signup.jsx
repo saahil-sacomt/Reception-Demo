@@ -5,7 +5,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { signUp } from '../services/authService';
 import Input from '../components/Input';
 import Button from '../components/Button';
-import companyLogo from '../assets/sreenethraenglishisolated.png'; // Ensure the logo path is correct
+import companyLogo from '../assets/SACOMTLogoWhite.png'; // Ensure the logo path is correct
 
 const Signup = () => {
   const [name, setName] = useState('');
@@ -170,7 +170,7 @@ const Signup = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-white p-20">
-      <div className="max-w-3xl w-full bg-green-50 shadow-lg rounded-xl p-8">
+      <div className="max-w-3xl w-full bg-blue-50 shadow-lg rounded-xl p-8">
         {/* Company Logo */}
         <div className="flex justify-center mb-6">
           <img
@@ -218,12 +218,12 @@ const Signup = () => {
 
         {/* Success Message */}
         {isSuccess ? (
-          <div className="rounded-xl bg-green-50 p-6 mb-6">
+          <div className="rounded-xl bg-blue-50 p-6 mb-6">
             <div className="flex">
               <div className="flex-shrink-0">
                 {/* Success Icon */}
                 <svg
-                  className="h-6 w-6 text-green-400"
+                  className="h-6 w-6 text-blue-400"
                   xmlns="http://www.w3.org/2000/svg"
                   fill="none"
                   viewBox="0 0 24 24"
@@ -239,8 +239,8 @@ const Signup = () => {
                 </svg>
               </div>
               <div className="ml-3">
-                <h3 className="text-lg leading-6 font-medium text-green-800">Signup Successful!</h3>
-                <div className="mt-2 text-sm text-green-700">
+                <h3 className="text-lg leading-6 font-medium text-blue-800">Signup Successful!</h3>
+                <div className="mt-2 text-sm text-blue-700">
                   <p>The new user has been created successfully.</p>
                 </div>
                 <div className="mt-4 flex space-x-4">

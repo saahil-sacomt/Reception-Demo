@@ -2,8 +2,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signIn } from '../services/authService';
-import topLogo from '../assets/sreenethraenglishisolated.png';
-import bottomLogo from '../assets/Retrato Black PNG.png';
+import topLogo from '../assets/SACOMTLogoWhite.png';
+import bottomLogo from '../assets/SACOMTLogoWhite.png';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -33,7 +33,7 @@ const Login = () => {
   return (
     <div className="flex flex-col md:flex-row h-screen bg-gray-50 md:bg-white">
       {/* Left Section with Logo and Message */}
-      <div className="hidden md:flex w-1/2 bg-cover bg-center relative items-center justify-center bg-green-50">
+      <div className="hidden md:flex w-1/2 bg-cover bg-center relative items-center justify-center bg-blue-50">
         
         <div className="text-center text-gray-800">
         <img src={topLogo} alt="Top Logo" className="h-24" />
@@ -84,7 +84,7 @@ const Login = () => {
 
             <button
               type="submit"
-              className="w-full bg-green-500 hover:bg-green-600 text-white py-2 px-4 rounded-lg transition duration-150"
+              className="w-full bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg transition duration-150"
             >
               Sign in
             </button>

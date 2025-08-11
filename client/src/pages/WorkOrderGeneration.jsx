@@ -18,7 +18,7 @@ import supabase from "../supabaseClient";
 import { useAuth } from "../context/AuthContext";
 import EmployeeVerification from "../components/EmployeeVerification";
 import { useNavigate, useParams } from "react-router-dom";
-import logo from "../assets/sreenethraenglishisolated.png";
+import logo from "../assets/SACOMTLogoWhite.png";
 import { useGlobalState } from "../context/GlobalStateContext";
 
 const today = new Date();
@@ -1655,7 +1655,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
         {Array.from({ length: 3 }, (_, i) => (
           <div
             key={i}
-            className={`flex-1 h-2 rounded-xl mx-1 ${step > i + 1 ? "bg-[#5db76d]" : "bg-gray-300"
+            className={`flex-1 h-2 rounded-xl mx-1 ${step > i + 1 ? "bg-[#0000ff]" : "bg-gray-300"
               } transition-all duration-300`}
           />
         ))}
@@ -1891,8 +1891,8 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                 }}
                 ref={yesButtonRef}
                 className={`px-4 py-2 rounded-lg focus:outline-none ${hasMrNumber === true
-                  ? "bg-green-600 text-white"
-                  : "bg-green-100 text-green-600 hover:bg-green-300"
+                  ? "bg-blue-600 text-white"
+                  : "bg-blue-100 text-blue-600 hover:bg-blue-300"
                   }`}
                 aria-pressed={hasMrNumber === true}
                 aria-label="Select Yes for MR Number"
@@ -1968,7 +1968,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                     handleMRNumberSearch();
                   }}
                   ref={fetchButtonRef}
-                  className="mt-2 text-white px-4 py-2 rounded-lg bg-green-500 hover:bg-green-600 transition"
+                  className="mt-2 text-white px-4 py-2 rounded-lg bg-blue-500 hover:bg-blue-600 transition"
                   aria-label="Fetch customer details based on MR Number"
                 >
                   Fetch Customer Details
@@ -2048,7 +2048,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
               }
               ref={employeeRef}
               onBlur={validateEmployeeSelection}
-              className={`border border-gray-300 w-full px-4 py-3 rounded-lg focus:outline-none focus:border-green-500 ${validationErrors.employee ? "border-red-500" : ""
+              className={`border border-gray-300 w-full px-4 py-3 rounded-lg focus:outline-none focus:border-blue-500 ${validationErrors.employee ? "border-red-500" : ""
                 }`}
               aria-label="Select Employee"
             >
@@ -2098,8 +2098,8 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                       });
                     }}
                     className={`px-4 py-2 rounded-lg ${workOrderForm.isInsurance
-                      ? "bg-green-600 text-white"
-                      : "bg-green-100 text-green-600"
+                      ? "bg-blue-600 text-white"
+                      : "bg-blue-100 text-blue-600"
                       }`}
                   >
                     Yes
@@ -2155,7 +2155,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
                         payload: { isB2B: true }
                       });
                     }}
-                    className={`px-4 py-2 rounded-lg ${isB2B ? "bg-green-600 text-white" : "bg-green-100 text-green-600"
+                    className={`px-4 py-2 rounded-lg ${isB2B ? "bg-blue-600 text-white" : "bg-blue-100 text-blue-600"
                       }`}
                   >
                     Yes
@@ -2596,7 +2596,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
           {step > 1 && (
             <button
               onClick={prevStep}
-              className="bg-green-500 hover:bg-green-600 text-white mx-2 px-4 py-2 rounded-lg"
+              className="bg-blue-500 hover:bg-blue-600 text-white mx-2 px-4 py-2 rounded-lg"
               aria-label="Previous Step"
             >
               Previous
@@ -2606,7 +2606,7 @@ const WorkOrderGeneration = ({ isCollapsed }) => {
             <button
               ref={nextButtonRef}
               onClick={nextStep}
-              className="bg-green-500 hover:bg-green-600 text-white mx-2 px-4 py-2 rounded-lg"
+              className="bg-blue-500 hover:bg-blue-600 text-white mx-2 px-4 py-2 rounded-lg"
               disabled={step === 4 && !isPinVerified}
               aria-label="Next Step"
             >
