@@ -860,7 +860,7 @@ if (productIds.length > 0) {
           <div className="bg-white p-6 flex flex-col md:flex-row justify-between items-center">
             {/* Welcome Message */}
             <div className="mb-4 md:mb-0">
-              <h2 className="font-normal text-[25px] text-green-500">
+              <h2 className="font-normal text-[25px] text-blue-500">
                 {getWelcomeMessage()}
               </h2>
               <p className="text-sm text-gray-600">
@@ -869,13 +869,13 @@ if (productIds.length > 0) {
             </div>
 
             {/* Metrics Section */}
-            <div className="bg-green-50 rounded-lg shadow flex overflow-hidden">
+            <div className="bg-blue-50 rounded-lg shadow flex overflow-hidden">
               {/* Action Required */}
               <div
                 className="flex flex-col px-8 py-2 transition-colors duration-300 hover:bg-gray-200 cursor-pointer"
                 onClick={role === 'admin' ? () => navigate('/admin/action-required') : handleEmployeeActionClick}
               >
-                <p className="text-3xl font-semibold text-green-500">{pendingRequestsCount}</p>
+                <p className="text-3xl font-semibold text-blue-500">{pendingRequestsCount}</p>
                 <p className="text-xs text-gray-600 py-2">Action Required</p>
               </div>
 
@@ -884,7 +884,7 @@ if (productIds.length > 0) {
                 className="flex flex-col px-8 py-2 transition-colors duration-300 hover:bg-gray-200 cursor-pointer"
                 onClick={openWorkOrdersModal}
               >
-                <p className="text-3xl font-semibold text-green-500">{state.pendingWorkOrdersCount}</p>
+                <p className="text-3xl font-semibold text-blue-500">{state.pendingWorkOrdersCount}</p>
                 <p className="text-xs text-gray-600 py-2">Pending Work Orders</p>
               </div>
 
@@ -893,13 +893,13 @@ if (productIds.length > 0) {
                 className="flex flex-col px-8 py-2 transition-colors duration-300 hover:bg-gray-200 cursor-pointer"
                 onClick={openSalesModal}
               >
-                <p className="text-3xl font-semibold text-green-500">{state.salesTodayCount}</p>
+                <p className="text-3xl font-semibold text-blue-500">{state.salesTodayCount}</p>
                 <p className="text-xs text-gray-600 py-2">Sales Today</p>
               </div>
 
               {/* Failed */}
               <div className="flex flex-col px-8 py-2 transition-colors duration-300 hover:bg-gray-200 cursor-pointer">
-                <p className="text-3xl font-semibold text-green-500">0</p>
+                <p className="text-3xl font-semibold text-blue-500">0</p>
                 <p className="text-xs text-gray-600 py-2">Failed</p> {/* Dummy count */}
               </div>
             </div>
@@ -907,20 +907,20 @@ if (productIds.length > 0) {
 
           {role === 'huihui' && (
             <div className="flex justify-center mb-6 mx-6">
-              <div className="flex flex-col items-center bg-green-50 py-8 px-6 rounded-lg shadow h-full max-w-sm w-full">
+              <div className="flex flex-col items-center bg-blue-50 py-8 px-6 rounded-lg shadow h-full max-w-sm w-full">
                 <img
                   src={walletImage}
                   alt="Wallet Icon"
                   className="w-48 h-auto p-6 shadow-xl rounded-full bg-white"
                 />
                 <div className="text-left space-y-2 ml-6 w-full">
-                  <h3 className="text-2xl text-green-500">Generate a New Privilege Card</h3>
+                  <h3 className="text-2xl text-blue-500">Generate a New Privilege Card</h3>
                   <p className="text-sm text-gray-600 pb-4">
                     Click the button below to generate new Privilege cards.
                   </p>
                   <button
                     onClick={handlePrivilegeCardClick}
-                    className="flex flex-row bg-green-500 items-center justify-center hover:bg-green-600 text-white px-5 py-2 rounded-lg transition"
+                    className="flex flex-row bg-blue-500 items-center justify-center hover:bg-blue-600 text-white px-5 py-2 rounded-lg transition"
                   >
                     <CreditCardIcon className="w-5 h-5 mr-1" /> Privilege Card
                   </button>
@@ -934,10 +934,10 @@ if (productIds.length > 0) {
             {/* Work Order Generation - OPD / Counselling */}
             {(role === 'opd' || role === 'counselling') && (
               <div
-                className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 h-full"
+                className="flex flex-col items-center bg-blue-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 h-full"
                 onClick={() => navigate('/work-order')}
               >
-                <WrenchScrewdriverIcon className='h-36 w-36 text-green-500' />
+                <WrenchScrewdriverIcon className='h-36 w-36 text-blue-500' />
                 <h2 className="text-xl text-gray-800 mt-4">Work Order Generation</h2>
               </div>
             )}
@@ -945,10 +945,10 @@ if (productIds.length > 0) {
             {/* Sales Order Generation - Reception */}
             {role === 'reception' && (
               <div
-                className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 h-full"
+                className="flex flex-col items-center bg-blue-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 h-full"
                 onClick={() => navigate('/sales-order')}
               >
-                <TicketIcon className='h-36 w-36 text-green-500' />
+                <TicketIcon className='h-36 w-36 text-blue-500' />
                 <h2 className="text-xl text-gray-800 mt-4">Sales Order Generation</h2>
               </div>
             )}
@@ -956,10 +956,10 @@ if (productIds.length > 0) {
             {/* Consulting - Reception */}
             {role === 'reception' && (
               <div
-                className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 h-full"
+                className="flex flex-col items-center bg-blue-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 h-full"
                 onClick={() => navigate('/consulting')}
               >
-                <ClipboardDocumentCheckIcon className='h-36 w-36 text-green-500' />
+                <ClipboardDocumentCheckIcon className='h-36 w-36 text-blue-500' />
                 <h2 className="text-xl text-gray-800 mt-4">Consulting</h2>
               </div>
             )}
@@ -967,10 +967,10 @@ if (productIds.length > 0) {
             {/* Patient Registration - Reception */}
             {role === 'reception' && (
               <div
-                className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 h-full"
+                className="flex flex-col items-center bg-blue-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 h-full"
                 onClick={() => navigate('/patient-registration')}
               >
-                <UserPlusIcon className='h-36 w-36 text-green-500' />
+                <UserPlusIcon className='h-36 w-36 text-blue-500' />
                 <h2 className="text-xl text-gray-800 mt-4">Patient Registration</h2>
               </div>
             )}
@@ -978,10 +978,10 @@ if (productIds.length > 0) {
             {/* Stock Management - visible for all except employee */}
             {role === 'employee' && (
               <div
-                className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 h-full"
+                className="flex flex-col items-center bg-blue-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 h-full"
                 onClick={() => navigate('/stock-manage')}
               >
-                <CircleStackIcon className='h-36 w-36 text-green-500' />
+                <CircleStackIcon className='h-36 w-36 text-blue-500' />
                 <h2 className="text-xl text-gray-800 mt-4">Stock Management</h2>
               </div>
             )}
@@ -990,29 +990,29 @@ if (productIds.length > 0) {
               <div className="flex flex-col lg:flex-row lg:space-x-6 mt-10 lg:mt-0 w-full px-6">
                 {/* Special Work Order Container */}
                 <div
-                  className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 w-full"
+                  className="flex flex-col items-center bg-blue-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 w-full"
                   onClick={() => navigate('/special-work-order')}
                 >
-                  <WrenchScrewdriverIcon className='h-36 w-36 text-green-500' />
+                  <WrenchScrewdriverIcon className='h-36 w-36 text-blue-500' />
                   <h2 className="text-xl text-gray-800 mt-4">Sales Order</h2>
                   <p className="text-sm text-gray-600 mt-2 text-center">Generate Sales orders</p>
                 </div>
 
                 {/* Special Stock Management Container */}
                 <div
-                  className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 w-full mt-6 lg:mt-0"
+                  className="flex flex-col items-center bg-blue-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 w-full mt-6 lg:mt-0"
                   onClick={() => navigate('/special-stock-management')}
                 >
-                  <ArchiveBoxArrowDownIcon className='h-36 w-36 text-green-500' />
+                  <ArchiveBoxArrowDownIcon className='h-36 w-36 text-blue-500' />
                   <h2 className="text-xl text-gray-800 mt-4">Special Stock Management</h2>
                   <p className="text-sm text-gray-600 mt-2 text-center">Manage products inventory</p>
                 </div>
 
                 <div
-                  className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 w-full mt-6 lg:mt-0"
+                  className="flex flex-col items-center bg-blue-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 w-full mt-6 lg:mt-0"
                   onClick={() => navigate('/pending-sales-order')}
                 >
-                  <ClockIcon className='h-36 w-36 text-green-500' />
+                  <ClockIcon className='h-36 w-36 text-blue-500' />
                   <h2 className="text-xl text-gray-800 mt-4">Pending sales orders</h2>
                   {/* <p className="text-sm text-gray-600 mt-2 text-center">Manage products inventory</p> */}
                 </div>
@@ -1025,20 +1025,20 @@ if (productIds.length > 0) {
 
             {/* Reports - visible to everyone */}
             {role !== 'echs' && role !== 'cghs' && (<div
-              className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 h-full"
+              className="flex flex-col items-center bg-blue-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 h-full"
               onClick={() => navigate('/reportgenerator')}
             >
-              <ClipboardDocumentIcon className='h-36 w-36 text-green-500' />
+              <ClipboardDocumentIcon className='h-36 w-36 text-blue-500' />
               <h2 className="text-xl text-gray-800 mt-4">Reports</h2>
             </div>)}
 
             {/* Super Admin - Add New User */}
             {role === 'super_admin' && (
               <div
-                className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 h-full text-center"
+                className="flex flex-col items-center bg-blue-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 h-full text-center"
                 onClick={() => navigate('/signup')}
               >
-                <ClipboardDocumentIcon className='h-36 w-36 text-green-500 rounded-lg' />
+                <ClipboardDocumentIcon className='h-36 w-36 text-blue-500 rounded-lg' />
                 <h2 className="text-xl text-gray-800 mt-4">Add New User</h2>
               </div>
             )}
@@ -1046,10 +1046,10 @@ if (productIds.length > 0) {
             {/* Purchase Stock - all except counselling */}
             {role !== 'counselling' && role !== 'insurance' && role !== 'echs' && role !== 'cghs' && (
               <div
-                className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 h-full"
+                className="flex flex-col items-center bg-blue-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 h-full"
                 onClick={() => navigate('/employee-stock-management')}
               >
-                <ArchiveBoxArrowDownIcon className='h-36 w-36 text-green-500' />
+                <ArchiveBoxArrowDownIcon className='h-36 w-36 text-blue-500' />
                 <h2 className="text-xl text-gray-800 mt-4">Purchase Stock</h2>
               </div>
             )}
@@ -1057,10 +1057,10 @@ if (productIds.length > 0) {
             {/* Insurance Claims Card */}
             {(role === 'insurance') && (
               <div
-                className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 h-full"
+                className="flex flex-col items-center bg-blue-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 h-full"
                 onClick={() => navigate('/insuranceCreation')}
               >
-                <ShieldCheckIcon className='h-36 w-36 text-green-500' />
+                <ShieldCheckIcon className='h-36 w-36 text-blue-500' />
                 <h2 className="text-xl text-gray-800 mt-4">Insurance Claims</h2>
               </div>
             )}
@@ -1068,10 +1068,10 @@ if (productIds.length > 0) {
             {/* Credit and Debit Notes - not OPD/counselling */}
             {(role !== 'opd' && role !== 'counselling' && role !== 'insurance' && role !== 'echs' && role !== 'cghs') && (
               <div
-                className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 h-full"
+                className="flex flex-col items-center bg-blue-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 h-full"
                 onClick={() => navigate('/notes')}
               >
-                <BanknotesIcon className='h-36 w-36 text-green-500' />
+                <BanknotesIcon className='h-36 w-36 text-blue-500' />
                 <h2 className="text-xl text-gray-800 mt-4">Credit and Debit Notes</h2>
               </div>
             )}
@@ -1079,10 +1079,10 @@ if (productIds.length > 0) {
             {/* Counselling - Add Service */}
             {role === 'counselling' && (
               <div
-                className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 h-full"
+                className="flex flex-col items-center bg-blue-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 h-full"
                 onClick={() => navigate('/add-service')}
               >
-                <ArchiveBoxArrowDownIcon className='h-36 w-36 text-green-500' />
+                <ArchiveBoxArrowDownIcon className='h-36 w-36 text-blue-500' />
                 <h2 className="text-xl text-gray-800 mt-4">Add Service</h2>
               </div>
             )}
@@ -1093,28 +1093,28 @@ if (productIds.length > 0) {
               <>
                 {/* Reports */}
                 <div
-                  className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 h-full"
+                  className="flex flex-col items-center bg-blue-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 h-full"
                   onClick={() => navigate('/reportgenerator')}
                 >
-                  <ClipboardDocumentIcon className='h-36 w-36 text-green-500' />
+                  <ClipboardDocumentIcon className='h-36 w-36 text-blue-500' />
                   <h2 className="text-xl text-gray-800 mt-4">Reports</h2>
                 </div>
 
                 {/* Purchase Section */}
                 <div
-                  className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 h-full"
+                  className="flex flex-col items-center bg-blue-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 h-full"
                   onClick={() => navigate('/employee-stock-management')}
                 >
-                  <ArchiveBoxArrowDownIcon className='h-36 w-36 text-green-500' />
+                  <ArchiveBoxArrowDownIcon className='h-36 w-36 text-blue-500' />
                   <h2 className="text-xl text-gray-800 mt-4">Purchase Section</h2>
                 </div>
 
                 {/* Credit and Debit Notes */}
                 <div
-                  className="flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 h-full"
+                  className="flex flex-col items-center bg-blue-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition duration-200 h-full"
                   onClick={() => navigate('/notes')}
                 >
-                  <BanknotesIcon className='h-36 w-36 text-green-500' />
+                  <BanknotesIcon className='h-36 w-36 text-blue-500' />
                   <h2 className="text-xl text-gray-800 mt-4">Credit and Debit Notes</h2>
                 </div>
               </>
@@ -1157,7 +1157,7 @@ if (productIds.length > 0) {
 
                   <button
                     onClick={handleWorkOrderSearch}
-                    className="bg-green-500 text-white px-4 py-2 rounded-r-lg hover:bg-green-600 flex items-center"
+                    className="bg-blue-500 text-white px-4 py-2 rounded-r-lg hover:bg-blue-600 flex items-center"
                   >
                     <MagnifyingGlassIcon className="h-5 w-5 mr-1" />
                     Search
@@ -1187,7 +1187,7 @@ if (productIds.length > 0) {
                         <div className="flex justify-between items-center">
                           {/* **Modified: Header with Order ID on Left and Date on Right** */}
                           <div className="flex flex-col">
-                            <h3 className="text-lg font-semibold text-green-500">{order.work_order_id}</h3>
+                            <h3 className="text-lg font-semibold text-blue-500">{order.work_order_id}</h3>
                             <p className="text-sm text-gray-500">Date: {formatDate(order.created_at)}</p>
                           </div>
                           <button
@@ -1218,7 +1218,7 @@ if (productIds.length > 0) {
                               <div className="flex justify-between items-center">
                                 {/* **Modified: Header with Order ID on Left and Date on Right** */}
                                 <div className="flex flex-col">
-                                  <h3 className="text-lg font-semibold text-green-500">{order.work_order_id}</h3>
+                                  <h3 className="text-lg font-semibold text-blue-500">{order.work_order_id}</h3>
                                   <p className="text-sm text-gray-500">Date: {formatDate(order.created_at)}</p>
                                 </div>
                                 <button
@@ -1310,7 +1310,7 @@ if (productIds.length > 0) {
                     <div className=" mb-8">
                       <table className="min-w-full border-collapse text-sm">
                         <thead>
-                          <tr className="bg-green-100">
+                          <tr className="bg-blue-100">
                             <th className="px-4 py-2 border text-left">#</th>
                             {/* <th className="px-4 py-2 border text-left">Product ID</th> */}
                             <th className="px-4 py-2 border text-left">Service Name</th>
@@ -1445,7 +1445,7 @@ if (productIds.length > 0) {
 
                   <button
                     onClick={handleSalesOrderSearch}
-                    className="bg-green-500 text-white px-4 py-2 rounded-r-lg hover:bg-green-600 flex items-center"
+                    className="bg-blue-500 text-white px-4 py-2 rounded-r-lg hover:bg-blue-600 flex items-center"
                   >
                     <MagnifyingGlassIcon className="h-5 w-5 mr-1" />
                     Search
@@ -1475,7 +1475,7 @@ if (productIds.length > 0) {
                         <div className="flex justify-between items-center">
                           {/* **Modified: Header with Order ID on Left and Date on Right** */}
                           <div className="flex flex-col">
-                            <h3 className="text-lg font-semibold text-green-500">{order.sales_order_id}</h3>
+                            <h3 className="text-lg font-semibold text-blue-500">{order.sales_order_id}</h3>
                             <p className="text-sm text-gray-500">Date: {formatDate(order.created_at)}</p>
                           </div>
                           <button
@@ -1506,7 +1506,7 @@ if (productIds.length > 0) {
                               <div className="flex justify-between items-center">
                                 {/* **Modified: Header with Order ID on Left and Date on Right** */}
                                 <div className="flex flex-col">
-                                  <h3 className="text-lg font-semibold text-green-500">{order.sales_order_id}</h3>
+                                  <h3 className="text-lg font-semibold text-blue-500">{order.sales_order_id}</h3>
                                   <p className="text-sm text-gray-500">Date: {formatDate(order.created_at)}</p>
                                 </div>
                                 <button
@@ -1602,7 +1602,7 @@ if (productIds.length > 0) {
                     <div className="overflow-x-auto mb-8 text-sm">
                       <table className="min-w-full border-collapse">
                         <thead>
-                          <tr className="bg-green-100">
+                          <tr className="bg-blue-100">
                             <th className="px-4 py-2 border text-left">#</th>
                             {/* <th className="px-4 py-2 border text-left">Product ID</th> */}
                             <th className="px-4 py-2 border text-left">Service Name</th>
