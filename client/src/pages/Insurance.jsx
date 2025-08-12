@@ -325,7 +325,7 @@ const Insurance = ({ isCollapsed }) => {
         {Array.from({ length: 3 }, (_, i) => (
           <div
             key={i}
-            className={`flex-1 h-2 rounded-xl mx-1 ${currentStep > i + 1 ? "bg-[#5db76d]" : "bg-gray-300"
+            className={`flex-1 h-2 rounded-xl mx-1 ${currentStep > i + 1 ? "bg-[#0000ff]" : "bg-gray-300"
               } transition-all duration-300`}
           />
         ))}

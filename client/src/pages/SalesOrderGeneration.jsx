@@ -2300,7 +2300,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
         {Array.from({ length: 6 }, (_, i) => (
           <div
             key={i}
-            className={`flex-1 h-2 rounded-xl mx-1 ${step > i ? "bg-[#5db76d]" : "bg-gray-300"
+            className={`flex-1 h-2 rounded-xl mx-1 ${step > i ? "bg-[#0000ff]" : "bg-gray-300"
               } transition-all duration-300`}
           />
         ))}
