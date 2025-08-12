@@ -92,10 +92,10 @@ const Sidebar = ({ isCollapsed, toggleSidebar, selectedTab }) => {
                 isActive
                   ? `${
                       isCollapsed
-                        ? 'text-green-600'
-                        : 'bg-green-50 text-green-600 shadow transform scale-[1.05]'
+                        ? 'text-blue-600'
+                        : 'bg-blue-50 text-blue-600 shadow transform scale-[1.05]'
                     }`
-                  : 'hover:bg-green-50'
+                  : 'hover:bg-blue-50'
               }`
             }
           >

@@ -305,7 +305,7 @@ const InsuranceCheckout = memo(() => {
                             <button
                                 onClick={fetchPatientByMRNumber}
                                 disabled={isLoading}
-                                className={`w-full bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg 
+                                className={`w-full bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg 
                     ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 type="button"
                             >
@@ -434,8 +434,8 @@ const InsuranceCheckout = memo(() => {
                                         <div className="font-medium">Total Approved Amount:</div>
                                         <div className="text-right">₹{approvedAmount.toFixed(2)}</div>
 
-                                        <div className="font-medium text-green-600">Balance Payment:</div>
-                                        <div className="text-right text-green-600 font-bold">
+                                        <div className="font-medium text-blue-600">Balance Payment:</div>
+                                        <div className="text-right text-blue-600 font-bold">
                                             ₹{balanceAmount.toFixed(2)}
                                         </div>
                                     </div>
@@ -504,7 +504,7 @@ const InsuranceCheckout = memo(() => {
                                                     <span className="font-medium">Approved Amount:</span>
                                                     <span>₹{approvedAmount.toFixed(2)}</span>
                                                 </div>
-                                                <div className="flex justify-between font-bold text-green-600">
+                                                <div className="flex justify-between font-bold text-blue-600">
                                                     <span>Balance Payment:</span>
                                                     <span>₹{balanceAmount.toFixed(2)}</span>
                                                 </div>
@@ -519,7 +519,7 @@ const InsuranceCheckout = memo(() => {
                                 <button
                                     type="button"
                                     onClick={() => window.print()}
-                                    className="flex items-center bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-lg"
+                                    className="flex items-center bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-lg"
                                 >
                                     <PrinterIcon className="w-5 h-5 mr-2" />
                                     Print Bill
@@ -556,7 +556,7 @@ const InsuranceCheckout = memo(() => {
                             type="button"
                             ref={nextButtonRef}
                             onClick={nextStep}
-                            className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg"
+                            className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg"
                         >
                             Next
                         </button>

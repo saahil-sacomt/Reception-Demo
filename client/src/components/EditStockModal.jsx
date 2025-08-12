@@ -98,7 +98,7 @@ const EditStockModal = ({ isOpen, onClose, stockEntry, refreshStockData }) => {
           </div>
         )}
         {success && (
-          <div className="flex items-center text-green-500 mb-4 whitespace-pre-line">
+          <div className="flex items-center text-blue-500 mb-4 whitespace-pre-line">
             <svg
               className="w-5 h-5 mr-2"
               fill="none"
@@ -196,7 +196,7 @@ const EditStockModal = ({ isOpen, onClose, stockEntry, refreshStockData }) => {
               className={`px-4 py-2 text-white rounded flex items-center justify-center ${
                 isLoading
                   ? "bg-blue-500 cursor-not-allowed"
-                  : "bg-green-500 hover:bg-green-600"
+                  : "bg-blue-500 hover:bg-blue-600"
               }`}
               disabled={isLoading}
             >

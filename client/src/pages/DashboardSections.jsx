@@ -14,10 +14,10 @@ import {
 const DashboardSections = ({ role, navigate, walletImage, handlePrivilegeCardClick }) => {
   const renderCard = (Icon, title, onClick, additionalClasses = '') => (
     <div
-      className={`flex flex-col items-center bg-green-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition-shadow duration-200 ${additionalClasses}`}
+      className={`flex flex-col items-center bg-blue-50 shadow-lg rounded-lg p-6 cursor-pointer hover:shadow-xl transition-shadow duration-200 ${additionalClasses}`}
       onClick={onClick}
     >
-      <Icon className='h-36 w-36 text-green-500' />
+      <Icon className='h-36 w-36 text-blue-500' />
       <h2 className="mt-4 text-xl font-medium text-gray-800">{title}</h2>
     </div>
   );
@@ -26,18 +26,18 @@ const DashboardSections = ({ role, navigate, walletImage, handlePrivilegeCardCli
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mx-6 z-10">
       {/* Privilege Card Section */}
       {!['admin', 'super_admin'].includes(role) && (
-        <div className="flex flex-row items-center bg-green-50 rounded-lg shadow p-8">
+        <div className="flex flex-row items-center bg-blue-50 rounded-lg shadow p-8">
           <img
             src={walletImage}
             alt="Wallet Icon"
             className="w-48 h-auto p-6 bg-white rounded-full shadow-xl"
           />
           <div className="ml-6 space-y-2 text-left">
-            <h3 className="text-2xl font-semibold text-green-500">Generate a New Privilege Card</h3>
+            <h3 className="text-2xl font-semibold text-blue-500">Generate a New Privilege Card</h3>
             <p className="text-sm text-gray-600 pb-4">Click the button below to generate new Privilege cards.</p>
             <button
               onClick={handlePrivilegeCardClick}
-              className="flex items-center justify-center px-5 py-2 text-white bg-green-500 rounded-lg hover:bg-green-600 transition-colors"
+              className="flex items-center justify-center px-5 py-2 text-white bg-blue-500 rounded-lg hover:bg-blue-600 transition-colors"
             >
               <CreditCardIcon className="w-5 h-5 mr-1" /> Privilege Card
             </button>

@@ -2268,7 +2268,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
               <button
                 type="button" // Added type="button"
                 onClick={confirmWorkOrderSelection}
-                className="mr-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg"
+                className="mr-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg"
               >
                 Confirm
               </button>
@@ -2334,7 +2334,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                       updateSalesOrderForm({ fetchMethod: "work_order_id" })
                     }
                     className={`px-4 py-2 rounded-lg ${salesOrderForm.fetchMethod === "work_order_id"
-                      ? "bg-green-500 text-white"
+                      ? "bg-blue-500 text-white"
                       : "bg-gray-200"
                       }`}
                     onKeyDown={(e) => {
@@ -2355,7 +2355,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                     }
                     id="fetchMethod-mr_number"
                     className={`px-4 py-2 rounded-lg ${salesOrderForm.fetchMethod === "mr_number"
-                      ? "bg-green-500 text-white"
+                      ? "bg-blue-500 text-white"
                       : "bg-gray-200"
                       }`}
                     onKeyDown={(e) => {
@@ -2381,7 +2381,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                     }
                     id="fetchMethod-phone_number"
                     className={`px-4 py-2 rounded-lg ${salesOrderForm.fetchMethod === "phone_number"
-                      ? "bg-green-500 text-white"
+                      ? "bg-blue-500 text-white"
                       : "bg-gray-200"
                       }`}
                     onKeyDown={(e) => {
@@ -2451,7 +2451,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                 disabled={hasProceededWithoutWorkOrder}
                 className={`mt-2 ${hasProceededWithoutWorkOrder
                   ? "bg-gray-400 cursor-not-allowed"
-                  : "bg-green-500 hover:bg-green-600"
+                  : "bg-blue-500 hover:bg-blue-600"
                   } text-white px-4 py-2 rounded-lg transition`}
                 onKeyDown={(e) => {
                   if (e.key === "ArrowUp") {
@@ -2472,7 +2472,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                     {workOrders.map((workOrder, index) => (
                       <li
                         key={workOrder.id}
-                        className="bg-green-50 p-4 rounded-md shadow-md"
+                        className="bg-blue-50 p-4 rounded-md shadow-md"
                       >
                         <div className="flex justify-between items-center">
                           <div>
@@ -2494,7 +2494,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                             ref={index === 0 ? firstWorkOrderButtonRef : null}
                             onClick={() => handleSelectWorkOrder(workOrder)}
                             id={`workOrderButton-${index}`}
-                            className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition"
+                            className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition"
                             onKeyDown={(e) => {
                               if (e.key === "ArrowRight") {
                                 e.preventDefault();
@@ -2531,7 +2531,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                     type="button" // Added type="button"
                     onClick={handleProceedWithoutWorkOrder}
                     ref={proceedButtonRef}
-                    className="mt-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition"
+                    className="mt-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition"
                     onKeyDown={(e) => {
                       if (e.key === "ArrowUp") {
                         e.preventDefault();
@@ -2867,7 +2867,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                   id="hasMrNumber-yes"
                   onClick={() => updateSalesOrderForm({ hasMrNumber: "yes" })}
                   className={`px-4 py-2 rounded-lg ${hasMrNumber === "yes"
-                    ? "bg-green-500 text-white"
+                    ? "bg-blue-500 text-white"
                     : "bg-gray-200"
                     }`}
                   onKeyDown={(e) => {
@@ -2884,7 +2884,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                   id="hasMrNumber-no"
                   onClick={() => updateSalesOrderForm({ hasMrNumber: "no" })}
                   className={`px-4 py-2 rounded-lg ${hasMrNumber === "no"
-                    ? "bg-green-500 text-white"
+                    ? "bg-blue-500 text-white"
                     : "bg-gray-200"
                     }`}
                   onKeyDown={(e) => {
@@ -2928,7 +2928,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                       // No need to focus next button here as focus is managed in handleMRNumberSearch
                     }}
                     ref={fetchButtonRef}
-                    className="mt-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition"
+                    className="mt-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition"
                     onKeyDown={(e) => {
                       if (e.key === "ArrowUp") {
                         e.preventDefault();
@@ -3157,7 +3157,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                     }, 0);
                   }}
                   className={`px-4 py-2 rounded-lg ${state.salesOrderForm.privilegeCard
-                    ? "bg-green-500 text-white"
+                    ? "bg-blue-500 text-white"
                     : "bg-gray-200"
                     }`}
                   onKeyDown={(e) => {
@@ -3195,7 +3195,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                   }}
                   id="privilegeCard-no"
                   className={`px-4 py-2 rounded-lg ${!state.salesOrderForm.privilegeCard
-                    ? "bg-green-500 text-white"
+                    ? "bg-blue-500 text-white"
                     : "bg-gray-200"
                     }`}
                   onKeyDown={(e) => {
@@ -3224,7 +3224,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                         })
                       }
                       className={`px-4 py-2 rounded-lg ${state.salesOrderForm.redeemOption === "barcode"
-                        ? "bg-green-500 text-white"
+                        ? "bg-blue-500 text-white"
                         : "bg-gray-200"
                         }`}
                       onKeyDown={(e) => {
@@ -3253,7 +3253,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                         })
                       }
                       className={`px-4 py-2 rounded-lg ${state.salesOrderForm.redeemOption === "phone"
-                        ? "bg-green-500 text-white"
+                        ? "bg-blue-500 text-white"
                         : "bg-gray-200"
                         }`}
                       onKeyDown={(e) => {
@@ -3295,7 +3295,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                       <button
                         type="button"
                         onClick={handleFetchPrivilegeCardByNumber}
-                        className="bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg w-full"
+                        className="bg-blue-500 hover:bg-blue-600 text-white py-2 rounded-lg w-full"
                         onKeyDown={(e) => {
                           if (e.key === "ArrowLeft") {
                             e.preventDefault();
@@ -3357,7 +3357,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                         <button
                           type="button"
                           onClick={handleSendOtp}
-                          className="mt-4 bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg w-full"
+                          className="mt-4 bg-blue-500 hover:bg-blue-600 text-white py-2 rounded-lg w-full"
                           onKeyDown={(e) => {
                             if (e.key === "ArrowLeft") {
                               e.preventDefault();
@@ -3407,7 +3407,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                           <button
                             type="button"
                             onClick={handleVerifyOtp}
-                            className="bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg w-full"
+                            className="bg-blue-500 hover:bg-blue-600 text-white py-2 rounded-lg w-full"
                             onKeyDown={(e) => {
                               if (e.key === "Enter") {
                                 e.preventDefault();
@@ -3473,7 +3473,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                                 });
                               }}
                               className={`px-4 py-2 mb-2 rounded-lg ${state.salesOrderForm.redeemOption === "full"
-                                ? "bg-green-500 text-white"
+                                ? "bg-blue-500 text-white"
                                 : "bg-gray-200"
                                 }`}
                             >
@@ -3499,7 +3499,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                                 ); // Focus on custom amount input
                               }}
                               className={`px-4 py-2 mb-2 rounded-lg ${state.salesOrderForm.redeemOption === "custom"
-                                ? "bg-green-500 text-white"
+                                ? "bg-blue-500 text-white"
                                 : "bg-gray-200"
                                 }`}
                             >
@@ -3570,7 +3570,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                   {/* Prompt to create a new privilege card if not found */}
                   {state.salesOrderForm.isOtpVerified &&
                     !state.salesOrderForm.privilegeCardDetails && (
-                      <div className="mt-6 bg-green-50 p-4 rounded">
+                      <div className="mt-6 bg-blue-50 p-4 rounded">
                         <p className="text-center text-red-500">
                           No Privilege Card found for this{" "}
                           {state.salesOrderForm.redeemOption === "phone"
@@ -3580,7 +3580,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                         <button
                           type="button"
                           onClick={handleNewPrivilegeCard}
-                          className="mt-4 bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg w-full"
+                          className="mt-4 bg-blue-500 hover:bg-blue-600 text-white py-2 rounded-lg w-full"
                         >
                           Create New Privilege Card
                         </button>
@@ -3607,7 +3607,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                 }
                 ref={employeeRef}
                 onBlur={validateEmployeeSelection}
-                className="border border-gray-300 w-full px-4 py-3 rounded-lg focus:outline-none focus:border-green-500"
+                className="border border-gray-300 w-full px-4 py-3 rounded-lg focus:outline-none focus:border-blue-500"
               >
                 <option value="" disabled>
                   Select Employee
@@ -3938,7 +3938,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                     </div>
 
                     {step === 5 && salesOrderForm.showSuccessMessage && (
-                      <div className="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 mb-6 rounded">
+                      <div className="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4 mb-6 rounded">
                         <div className="flex items-center">
                           <svg className="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
@@ -4007,7 +4007,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
               <button
                 type="button" // Added type="button"
                 onClick={prevStep}
-                className="bg-green-500 hover:bg-green-600 text-white mx-2 px-4 py-2 rounded-lg"
+                className="bg-blue-500 hover:bg-blue-600 text-white mx-2 px-4 py-2 rounded-lg"
               >
                 Previous
               </button>
@@ -4017,7 +4017,7 @@ const SalesOrderGeneration = memo(({ isCollapsed, onModificationSuccess }) => {
                 type="button" // Added type="button"
                 ref={nextButtonRef}
                 onClick={nextStep}
-                className={`bg-green-500 hover:bg-green-600 text-white mx-2 px-4 py-2 rounded-lg ${step === 4 && !salesOrderForm.isPinVerified
+                className={`bg-blue-500 hover:bg-blue-600 text-white mx-2 px-4 py-2 rounded-lg ${step === 4 && !salesOrderForm.isPinVerified
                   ? "opacity-50 cursor-not-allowed"
                   : ""
                   }`}

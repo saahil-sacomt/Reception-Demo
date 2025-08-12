@@ -867,7 +867,7 @@ const SpecialEmployeeStockManagement = ({ isCollapsed }) => {
     return (
         <div
             className={`transition-all duration-300 ${isCollapsed ? "mx-20" : "mx-20 px-20"
-                } justify-center my-20 p-8 rounded-xl mx-auto max-w-4xl bg-green-50 shadow-inner`}
+                } justify-center my-20 p-8 rounded-xl mx-auto max-w-4xl bg-blue-50 shadow-inner`}
         >
             <ToastContainer
                 position="top-right"
@@ -890,7 +890,7 @@ const SpecialEmployeeStockManagement = ({ isCollapsed }) => {
                 <button
                     onClick={() => handleModeSelection("add")}
                     className={`mx-2 px-4 py-2 rounded ${mode === "add"
-                        ? "bg-green-500 text-white shadow-2xl"
+                        ? "bg-blue-500 text-white shadow-2xl"
                         : "bg-gray-200 text-gray-700 hover:bg-gray-300"
                         }`}
                 >
@@ -899,7 +899,7 @@ const SpecialEmployeeStockManagement = ({ isCollapsed }) => {
                 <button
                     onClick={() => handleModeSelection("update")}
                     className={`mx-2 px-4 py-2 rounded ${mode === "update"
-                        ? "bg-green-500 text-white shadow-2xl"
+                        ? "bg-blue-500 text-white shadow-2xl"
                         : "bg-gray-200 text-gray-700 hover:bg-gray-300"
                         }`}
                 >
@@ -1258,7 +1258,7 @@ const SpecialEmployeeStockManagement = ({ isCollapsed }) => {
                         type="submit"
                         className={`mt-4 w-full p-2 text-white rounded ${isLoading
                             ? "bg-blue-500 cursor-not-allowed"
-                            : "bg-green-500 hover:bg-green-600"
+                            : "bg-blue-500 hover:bg-blue-600"
                             }`}
                         disabled={isLoading}
                     >
@@ -1639,7 +1639,7 @@ const SpecialEmployeeStockManagement = ({ isCollapsed }) => {
                         type="submit"
                         className={`mt-4 w-full p-2 text-white rounded ${isLoading
                             ? "bg-blue-500 cursor-not-allowed"
-                            : "bg-green-500 hover:bg-green-600"
+                            : "bg-blue-500 hover:bg-blue-600"
                             }`}
                         disabled={isLoading}
                     >
@@ -1969,7 +1969,7 @@ const SpecialEmployeeStockManagement = ({ isCollapsed }) => {
                             </button>
                             <button
                                 onClick={handleConfirmModal}
-                                className={`px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 ${!state.purchaseModal.content.isEmployeeVerified
+                                className={`px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 ${!state.purchaseModal.content.isEmployeeVerified
                                     ? "opacity-50 cursor-not-allowed"
                                     : ""
                                     }`}

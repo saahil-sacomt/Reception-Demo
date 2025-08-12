@@ -122,14 +122,14 @@ const EmployeeVerification = ({ employee, onVerify , component = 'notInsurance'}
         type="button"
         ref={verifyButtonRef}
         onClick={verifyPin}
-        className="bg-green-500 text-white px-4 py-2 rounded mb-2"
+        className="bg-blue-500 text-white px-4 py-2 rounded mb-2"
       >
         Verify
       </button>
 
       {/* Error and Success Messages */}
       {error && <p className="text-red-500">{error}</p>}
-      {successMessage && <p className="text-green-500">{successMessage}</p>}
+      {successMessage && <p className="text-blue-500">{successMessage}</p>}
     </div>
   );
 };

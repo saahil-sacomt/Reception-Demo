@@ -174,7 +174,7 @@ const EmployeeActionRequired = ({ isCollapsed }) => {
 
         {/* Notification */}
         {notification.message && (
-          <div className={`flex items-center mb-6 p-4 rounded-lg ${notification.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+          <div className={`flex items-center mb-6 p-4 rounded-lg ${notification.type === 'success' ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700'}`}>
             {notification.type === 'success' ? (
               <CheckIcon className="w-6 h-6 mr-2" />
             ) : (
@@ -194,17 +194,17 @@ const EmployeeActionRequired = ({ isCollapsed }) => {
             <div className="flex flex-col md:flex-row md:space-x-6 space-y-6 md:space-y-0">
               {/* Sales Orders Requests */}
               {salesRequests.length > 0 && (
-                <div className="flex-1 p-6 rounded-lg border border-green-500 bg-white transition">
+                <div className="flex-1 p-6 rounded-lg border border-blue-500 bg-white transition">
                   <h3 className="text-xl font-medium mb-2 text-gray-800">Sales Orders</h3>
                   {salesRequests.map(request => (
-                    <div key={request.request_id} className="flex justify-between items-start mb-4 p-4 rounded-lg bg-green-50 hover:shadow-lg">
+                    <div key={request.request_id} className="flex justify-between items-start mb-4 p-4 rounded-lg bg-blue-50 hover:shadow-lg">
                       <div>
                         <p className="font-medium text-gray-800">{request.request_id}</p>
                         <p className="text-sm text-gray-600">Order ID: {request.order_id}</p>
                         <p className="text-sm text-gray-600">Modification Type: {request.modification_type}</p>
                         <p className="text-sm text-gray-600">
                           Status: 
-                          <span className={`ml-1 font-semibold ${request.status === 'approved' ? 'text-green-600' : 'text-red-600'}`}>
+                          <span className={`ml-1 font-semibold ${request.status === 'approved' ? 'text-blue-600' : 'text-red-600'}`}>
                             {request.status}
                           </span>
                         </p>
@@ -216,7 +216,7 @@ const EmployeeActionRequired = ({ isCollapsed }) => {
                         {request.status === 'approved' ? (
                           <button
                             onClick={() => handleModifyOrder(request.order_id)}
-                            className="flex items-center px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                            className="flex items-center px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
                           >
                             Modify Order
                           </button>
@@ -240,17 +240,17 @@ const EmployeeActionRequired = ({ isCollapsed }) => {
 
               {/* Work Orders Requests */}
               {workRequests.length > 0 && (
-                <div className="flex-1 p-6 rounded-lg border border-green-500 bg-white transition">
+                <div className="flex-1 p-6 rounded-lg border border-blue-500 bg-white transition">
                   <h3 className="text-xl font-medium mb-2 text-gray-800">Work Orders</h3>
                   {workRequests.map(request => (
-                    <div key={request.request_id} className="flex justify-between items-start mb-4 p-4 rounded-lg bg-green-50 hover:shadow-lg">
+                    <div key={request.request_id} className="flex justify-between items-start mb-4 p-4 rounded-lg bg-blue-50 hover:shadow-lg">
                       <div>
                         <p className="font-medium text-gray-800">{request.request_id}</p>
                         <p className="text-sm text-gray-600">Order ID: {request.order_id}</p>
                         <p className="text-sm text-gray-600">Modification Type: {request.modification_type}</p>
                         <p className="text-sm text-gray-600">
                           Status: 
-                          <span className={`ml-1 font-semibold ${request.status === 'approved' ? 'text-green-600' : 'text-red-600'}`}>
+                          <span className={`ml-1 font-semibold ${request.status === 'approved' ? 'text-blue-600' : 'text-red-600'}`}>
                             {request.status}
                           </span>
                         </p>
@@ -262,7 +262,7 @@ const EmployeeActionRequired = ({ isCollapsed }) => {
                         {request.status === 'approved' ? (
                           <button
                             onClick={() => handleModifyOrder(request.order_id)}
-                            className="flex items-center px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                            className="flex items-center px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
                           >
                             Modify Order
                           </button>

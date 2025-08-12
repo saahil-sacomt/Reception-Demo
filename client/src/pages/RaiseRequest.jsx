@@ -172,7 +172,7 @@ const RaiseRequest = ({ isCollapsed }) => {
 
         {/* Notification */}
         {notification.message && (
-          <div className={`flex items-center mb-4 p-4 rounded-lg ${notification.type === 'success' ? 'bg-green-100 text-green-700' : notification.type === 'error' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>
+          <div className={`flex items-center mb-4 p-4 rounded-lg ${notification.type === 'success' ? 'bg-blue-100 text-blue-700' : notification.type === 'error' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>
             {notification.type === 'success' && <CheckCircleIcon className="w-6 h-6 mr-2" />}
             {notification.type === 'error' && <ExclamationCircleIcon className="w-6 h-6 mr-2" />}
             {notification.type === 'info' && <InformationCircleIcon className="w-6 h-6 mr-2" />}
@@ -187,16 +187,16 @@ const RaiseRequest = ({ isCollapsed }) => {
             <button
               onClick={() => setSelectedOrderType('work_order')}
               className={`flex-1 py-3 px-6 border rounded-md text-center ${
-                selectedOrderType === 'work_order' ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-700'
-              } hover:bg-green-600 hover:text-white transition`}
+                selectedOrderType === 'work_order' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'
+              } hover:bg-blue-600 hover:text-white transition`}
             >
               Work Order
             </button>
             <button
               onClick={() => setSelectedOrderType('sales_order')}
               className={`flex-1 py-3 px-6 border rounded-md text-center ${
-                selectedOrderType === 'sales_order' ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-700'
-              } hover:bg-green-600 hover:text-white transition`}
+                selectedOrderType === 'sales_order' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'
+              } hover:bg-blue-600 hover:text-white transition`}
             >
               Sales Order
             </button>
@@ -213,7 +213,7 @@ const RaiseRequest = ({ isCollapsed }) => {
                 <label className="inline-flex items-center">
                   <input
                     type="radio"
-                    className="form-radio h-5 w-5 text-green-600"
+                    className="form-radio h-5 w-5 text-blue-600"
                     name="searchModeSales"
                     value="all"
                     checked={searchModeSales === 'all'}
@@ -230,7 +230,7 @@ const RaiseRequest = ({ isCollapsed }) => {
                 <label className="inline-flex items-center">
                   <input
                     type="radio"
-                    className="form-radio h-5 w-5 text-green-600"
+                    className="form-radio h-5 w-5 text-blue-600"
                     name="searchModeSales"
                     value="id"
                     checked={searchModeSales === 'id'}
@@ -257,12 +257,12 @@ const RaiseRequest = ({ isCollapsed }) => {
                     placeholder="Enter Sales Order ID"
                     value={orderId}
                     onChange={(e) => setOrderId(e.target.value)}
-                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-3 focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-3 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                   />
                 </div>
                 <button
                   onClick={fetchOrders}
-                  className={`mt-4 sm:mt-0 w-full sm:w-auto inline-flex justify-center py-3 px-6 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition ${
+                  className={`mt-4 sm:mt-0 w-full sm:w-auto inline-flex justify-center py-3 px-6 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition ${
                     isLoading ? 'opacity-50 cursor-not-allowed' : ''
                   }`}
                   disabled={isLoading}
@@ -276,7 +276,7 @@ const RaiseRequest = ({ isCollapsed }) => {
               <div className="bg-white rounded-lg px-6 flex justify-center mb-4">
                 <button
                   onClick={fetchOrders}
-                  className={`w-full sm:w-auto inline-flex justify-center py-3 px-6 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition ${
+                  className={`w-full sm:w-auto inline-flex justify-center py-3 px-6 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition ${
                     isLoading ? 'opacity-50 cursor-not-allowed' : ''
                   }`}
                   disabled={isLoading}
@@ -297,7 +297,7 @@ const RaiseRequest = ({ isCollapsed }) => {
                 <label className="inline-flex items-center">
                   <input
                     type="radio"
-                    className="form-radio h-5 w-5 text-green-600"
+                    className="form-radio h-5 w-5 text-blue-600"
                     name="searchModeWork"
                     value="all"
                     checked={searchModeWork === 'all'}
@@ -314,7 +314,7 @@ const RaiseRequest = ({ isCollapsed }) => {
                 <label className="inline-flex items-center">
                   <input
                     type="radio"
-                    className="form-radio h-5 w-5 text-green-600"
+                    className="form-radio h-5 w-5 text-blue-600"
                     name="searchModeWork"
                     value="id"
                     checked={searchModeWork === 'id'}
@@ -341,12 +341,12 @@ const RaiseRequest = ({ isCollapsed }) => {
                     placeholder="Enter Work Order ID"
                     value={workOrderId}
                     onChange={(e) => setWorkOrderId(e.target.value)}
-                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-3 focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-3 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                   />
                 </div>
                 <button
                   onClick={fetchOrders}
-                  className={`mt-4 sm:mt-0 w-full sm:w-auto inline-flex justify-center py-3 px-6 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition ${
+                  className={`mt-4 sm:mt-0 w-full sm:w-auto inline-flex justify-center py-3 px-6 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition ${
                     isLoading ? 'opacity-50 cursor-not-allowed' : ''
                   }`}
                   disabled={isLoading}
@@ -360,7 +360,7 @@ const RaiseRequest = ({ isCollapsed }) => {
               <div className="bg-white rounded-lg px-6 flex justify-center mb-4">
                 <button
                   onClick={fetchOrders}
-                  className={`w-full sm:w-auto inline-flex justify-center py-3 px-6 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition ${
+                  className={`w-full sm:w-auto inline-flex justify-center py-3 px-6 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition ${
                     isLoading ? 'opacity-50 cursor-not-allowed' : ''
                   }`}
                   disabled={isLoading}
@@ -381,8 +381,8 @@ const RaiseRequest = ({ isCollapsed }) => {
                 <li
                   key={order.id}
                   onClick={() => openModal(order)}
-                  className={`cursor-pointer p-4 border rounded-lg shadow-sm hover:bg-green-50 transition duration-200 ${
-                    selectedOrder?.id === order.id ? 'border-green-500 bg-green-50' : 'border-gray-200'
+                  className={`cursor-pointer p-4 border rounded-lg shadow-sm hover:bg-blue-50 transition duration-200 ${
+                    selectedOrder?.id === order.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
                   }`}
                 >
                   <p className="font-medium text-gray-800">{selectedOrderType === 'sales_order' ? order.sales_order_id : order.work_order_id}</p>
@@ -469,7 +469,7 @@ const RaiseRequest = ({ isCollapsed }) => {
               id="modificationType"
               value={modificationType}
               onChange={(e) => setModificationType(e.target.value)}
-              className="mt-1 block w-full pl-3 pr-10 py-3 text-base border-gray-300 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm rounded-md"
+              className="mt-1 block w-full pl-3 pr-10 py-3 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
             >
               <option value="">Select Modification Type</option>
               {modificationTypes.map((type, idx) => (
@@ -487,7 +487,7 @@ const RaiseRequest = ({ isCollapsed }) => {
                 placeholder="Enter modification reason"
                 value={modificationReason}
                 onChange={(e) => setModificationReason(e.target.value)}
-                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-3 focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-3 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                 rows={4}
               />
             </div>

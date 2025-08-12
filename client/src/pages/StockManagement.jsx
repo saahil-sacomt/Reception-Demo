@@ -752,7 +752,7 @@ const StockManagement = ({ isCollapsed }) => {
     <div
       className={`transition-all duration-300 ${
         isCollapsed ? "mx-20" : "mx-20 px-20"
-      } justify-center my-20 p-8 rounded-xl mx-auto max-w-4xl bg-green-50 shadow-inner`}
+      } justify-center my-20 p-8 rounded-xl mx-auto max-w-4xl bg-blue-50 shadow-inner`}
     >
       <h1 className="text-2xl font-semibold mb-6 text-center">Stock Management</h1>
 
@@ -866,7 +866,7 @@ const StockManagement = ({ isCollapsed }) => {
         <button
           type="submit"
           className={`mt-4 w-full p-2 text-white rounded flex items-center justify-center ${
-            isLoadingRef.current ? "bg-blue-500 cursor-not-allowed" : "bg-green-500 hover:bg-green-600"
+            isLoadingRef.current ? "bg-blue-500 cursor-not-allowed" : "bg-blue-500 hover:bg-blue-600"
           }`}
           disabled={isLoadingRef.current}
         >
@@ -926,7 +926,7 @@ const StockManagement = ({ isCollapsed }) => {
               <button
                 type="button"
                 className={`px-4 py-2 rounded ${
-                  bulkUploadMode === "add" ? "bg-green-500 text-white shadow-xl" : "bg-gray-200 text-gray-700"
+                  bulkUploadMode === "add" ? "bg-blue-500 text-white shadow-xl" : "bg-gray-200 text-gray-700"
                 }`}
                 onClick={() => setBulkUploadMode("add")}
               >
@@ -935,7 +935,7 @@ const StockManagement = ({ isCollapsed }) => {
               <button
                 type="button"
                 className={`px-4 py-2 rounded ${
-                  bulkUploadMode === "rewrite" ? "bg-green-500 text-white shadow-xl" : "bg-gray-200 text-gray-700"
+                  bulkUploadMode === "rewrite" ? "bg-blue-500 text-white shadow-xl" : "bg-gray-200 text-gray-700"
                 }`}
                 onClick={() => setBulkUploadMode("rewrite")}
               >
@@ -961,7 +961,7 @@ const StockManagement = ({ isCollapsed }) => {
         <button
           type="submit"
           className={`mt-4 w-full p-2 text-white rounded flex items-center justify-center ${
-            isLoadingRef.current ? "bg-blue-500 cursor-not-allowed" : "bg-green-500 hover:bg-green-600"
+            isLoadingRef.current ? "bg-blue-500 cursor-not-allowed" : "bg-blue-500 hover:bg-blue-600"
           }`}
           disabled={isLoadingRef.current}
         >
@@ -1123,7 +1123,7 @@ const StockManagement = ({ isCollapsed }) => {
         <button
           type="submit"
           className={`mt-4 w-full p-2 text-white rounded flex items-center justify-center ${
-            isLoadingRef.current ? "bg-blue-500 cursor-not-allowed" : "bg-green-500 hover:bg-green-600"
+            isLoadingRef.current ? "bg-blue-500 cursor-not-allowed" : "bg-blue-500 hover:bg-blue-600"
           }`}
           disabled={isLoadingRef.current}
         >
@@ -1216,7 +1216,7 @@ const StockManagement = ({ isCollapsed }) => {
         <button
           type="submit"
           className={`mt-4 w-full p-2 text-white rounded flex items-center justify-center ${
-            isLoadingRef.current ? "bg-blue-500 cursor-not-allowed" : "bg-green-500 hover:bg-green-600"
+            isLoadingRef.current ? "bg-blue-500 cursor-not-allowed" : "bg-blue-500 hover:bg-blue-600"
           }`}
           disabled={isLoadingRef.current}
         >

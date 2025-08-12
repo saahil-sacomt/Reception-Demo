@@ -220,12 +220,12 @@ const PrivilegeGeneration = ({ isCollapsed }) => {
 
   return (
     <div className={`transition-all duration-300 ${isCollapsed ? "mx-20" : "mx-20 px-20"
-        } justify-center mt-20 p-20 rounded-xl mx-auto max-w-2xl bg-green-50 shadow-inner`}>
+        } justify-center mt-20 p-20 rounded-xl mx-auto max-w-2xl bg-blue-50 shadow-inner`}>
       <h2 className="text-2xl font-semibold text-center mb-4 ">Privilege Generation</h2>
 
       {isOtpVerified ? (
         <div>
-          <p className="text-green-600 font-bold text-center">OTP Verified Successfully!</p>
+          <p className="text-blue-600 font-bold text-center">OTP Verified Successfully!</p>
 
           {/* Customer Name Input */}
           <label className="block text-base font-medium text-gray-700 mb-1 mt-4">
@@ -275,7 +275,7 @@ const PrivilegeGeneration = ({ isCollapsed }) => {
             onClick={generateAndSaveCard}
             disabled={isLoading}
             className={`mt-4 w-full py-2 rounded-lg flex items-center justify-center transition ${
-              isLoading ? 'bg-yellow-400 cursor-not-allowed' : 'bg-green-500 hover:bg-green-600'
+              isLoading ? 'bg-yellow-400 cursor-not-allowed' : 'bg-blue-500 hover:bg-blue-600'
             } text-white`}
           >
             {isLoading ? (
@@ -321,7 +321,7 @@ const PrivilegeGeneration = ({ isCollapsed }) => {
               />
               <button
                 onClick={requestOtp}
-                className="mt-4 w-full bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg flex items-center justify-center"
+                className="mt-4 w-full bg-blue-500 hover:bg-blue-600 text-white py-2 rounded-lg flex items-center justify-center"
               >
                 Request OTP
               </button>
@@ -340,7 +340,7 @@ const PrivilegeGeneration = ({ isCollapsed }) => {
               />
               <button
                 onClick={verifyOtp}
-                className="mt-4 w-full bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg flex items-center justify-center"
+                className="mt-4 w-full bg-blue-500 hover:bg-blue-600 text-white py-2 rounded-lg flex items-center justify-center"
               >
                 Verify OTP
               </button>

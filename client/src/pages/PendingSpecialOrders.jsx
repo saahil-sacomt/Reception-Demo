@@ -162,7 +162,7 @@ const PendingSpecialOrders = ({ isCollapsed }) => {
                         <p className="text-gray-500 mb-4">No pending orders found</p>
                         <button
                             onClick={() => navigate('/special-work-order')}
-                            className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md"
+                            className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md"
                         >
                             Create New Order
                         </button>
@@ -212,7 +212,7 @@ const PendingSpecialOrders = ({ isCollapsed }) => {
                                                     <button
                                                         onClick={() => markOrderComplete(order.work_order_id)}
                                                         disabled={isMarkingComplete}
-                                                        className="bg-green-500 hover:bg-green-600 text-white px-3 py-1.5 rounded-md flex items-center"
+                                                        className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded-md flex items-center"
                                                     >
                                                         <CheckCircleIcon className="w-4 h-4 mr-1" />
                                                         Complete

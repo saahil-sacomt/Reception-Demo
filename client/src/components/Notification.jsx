@@ -10,7 +10,7 @@ const Notification = ({ type, message }) => {
     type === "error"
       ? "bg-red-100 text-red-700"
       : type === "success"
-      ? "bg-green-100 text-green-700"
+      ? "bg-blue-100 text-blue-700"
       : "bg-gray-100 text-gray-700";
 
   return (

@@ -279,7 +279,7 @@ const Notes = () => {
   return (
     <div className="max-w-3xl mx-auto p-6">
       <div
-        className={`transition-all duration-300 justify-center my-12 p-8 rounded-xl mx-auto bg-green-50`}
+        className={`transition-all duration-300 justify-center my-12 p-8 rounded-xl mx-auto bg-blue-50`}
       >
         <h1 className="text-3xl font-semibold mb-6 text-center">Manage Credit and Debit Notes</h1>
 
@@ -296,7 +296,7 @@ const Notes = () => {
               value={order_id}
               onChange={handleChange}
               placeholder="Enter Order ID"
-              className="w-full p-2 border rounded-md focus:ring-green-500 focus:border-green-500"
+              className="w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500"
               required
             />
           </div>
@@ -313,8 +313,8 @@ const Notes = () => {
                     type="button"
                     onClick={() => dispatch({ type: 'SET_NOTES_FORM', payload: { note_type: 'debit' } })}
                     className={`px-4 py-2 rounded-md border ${
-                      note_type === 'debit' ? 'bg-green-500 text-white shadow-xl' : 'bg-white text-gray-700'
-                    } focus:outline-none focus:ring-2 focus:ring-green-400`}
+                      note_type === 'debit' ? 'bg-blue-500 text-white shadow-xl' : 'bg-white text-gray-700'
+                    } focus:outline-none focus:ring-2 focus:ring-blue-400`}
                   >
                     Credit
                   </button>
@@ -323,8 +323,8 @@ const Notes = () => {
                     type="button"
                     onClick={() => dispatch({ type: 'SET_NOTES_FORM', payload: { note_type: 'credit' } })}
                     className={`px-4 py-2 rounded-md border ${
-                      note_type === 'credit' ? 'bg-green-500 text-white shadow-xl' : 'bg-white text-gray-700'
-                    } focus:outline-none focus:ring-2 focus:ring-green-400`}
+                      note_type === 'credit' ? 'bg-blue-500 text-white shadow-xl' : 'bg-white text-gray-700'
+                    } focus:outline-none focus:ring-2 focus:ring-blue-400`}
                   >
                     Debit
                   </button>
@@ -345,7 +345,7 @@ const Notes = () => {
                   onFocus={() => setShowProductSuggestions(true)}
                   onBlur={() => setTimeout(() => setShowProductSuggestions(false), 200)} // Delay to allow click
                   placeholder="Search by product name or ID"
-                  className="w-full p-2 border rounded-md focus:ring-green-500 focus:border-green-500"
+                  className="w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500"
                   required
                   ref={searchProductRef}
                 />
@@ -376,7 +376,7 @@ const Notes = () => {
                   name="branch_code"
                   value={branch_code}
                   onChange={handleChange}
-                  className="w-full p-2 border rounded-md focus:ring-green-500 focus:border-green-500"
+                  className="w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500"
                   required
                 >
                   <option value="" disabled>
@@ -405,7 +405,7 @@ const Notes = () => {
                   name="quantity"
                   value={quantity}
                   onChange={handleChange}
-                  className="w-full p-2 border rounded-md focus:ring-green-500 focus:border-green-500"
+                  className="w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500"
                   min="1"
                   required
                 />
@@ -422,7 +422,7 @@ const Notes = () => {
                   name="client_name"
                   value={client_name}
                   onChange={handleChange}
-                  className="w-full p-2 border rounded-md focus:ring-green-500 focus:border-green-500"
+                  className="w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500"
                   required
                 />
               </div>
@@ -438,7 +438,7 @@ const Notes = () => {
                   name="client_address"
                   value={client_address}
                   onChange={handleChange}
-                  className="w-full p-2 border rounded-md focus:ring-green-500 focus:border-green-500"
+                  className="w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500"
                   placeholder="Optional"
                 />
               </div>
@@ -452,7 +452,7 @@ const Notes = () => {
                   selected={new Date(date)}
                   onChange={(date) => dispatch({ type: 'SET_NOTES_FORM', payload: { date } })}
                   dateFormat="dd/MM/yyyy"
-                  className="w-full p-2 border rounded-md focus:ring-green-500 focus:border-green-500"
+                  className="w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500"
                   required
                 />
               </div>
@@ -469,7 +469,7 @@ const Notes = () => {
               name="reason"
               value={reason}
               onChange={handleChange}
-              className="w-full p-2 border rounded-md focus:ring-green-500 focus:border-green-500"
+              className="w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500"
               rows="3"
               placeholder="Optional"
             ></textarea>
@@ -479,7 +479,7 @@ const Notes = () => {
           <div>
             <button
               type="submit"
-              className={`w-full bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-400 flex items-center justify-center ${
+              className={`w-full bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400 flex items-center justify-center ${
                 state.isUploading ? 'opacity-50 cursor-not-allowed' : ''
               }`}
               disabled={state.isUploading}

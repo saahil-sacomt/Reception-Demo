@@ -83,7 +83,7 @@ const FetchLoyaltyPoints = ({ isCollapsed }) => {
               value={phoneNumber}
               onChange={(e) => setPhoneNumber(e.target.value)}
               placeholder="Enter your phone number"
-              className="w-full border border-gray-300 px-4 py-2 rounded-lg focus:outline-none focus:border-green-500"
+              className="w-full border border-gray-300 px-4 py-2 rounded-lg focus:outline-none focus:border-blue-500"
             />
           </div>
 
@@ -108,7 +108,7 @@ const FetchLoyaltyPoints = ({ isCollapsed }) => {
               value={pcNumber}
               onChange={(e) => setPcNumber(e.target.value)}
               placeholder="Enter your PC number"
-              className="w-full border border-gray-300 px-4 py-2 rounded-lg focus:outline-none focus:border-green-500"
+              className="w-full border border-gray-300 px-4 py-2 rounded-lg focus:outline-none focus:border-blue-500"
             />
           </div>
 
@@ -121,7 +121,7 @@ const FetchLoyaltyPoints = ({ isCollapsed }) => {
           <button
             type="submit"
             disabled={loading}
-            className={`w-full bg-green-500 text-white py-2 rounded-lg hover:bg-green-600 transition ${
+            className={`w-full bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600 transition ${
               loading ? "opacity-50 cursor-not-allowed" : ""
             }`}
           >
@@ -131,7 +131,7 @@ const FetchLoyaltyPoints = ({ isCollapsed }) => {
 
         {/* User Data Display */}
         {userData && (
-          <div className="mt-6 bg-green-50 p-4 rounded-lg shadow-inner">
+          <div className="mt-6 bg-blue-50 p-4 rounded-lg shadow-inner">
             <h3 className="text-xl font-semibold text-gray-700 mb-4 text-center">
               Privilege Card Details
             </h3>
